@@ -1,0 +1,48 @@
+/* ═══════ AUTOESPACE — GLOBAL UTILITIES ═══════ */
+
+/* Remove default root constraints */
+#root {
+  min-height: 100vh;
+}
+
+/* Smooth focus outlines for accessibility */
+:focus-visible {
+  outline: 2px solid #F59E0B;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Text selection styling — brand amber */
+::selection {
+  background: rgba(245, 158, 11, 0.3);
+  color: #F0F4F8;
+}
+
+::-moz-selection {
+  background: rgba(245, 158, 11, 0.3);
+  color: #F0F4F8;
+}
+
+/* Smooth transitions for all interactive elements */
+button, a, input, select, textarea {
+  transition: all 0.15s ease;
+}
+
+/* Better input styling */
+input:focus, select:focus, textarea:focus {
+  border-color: #3B5075 !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.08);
+}
+
+/* Table improvements */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Print styles for invoices */
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+}
