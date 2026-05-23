@@ -627,13 +627,13 @@ export function POSBillingPage({ products, activeShopId, shop, onMultiSale, toas
                     </div>
 
                     {/* Notes + Action */}
-                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                        <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes: warranty info, special instructions..."
+                    <div className="pos-action-row" style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <input className="pos-action-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes: warranty info, special instructions..."
                             style={{ flex: 1, padding: "10px 14px", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, color: T.t1, fontFamily: FONT.ui, fontSize: 13 }} />
                         <Btn variant="ghost" onClick={newBill}>Clear Bill</Btn>
                         <Btn variant="ghost" onClick={() => window.print()} style={{ marginRight: 0 }}>🖨 Print</Btn>
-                        <Btn variant={billType === "Sale" ? "amber" : "sky"} loading={saving} onClick={handleSubmit} style={{ padding: "12px 28px" }}>
-                            {billType === "Sale" ? "🧾 Record Sale & Generate Bill" : "📝 Save Quotation"}
+                        <Btn variant={billType === "Sale" ? "amber" : "sky"} loading={saving} onClick={handleSubmit} style={{ padding: "12px 28px", whiteSpace: "nowrap" }}>
+                            {billType === "Sale" ? "🧾 Record Sale" : "📝 Save Quotation"}
                         </Btn>
                     </div>
                 </>

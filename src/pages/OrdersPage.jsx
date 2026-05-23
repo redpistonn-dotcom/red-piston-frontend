@@ -177,9 +177,9 @@ export function OrdersPage() {
     const newOrderCount = statusCounts.NEW || 0;
 
     return (
-        <div style={{ padding: "24px 28px" }}>
+        <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Header */}
-            <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+            <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                 <div>
                     <h1 style={{ fontSize: 24, fontWeight: 900, color: T.t1, margin: 0 }}>📦 Marketplace Orders</h1>
                     <p style={{ fontSize: 14, color: T.t3, margin: "6px 0 0" }}>{marketplaceOrders.length} orders from online customers</p>
@@ -213,7 +213,7 @@ export function OrdersPage() {
             </div>
 
             {/* Tabs */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 24, overflowX: "auto" }}>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
                 {TABS.map(tab => {
                     const cnt = statusCounts[tab] || 0;
                     const isActive = activeTab === tab;

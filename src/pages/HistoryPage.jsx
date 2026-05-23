@@ -355,7 +355,7 @@ export function HistoryPage({ movements, activeShopId }) {
                 <div style={{ flex: 1, minWidth: 180 }}><Input value={search} onChange={setSearch} placeholder="Search product, invoice, customer…" icon="🔍" /></div>
 
                 {/* Date Range */}
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div className="history-date-range" style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: "6px 10px", color: T.t1, fontFamily: FONT.ui, fontSize: 12 }} />
                     <span style={{ color: T.t3, fontSize: 11 }}>to</span>
                     <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: "6px 10px", color: T.t1, fontFamily: FONT.ui, fontSize: 12 }} />

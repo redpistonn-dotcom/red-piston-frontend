@@ -45,57 +45,68 @@ function getErr(e, fallback = "Something went wrong. Please try again.") {
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 const css = `
   @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
-  .auth-card { animation: fadeUp 0.28s ease; }
-  .auth-input:focus { border-color: ${T.amber} !important; box-shadow: 0 0 0 3px ${T.amberGlow} !important; }
-  .admin-input:focus { border-color: #7C3AED !important; box-shadow: 0 0 0 3px rgba(124,58,237,0.22) !important; }
-  .otp-box:focus { border-color: ${T.amber} !important; box-shadow: 0 0 0 2px ${T.amberGlow}; }
-  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
-  .btn-google:hover { background: #1a2640 !important; border-color: ${T.borderHi} !important; }
-  .role-card:hover { border-color: ${T.amber}99 !important; background: ${T.amberSoft} !important; }
-  .role-card.selected { border-color: ${T.amber} !important; background: ${T.amberSoft} !important; box-shadow: 0 0 0 3px ${T.amberGlow}, 0 6px 20px rgba(0,0,0,0.25) !important; }
+  .auth-card { animation: fadeUp 0.28s cubic-bezier(0.16,1,0.3,1); }
+  .auth-input:focus { border-color: #FF1F3A !important; box-shadow: 0 0 0 2px rgba(255,31,58,0.15) !important; outline: none !important; }
+  .admin-input:focus { border-color: #7C3AED !important; box-shadow: 0 0 0 2px rgba(124,58,237,0.2) !important; }
+  .otp-box:focus { border-color: #FF1F3A !important; box-shadow: 0 0 0 2px rgba(255,31,58,0.15); outline: none !important; }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 0 24px rgba(255,31,58,0.35); }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-google:hover { background: #f0f0f0 !important; }
+  .role-card:hover { border-color: rgba(255,31,58,0.5) !important; background: rgba(255,31,58,0.06) !important; }
+  .role-card.selected { border-color: #FF1F3A !important; background: rgba(255,31,58,0.08) !important; box-shadow: 0 0 0 2px rgba(255,31,58,0.15) !important; }
   .tab-btn { transition: all 0.18s; }
-  .tab-btn.active { background: ${T.amber}18; color: ${T.amber} !important; border-bottom: 2px solid ${T.amber} !important; }
-  @media (max-width: 860px) {
-    .auth-split { flex-direction: column !important; }
-    .auth-left { width: 100% !important; min-width: 0 !important; border-right: none !important; border-bottom: 1px solid ${T.border}; padding: 24px 20px !important; }
-    .auth-right { padding: 28px 20px !important; }
+  .tab-btn.active { background: rgba(255,31,58,0.1) !important; color: #FF1F3A !important; border-bottom: 2px solid #FF1F3A !important; }
+  .stitch-tab-active { background: #33343c !important; color: #e3e1ec !important; border: 1px solid rgba(255,255,255,0.06) !important; }
+  .stitch-tab-inactive { background: transparent !important; color: #c9c6c5 !important; border: 1px solid transparent !important; }
+  .stitch-tab-inactive:hover { color: #e3e1ec !important; }
+  .btn-outline-stitch:hover { background: #292931 !important; }
+  /* Left panel: hide on small screens */
+  @media (max-width: 900px) {
+    .auth-hero-left { display: none !important; }
+    .auth-form-right { width: 100% !important; }
   }
   @media (max-width: 540px) {
-    /* Full-screen card on small phones */
-    .auth-page-wrap { padding: 0 !important; align-items: stretch !important; min-height: 100dvh !important; }
-    .auth-split-card { border-radius: 0 !important; min-height: 100dvh !important; box-shadow: none !important; border: none !important; }
-    .auth-left { display: none !important; }
-    .auth-right { padding: 32px 20px 40px !important; flex: 1 !important; }
+    .auth-form-right { padding: 32px 20px 40px !important; }
     .otp-box { width: 38px !important; height: 46px !important; font-size: 18px !important; }
   }
   @media (max-width: 380px) {
-    .auth-right { padding: 28px 16px 36px !important; }
-    .otp-box { width: 34px !important; height: 42px !important; gap: 6px !important; }
+    .auth-form-right { padding: 28px 16px 36px !important; }
+    .otp-box { width: 34px !important; height: 42px !important; }
   }
 `;
 
-// ─── Shared style tokens ──────────────────────────────────────────────────────
+// ─── Shared style tokens (Stitch Apex Performance palette) ───────────────────
 const S = {
-  label:  { fontSize: 12, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6, display: "block" },
-  input:  { width: "100%", background: T.surface, border: `1.5px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", color: T.t1, fontSize: 15, outline: "none", boxSizing: "border-box", fontFamily: FONT.ui, transition: "border 0.18s" },
-  phoneRow: { display: "flex", alignItems: "stretch", border: `1.5px solid ${T.border}`, borderRadius: 10, overflow: "hidden", background: T.surface },
-  phoneFlag: { padding: "12px 14px", background: "#0D1628", color: T.t2, fontSize: 13, fontWeight: 700, borderRight: `1.5px solid ${T.border}`, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", fontFamily: FONT.mono },
-  phoneInput: { flex: 1, background: "transparent", border: "none", outline: "none", color: T.t1, fontSize: 16, padding: "12px 14px", fontFamily: FONT.mono, letterSpacing: "1px" },
-  btnPrimary: (disabled) => ({ width: "100%", padding: "14px", background: disabled ? "#2a2a2a" : T.amber, color: disabled ? "#555" : "#000", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", fontFamily: FONT.ui, transition: "all 0.18s" }),
-  btnOutline: { width: "100%", padding: "13px", background: "transparent", border: `1.5px solid ${T.border}`, borderRadius: 10, color: T.t2, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.18s" },
-  btnGoogle: { width: "100%", padding: "13px", background: T.surface, border: `1.5px solid ${T.border}`, borderRadius: 10, color: T.t1, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontFamily: FONT.ui },
-  btnBack: { background: "none", border: "none", color: T.t3, cursor: "pointer", fontSize: 13, padding: "0 0 20px", display: "flex", alignItems: "center", gap: 5, fontFamily: FONT.ui },
+  label:  { fontSize: 11, fontWeight: 700, color: "#af8785", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6, display: "block", fontFamily: "'Inter', sans-serif" },
+  input:  { width: "100%", background: "#1a1b22", border: "1px solid #3F3F46", borderRadius: 8, padding: "12px 14px", color: "#e3e1ec", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: FONT.mono, transition: "border 0.18s, box-shadow 0.18s" },
+  phoneRow: { display: "flex", alignItems: "stretch", border: "1px solid #3F3F46", borderRadius: 8, overflow: "hidden", background: "#1a1b22" },
+  phoneFlag: { padding: "12px 14px", background: "#0d0e15", color: "#c9c6c5", fontSize: 13, fontWeight: 500, borderRight: "1px solid #3F3F46", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", fontFamily: FONT.mono },
+  phoneInput: { flex: 1, background: "transparent", border: "none", outline: "none", color: "#e3e1ec", fontSize: 15, padding: "12px 14px", fontFamily: FONT.mono, letterSpacing: "0.08em" },
+  btnPrimary: (disabled) => ({ width: "100%", padding: "14px", background: disabled ? "#3F3F46" : "#FF1F3A", color: disabled ? "#af8785" : "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.2s", boxShadow: disabled ? "none" : "0 0 20px rgba(255,31,58,0.2)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }),
+  btnOutline: { width: "100%", padding: "13px", background: "transparent", border: "1px solid #3F3F46", borderRadius: 8, color: "#c9c6c5", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
+  btnGoogle: { width: "100%", padding: "13px", background: "#fff", border: "none", borderRadius: 8, color: "#313030", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" },
+  btnBack: { background: "none", border: "none", color: "#af8785", cursor: "pointer", fontSize: 13, padding: "0 0 20px", display: "flex", alignItems: "center", gap: 5, fontFamily: "'Inter', sans-serif" },
   otpRow: { display: "flex", gap: 8, marginBottom: 20, justifyContent: "center" },
-  otpBox: { width: 44, height: 50, textAlign: "center", fontSize: 20, fontWeight: 700, fontFamily: FONT.mono, background: T.surface, border: `1.5px solid ${T.border}`, borderRadius: 10, color: T.t1, outline: "none" },
-  error: { background: "#1c0909", border: `1.5px solid ${T.crimson}`, borderRadius: 10, padding: "11px 14px", color: T.crimson, fontSize: 13, marginBottom: 16, lineHeight: 1.5 },
-  divider: { display: "flex", alignItems: "center", gap: 10, margin: "18px 0" },
-  dividerLine: { flex: 1, height: 1, background: T.border },
-  dividerText: { color: T.t4, fontSize: 12, fontWeight: 600 },
-  heading: { fontSize: 26, fontWeight: 800, color: T.t1, marginBottom: 6, letterSpacing: "-0.3px" },
-  sub: { fontSize: 14, color: T.t2, marginBottom: 28, lineHeight: 1.55 },
-  chip: { fontSize: 11, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: T.amber, marginBottom: 8 },
-  hint: { fontSize: 12, color: T.t4, lineHeight: 1.6, marginBottom: 18 },
+  otpBox: { width: 46, height: 54, textAlign: "center", fontSize: 22, fontWeight: 700, fontFamily: FONT.mono, background: "#1a1b22", border: "1px solid #3F3F46", borderRadius: 8, color: "#e3e1ec", outline: "none" },
+  error: { background: "#1c0909", border: "1px solid #EF4444", borderRadius: 8, padding: "11px 14px", color: "#EF4444", fontSize: 13, marginBottom: 16, lineHeight: 1.5 },
+  divider: { display: "flex", alignItems: "center", gap: 12, margin: "20px 0" },
+  dividerLine: { flex: 1, height: 1, background: "#3F3F46" },
+  dividerText: { color: "#af8785", fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: FONT.mono },
+  heading: { fontSize: 22, fontWeight: 600, color: "#e3e1ec", marginBottom: 6, letterSpacing: "-0.2px", fontFamily: "'Outfit', sans-serif" },
+  sub: { fontSize: 14, color: "#af8785", marginBottom: 24, lineHeight: 1.55 },
+  chip: { fontSize: 10, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#ffb3b0", marginBottom: 8, fontFamily: FONT.mono },
+  hint: { fontSize: 12, color: "#5e3f3d", lineHeight: 1.6, marginBottom: 16 },
 };
+
+// ─── Indian states for shop registration ─────────────────────────────────────
+const INDIA_STATES = [
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
+  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
+  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab",
+  "Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand",
+  "West Bengal","Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry",
+];
 
 // ─── Left branding panel content ─────────────────────────────────────────────
 const FEATURES = [
@@ -121,14 +132,15 @@ export default function LoginPage({ onLogin }) {
   const [resendTimer, setResendTimer]     = useState(0);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
-  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", city: "Hyderabad", contactPhone: "", gstin: "" });
-  const [profile, setProfile]     = useState({ name: "" });
+  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", gstin: "" });
+  const [profile, setProfile]     = useState({ name: "", profileType: "INDIVIDUAL" });
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingUser, setPendingUser]     = useState(null); // for profile step
   const [rejectionMsg, setRejectionMsg]   = useState("");
   const [forgotEmail, setForgotEmail]     = useState("");
   const [forgotMode, setForgotMode]       = useState(false);
   const [forgotSent, setForgotSent]       = useState(false);
+  const [landingTab, setLandingTab]       = useState("owner"); // "owner" | "customer"
 
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
@@ -287,6 +299,9 @@ export default function LoginPage({ onLogin }) {
     if (!shopDetails.ownerName.trim()) { setError("Enter your full name"); return; }
     if (!shopDetails.shopName.trim())  { setError("Enter your shop name"); return; }
     if (!shopDetails.city.trim())      { setError("Enter your city"); return; }
+    if (!shopDetails.state)            { setError("Select your state"); return; }
+    const pin = shopDetails.pincode.replace(/\D/g, "");
+    if (pin && pin.length !== 6)       { setError("Enter a valid 6-digit pincode"); return; }
     const ph = shopDetails.contactPhone.replace(/\D/g, "");
     if (ph.length !== 10) { setError("Enter a valid 10-digit contact number"); return; }
     setError(""); setLoading(true);
@@ -296,6 +311,8 @@ export default function LoginPage({ onLogin }) {
         ownerName:    shopDetails.ownerName.trim(),
         shopName:     shopDetails.shopName.trim(),
         city:         shopDetails.city.trim(),
+        state:        shopDetails.state,
+        pincode:      pin || undefined,
         contactPhone: ph,
         gstin:        shopDetails.gstin.trim() || undefined,
       });
@@ -309,7 +326,7 @@ export default function LoginPage({ onLogin }) {
     if (!profile.name.trim()) { setError("Enter your name"); return; }
     setError(""); setLoading(true);
     try {
-      const res = await api.patch("/api/auth/me", { name: profile.name.trim() });
+      const res = await api.patch("/api/auth/me", { name: profile.name.trim(), profileType: profile.profileType });
       const user = { ...pendingUser, name: (res?.data || res)?.name || profile.name.trim() };
       localStorage.setItem("as_user", JSON.stringify(user));
       onLogin(user);
@@ -366,37 +383,102 @@ export default function LoginPage({ onLogin }) {
     switch (step) {
 
       // ══════════════════════════════════════════════════════════════════════
-      // LANDING — the two clear entry points
+      // LANDING — Stitch design: tab switcher + phone OTP form
       // ══════════════════════════════════════════════════════════════════════
       case STEPS.LANDING:
         return (
           <div className="auth-card">
-            <div style={S.heading}>Welcome to AutoSpace</div>
-            <div style={S.sub}>India's smartest platform for auto parts shops &amp; buyers.</div>
+            {/* Heading */}
+            <div style={{ marginBottom: 28 }}>
+              <div style={S.heading}>System Access</div>
+              <div style={{ fontSize: 14, color: "#af8785", lineHeight: 1.5, marginTop: 4 }}>Initialize your session to manage operations.</div>
+            </div>
 
-            {/* Sign In */}
+            {/* Role tab switcher */}
+            <div style={{ background: "#1a1b22", borderRadius: 8, border: "1px solid #3F3F46", padding: 4, display: "flex", marginBottom: 28, gap: 4 }}>
+              <button
+                className={landingTab === "owner" ? "stitch-tab-active" : "stitch-tab-inactive"}
+                style={{ flex: 1, padding: "10px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.15s" }}
+                onClick={() => setLandingTab("owner")}
+              >SHOP OWNER / STAFF</button>
+              <button
+                className={landingTab === "customer" ? "stitch-tab-active" : "stitch-tab-inactive"}
+                style={{ flex: 1, padding: "10px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.15s" }}
+                onClick={() => setLandingTab("customer")}
+              >CUSTOMER</button>
+            </div>
+
+            {/* Phone input */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={S.label}>MOBILE NUMBER</label>
+              <div style={S.phoneRow}>
+                <div style={S.phoneFlag}>
+                  <span style={{ fontSize: 16 }}>🇮🇳</span>
+                  <span>+91</span>
+                </div>
+                <input
+                  className="auth-input"
+                  style={S.phoneInput}
+                  placeholder="Enter 10 digit number"
+                  value={phone}
+                  maxLength={10}
+                  inputMode="numeric"
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
+                  onKeyDown={e => e.key === "Enter" && phone.length === 10 && sendOtp(STEPS.SIGNIN_OTP)}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {error && <div style={{ ...S.error, marginBottom: 16 }}>{error}</div>}
+
+            {/* GET OTP button */}
             <button
               className="btn-primary"
-              style={{ ...S.btnPrimary(false), marginBottom: 12 }}
-              onClick={() => { setAuthTab("phone"); go(STEPS.SIGNIN); }}
+              style={{ ...S.btnPrimary(loading || phone.length !== 10), marginBottom: 20 }}
+              disabled={loading || phone.length !== 10}
+              onClick={() => sendOtp(STEPS.SIGNIN_OTP)}
             >
-              Sign In →
+              {loading ? "Sending…" : <><span>GET OTP</span><span style={{ fontSize: 16 }}>→</span></>}
             </button>
 
-            {/* Create Account */}
+            {/* OR divider */}
+            <div style={S.divider}>
+              <div style={S.dividerLine} />
+              <span style={S.dividerText}>OR</span>
+              <div style={S.dividerLine} />
+            </div>
+
+            {/* Login with password */}
             <button
-              style={{ ...S.btnOutline, marginBottom: 28 }}
-              onClick={() => go(STEPS.REG_ROLE)}
+              className="btn-outline-stitch"
+              style={{ ...S.btnOutline, marginBottom: landingTab === "customer" ? 12 : 0 }}
+              onClick={() => { setAuthTab("email"); go(STEPS.SIGNIN); }}
             >
-              Create Account
+              <span style={{ fontSize: 15 }}>🔑</span>
+              LOGIN WITH PASSWORD
             </button>
 
-            <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 20, textAlign: "center" }}>
+            {/* Google — customer tab only */}
+            {landingTab === "customer" && (
+              <button className="btn-google" style={S.btnGoogle} onClick={() => googleAuth("signin")}>
+                <svg width="18" height="18" viewBox="0 0 48 48">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                CONTINUE WITH GOOGLE
+              </button>
+            )}
+
+            {/* Admin access */}
+            <div style={{ textAlign: "center", marginTop: 28, paddingTop: 20, borderTop: "1px solid rgba(63,63,70,0.4)" }}>
               <button
-                style={{ background: "none", border: "none", color: T.t4, cursor: "pointer", fontSize: 12, fontFamily: FONT.ui }}
+                style={{ background: "none", border: "none", color: "#5e3f3d", cursor: "pointer", fontSize: 11, fontFamily: FONT.mono, letterSpacing: "0.06em" }}
                 onClick={() => { setEmail(""); setPassword(""); go(STEPS.ADMIN_AUTH); }}
               >
-                🛡️ Platform Admin Access
+                🛡️ PLATFORM ADMIN ACCESS
               </button>
             </div>
           </div>
@@ -523,7 +605,7 @@ export default function LoginPage({ onLogin }) {
       case STEPS.SIGNIN_OTP:
         return (
           <div className="auth-card">
-            <button style={S.btnBack} onClick={() => back(STEPS.SIGNIN)}>← Back</button>
+            <button style={S.btnBack} onClick={() => back(STEPS.LANDING)}>← Back</button>
             <div style={S.chip}>Sign In · OTP Verification</div>
             <div style={S.heading}>Enter OTP</div>
             <div style={S.sub}>Sent to +91 {phone}. Check your SMS.</div>
@@ -730,6 +812,20 @@ export default function LoginPage({ onLogin }) {
             <label style={S.label}>City <span style={{ color: T.crimson }}>*</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Hyderabad" value={shopDetails.city} onChange={e => setShopDetails(d => ({ ...d, city: e.target.value }))} />
 
+            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
+              <div style={{ flex: 2 }}>
+                <label style={S.label}>State <span style={{ color: T.crimson }}>*</span></label>
+                <select className="auth-input" style={{ ...S.input, cursor: "pointer" }} value={shopDetails.state} onChange={e => setShopDetails(d => ({ ...d, state: e.target.value }))}>
+                  <option value="">Select state…</option>
+                  {INDIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={S.label}>Pincode</label>
+                <input className="auth-input" style={S.input} placeholder="500001" value={shopDetails.pincode} maxLength={6} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, pincode: e.target.value.replace(/\D/g, "") }))} />
+              </div>
+            </div>
+
             <label style={S.label}>Shop Contact Number <span style={{ color: T.crimson }}>*</span></label>
             <div style={{ ...S.phoneRow, marginBottom: 14 }}>
               <div style={S.phoneFlag}>IN +91</div>
@@ -758,11 +854,26 @@ export default function LoginPage({ onLogin }) {
         return (
           <div className="auth-card">
             <div style={S.chip}>Almost done!</div>
-            <div style={S.heading}>What's your name?</div>
-            <div style={S.sub}>Just your name — you can update it later in your profile.</div>
+            <div style={S.heading}>Quick setup</div>
+            <div style={S.sub}>Tell us a bit about yourself so we can personalise your experience.</div>
             {error && <div style={S.error}>{error}</div>}
-            <label style={S.label}>Full Name</label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 24 }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => setProfile({ name: e.target.value })} onKeyDown={e => e.key === "Enter" && saveProfile()} autoFocus />
+            <label style={S.label}>Full Name <span style={{ color: T.crimson }}>*</span></label>
+            <input className="auth-input" style={{ ...S.input, marginBottom: 18 }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} onKeyDown={e => e.key === "Enter" && saveProfile()} autoFocus />
+            <label style={S.label}>I am a…</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+              {[
+                { value: "INDIVIDUAL", label: "Car Owner", icon: "🚗" },
+                { value: "MECHANIC",   label: "Mechanic",  icon: "🔧" },
+                { value: "FLEET_MANAGER", label: "Fleet Manager", icon: "🚚" },
+              ].map(opt => (
+                <button key={opt.value} type="button"
+                  onClick={() => setProfile(p => ({ ...p, profileType: opt.value }))}
+                  style={{ flex: 1, padding: "10px 6px", borderRadius: 8, border: `1.5px solid ${profile.profileType === opt.value ? "#FF1F3A" : "#3F3F46"}`, background: profile.profileType === opt.value ? "rgba(255,31,58,0.08)" : "#1a1b22", color: profile.profileType === opt.value ? "#FF1F3A" : "#c9c6c5", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", transition: "all 0.15s", textAlign: "center" }}>
+                  <div style={{ fontSize: 18, marginBottom: 4 }}>{opt.icon}</div>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <button className="btn-primary" style={S.btnPrimary(loading || !profile.name.trim())} disabled={loading || !profile.name.trim()} onClick={saveProfile}>
               {loading ? "Saving…" : "Enter AutoSpace →"}
             </button>
@@ -864,46 +975,122 @@ export default function LoginPage({ onLogin }) {
     }
   };
 
-  // ─── Page layout ────────────────────────────────────────────────────────────
+  // ─── Page layout — Stitch "Apex Performance" split panel ────────────────────
   return (
-    <div className="auth-page-wrap auth-split" style={{ display: "flex", minHeight: "100vh", background: T.bg, fontFamily: FONT.ui }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#12131a", fontFamily: "'Inter', sans-serif" }}>
       <style>{css}</style>
       <div id="recaptcha-container" />
 
-      {/* Left branding panel */}
-      <div className="auth-left" style={{ width: 400, minWidth: 400, background: T.surface, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "48px 44px", borderRight: `1px solid ${T.border}` }}>
-        <div>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 44 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: `linear-gradient(145deg, ${T.amber}, ${T.amberDim})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "#fff", fontWeight: 900, flexShrink: 0, boxShadow: `0 4px 16px ${T.amberGlow}` }}>⚙</div>
+      {/* ── Left 3/5: Engine photo + branding ── */}
+      <div className="auth-hero-left" style={{
+        width: "60%", position: "relative", overflow: "hidden", flexShrink: 0,
+      }}>
+        {/* Engine photo */}
+        <img
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuASXvM9fpki5nRklH4bc9MrdWCwsO7Prc9vjumG1rrrQzdx7_u5nqcWbJDm7CjEajHps3gCqJlk5mAeZT9qmQB4GA73ygs2XJq3ibgeCSHal4hXeiENvVurlO0mbgMV_hshY2tgwLQzQspUJ2CyvPzGx-RnUjAba2cUsGpQRNw1VR7RCeJjo4gw9JRX_bMgqpID9cRCmfhPTH6UOUCo279hEECl6geFyDTi3pRLnBNtbLkScT_5v1nPWI82e2ehX9QhmO0HIFOG6A"
+          alt="High-performance engine"
+          style={{ width: "100%", height: "100%", objectFit: "cover", filter: "grayscale(20%)", display: "block" }}
+          onError={e => { e.target.style.display = "none"; }}
+        />
+        {/* Hero overlay */}
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(0deg, rgba(18,19,26,0.92) 0%, rgba(18,19,26,0.25) 100%)" }} />
+
+        {/* Content over the image */}
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 48 }}>
+
+          {/* Logo — top */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <div style={{
+              width: 48, height: 48, background: "#FF1F3A", borderRadius: 8,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 22, color: "#fff", flexShrink: 0,
+              boxShadow: "0 0 20px rgba(255,31,58,0.3)",
+            }}>⚙</div>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: T.amber }}>RED PISTON</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: T.t1, letterSpacing: "0.04em" }}>AutoSpace</div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", fontFamily: "'Outfit', sans-serif", lineHeight: 1 }}>Red Piston OS</div>
+              <div style={{ fontSize: 10, color: "#ffb3b0", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 3 }}>Version 4.2.0 Build Delta</div>
             </div>
           </div>
-          <div style={{ fontSize: 25, fontWeight: 700, color: T.t1, lineHeight: 1.35, marginBottom: 36 }}>The smart platform for India's auto parts trade</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {FEATURES.map(f => (
-              <div key={f.title} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: T.amberGlow, border: `1px solid ${T.amberSoft}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{f.icon}</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: T.t1, marginBottom: 2 }}>{f.title}</div>
-                  <div style={{ fontSize: 12, color: T.t2, lineHeight: 1.4 }}>{f.desc}</div>
-                </div>
-              </div>
-            ))}
+
+          {/* Headline — middle */}
+          <div style={{ maxWidth: 480 }}>
+            <div style={{ fontSize: 56, fontWeight: 900, color: "#fff", fontFamily: "'Outfit', sans-serif", lineHeight: 1.08, marginBottom: 20, letterSpacing: "-0.02em" }}>
+              The Engine of Automotive Commerce.
+            </div>
+            <div style={{ fontSize: 16, color: "#e8bcb9", lineHeight: 1.65, maxWidth: 400 }}>
+              Streamline logistics, manage high-performance inventory, and scale your automotive enterprise with precision engineering.
+            </div>
           </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 20, borderTop: `1px solid ${T.border}`, color: T.t3, fontSize: 13 }}>
-          <span>⭐</span> Trusted by shops in Hyderabad · Launch city: Hyderabad
+
+          {/* Stats — bottom */}
+          <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+            <div>
+              <div style={{ fontSize: 10, color: "#ffb3b0", fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>UPTIME</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#fff", fontFamily: "'Outfit', sans-serif" }}>99.98%</div>
+            </div>
+            <div style={{ width: 1, height: 40, background: "#3F3F46" }} />
+            <div>
+              <div style={{ fontSize: 10, color: "#ffb3b0", fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>THROUGHPUT</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#fff", fontFamily: "'Outfit', sans-serif" }}>450k/s</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Right auth panel */}
-      <div className="auth-right" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 48px" }}>
-        <div style={{ width: "100%", maxWidth: 440 }}>
+      {/* ── Right 2/5: Form panel ── */}
+      <div className="auth-form-right" style={{
+        flex: 1,
+        background: "#12131a",
+        backgroundImage: "radial-gradient(#3F3F46 0.5px, transparent 0.5px)",
+        backgroundSize: "24px 24px",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: "32px 48px",
+        position: "relative",
+        overflowY: "auto",
+      }}>
+        {/* Secure Terminal badge */}
+        <div style={{
+          position: "absolute", top: 24, right: 24,
+          display: "flex", alignItems: "center", gap: 8,
+          background: "#292931", border: "1px solid #3F3F46",
+          borderRadius: 9999, padding: "6px 14px",
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", display: "block", boxShadow: "0 0 8px rgba(16,185,129,0.6)" }} />
+          <span style={{ fontSize: 10, color: "#af8785", fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Secure Terminal 08-AX</span>
+        </div>
+
+        {/* Mobile branding (only visible when left panel is hidden) */}
+        <div style={{ display: "none" }} className="auth-mobile-brand">
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ fontSize: 24, fontWeight: 900, color: "#FF1F3A" }}>⚙</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#e3e1ec", fontFamily: "'Outfit', sans-serif" }}>Red Piston</div>
+          </div>
+        </div>
+
+        {/* Form container */}
+        <div style={{ width: "100%", maxWidth: 400 }}>
           {renderStep()}
         </div>
+
+        {/* Footer links — only on main auth steps */}
+        {(step === STEPS.LANDING || step === STEPS.SIGNIN) && (
+          <div style={{ width: "100%", maxWidth: 400, marginTop: 32, paddingTop: 24, borderTop: "1px solid rgba(63,63,70,0.35)", textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "#af8785", marginBottom: 14 }}>
+              New to the platform?{" "}
+              <button
+                style={{ background: "none", border: "none", color: "#ffb3b0", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}
+                onClick={() => go(STEPS.REG_ROLE)}
+              >
+                Register a Shop
+              </button>
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 24 }}>
+              <span style={{ fontSize: 10, color: "#5e3f3d", fontFamily: "'JetBrains Mono', monospace", cursor: "pointer", letterSpacing: "0.06em" }}>TERMS OF SERVICE</span>
+              <span style={{ fontSize: 10, color: "#5e3f3d", fontFamily: "'JetBrains Mono', monospace", cursor: "pointer", letterSpacing: "0.06em" }}>PRIVACY POLICY</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

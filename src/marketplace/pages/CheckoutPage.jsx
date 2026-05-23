@@ -175,7 +175,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                             }}>
                                 {isDone ? "✓" : i + 1}
                             </div>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: isActive ? T.amber : isDone ? T.emerald : T.t3, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{label}</div>
+                            <div className="checkout-step-label" style={{ fontSize: 10, fontWeight: 700, color: isActive ? T.amber : isDone ? T.emerald : T.t3, textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{label}</div>
                         </div>
                         {i < 3 && <div className="step-connector" style={{ width: 50, height: 2, background: isDone ? T.emerald : T.border, margin: "0 6px", marginBottom: 20, transition: "all 0.3s" }} />}
                     </div>

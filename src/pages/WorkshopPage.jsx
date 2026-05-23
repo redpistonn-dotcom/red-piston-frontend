@@ -244,36 +244,38 @@ export function WorkshopPage({ jobCards, vehicles, parties, products, activeShop
                     return (
                         <div key={job.id} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", transition: "0.2s" }}>
                             {/* Job Card Header */}
-                            <div onClick={() => setExpandedId(isExpanded ? null : job.id)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", gap: 16, alignItems: "center" }} className="row-hover">
-                                <div style={{ width: 44, height: 44, borderRadius: 10, background: statusCfg.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                            <div onClick={() => setExpandedId(isExpanded ? null : job.id)} className="workshop-job-header row-hover" style={{ padding: "16px 20px", cursor: "pointer", display: "flex", gap: 16, alignItems: "center" }}>
+                                <div style={{ width: 44, height: 44, borderRadius: 10, background: statusCfg.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
                                     {statusCfg.icon}
                                 </div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                                         <span style={{ fontWeight: 900, color: T.t1, fontSize: 15 }}>{job.jobNumber}</span>
-                                        <span style={{ background: statusCfg.bg, color: statusCfg.color, padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800 }}>{statusCfg.label}</span>
+                                        <span style={{ background: statusCfg.bg, color: statusCfg.color, padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 800, whiteSpace: "nowrap" }}>{statusCfg.label}</span>
                                     </div>
-                                    <div style={{ fontSize: 12, color: T.t3, marginTop: 3 }}>
+                                    <div style={{ fontSize: 12, color: T.t3, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                         {vehicle ? `${vehicle.make} ${vehicle.model} · ${vehicle.registrationNumber}` : "No vehicle"} · {customer?.name || "Unknown"}
                                     </div>
                                 </div>
-                                <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 11, color: T.t3 }}>Estimated</div>
-                                    <div style={{ fontSize: 18, fontWeight: 900, color: T.amber, fontFamily: FONT.mono }}>{fmt(job.estimatedAmount || 0)}</div>
-                                </div>
-                                {/* Time tracking */}
-                                {getElapsedHours(job) && (
-                                    <div style={{ textAlign: "right" }}>
-                                        <div style={{ fontSize: 11, color: T.t3 }}>Elapsed</div>
-                                        <div style={{ fontSize: 14, fontWeight: 700, color: T.sky, fontFamily: FONT.mono }}>⏱ {getElapsedHours(job)}</div>
+                                <div className="workshop-job-stats" style={{ display: "flex", gap: 16, alignItems: "center", flexShrink: 0 }}>
+                                    <div className="workshop-job-stat" style={{ textAlign: "right" }}>
+                                        <div style={{ fontSize: 11, color: T.t3 }}>Est.</div>
+                                        <div style={{ fontSize: 16, fontWeight: 900, color: T.amber, fontFamily: FONT.mono }}>{fmt(job.estimatedAmount || 0)}</div>
                                     </div>
-                                )}
-                                <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 11, color: T.t3 }}>Checklist</div>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: checklistDone === checklistTotal ? T.emerald : T.t2, fontFamily: FONT.mono }}>{checklistDone}/{checklistTotal}</div>
-                                </div>
-                                <div style={{ fontSize: 11, color: T.t3, textAlign: "right", minWidth: 70 }}>
-                                    {daysAgo(job.createdAt)}
+                                    {/* Time tracking */}
+                                    {getElapsedHours(job) && (
+                                        <div className="workshop-job-stat" style={{ textAlign: "right" }}>
+                                            <div style={{ fontSize: 11, color: T.t3 }}>Elapsed</div>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: T.sky, fontFamily: FONT.mono }}>⏱ {getElapsedHours(job)}</div>
+                                        </div>
+                                    )}
+                                    <div className="workshop-job-stat" style={{ textAlign: "right" }}>
+                                        <div style={{ fontSize: 11, color: T.t3 }}>Checklist</div>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: checklistDone === checklistTotal ? T.emerald : T.t2, fontFamily: FONT.mono }}>{checklistDone}/{checklistTotal}</div>
+                                    </div>
+                                    <div style={{ fontSize: 11, color: T.t3, textAlign: "right", minWidth: 56, whiteSpace: "nowrap" }}>
+                                        {daysAgo(job.createdAt)}
+                                    </div>
                                 </div>
                             </div>
 

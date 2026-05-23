@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import * as XLSX from "xlsx";
 import { api } from "../api/client.js";
 import { T, FONT } from "../theme.js";
 import { Avatar } from "../components/Avatar.jsx";
@@ -156,6 +157,447 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
   );
 }
 
+// ─── Catalog Tab — Upload Excel → DB Import ───────────────────────────────────
+
+// Maps common Excel header names → DB field names (case-insensitive, underscore→space)
+const DETECT_MAP = {
+  'oem number': 'oemNumber', 'oem_number': 'oemNumber', 'part number': 'oemNumber',
+  'part_number': 'oemNumber', 'part no': 'oemNumber', 'part no.': 'oemNumber',
+  'partno': 'oemNumber', 'material': 'oemNumber', 'item code': 'oemNumber', 'item no': 'oemNumber',
+  'part name': 'partName', 'part_name': 'partName', 'description': 'partName',
+  'material description': 'partName', 'item name': 'partName', 'name': 'partName', 'product name': 'partName',
+  'brand': 'brand', 'manufacturer': 'brand', 'make': 'brand',
+  'category': 'categoryL1', 'category l1': 'categoryL1', 'category_l1': 'categoryL1', 'cat1': 'categoryL1',
+  'category l2': 'categoryL2', 'category_l2': 'categoryL2', 'sub category': 'categoryL2',
+  'category l3': 'categoryL3', 'category_l3': 'categoryL3',
+  'hsn': 'hsnCode', 'hsn code': 'hsnCode', 'hsn_code': 'hsnCode',
+  'gst': 'gstRate', 'gst rate': 'gstRate', 'gst_rate': 'gstRate', 'gst %': 'gstRate', 'gst%': 'gstRate',
+  'unit': 'unitOfSale', 'unit of sale': 'unitOfSale', 'uom': 'unitOfSale',
+  'mrp': 'mrp', 'max retail price': 'mrp', 'maximum retail price': 'mrp', 'selling price': 'mrp', 'sell price': 'mrp',
+  'buy price': 'buyPrice', 'buying price': 'buyPrice', 'cost price': 'buyPrice', 'purchase price': 'buyPrice', 'pl01': 'buyPrice',
+  'long description': 'description', 'remarks': 'description', 'product description': 'description',
+  'alternate oem': 'alternateOem', 'alternate oem numbers': 'alternateOem', 'alt oem': 'alternateOem', 'cross reference': 'alternateOem',
+  'weight': 'weightGrams', 'weight grams': 'weightGrams', 'weight (g)': 'weightGrams', 'weight (gm)': 'weightGrams', 'wt': 'weightGrams',
+};
+
+// Template columns shown in sample Excel
+const TEMPLATE_COLS = [
+  { key: 'oemNumber',    label: 'OEM Number',            required: true,  example: '265C0-00QAG',                   note: 'Primary OEM/part number — must be unique (required)' },
+  { key: 'partName',     label: 'Part Name',             required: true,  example: 'Brake Pad Set Front',            note: 'Display name shown to customers (required)' },
+  { key: 'brand',        label: 'Brand',                 required: false, example: 'Bosch',                          note: 'Manufacturer brand name' },
+  { key: 'categoryL1',   label: 'Category L1',           required: false, example: 'Brakes',                         note: 'Top category: Brakes / Engine / Filters / Suspension / Electrical / Body' },
+  { key: 'categoryL2',   label: 'Category L2',           required: false, example: 'Brake Pads',                     note: 'Sub-category under Category L1' },
+  { key: 'categoryL3',   label: 'Category L3',           required: false, example: 'Disc Brake Pads',                note: 'Further classification' },
+  { key: 'hsnCode',      label: 'HSN Code',              required: false, example: '87083000',                       note: 'HSN code for GST filing — required for invoicing' },
+  { key: 'gstRate',      label: 'GST Rate',              required: false, example: '18',                             note: '18 or 28 — defaults to 18 if blank' },
+  { key: 'unitOfSale',   label: 'Unit of Sale',          required: false, example: 'Piece',                          note: 'Piece / Set / Pair / Litre / KG / Box' },
+  { key: 'mrp',          label: 'MRP',                   required: false, example: '850',                            note: 'Max Retail Price — reference for shops when setting their selling price' },
+  { key: 'buyPrice',     label: 'Buy Price',             required: false, example: '600',                            note: 'Supplier cost price — reference for shops' },
+  { key: 'description',  label: 'Description',           required: false, example: 'High-performance ceramic brake pads with low dust', note: 'Detailed product description' },
+  { key: 'alternateOem', label: 'Alternate OEM Numbers', required: false, example: '265C0-00QAF, 34116776683',       note: 'Comma-separated cross-reference OEM numbers' },
+  { key: 'weightGrams',  label: 'Weight Grams',          required: false, example: '420',                            note: 'Weight in grams (used for shipping calculation)' },
+];
+
+const BATCH_SIZE = 200;
+
+function downloadTemplate() {
+  const wb = XLSX.utils.book_new();
+  const headers = TEMPLATE_COLS.map(c => c.label);
+  const ex1 = TEMPLATE_COLS.map(c => c.example);
+  const ex2 = ['580B7-01QAA', 'Oil Filter', 'Denso', 'Engine', 'Filters', 'Oil Filters', '84073290', '18', 'Piece', '320', '220', 'Genuine Denso oil filter for petrol engines', '', '185'];
+  const ws = XLSX.utils.aoa_to_sheet([headers, ex1, ex2]);
+  ws['!cols'] = TEMPLATE_COLS.map(c => ({ wch: Math.max(c.label.length, c.example.length) + 4 }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Parts Template');
+  const instrWs = XLSX.utils.aoa_to_sheet([
+    ['Column Name', 'Required?', 'Example Value', 'Description'],
+    ...TEMPLATE_COLS.map(c => [c.label, c.required ? 'REQUIRED' : 'Optional', c.example, c.note]),
+  ]);
+  instrWs['!cols'] = [{ wch: 26 }, { wch: 10 }, { wch: 38 }, { wch: 65 }];
+  XLSX.utils.book_append_sheet(wb, instrWs, 'Instructions');
+  XLSX.writeFile(wb, 'RedPiston_Parts_Import_Template.xlsx');
+}
+
+async function parseExcel(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: false });
+  if (rows.length === 0) throw new Error('The file has no data rows');
+  const headers = Object.keys(rows[0]);
+  const colMap = {};
+  for (const h of headers) {
+    const norm = h.toLowerCase().trim().replace(/_+/g, ' ');
+    if (DETECT_MAP[norm]) colMap[h] = DETECT_MAP[norm];
+  }
+  const parts = rows.map(row => {
+    const p = {};
+    for (const [col, field] of Object.entries(colMap)) {
+      const v = row[col];
+      if (v !== null && v !== undefined && String(v).trim() !== '') p[field] = String(v).trim();
+    }
+    return p;
+  }).filter(p => p.oemNumber || p.partName);
+  return { headers, colMap, parts, total: rows.length, mapped: parts.length, preview: rows.slice(0, 5) };
+}
+
+function CatalogTab() {
+  const [view, setView] = useState('import');
+
+  const [fileData, setFileData] = useState(null);
+  const [parsing, setParsing]   = useState(false);
+  const [parseErr, setParseErr] = useState('');
+  const [dragOver, setDragOver] = useState(false);
+
+  const [importing, setImporting]   = useState(false);
+  const [importProg, setImportProg] = useState(null);
+  const [importDone, setImportDone] = useState(false);
+
+  const [dbParts, setDbParts]     = useState([]);
+  const [dbTotal, setDbTotal]     = useState(0);
+  const [dbStats, setDbStats]     = useState(null);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbSearch, setDbSearch]   = useState('');
+  const [dbOffset, setDbOffset]   = useState(0);
+  const DB_LIMIT = 50;
+
+  const fetchDbStats = useCallback(async () => {
+    try { const res = await api.get('/api/admin/catalog/stats'); setDbStats(res.data); } catch { /* offline */ }
+  }, []);
+
+  const fetchDbParts = useCallback(async (q, off) => {
+    setDbLoading(true);
+    try {
+      const params = { limit: DB_LIMIT, offset: off };
+      if (q) params.q = q;
+      const res = await api.get('/api/admin/catalog/parts', params);
+      setDbParts(res.data || []);
+      setDbTotal(res.total || 0);
+    } catch { setDbParts([]); }
+    setDbLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (view === 'live') { fetchDbStats(); fetchDbParts('', 0); }
+  }, [view]); // eslint-disable-line
+
+  useEffect(() => {
+    if (view !== 'live') return;
+    const t = setTimeout(() => { setDbOffset(0); fetchDbParts(dbSearch, 0); }, 350);
+    return () => clearTimeout(t);
+  }, [dbSearch]); // eslint-disable-line
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setParseErr('Upload an Excel (.xlsx, .xls) or CSV (.csv) file'); return; }
+    setParsing(true); setParseErr(''); setFileData(null); setImportDone(false); setImportProg(null);
+    try { setFileData({ name: file.name, ...(await parseExcel(file)) }); }
+    catch (e) { setParseErr(e.message || 'Failed to parse file — check the format'); }
+    setParsing(false);
+  };
+
+  const handleImport = async () => {
+    if (!fileData || importing) return;
+    setImporting(true);
+    const parts = fileData.parts;
+    let created = 0, updated = 0, skipped = 0;
+    setImportProg({ done: 0, total: parts.length, created: 0, updated: 0, skipped: 0 });
+    for (let i = 0; i < parts.length; i += BATCH_SIZE) {
+      const batch = parts.slice(i, i + BATCH_SIZE);
+      try {
+        const res = await api.post('/api/admin/catalog/bulk-import', {
+          parts: batch.map(p => ({
+            partName:            p.partName || p.oemNumber,
+            oemNumber:           p.oemNumber || null,
+            brand:               p.brand || null,
+            categoryL1:          p.categoryL1 || null,
+            categoryL2:          p.categoryL2 || null,
+            categoryL3:          p.categoryL3 || null,
+            hsnCode:             p.hsnCode || null,
+            gstRate:             p.gstRate ? parseFloat(p.gstRate) : undefined,
+            unit:                p.unitOfSale || null,
+            description:         p.description || null,
+            mrp:                 p.mrp ? parseFloat(p.mrp) : undefined,
+            buyPrice:            p.buyPrice ? parseFloat(p.buyPrice) : undefined,
+            alternateOemNumbers: p.alternateOem ? p.alternateOem.split(',').map(s => s.trim()).filter(Boolean) : undefined,
+            weightGrams:         p.weightGrams ? parseInt(p.weightGrams) : undefined,
+          })),
+        });
+        created += res.data.created; updated += res.data.updated; skipped += res.data.skipped;
+      } catch (err) { skipped += batch.length; }
+      setImportProg({ done: Math.min(i + BATCH_SIZE, parts.length), total: parts.length, created, updated, skipped });
+    }
+    setImportDone(true); setImporting(false); fetchDbStats();
+  };
+
+  const S = {
+    subTab: (active) => ({ padding: '10px 20px', fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'none', fontFamily: "'Inter', sans-serif", color: active ? '#FF1F3A' : '#af8785', borderBottom: active ? '2px solid #FF1F3A' : '2px solid transparent', transition: 'all 0.15s', letterSpacing: '0.02em' }),
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid #3F3F46', marginBottom: 24 }}>
+        {[{ key: 'import', label: '⬆ Import Excel' }, { key: 'live', label: '🗄 Live Database' }].map(t => (
+          <button key={t.key} onClick={() => setView(t.key)} style={S.subTab(view === t.key)}>{t.label}</button>
+        ))}
+      </div>
+
+      {view === 'import' && (
+        <div>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#e3e1ec', fontFamily: "'Outfit', sans-serif", marginBottom: 4 }}>Import Parts to Master Catalog</div>
+              <div style={{ fontSize: 12, color: '#af8785', fontFamily: "'Inter', sans-serif", lineHeight: 1.6 }}>
+                Upload any supplier Excel or CSV. Columns are auto-detected and mapped — then sent to the live database in batches.
+              </div>
+            </div>
+            <button onClick={downloadTemplate} style={{ flexShrink: 0, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: '9px 16px', color: '#93C5FD', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+              📥 Download Sample Template
+            </button>
+          </div>
+
+          {parseErr && (
+            <div style={{ background: '#1c0909', border: '1px solid #EF4444', borderRadius: 10, padding: '12px 16px', color: '#EF4444', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>⚠</span><span style={{ flex: 1 }}>{parseErr}</span>
+              <button onClick={() => setParseErr('')} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+            </div>
+          )}
+
+          {parsing && (
+            <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 12, padding: '52px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 30, marginBottom: 12, animation: 'spin 1s linear infinite' }}>⟳</div>
+              <div style={{ color: '#af8785', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>Reading and parsing file…</div>
+            </div>
+          )}
+
+          {!fileData && !parsing && (
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+              onClick={() => document.getElementById('_xls_upload').click()}
+              style={{ background: dragOver ? 'rgba(255,31,58,0.04)' : '#0d0e15', border: `2px dashed ${dragOver ? '#FF1F3A' : '#3F3F46'}`, borderRadius: 12, padding: '56px 24px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              <div style={{ fontSize: 48, marginBottom: 14 }}>📊</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#e3e1ec', fontFamily: "'Outfit', sans-serif", marginBottom: 6 }}>Drop your Excel or CSV file here</div>
+              <div style={{ fontSize: 12, color: '#af8785', fontFamily: "'Inter', sans-serif", marginBottom: 20 }}>
+                Supports .xlsx · .xls · .csv &nbsp;·&nbsp; Column names auto-detected
+              </div>
+              <span style={{ background: 'rgba(255,31,58,0.1)', border: '1px solid rgba(255,31,58,0.4)', color: '#FF1F3A', borderRadius: 8, padding: '10px 22px', fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>
+                Choose File
+              </span>
+              <input id="_xls_upload" type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
+                onChange={e => { handleFile(e.target.files[0]); e.target.value = ''; }} />
+            </div>
+          )}
+
+          {fileData && !parsing && (
+            <div>
+              {/* File info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
+                <span style={{ fontSize: 22 }}>📄</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, color: '#e3e1ec', fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>{fileData.name}</div>
+                  <div style={{ fontSize: 11, color: '#af8785', marginTop: 3, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {fileData.total.toLocaleString()} rows &nbsp;·&nbsp;
+                    <span style={{ color: '#10B981' }}>{fileData.mapped.toLocaleString()} parts ready</span>
+                    {fileData.total !== fileData.mapped && <span> &nbsp;·&nbsp; {(fileData.total - fileData.mapped).toLocaleString()} skipped (no OEM and no Name)</span>}
+                  </div>
+                </div>
+                <button onClick={() => { setFileData(null); setImportDone(false); setImportProg(null); setParseErr(''); }}
+                  style={{ background: 'none', border: '1px solid #3F3F46', borderRadius: 6, color: '#af8785', cursor: 'pointer', padding: '4px 10px', fontSize: 12, fontFamily: "'Inter', sans-serif" }}>
+                  ✕ Clear
+                </button>
+              </div>
+
+              {/* Column detection */}
+              <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 10 }}>
+                  Auto-Detected Columns — {Object.keys(fileData.colMap).length} of {fileData.headers.length} matched
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {fileData.headers.map(h => {
+                    const m = fileData.colMap[h];
+                    return (
+                      <span key={h} style={{ background: m ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${m ? 'rgba(16,185,129,0.3)' : '#292931'}`, borderRadius: 5, padding: '3px 8px', fontSize: 10, color: m ? '#10B981' : '#5e3f3d', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {h}{m ? ` → ${m}` : ''}
+                      </span>
+                    );
+                  })}
+                </div>
+                {Object.keys(fileData.colMap).length === 0 && (
+                  <div style={{ marginTop: 10, fontSize: 12, color: '#EF4444', fontFamily: "'Inter', sans-serif" }}>
+                    ⚠ No columns matched. Download the sample template to see the expected column names.
+                  </div>
+                )}
+              </div>
+
+              {/* Preview */}
+              <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+                <div style={{ padding: '10px 16px', borderBottom: '1px solid #292931', fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace" }}>
+                  Preview — First 5 Rows
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
+                    <thead>
+                      <tr>
+                        {fileData.headers.slice(0, 8).map(h => (
+                          <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: fileData.colMap[h] ? '#10B981' : '#5e3f3d', borderBottom: '1px solid #292931', textAlign: 'left', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>
+                            {h}
+                          </th>
+                        ))}
+                        {fileData.headers.length > 8 && <th style={{ padding: '8px 12px', fontSize: 10, color: '#3F3F46', borderBottom: '1px solid #292931' }}>+{fileData.headers.length - 8} more</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fileData.preview.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #1a1a22' }}>
+                          {fileData.headers.slice(0, 8).map(h => (
+                            <td key={h} style={{ padding: '7px 12px', fontSize: 11, color: '#c9c6c5', fontFamily: "'Inter', sans-serif", maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {row[h] !== null && row[h] !== undefined ? String(row[h]) : <span style={{ color: '#3F3F46' }}>—</span>}
+                            </td>
+                          ))}
+                          {fileData.headers.length > 8 && <td />}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {importDone ? (
+                <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <span style={{ fontSize: 22 }}>✅</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, color: '#10B981', fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Import complete!</div>
+                    <div style={{ fontSize: 11, color: '#af8785', marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {importProg?.created ?? 0} created &nbsp;·&nbsp; {importProg?.updated ?? 0} updated &nbsp;·&nbsp; {importProg?.skipped ?? 0} skipped
+                    </div>
+                  </div>
+                  <button onClick={() => setView('live')} style={{ background: '#FF1F3A', border: 'none', borderRadius: 8, padding: '9px 18px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
+                    View in DB →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button onClick={handleImport} disabled={importing || !fileData.mapped}
+                    style={{ background: (importing || !fileData.mapped) ? '#292931' : '#FF1F3A', color: (importing || !fileData.mapped) ? '#5e3f3d' : '#fff', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 13, fontWeight: 700, cursor: (importing || !fileData.mapped) ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif", letterSpacing: '0.04em', boxShadow: (importing || !fileData.mapped) ? 'none' : '0 0 20px rgba(255,31,58,0.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {importing ? `⟳ Importing… ${importProg?.done ?? 0} / ${importProg?.total ?? 0}` : `⬆ Import ${fileData.mapped.toLocaleString()} Parts to Database`}
+                  </button>
+                  {importProg && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ height: 5, background: '#292931', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                        <div style={{ height: '100%', width: `${Math.round((importProg.done / importProg.total) * 100)}%`, background: '#FF1F3A', borderRadius: 4, transition: 'width 0.3s ease' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                        <span style={{ color: '#af8785' }}>{importProg.done.toLocaleString()} / {importProg.total.toLocaleString()}</span>
+                        <span style={{ color: '#10B981' }}>+{importProg.created} created</span>
+                        <span style={{ color: '#3B82F6' }}>↺ {importProg.updated} updated</span>
+                        <span style={{ color: '#5e3f3d' }}>⊘ {importProg.skipped} skipped</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {view === 'live' && (
+        <>
+          {dbStats && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+              {[
+                { label: 'Total Parts', val: dbStats.total, color: '#FF1F3A' },
+                { label: 'Verified', val: dbStats.verified, color: '#10B981' },
+                { label: 'Pending Review', val: dbStats.pending, color: '#F59E0B' },
+                { label: 'Rejected', val: dbStats.rejected, color: '#EF4444' },
+              ].map(s => (
+                <div key={s.label} style={{ background: 'linear-gradient(145deg, #1e1f26 0%, #12131a 100%)', border: '1px solid #3F3F46', borderTop: `2px solid ${s.color}`, borderRadius: 10, padding: '16px 18px' }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: s.color, fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em' }}>{s.val?.toLocaleString() ?? '—'}</div>
+                  <div style={{ fontSize: 10, color: '#af8785', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'JetBrains Mono', monospace", marginTop: 4 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 220, position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#5e3f3d', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+              <input value={dbSearch} onChange={e => setDbSearch(e.target.value)} placeholder="Search by part name, OEM or brand…"
+                style={{ width: '100%', background: '#1e1f26', border: '1.5px solid #3F3F46', borderRadius: 10, padding: '10px 14px 10px 36px', color: '#e3e1ec', fontSize: 13, outline: 'none', fontFamily: "'Inter', sans-serif", boxSizing: 'border-box' }} />
+            </div>
+            <button onClick={() => fetchDbParts(dbSearch, dbOffset)}
+              style={{ background: 'transparent', border: '1px solid #3F3F46', borderRadius: 8, padding: '9px 16px', color: '#c9c6c5', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
+              ↺ Refresh
+            </button>
+            <span style={{ fontSize: 11, color: '#af8785', fontFamily: "'JetBrains Mono', monospace" }}>{dbTotal.toLocaleString()} parts in DB</span>
+          </div>
+          {dbTotal === 0 && !dbLoading && (
+            <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 12, padding: '48px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 36, marginBottom: 12 }}>📦</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#e3e1ec', marginBottom: 6, fontFamily: "'Outfit', sans-serif" }}>Master catalog is empty</div>
+              <div style={{ fontSize: 12, color: '#af8785', fontFamily: "'Inter', sans-serif", marginBottom: 16 }}>
+                Use the <strong style={{ color: '#FF1F3A' }}>Import Excel</strong> tab to upload a supplier file.
+              </div>
+              <button onClick={() => setView('import')} style={{ background: '#FF1F3A', border: 'none', borderRadius: 8, padding: '10px 22px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
+                ⬆ Go to Import
+              </button>
+            </div>
+          )}
+          {(dbParts.length > 0 || dbLoading) && (
+            <div className="admin-table-wrap">
+              <div className="admin-table-wrap-inner">
+                <table style={{ minWidth: 780, width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['OEM Number', 'Part Name', 'Brand', 'Category', 'GST %', 'Status', 'Shop Stock'].map(h => (
+                        <th key={h} style={{ padding: '10px 16px', fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', borderBottom: '1px solid #3F3F46', textAlign: 'left', background: '#0d0e15', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dbLoading ? (
+                      <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#5e3f3d', fontFamily: "'Inter', sans-serif" }}>Loading…</td></tr>
+                    ) : dbParts.map(p => (
+                      <tr key={p.masterPartId} className="admin-table-row" style={{ borderBottom: '1px solid #292931' }}>
+                        <td style={{ padding: '11px 16px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#e3e1ec', whiteSpace: 'nowrap' }}>{p.primaryOemNumber || <span style={{ color: '#3F3F46' }}>—</span>}</td>
+                        <td style={{ padding: '11px 16px', fontSize: 13, color: '#e3e1ec', fontFamily: "'Inter', sans-serif", maxWidth: 260 }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.partName}</div>
+                        </td>
+                        <td style={{ padding: '11px 16px', fontSize: 12, color: '#c9c6c5', fontFamily: "'Inter', sans-serif" }}>{p.brand || <span style={{ color: '#3F3F46' }}>—</span>}</td>
+                        <td style={{ padding: '11px 16px', fontSize: 11, color: '#af8785', fontFamily: "'Inter', sans-serif" }}>{p.categoryL1 || <span style={{ color: '#3F3F46' }}>—</span>}</td>
+                        <td style={{ padding: '11px 16px', fontSize: 12, color: '#F59E0B', fontFamily: "'JetBrains Mono', monospace" }}>{p.gstRate}%</td>
+                        <td style={{ padding: '11px 16px' }}>
+                          <span style={{ background: p.status === 'VERIFIED' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${p.status === 'VERIFIED' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`, color: p.status === 'VERIFIED' ? '#10B981' : '#F59E0B', borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: '11px 16px', fontSize: 11, color: '#3B82F6', fontFamily: "'JetBrains Mono', monospace" }}>{p._count?.inventory ?? 0} shops</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {dbTotal > DB_LIMIT && (
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 14, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: '#af8785', fontFamily: "'JetBrains Mono', monospace", marginRight: 8 }}>
+                {dbOffset + 1}–{Math.min(dbOffset + DB_LIMIT, dbTotal)} of {dbTotal.toLocaleString()}
+              </span>
+              <button disabled={dbOffset === 0} onClick={() => { const o = dbOffset - DB_LIMIT; setDbOffset(o); fetchDbParts(dbSearch, o); }}
+                style={{ background: 'transparent', border: '1px solid #3F3F46', borderRadius: 7, padding: '6px 14px', color: dbOffset === 0 ? '#3F3F46' : '#c9c6c5', fontSize: 12, fontWeight: 600, cursor: dbOffset === 0 ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif" }}>← Prev</button>
+              <button disabled={dbOffset + DB_LIMIT >= dbTotal} onClick={() => { const o = dbOffset + DB_LIMIT; setDbOffset(o); fetchDbParts(dbSearch, o); }}
+                style={{ background: 'transparent', border: '1px solid #3F3F46', borderRadius: 7, padding: '6px 14px', color: dbOffset + DB_LIMIT >= dbTotal ? '#3F3F46' : '#c9c6c5', fontSize: 12, fontWeight: 600, cursor: dbOffset + DB_LIMIT >= dbTotal ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif" }}>Next →</button>
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function SuperAdminPage({ onImpersonate, currentUser }) {
   const [activeTab, setActiveTab] = useState("users"); // "users" | "verifications"
@@ -298,36 +740,49 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
   };
 
   const S = {
-    page: { minHeight: "100vh", background: T.bg, color: T.t1, fontFamily: FONT.ui },
+    page: { minHeight: "100vh", background: T.bg, color: T.t1, fontFamily: FONT.body },
     header: {
-      background: T.surface, borderBottom: `1px solid ${T.border}`,
-      padding: "14px 20px", position: "sticky", top: 0, zIndex: 99,
+      background: "#0d0e15",
+      borderBottom: `1px solid ${T.border}`,
+      padding: "0 28px",
+      position: "sticky", top: 0, zIndex: 99,
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      flexWrap: "wrap", gap: 8,
+      height: 56, gap: 16,
     },
-    title: { display: "flex", alignItems: "center", gap: 10 },
+    title: { display: "flex", alignItems: "center", gap: 12 },
     badge: {
-      width: 36, height: 36, borderRadius: 10,
-      background: `linear-gradient(135deg, ${T.violet}, #6D28D9)`,
+      width: 32, height: 32, borderRadius: 6,
+      background: `#FF1F3A`,
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 16, boxShadow: `0 4px 14px ${T.violetBg}`,
+      fontSize: 16, boxShadow: `0 0 16px rgba(255,31,58,0.25)`,
       flexShrink: 0,
     },
-    titleText: { fontSize: 18, fontWeight: 800, color: T.t1, fontFamily: FONT.ui },
-    titleSub: { fontSize: 10, color: T.violet, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" },
-    body: { padding: "24px 28px", maxWidth: 1200, margin: "0 auto" },
-    statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 24 },
-    statCard: {
-      background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
-      padding: "16px 18px", transition: "border-color 0.15s",
-    },
-    statVal: { fontSize: 26, fontWeight: 900, color: T.t1, marginBottom: 3, fontFamily: FONT.ui },
-    statLabel: { fontSize: 11, color: T.t3, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" },
+    titleText: { fontSize: 15, fontWeight: 700, color: T.t1, fontFamily: "'Outfit', sans-serif" },
+    titleSub: { fontSize: 10, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" },
+    body: { padding: "28px 28px", maxWidth: 1300, margin: "0 auto" },
+    statsGrid: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 28 },
+    statCard: (color) => ({
+      background: "linear-gradient(145deg, #1e1f26 0%, #12131a 100%)",
+      border: `1px solid #3F3F46`,
+      borderTop: `2px solid ${color}`,
+      borderRadius: 12,
+      padding: "18px 20px",
+      transition: "border-color 0.2s, box-shadow 0.2s",
+      cursor: "default",
+    }),
+    statVal: { fontSize: 26, fontWeight: 700, color: T.t1, marginBottom: 4, fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.02em" },
+    statLabel: { fontSize: 10, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: "'Inter', sans-serif" },
     controls: { display: "flex", gap: 10, marginBottom: 18, alignItems: "center", flexWrap: "wrap" },
+    searchWrap: {
+      flex: 1, minWidth: 220, position: "relative", display: "flex", alignItems: "center",
+    },
     searchInput: {
-      flex: 1, minWidth: 200, background: T.card, border: `1.5px solid ${T.border}`,
-      borderRadius: 10, padding: "10px 14px", color: T.t1, fontSize: 14,
-      outline: "none", fontFamily: FONT.ui,
+      flex: 1, minWidth: 220, background: T.card, border: `1.5px solid ${T.border}`,
+      borderRadius: 10, padding: "10px 14px 10px 38px", color: T.t1, fontSize: 14,
+      outline: "none", fontFamily: FONT.ui, width: "100%",
+    },
+    searchIcon: {
+      position: "absolute", left: 13, color: T.t3, fontSize: 14, pointerEvents: "none",
     },
     select: {
       background: T.card, border: `1.5px solid ${T.border}`, borderRadius: 10,
@@ -336,44 +791,50 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
     },
     table: { width: "100%", borderCollapse: "collapse" },
     th: {
-      padding: "10px 14px", fontSize: 10, fontWeight: 700, color: T.t3,
-      textTransform: "uppercase", letterSpacing: "0.08em",
+      padding: "11px 16px", fontSize: 10, fontWeight: 700, color: T.t3,
+      textTransform: "uppercase", letterSpacing: "0.09em",
       borderBottom: `1px solid ${T.border}`, textAlign: "left",
-      background: T.surface,
+      background: T.card, whiteSpace: "nowrap",
     },
     td: {
-      padding: "11px 14px", fontSize: 13, color: T.t2,
+      padding: "13px 16px", fontSize: 13, color: T.t2,
       borderBottom: `1px solid ${T.border}`,
-      fontFamily: FONT.ui,
+      fontFamily: FONT.ui, verticalAlign: "middle",
     },
-    row: { transition: "background 0.1s", cursor: "default" },
+    row: { transition: "background 0.12s", cursor: "default" },
     btnImpersonate: {
-      background: `linear-gradient(135deg, ${T.violet}, #6D28D9)`,
-      border: "none", borderRadius: 7, padding: "5px 11px",
-      color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer",
-      fontFamily: FONT.ui, transition: "opacity 0.15s", whiteSpace: "nowrap",
+      background: "rgba(124,58,237,0.12)",
+      border: `1px solid rgba(124,58,237,0.35)`,
+      borderRadius: 7, padding: "5px 11px",
+      color: "#A78BFA", fontSize: 11, fontWeight: 700, cursor: "pointer",
+      fontFamily: FONT.ui, transition: "all 0.15s", whiteSpace: "nowrap",
     },
     btnToggle: (isActive) => ({
-      background: "transparent",
-      border: `1px solid ${isActive ? T.crimson : T.emerald}`,
+      background: isActive ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)",
+      border: `1px solid ${isActive ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.3)"}`,
       borderRadius: 7, padding: "5px 10px",
       color: isActive ? T.crimson : T.emerald,
       fontSize: 11, fontWeight: 600,
       cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap",
     }),
-    pagination: { display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16, alignItems: "center", flexWrap: "wrap" },
+    pagination: { display: "flex", gap: 8, justifyContent: "space-between", marginTop: 18, alignItems: "center", flexWrap: "wrap" },
     pageBtn: (active) => ({
-      background: active ? T.amber : T.card, border: `1px solid ${active ? T.amber : T.border}`,
-      borderRadius: 7, padding: "6px 14px", color: active ? "#000" : T.t2,
-      fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui,
+      background: active ? T.amber : "transparent",
+      border: `1px solid ${active ? T.amber : T.border}`,
+      borderRadius: 8, padding: "7px 16px", color: active ? "#000" : T.t2,
+      fontSize: 12, fontWeight: 700, cursor: active ? "default" : "pointer", fontFamily: FONT.ui,
+      transition: "all 0.15s",
     }),
     btnAddUser: {
-      background: T.amber, border: "none", borderRadius: 9, padding: "9px 16px",
-      color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui,
-      display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+      background: T.amber, border: "none", borderRadius: 8, padding: "9px 18px",
+      color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif",
+      display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
+      textTransform: "uppercase", letterSpacing: "0.06em",
+      transition: "filter 0.15s, transform 0.15s",
+      boxShadow: "0 0 16px rgba(255,31,58,0.2)",
     },
     tab: (active) => ({
-      padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+      padding: "12px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
       border: "none", background: "none", fontFamily: FONT.ui,
       color: active ? T.amber : T.t3,
       borderBottom: active ? `2px solid ${T.amber}` : "2px solid transparent",
@@ -381,9 +842,10 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
     }),
     statusBadge: (isActive) => ({
       background: isActive ? T.emeraldBg : T.crimsonBg,
-      border: `1px solid ${isActive ? T.emerald : T.crimson}`,
+      border: `1px solid ${isActive ? "rgba(16,185,129,0.35)" : "rgba(239,68,68,0.35)"}`,
       color: isActive ? T.emerald : T.crimson,
-      borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 700, fontFamily: FONT.ui,
+      borderRadius: 20, padding: "3px 10px", fontSize: 10, fontWeight: 700, fontFamily: FONT.ui,
+      letterSpacing: "0.04em", whiteSpace: "nowrap",
     }),
   };
 
@@ -392,32 +854,44 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
   const filteredUserTypes = userTypes.filter(ut => ALLOWED_ROLE_SLUGS.includes(ut.slug));
 
   const ADMIN_CSS = `
-    /* ── Admin content area padding ── */
-    .admin-content-wrap { padding-left: 68px; }
+    /* ── Stats grid ── */
+    .admin-stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 28px; }
+    .admin-stat-card:hover { border-color: ${T.borderHi} !important; }
 
-    /* ── Admin stat cards: 3-col on desktop, 2-col on mobile ── */
-    .admin-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 14px; margin-bottom: 28px; }
+    /* ── Admin controls row ── */
+    .admin-controls-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; flex-wrap: wrap; }
+    .admin-search-input { flex: 1; min-width: 200px; }
 
-    /* ── Admin controls row: search + filter + button ── */
-    .admin-controls-row { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
-    .admin-search-input { flex: 1; min-width: 160px; }
+    /* ── Add user button hover ── */
+    .admin-add-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
-    /* ── Table: horizontal scroll on mobile ── */
-    .admin-table-wrap { background: ${T.surface}; border: 1px solid ${T.border}; border-radius: 14px; overflow: hidden; }
+    /* ── Table ── */
+    .admin-table-wrap { background: linear-gradient(145deg, #1e1f26 0%, #12131a 100%); border: 1px solid #3F3F46; border-radius: 12px; overflow: hidden; }
     .admin-table-wrap-inner { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .admin-table-wrap-inner table { min-width: 800px; width: 100%; border-collapse: collapse; }
+    .admin-table-wrap-inner table { min-width: 900px; width: 100%; border-collapse: collapse; }
+    .admin-table-row:hover { background: ${T.cardHover} !important; }
 
-    /* ── User card layout for mobile (hides table, shows cards) ── */
+    /* ── User card layout for mobile ── */
     .admin-user-card { display: none; }
 
     /* ── Pagination ── */
-    .admin-pagination { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; align-items: center; flex-wrap: wrap; }
+    .admin-pagination { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; align-items: center; flex-wrap: wrap; }
+
+    /* ── Impersonate / toggle btn hover ── */
+    .btn-impersonate:hover { background: rgba(124,58,237,0.22) !important; border-color: rgba(124,58,237,0.6) !important; }
+    .btn-toggle-active:hover { background: rgba(239,68,68,0.16) !important; }
+    .btn-toggle-inactive:hover { background: rgba(16,185,129,0.16) !important; }
+
+    /* ── Section heading ── */
+    .admin-section-title { font-size: 14px; font-weight: 700; color: ${T.t1}; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+    @media (max-width: 1280px) {
+      .admin-stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
+    }
 
     @media (max-width: 768px) {
-      /* Sidebar becomes topbar — content no longer needs left padding */
       .admin-content-wrap { padding-left: 0 !important; padding-top: 58px !important; }
 
-      /* Admin sidebar → horizontal topbar */
       .admin-sidebar {
         top: 0 !important; bottom: auto !important;
         left: 0 !important; right: 0 !important;
@@ -435,24 +909,18 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
       .admin-sidebar-logout { margin: 0 !important; }
       .admin-sidebar-logo { margin-bottom: 0 !important; width: 32px !important; height: 32px !important; font-size: 14px !important; }
 
-      /* Page body padding */
       .admin-page-body { padding: 16px 14px 40px !important; }
-
-      /* Sticky header needs to be below the topbar */
       .admin-page-sticky-header { top: 54px !important; }
 
-      /* Stats: 2-col on mobile, smaller values */
       .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; margin-bottom: 18px !important; }
       .admin-stats-grid .stat-val { font-size: 22px !important; }
       .admin-stats-grid .stat-label { font-size: 10px !important; }
 
-      /* Controls row: search full width, select+button in a row */
       .admin-controls-row { gap: 8px !important; }
       .admin-search-input { min-width: 0 !important; width: 100% !important; flex: none !important; order: 0 !important; }
       .admin-type-select { flex: 1 !important; min-width: 0 !important; }
       .admin-add-btn { flex-shrink: 0 !important; }
 
-      /* Table → Cards on mobile */
       .admin-table-wrap-inner { overflow: visible !important; }
       .admin-table-wrap-inner table { display: none !important; }
       .admin-user-card { display: block !important; }
@@ -464,65 +932,83 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
     }
   `;
 
+  const STAT_CONFIG = [
+    { label: "Total Users",  key: "totalUsers",  color: T.violet,  icon: "👥",  glow: "rgba(167,139,250,0.25)" },
+    { label: "Shop Owners",  key: "shopOwners",  color: T.emerald, icon: "🏪",  glow: "rgba(16,185,129,0.25)" },
+    { label: "Customers",    key: "customers",   color: T.sky,     icon: "🛒",  glow: "rgba(56,189,248,0.25)" },
+    { label: "Total Shops",  key: "totalShops",  color: T.amber,   icon: "📦",  glow: "rgba(227,24,55,0.25)" },
+    { label: "Active Users", key: "activeUsers", color: T.emerald, icon: "✅",  glow: "rgba(16,185,129,0.25)" },
+    { label: "Admins",       key: "admins",      color: "#A78BFA", icon: "🛡️", glow: "rgba(167,139,250,0.25)" },
+  ];
+
   return (
     <div style={S.page}>
       <style>{ADMIN_CSS}</style>
-      {/* Header */}
+
+      {/* ── Header ── */}
       <div className="admin-page-sticky-header" style={S.header}>
         <div style={S.title}>
-          <div style={S.badge}>🛡️</div>
+          <div style={S.badge}>⚡</div>
           <div>
             <div style={S.titleText}>Admin Console</div>
-            <div style={S.titleSub}>Platform Management</div>
+            <div style={S.titleSub}>PLATFORM MANAGEMENT</div>
           </div>
         </div>
-        <div style={{ fontSize: 12, color: T.t3 }}>
-          {total} user{total !== 1 ? "s" : ""} total
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
+            <span style={{ color: T.t1, fontWeight: 700 }}>{total}</span> users total
+          </div>
+          {currentUser && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Avatar user={currentUser} size={28} />
+              <span style={{ fontSize: 12, color: T.t2, fontWeight: 600 }}>{currentUser.name || currentUser.email}</span>
+            </div>
+          )}
         </div>
       </div>
 
       <div className="admin-page-body" style={S.body}>
+
         {/* Global error / success */}
         {error && (
-          <div style={{ background: T.crimsonBg, border: `1.5px solid ${T.crimson}`, borderRadius: 10, padding: "11px 14px", color: T.crimson, fontSize: 13, marginBottom: 16, fontFamily: FONT.ui }}>
-            {error}
+          <div style={{ background: "rgba(239,68,68,0.07)", border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.crimson, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+            <span>⚠</span> {error}
           </div>
         )}
         {successMsg && (
-          <div style={{ background: T.emeraldBg, border: `1.5px solid ${T.emerald}`, borderRadius: 10, padding: "11px 14px", color: T.emerald, fontSize: 13, marginBottom: 16, fontFamily: FONT.ui }}>
-            {successMsg}
+          <div style={{ background: "rgba(16,185,129,0.07)", border: `1px solid rgba(16,185,129,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.emerald, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+            <span>✓</span> {successMsg}
           </div>
         )}
 
-        {/* Stats */}
+        {/* ── Stats Grid ── */}
         {stats && (
-          <div className="admin-stats-grid" style={S.statsGrid}>
-            {[
-              { label: "Total Users",  val: stats.totalUsers,  color: T.t1,      icon: "👥" },
-              { label: "Shop Owners",  val: stats.shopOwners,  color: T.emerald, icon: "🏪" },
-              { label: "Customers",    val: stats.customers,   color: T.sky,     icon: "🛒" },
-              { label: "Total Shops",  val: stats.totalShops,  color: T.amber,   icon: "📦" },
-              { label: "Active Users", val: stats.activeUsers, color: T.emerald, icon: "✅" },
-              { label: "Admins",       val: stats.admins,      color: T.violet,  icon: "🛡️" },
-            ].map((s) => (
-              <div key={s.label} style={S.statCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                  <div className="stat-val" style={{ ...S.statVal, color: s.color }}>{s.val ?? "—"}</div>
-                  <span style={{ fontSize: 18, opacity: 0.6 }}>{s.icon}</span>
+          <div className="admin-stats-grid">
+            {STAT_CONFIG.map((sc) => (
+              <div key={sc.label} className="admin-stat-card" style={S.statCard(sc.color, sc.glow)}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                  <div className="stat-val" style={{ ...S.statVal, color: sc.color }}>{stats[sc.key] ?? "—"}</div>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: `${sc.color}14`, border: `1px solid ${sc.color}28`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{sc.icon}</div>
                 </div>
-                <div className="stat-label" style={S.statLabel}>{s.label}</div>
+                <div className="stat-label" style={S.statLabel}>{sc.label}</div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Tabs */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.border}`, marginBottom: 20 }}>
+        {/* ── Tabs ── */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${T.border}`, marginBottom: 24, gap: 0 }}>
           <button style={S.tab(activeTab === "users")} onClick={() => setActiveTab("users")}>
             Users
           </button>
           <button style={S.tab(activeTab === "verifications")} onClick={() => setActiveTab("verifications")}>
-            Verifications{pendingCount > 0 ? ` ⏳ ${pendingCount}` : ""}
+            Verifications
+            {pendingCount > 0 && (
+              <span style={{ marginLeft: 7, background: T.amber, color: "#000", borderRadius: 20, padding: "1px 7px", fontSize: 10, fontWeight: 800 }}>{pendingCount}</span>
+            )}
+          </button>
+          <button style={S.tab(activeTab === "catalog")} onClick={() => setActiveTab("catalog")}>
+            Parts Catalog
           </button>
         </div>
 
@@ -531,26 +1017,28 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
           <>
             {/* Controls */}
             <div className="admin-controls-row" style={S.controls}>
-              <input
-                className="admin-search-input"
-                style={S.searchInput}
-                placeholder="🔍  Search by name, email or phone..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+              <div className="admin-search-input" style={S.searchWrap}>
+                <span style={S.searchIcon}>🔍</span>
+                <input
+                  style={S.searchInput}
+                  placeholder="Search by name, email or phone..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
               <select
                 className="admin-type-select"
                 style={S.select}
                 value={roleFilter}
                 onChange={e => setRoleFilter(e.target.value)}
               >
-                <option value="ALL">All Types</option>
+                <option value="ALL">All Roles</option>
                 {filteredUserTypes.map(ut => (
                   <option key={ut.slug} value={ut.slug}>{ut.name}</option>
                 ))}
               </select>
               <button className="admin-add-btn" style={S.btnAddUser} onClick={() => setShowAddUser(true)}>
-                + Add User
+                <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add User
               </button>
             </div>
 
@@ -561,29 +1049,36 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                 <table style={S.table}>
                   <thead>
                     <tr>
-                      {["User", "Role", "User Type", "Shop", "Last Login", "Logins", "Status", "Actions"].map(h => (
+                      {["User", "Role", "Change Type", "Shop", "Last Login", "Logins", "Status", "Actions"].map(h => (
                         <th key={h} style={S.th}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={8} style={{ ...S.td, textAlign: "center", padding: 40, color: T.t3 }}>Loading users...</td></tr>
+                      Array.from({ length: 5 }).map((_, i) => (
+                        <tr key={i}><td colSpan={8} style={{ ...S.td, padding: 0 }}>
+                          <div style={{ height: 56, background: `linear-gradient(90deg, ${T.card} 25%, ${T.cardHover} 50%, ${T.card} 75%)`, backgroundSize: "200% 100%", animation: "shimmer 1.5s ease infinite" }} />
+                        </td></tr>
+                      ))
                     ) : users.length === 0 ? (
-                      <tr><td colSpan={8} style={{ ...S.td, textAlign: "center", padding: 40, color: T.t3 }}>No users found</td></tr>
+                      <tr><td colSpan={8} style={{ ...S.td, textAlign: "center", padding: "48px 24px", color: T.t3 }}>
+                        <div style={{ fontSize: 36, marginBottom: 8 }}>🔍</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: T.t2 }}>No users found</div>
+                        <div style={{ fontSize: 12, color: T.t4, marginTop: 4 }}>Try adjusting your search or filter</div>
+                      </td></tr>
                     ) : users.map(u => (
                       <tr
                         key={u.userId}
+                        className="admin-table-row"
                         style={S.row}
-                        onMouseEnter={e => e.currentTarget.style.background = `${T.amber}08`}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                       >
                         <td style={S.td}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <Avatar user={u} size={32} />
+                          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                            <Avatar user={u} size={36} />
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: T.t1 }}>{u.name || <span style={{ color: T.t4, fontStyle: "italic" }}>No name</span>}</div>
-                              <div style={{ fontSize: 11, color: T.t3 }}>{u.email || u.phone || "—"}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, marginBottom: 2 }}>{u.name || <span style={{ color: T.t4, fontStyle: "italic" }}>No name</span>}</div>
+                              <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono }}>{u.email || u.phone || "—"}</div>
                             </div>
                           </div>
                         </td>
@@ -624,22 +1119,26 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                           </span>
                         </td>
                         <td style={{ ...S.td, whiteSpace: "nowrap" }}>
-                          {(u.userType?.slug || u.role) !== "PLATFORM_ADMIN" && (
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            {(u.userType?.slug || u.role) !== "PLATFORM_ADMIN" && (
+                              <button
+                                className="btn-impersonate"
+                                style={{ ...S.btnImpersonate, opacity: impersonatingId === u.userId ? 0.55 : 1 }}
+                                onClick={() => handleImpersonate(u)}
+                                disabled={!!impersonatingId}
+                                title={`Login as ${u.name || u.email}`}
+                              >
+                                {impersonatingId === u.userId ? "···" : "⚡ Login as"}
+                              </button>
+                            )}
                             <button
-                              style={{ ...S.btnImpersonate, opacity: impersonatingId === u.userId ? 0.6 : 1, marginRight: 6 }}
-                              onClick={() => handleImpersonate(u)}
-                              disabled={!!impersonatingId}
-                              title={`Login as ${u.name || u.email}`}
+                              className={u.isActive ? "btn-toggle-active" : "btn-toggle-inactive"}
+                              style={S.btnToggle(u.isActive)}
+                              onClick={() => handleToggleActive(u)}
                             >
-                              {impersonatingId === u.userId ? "…" : "⚡ Imp."}
+                              {u.isActive ? "Deactivate" : "Activate"}
                             </button>
-                          )}
-                          <button
-                            style={S.btnToggle(u.isActive)}
-                            onClick={() => handleToggleActive(u)}
-                          >
-                            {u.isActive ? "Deactivate" : "Activate"}
-                          </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -719,19 +1218,28 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
             {/* Pagination */}
             {pages > 1 && (
               <div className="admin-pagination" style={S.pagination}>
-                <span style={{ fontSize: 12, color: T.t3 }}>
-                  Page {currentPage + 1} of {pages} · {total} users
+                <span style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
+                  Showing <span style={{ color: T.t1, fontWeight: 700 }}>{offset + 1}–{Math.min(offset + LIMIT, total)}</span> of <span style={{ color: T.t1, fontWeight: 700 }}>{total}</span> users
                 </span>
-                <button
-                  style={S.pageBtn(false)}
-                  disabled={currentPage === 0}
-                  onClick={() => { const o = offset - LIMIT; setOffset(o); fetchUsers(search, roleFilter, o); }}
-                >← Prev</button>
-                <button
-                  style={S.pageBtn(false)}
-                  disabled={currentPage >= pages - 1}
-                  onClick={() => { const o = offset + LIMIT; setOffset(o); fetchUsers(search, roleFilter, o); }}
-                >Next →</button>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    style={{ ...S.pageBtn(false), opacity: currentPage === 0 ? 0.4 : 1 }}
+                    disabled={currentPage === 0}
+                    onClick={() => { const o = offset - LIMIT; setOffset(o); fetchUsers(search, roleFilter, o); }}
+                  >← Prev</button>
+                  {Array.from({ length: Math.min(pages, 5) }, (_, i) => i).map(i => (
+                    <button
+                      key={i}
+                      style={S.pageBtn(i === currentPage)}
+                      onClick={() => { const o = i * LIMIT; setOffset(o); fetchUsers(search, roleFilter, o); }}
+                    >{i + 1}</button>
+                  ))}
+                  <button
+                    style={{ ...S.pageBtn(false), opacity: currentPage >= pages - 1 ? 0.4 : 1 }}
+                    disabled={currentPage >= pages - 1}
+                    onClick={() => { const o = offset + LIMIT; setOffset(o); fetchUsers(search, roleFilter, o); }}
+                  >Next →</button>
+                </div>
               </div>
             )}
           </>
@@ -741,121 +1249,121 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
         {activeTab === "verifications" && (
           <>
             {verError && (
-              <div style={{ background: T.crimsonBg, border: `1.5px solid ${T.crimson}`, borderRadius: 10, padding: "11px 14px", color: T.crimson, fontSize: 13, marginBottom: 16, fontFamily: FONT.ui }}>
-                {verError}
+              <div style={{ background: "rgba(239,68,68,0.07)", border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.crimson, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+                <span>⚠</span> {verError}
               </div>
             )}
             {verSuccess && (
-              <div style={{ background: T.emeraldBg, border: `1.5px solid ${T.emerald}`, borderRadius: 10, padding: "11px 14px", color: T.emerald, fontSize: 13, marginBottom: 16, fontFamily: FONT.ui }}>
-                {verSuccess}
+              <div style={{ background: "rgba(16,185,129,0.07)", border: `1px solid rgba(16,185,129,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.emerald, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+                <span>✓</span> {verSuccess}
               </div>
             )}
 
             {verLoading ? (
-              <div style={{ textAlign: "center", padding: 60, color: T.t3, fontFamily: FONT.ui }}>Loading verifications…</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} style={{ height: 160, borderRadius: 14, background: T.card, border: `1px solid ${T.border}`, animation: "shimmer 1.5s ease infinite", backgroundImage: `linear-gradient(90deg, ${T.card} 25%, ${T.cardHover} 50%, ${T.card} 75%)`, backgroundSize: "200% 100%" }} />
+                ))}
+              </div>
             ) : verifications.length === 0 ? (
-              <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: T.t1, marginBottom: 6, fontFamily: FONT.ui }}>All clear!</div>
-                <div style={{ fontSize: 13, color: T.t3, fontFamily: FONT.ui }}>No pending or rejected shop owner applications.</div>
+              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: "60px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: 44, marginBottom: 14 }}>🎉</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: T.t1, marginBottom: 6, fontFamily: FONT.ui }}>Queue is clear!</div>
+                <div style={{ fontSize: 13, color: T.t3, fontFamily: FONT.ui }}>No pending shop owner applications to review.</div>
               </div>
             ) : (
-              <div className="admin-table-wrap">
-                <div className="admin-table-wrap-inner">
-                <table style={S.table}>
-                  <thead>
-                    <tr>
-                      {["User", "Email / Phone", "Status", "Registered", "Actions"].map(h => (
-                        <th key={h} style={S.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {verifications.map(v => (
-                      <>
-                        <tr
-                          key={v.userId}
-                          style={S.row}
-                          onMouseEnter={e => e.currentTarget.style.background = `${T.amber}08`}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                        >
-                          <td style={S.td}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <Avatar user={v} size={32} />
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: T.t1, fontFamily: FONT.ui }}>{v.name || <span style={{ color: T.t4, fontStyle: "italic" }}>No name</span>}</div>
-                                {v.verificationStatus === "REJECTED" && v.verificationNote && (
-                                  <div style={{ fontSize: 11, color: T.crimson, marginTop: 2 }}>{v.verificationNote}</div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td style={S.td}>
-                            <div style={{ fontSize: 13, color: T.t2, fontFamily: FONT.ui }}>{v.email || "—"}</div>
-                            {v.phone && <div style={{ fontSize: 11, color: T.t3 }}>{v.phone}</div>}
-                          </td>
-                          <td style={S.td}><VerificationBadge status={v.verificationStatus} /></td>
-                          <td style={{ ...S.td, color: T.t3 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
+                {verifications.map(v => (
+                  <div key={v.userId} style={{
+                    background: T.card, border: `1px solid ${T.border}`,
+                    borderRadius: 16, overflow: "hidden",
+                    boxShadow: v.verificationStatus === "PENDING" ? `0 0 0 1px rgba(251,191,36,0.2), 0 4px 20px rgba(0,0,0,0.3)` : "0 4px 20px rgba(0,0,0,0.2)",
+                    transition: "box-shadow 0.2s",
+                  }}>
+                    {/* Card top bar */}
+                    <div style={{ padding: "14px 18px", background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <Avatar user={v} size={40} />
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: T.t1 }}>{v.name || <span style={{ fontStyle: "italic", color: T.t4 }}>No name</span>}</div>
+                          <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>{v.email || "—"}</div>
+                        </div>
+                      </div>
+                      <VerificationBadge status={v.verificationStatus} />
+                    </div>
+
+                    {/* Card body */}
+                    <div style={{ padding: "14px 18px" }}>
+                      <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
+                        <div>
+                          <div style={{ fontSize: 10, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Registered</div>
+                          <div style={{ fontSize: 12, color: T.t2 }}>
                             {v.createdAt ? new Date(v.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
-                          </td>
-                          <td style={{ ...S.td, whiteSpace: "nowrap" }}>
-                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                              <button
-                                style={{ background: T.emeraldBg, border: `1px solid ${T.emerald}`, color: T.emerald, borderRadius: 7, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
-                                onClick={() => handleVerify(v.userId, "APPROVE")}
-                              >
-                                ✓ Approve
-                              </button>
-                              <button
-                                style={{ background: T.crimsonBg, border: `1px solid ${T.crimson}`, color: T.crimson, borderRadius: 7, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
-                                onClick={() => { setRejectingId(rejectingId === v.userId ? null : v.userId); setRejectReason(""); setVerError(""); }}
-                              >
-                                ✗ Reject
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        {rejectingId === v.userId && (
-                          <tr key={`reject-${v.userId}`}>
-                            <td colSpan={5} style={{ ...S.td, background: T.crimsonBg, padding: "14px 20px" }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: T.crimson, marginBottom: 8, fontFamily: FONT.ui }}>Rejection reason (required)</div>
-                              <textarea
-                                style={{ width: "100%", background: T.card, border: `1.5px solid ${T.crimson}`, borderRadius: 10, padding: "10px 14px", color: T.t1, fontSize: 13, fontFamily: FONT.ui, outline: "none", resize: "vertical", minHeight: 72, boxSizing: "border-box", marginBottom: 10 }}
-                                placeholder="Explain why this application is being rejected..."
-                                value={rejectReason}
-                                onChange={e => setRejectReason(e.target.value)}
-                                autoFocus
-                              />
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <button
-                                  style={{ background: T.crimson, border: "none", color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
-                                  onClick={() => {
-                                    if (!rejectReason.trim()) { setVerError("A rejection reason is required"); return; }
-                                    handleVerify(v.userId, "REJECT", rejectReason);
-                                  }}
-                                >
-                                  Confirm Reject
-                                </button>
-                                <button
-                                  style={{ background: "transparent", border: `1px solid ${T.border}`, color: T.t3, borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}
-                                  onClick={() => { setRejectingId(null); setRejectReason(""); }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                          </div>
+                        </div>
+                        {v.verificationStatus === "REJECTED" && v.verificationNote && (
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 10, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Rejection Reason</div>
+                            <div style={{ fontSize: 12, color: T.crimson, lineHeight: 1.4 }}>{v.verificationNote}</div>
+                          </div>
                         )}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
+                      </div>
+
+                      {rejectingId !== v.userId ? (
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            style={{ flex: 1, background: "rgba(16,185,129,0.1)", border: `1px solid rgba(16,185,129,0.35)`, color: T.emerald, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(16,185,129,0.2)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "rgba(16,185,129,0.1)"; }}
+                            onClick={() => handleVerify(v.userId, "APPROVE")}
+                          >
+                            ✓ Approve
+                          </button>
+                          <button
+                            style={{ flex: 1, background: "rgba(239,68,68,0.08)", border: `1px solid rgba(239,68,68,0.3)`, color: T.crimson, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
+                            onClick={() => { setRejectingId(v.userId); setRejectReason(""); setVerError(""); }}
+                          >
+                            ✗ Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: T.crimson, marginBottom: 8 }}>Rejection reason (required)</div>
+                          <textarea
+                            style={{ width: "100%", background: T.bg, border: `1.5px solid rgba(239,68,68,0.4)`, borderRadius: 10, padding: "10px 14px", color: T.t1, fontSize: 13, fontFamily: FONT.ui, outline: "none", resize: "vertical", minHeight: 72, boxSizing: "border-box", marginBottom: 10 }}
+                            placeholder="Explain why this application is being rejected..."
+                            value={rejectReason}
+                            onChange={e => setRejectReason(e.target.value)}
+                            autoFocus
+                          />
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              style={{ flex: 1, background: T.crimson, border: "none", color: "#fff", borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
+                              onClick={() => {
+                                if (!rejectReason.trim()) { setVerError("A rejection reason is required"); return; }
+                                handleVerify(v.userId, "REJECT", rejectReason);
+                              }}
+                            >Confirm Reject</button>
+                            <button
+                              style={{ flex: 1, background: "transparent", border: `1px solid ${T.border}`, color: T.t3, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}
+                              onClick={() => { setRejectingId(null); setRejectReason(""); }}
+                            >Cancel</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </>
         )}
       </div>
+
+        {/* ─── CATALOG TAB ─── */}
+        {activeTab === "catalog" && <CatalogTab />}
 
       {/* Add User Modal */}
       {showAddUser && (

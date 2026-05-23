@@ -49,13 +49,16 @@ async function _doRefresh() {
       signal: controller.signal,
     });
   } catch {
-    clearTokens();
-    throw Object.assign(new Error('Session expired. Please login again.'), { code: 'SESSION_EXPIRED' });
+    // Network error or timeout — do NOT clear tokens; the backend may be temporarily
+    // unavailable. The stored refresh token is still potentially valid.
+    clearTimeout(timeoutId);
+    throw Object.assign(new Error('Network error. Could not reach auth server.'), { code: 'NETWORK_ERROR' });
   } finally {
     clearTimeout(timeoutId);
   }
 
   if (!res.ok) {
+    // Server explicitly rejected the token (401/403) — it is genuinely invalid.
     clearTokens();
     throw Object.assign(new Error('Session expired. Please login again.'), { code: 'SESSION_EXPIRED' });
   }
