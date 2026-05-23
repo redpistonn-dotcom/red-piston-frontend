@@ -132,7 +132,7 @@ export default function LoginPage({ onLogin }) {
   const [resendTimer, setResendTimer]     = useState(0);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
-  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", gstin: "" });
+  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "" });
   const [profile, setProfile]     = useState({ name: "", profileType: "INDIVIDUAL" });
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingUser, setPendingUser]     = useState(null); // for profile step
@@ -298,10 +298,11 @@ export default function LoginPage({ onLogin }) {
   const submitShopDetails = async () => {
     if (!shopDetails.ownerName.trim()) { setError("Enter your full name"); return; }
     if (!shopDetails.shopName.trim())  { setError("Enter your shop name"); return; }
+    if (!shopDetails.address.trim())   { setError("Enter your shop address"); return; }
     if (!shopDetails.city.trim())      { setError("Enter your city"); return; }
     if (!shopDetails.state)            { setError("Select your state"); return; }
     const pin = shopDetails.pincode.replace(/\D/g, "");
-    if (pin && pin.length !== 6)       { setError("Enter a valid 6-digit pincode"); return; }
+    if (!pin || pin.length !== 6)      { setError("Enter a valid 6-digit pincode"); return; }
     const ph = shopDetails.contactPhone.replace(/\D/g, "");
     if (ph.length !== 10) { setError("Enter a valid 10-digit contact number"); return; }
     setError(""); setLoading(true);
@@ -310,10 +311,12 @@ export default function LoginPage({ onLogin }) {
         userId:       pendingUserId,
         ownerName:    shopDetails.ownerName.trim(),
         shopName:     shopDetails.shopName.trim(),
+        address:      shopDetails.address.trim(),
         city:         shopDetails.city.trim(),
         state:        shopDetails.state,
-        pincode:      pin || undefined,
+        pincode:      pin,
         contactPhone: ph,
+        email:        shopDetails.email.trim() || undefined,
         gstin:        shopDetails.gstin.trim() || undefined,
       });
       go(STEPS.PENDING);
@@ -383,97 +386,52 @@ export default function LoginPage({ onLogin }) {
     switch (step) {
 
       // ══════════════════════════════════════════════════════════════════════
-      // LANDING — Stitch design: tab switcher + phone OTP form
+      // LANDING — Role selector: Customer vs Shop Owner
       // ══════════════════════════════════════════════════════════════════════
       case STEPS.LANDING:
         return (
           <div className="auth-card">
-            {/* Heading */}
-            <div style={{ marginBottom: 28 }}>
-              <div style={S.heading}>System Access</div>
-              <div style={{ fontSize: 14, color: "#af8785", lineHeight: 1.5, marginTop: 4 }}>Initialize your session to manage operations.</div>
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <div style={{ fontSize: 38, marginBottom: 10 }}>🔧</div>
+              <div style={S.heading}>Welcome to RedPiston</div>
+              <div style={{ fontSize: 14, color: "#af8785", marginTop: 4 }}>How would you like to continue?</div>
             </div>
 
-            {/* Role tab switcher */}
-            <div style={{ background: "#1a1b22", borderRadius: 8, border: "1px solid #3F3F46", padding: 4, display: "flex", marginBottom: 28, gap: 4 }}>
-              <button
-                className={landingTab === "owner" ? "stitch-tab-active" : "stitch-tab-inactive"}
-                style={{ flex: 1, padding: "10px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.15s" }}
-                onClick={() => setLandingTab("owner")}
-              >SHOP OWNER / STAFF</button>
-              <button
-                className={landingTab === "customer" ? "stitch-tab-active" : "stitch-tab-inactive"}
-                style={{ flex: 1, padding: "10px 8px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.15s" }}
-                onClick={() => setLandingTab("customer")}
-              >CUSTOMER</button>
-            </div>
+            {/* Role cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 28 }}>
+              {/* Customer */}
+              <div style={{ background: "#1a1b22", border: "2px solid #3F3F46", borderRadius: 14, padding: "22px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+                <div style={{ fontSize: 34, marginBottom: 8 }}>🚗</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#e3e1ec", marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>Customer</div>
+                <div style={{ fontSize: 11, color: "#af8785", lineHeight: 1.5, textAlign: "center", marginBottom: 16 }}>Buy auto parts with fitment guarantee</div>
+                <button className="btn-primary" style={{ ...S.btnPrimary(false), marginBottom: 8, fontSize: 12, padding: "10px 14px" }}
+                  onClick={() => { setLandingTab("customer"); go(STEPS.SIGNIN); }}>
+                  Sign In →
+                </button>
+                <button className="btn-outline-stitch" style={{ ...S.btnOutline, fontSize: 11, padding: "9px 14px" }}
+                  onClick={() => { setRole("customer"); setLandingTab("customer"); setPhone(""); go(STEPS.REG_AUTH); }}>
+                  Create Account
+                </button>
+              </div>
 
-            {/* Phone input */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={S.label}>MOBILE NUMBER</label>
-              <div style={S.phoneRow}>
-                <div style={S.phoneFlag}>
-                  <span style={{ fontSize: 16 }}>🇮🇳</span>
-                  <span>+91</span>
-                </div>
-                <input
-                  className="auth-input"
-                  style={S.phoneInput}
-                  placeholder="Enter 10 digit number"
-                  value={phone}
-                  maxLength={10}
-                  inputMode="numeric"
-                  onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
-                  onKeyDown={e => e.key === "Enter" && phone.length === 10 && sendOtp(STEPS.SIGNIN_OTP)}
-                  autoFocus
-                />
+              {/* Shop Owner */}
+              <div style={{ background: "#1a1b22", border: "2px solid #3F3F46", borderRadius: 14, padding: "22px 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
+                <div style={{ fontSize: 34, marginBottom: 8 }}>🏪</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#e3e1ec", marginBottom: 4, fontFamily: "'Outfit', sans-serif" }}>Shop Owner</div>
+                <div style={{ fontSize: 11, color: "#af8785", lineHeight: 1.5, textAlign: "center", marginBottom: 16 }}>Manage your shop, billing & inventory</div>
+                <button className="btn-primary" style={{ ...S.btnPrimary(false), marginBottom: 8, fontSize: 12, padding: "10px 14px" }}
+                  onClick={() => { setLandingTab("owner"); go(STEPS.SIGNIN); }}>
+                  Sign In →
+                </button>
+                <button className="btn-outline-stitch" style={{ ...S.btnOutline, fontSize: 11, padding: "9px 14px" }}
+                  onClick={() => { setRole("shop"); setLandingTab("owner"); setPhone(""); go(STEPS.REG_AUTH); }}>
+                  Register Shop
+                </button>
               </div>
             </div>
 
-            {error && <div style={{ ...S.error, marginBottom: 16 }}>{error}</div>}
-
-            {/* GET OTP button */}
-            <button
-              className="btn-primary"
-              style={{ ...S.btnPrimary(loading || phone.length !== 10), marginBottom: 20 }}
-              disabled={loading || phone.length !== 10}
-              onClick={() => sendOtp(STEPS.SIGNIN_OTP)}
-            >
-              {loading ? "Sending…" : <><span>GET OTP</span><span style={{ fontSize: 16 }}>→</span></>}
-            </button>
-
-            {/* OR divider */}
-            <div style={S.divider}>
-              <div style={S.dividerLine} />
-              <span style={S.dividerText}>OR</span>
-              <div style={S.dividerLine} />
-            </div>
-
-            {/* Login with password */}
-            <button
-              className="btn-outline-stitch"
-              style={{ ...S.btnOutline, marginBottom: landingTab === "customer" ? 12 : 0 }}
-              onClick={() => { setAuthTab("email"); go(STEPS.SIGNIN); }}
-            >
-              <span style={{ fontSize: 15 }}>🔑</span>
-              LOGIN WITH PASSWORD
-            </button>
-
-            {/* Google — customer tab only */}
-            {landingTab === "customer" && (
-              <button className="btn-google" style={S.btnGoogle} onClick={() => googleAuth("signin")}>
-                <svg width="18" height="18" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                </svg>
-                CONTINUE WITH GOOGLE
-              </button>
-            )}
-
             {/* Admin access */}
-            <div style={{ textAlign: "center", marginTop: 28, paddingTop: 20, borderTop: "1px solid rgba(63,63,70,0.4)" }}>
+            <div style={{ textAlign: "center", paddingTop: 16, borderTop: "1px solid rgba(63,63,70,0.4)" }}>
               <button
                 style={{ background: "none", border: "none", color: "#5e3f3d", cursor: "pointer", fontSize: 11, fontFamily: FONT.mono, letterSpacing: "0.06em" }}
                 onClick={() => { setEmail(""); setPassword(""); go(STEPS.ADMIN_AUTH); }}
@@ -491,9 +449,9 @@ export default function LoginPage({ onLogin }) {
         return (
           <div className="auth-card">
             <button style={S.btnBack} onClick={() => back(STEPS.LANDING)}>← Back</button>
-            <div style={S.chip}>Welcome back</div>
-            <div style={S.heading}>Sign In</div>
-            <div style={S.sub}>Access your shop dashboard or marketplace account.</div>
+            <div style={S.chip}>{landingTab === "owner" ? "🏪 Shop Owner" : "🚗 Customer"} · Sign In</div>
+            <div style={S.heading}>Welcome back</div>
+            <div style={S.sub}>{landingTab === "owner" ? "Sign in to your shop dashboard." : "Sign in to browse parts & track orders."}</div>
 
             {/* Tabs */}
             <div style={{ display: "flex", borderBottom: `1px solid ${T.border}`, marginBottom: 24 }}>
@@ -595,8 +553,14 @@ export default function LoginPage({ onLogin }) {
 
             {/* Link to create account */}
             <div style={{ textAlign: "center", fontSize: 13, color: T.t3, marginTop: 24, paddingTop: 18, borderTop: `1px solid ${T.border}` }}>
-              No account?{" "}
-              <button onClick={() => { setPhone(""); setEmail(""); setPassword(""); go(STEPS.REG_ROLE); }} style={{ background: "none", border: "none", color: T.amber, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>Create one →</button>
+              {landingTab === "owner" ? "New shop? " : "No account? "}
+              <button onClick={() => {
+                setRole(landingTab === "owner" ? "shop" : "customer");
+                setPhone(""); setEmail(""); setPassword("");
+                go(STEPS.REG_AUTH);
+              }} style={{ background: "none", border: "none", color: T.amber, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>
+                {landingTab === "owner" ? "Register your shop →" : "Create account →"}
+              </button>
             </div>
           </div>
         );
@@ -670,8 +634,8 @@ export default function LoginPage({ onLogin }) {
       case STEPS.REG_AUTH:
         return (
           <div className="auth-card">
-            <button style={S.btnBack} onClick={() => { back(STEPS.REG_ROLE); }}>← Back</button>
-            <div style={S.chip}>{role === "shop" ? "Shop Owner" : "Customer"} · Step 2 of 3</div>
+            <button style={S.btnBack} onClick={() => back(STEPS.LANDING)}>← Back</button>
+            <div style={S.chip}>{role === "shop" ? "🏪 Register Shop" : "🚗 Customer"} · Step 1 of 3</div>
             <div style={S.heading}>{role === "shop" ? "Verify Your Identity" : "Create Account"}</div>
             <div style={S.sub}>{role === "shop" ? "We verify every shop owner to keep the platform trustworthy." : "Quick setup — takes under a minute."}</div>
 
@@ -809,6 +773,9 @@ export default function LoginPage({ onLogin }) {
             <label style={S.label}>Shop Name <span style={{ color: T.crimson }}>*</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Kumar Auto Parts" value={shopDetails.shopName} onChange={e => setShopDetails(d => ({ ...d, shopName: e.target.value }))} />
 
+            <label style={S.label}>Shop Address <span style={{ color: T.crimson }}>*</span></label>
+            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Plot 12, KPHB Colony, Kukatpally" value={shopDetails.address} onChange={e => setShopDetails(d => ({ ...d, address: e.target.value }))} />
+
             <label style={S.label}>City <span style={{ color: T.crimson }}>*</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Hyderabad" value={shopDetails.city} onChange={e => setShopDetails(d => ({ ...d, city: e.target.value }))} />
 
@@ -832,12 +799,15 @@ export default function LoginPage({ onLogin }) {
               <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" value={shopDetails.contactPhone} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, contactPhone: e.target.value.replace(/\D/g, "") }))} />
             </div>
 
+            <label style={S.label}>Shop Email <span style={{ color: T.t4, fontWeight: 400, textTransform: "none" }}>(optional — for order & billing notifications)</span></label>
+            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} type="email" placeholder="shop@example.com" value={shopDetails.email} onChange={e => setShopDetails(d => ({ ...d, email: e.target.value }))} />
+
             <label style={S.label}>GSTIN <span style={{ color: T.t4, fontWeight: 400, textTransform: "none" }}>(optional — for GST billing)</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 28, fontFamily: FONT.mono, letterSpacing: "1px" }} placeholder="22AAAAA0000A1Z5" value={shopDetails.gstin} maxLength={15} onChange={e => setShopDetails(d => ({ ...d, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") }))} />
 
             <button className="btn-primary"
-              style={S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.city.trim() || shopDetails.contactPhone.length !== 10)}
-              disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.city.trim() || shopDetails.contactPhone.length !== 10}
+              style={S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10)}
+              disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10}
               onClick={submitShopDetails}>
               {loading ? "Submitting…" : "Submit for Verification →"}
             </button>
