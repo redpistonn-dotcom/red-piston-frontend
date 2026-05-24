@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { api } from "../api/client.js";
 import { T, FONT } from "../theme.js";
 import { Avatar } from "../components/Avatar.jsx";
+import { MANUFACTURERS, MODELS } from "../data/vehicleData.js";
 
 // Color map by slug — uses T.* theme tokens
 const SLUG_COLORS = {
@@ -245,6 +246,16 @@ const PART_CATEGORIES = [
   'Bearings', 'Gaskets & Seals', 'Belts & Chains', 'Clutch', 'Battery & Charging',
 ];
 
+// Vehicle types stored in vehicle_types DB table — mirrored here for the import dropdown
+const VEHICLE_TYPES = [
+  { slug: 'car',         label: 'Car / Passenger Vehicle',      icon: '🚗' },
+  { slug: '2wheeler',    label: 'Motorcycle / 2-Wheeler',        icon: '🏍️' },
+  { slug: 'commercial',  label: 'Commercial Vehicle (LCV/HCV)',  icon: '🚚' },
+  { slug: 'tractor',     label: 'Tractor / Farm Equipment',      icon: '🚜' },
+  { slug: 'autorickshaw',label: 'Auto Rickshaw / 3-Wheeler',     icon: '🛺' },
+  { slug: 'ev',          label: 'Electric Vehicle',              icon: '⚡' },
+];
+
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
   const headers = TEMPLATE_COLS.map(c => c.label);
@@ -299,7 +310,10 @@ function CatalogTab() {
 
   // 'idle' → 'analyzing' (show column analysis + confirm) → 'confirmed' (show import button)
   const [analysisStep, setAnalysisStep] = useState('idle');
-  const [defaultCategory, setDefaultCategory] = useState('');
+  const [defaultCategory,    setDefaultCategory]    = useState('');
+  const [defaultVehicleType, setDefaultVehicleType] = useState('');
+  const [defaultMake,        setDefaultMake]        = useState('');
+  const [defaultModel,       setDefaultModel]       = useState('');
 
   const [dbParts, setDbParts]     = useState([]);
   const [dbTotal, setDbTotal]     = useState(0);
@@ -339,7 +353,7 @@ function CatalogTab() {
     if (!file) return;
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setParseErr('Upload an Excel (.xlsx, .xls) or CSV (.csv) file'); return; }
     setParsing(true); setParseErr(''); setFileData(null); setImportDone(false); setImportProg(null);
-    setAnalysisStep('idle'); setDefaultCategory('');
+    setAnalysisStep('idle'); setDefaultCategory(''); setDefaultVehicleType(''); setDefaultMake(''); setDefaultModel('');
     try {
       const parsed = await parseExcel(file);
       setFileData({ name: file.name, ...parsed });
@@ -374,9 +388,10 @@ function CatalogTab() {
             buyPrice:            p.buyPrice ? parseFloat(p.buyPrice) : undefined,
             alternateOemNumbers: p.alternateOem ? p.alternateOem.split(',').map(s => s.trim()).filter(Boolean) : undefined,
             weightGrams:         p.weightGrams ? parseInt(p.weightGrams) : undefined,
-            // Vehicle fitment — stored in part_fitments table
-            vehicleMake:         p.vehicleMake || null,
-            vehicleModel:        p.vehicleModel || null,
+            // Vehicle fitment — column values take priority; batch defaults fill gaps
+            vehicleMake:         p.vehicleMake || defaultMake || null,
+            vehicleModel:        p.vehicleModel || defaultModel || null,
+            vehicleType:         defaultVehicleType || 'Car',
             yearFrom:            p.yearFrom ? parseInt(p.yearFrom) : undefined,
             yearTo:              p.yearTo ? parseInt(p.yearTo) : undefined,
             fuelType:            p.fuelType || null,
@@ -468,7 +483,7 @@ function CatalogTab() {
                     {fileData.total !== fileData.mapped && <span> &nbsp;·&nbsp; {(fileData.total - fileData.mapped).toLocaleString()} skipped (no OEM and no Name)</span>}
                   </div>
                 </div>
-                <button onClick={() => { setFileData(null); setImportDone(false); setImportProg(null); setParseErr(''); setAnalysisStep('idle'); setDefaultCategory(''); }}
+                <button onClick={() => { setFileData(null); setImportDone(false); setImportProg(null); setParseErr(''); setAnalysisStep('idle'); setDefaultCategory(''); setDefaultVehicleType(''); setDefaultMake(''); setDefaultModel(''); }}
                   style={{ background: 'none', border: '1px solid #3F3F46', borderRadius: 6, color: '#af8785', cursor: 'pointer', padding: '4px 10px', fontSize: 12, fontFamily: "'Inter', sans-serif" }}>
                   ✕ Clear
                 </button>
@@ -484,23 +499,110 @@ function CatalogTab() {
                 return (
                   <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 12, padding: '20px', marginBottom: 14 }}>
 
-                    {/* Step 1 — Category selector */}
-                    <div style={{ marginBottom: 20 }}>
+                    {/* Step 1 — Vehicle + Category defaults */}
+                    <div style={{ marginBottom: 22 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 4 }}>
-                        Step 1 — What type of parts are in this file?
+                        Step 1 — Set Batch Defaults
                       </div>
-                      <div style={{ fontSize: 11, color: '#5e3f3d', fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
-                        This will be set as Category L1 for rows that don't already have a category column in the sheet.
+                      <div style={{ fontSize: 11, color: '#5e3f3d', fontFamily: "'Inter', sans-serif", marginBottom: 12 }}>
+                        These values fill in rows that don't already have the column in the sheet. All optional.
+                      </div>
+
+                      {/* Vehicle type + Make + Model — 3 columns */}
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        🚗 Vehicle Fitment
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+                        {/* Vehicle Type */}
+                        <div>
+                          <div style={{ fontSize: 10, color: '#af8785', fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>Vehicle Type</div>
+                          <select
+                            value={defaultVehicleType}
+                            onChange={e => { setDefaultVehicleType(e.target.value); setDefaultMake(''); setDefaultModel(''); }}
+                            style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 7, padding: '8px 10px', color: '#e3e1ec', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: 'pointer' }}
+                          >
+                            <option value="">— Any Type —</option>
+                            {VEHICLE_TYPES.map(t => (
+                              <option key={t.slug} value={t.slug}>{t.icon} {t.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Make — filtered by vehicle type */}
+                        <div>
+                          <div style={{ fontSize: 10, color: '#af8785', fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>Make (Manufacturer)</div>
+                          <select
+                            value={defaultMake}
+                            onChange={e => { setDefaultMake(e.target.value); setDefaultModel(''); }}
+                            style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 7, padding: '8px 10px', color: '#e3e1ec', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: 'pointer' }}
+                          >
+                            <option value="">— Any / Mixed —</option>
+                            {MANUFACTURERS
+                              .filter(m => !defaultVehicleType || m.vehicleType === defaultVehicleType)
+                              .map(m => (
+                                <option key={m.id} value={m.name}>{m.logo} {m.name}</option>
+                              ))
+                            }
+                          </select>
+                        </div>
+
+                        {/* Model — filtered by selected Make */}
+                        <div>
+                          <div style={{ fontSize: 10, color: '#af8785', fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
+                            Model {!defaultMake && <span style={{ color: '#3F3F46' }}>(select Make first)</span>}
+                          </div>
+                          <select
+                            value={defaultModel}
+                            onChange={e => setDefaultModel(e.target.value)}
+                            disabled={!defaultMake}
+                            style={{ width: '100%', background: defaultMake ? '#1a1b22' : '#131418', border: `1.5px solid ${defaultMake ? '#3F3F46' : '#232328'}`, borderRadius: 7, padding: '8px 10px', color: defaultMake ? '#e3e1ec' : '#3F3F46', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: defaultMake ? 'pointer' : 'not-allowed' }}
+                          >
+                            <option value="">— All Models —</option>
+                            {(() => {
+                              const mfg = MANUFACTURERS.find(mf => mf.name === defaultMake);
+                              return mfg
+                                ? MODELS
+                                    .filter(m => m.mfgId === mfg.id)
+                                    .map(m => (
+                                      <option key={m.id} value={m.name}>{m.name} ({m.yearFrom}–{m.yearTo ?? 'present'})</option>
+                                    ))
+                                : null;
+                            })()}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Live preview of selected vehicle */}
+                      {defaultMake && (
+                        <div style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 7, padding: '7px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 14 }}>🔗</span>
+                          <span style={{ fontSize: 11, color: '#C4B5FD', fontFamily: "'JetBrains Mono', monospace" }}>
+                            Fitment will be created for:&nbsp;
+                            <strong>{defaultVehicleType ? VEHICLE_TYPES.find(t=>t.slug===defaultVehicleType)?.icon+' ' : ''}{defaultMake}</strong>
+                            {defaultModel && <> → <strong>{defaultModel}</strong></>}
+                            {!defaultModel && <span style={{ color: '#8B5CF6', fontWeight: 400 }}> (all models)</span>}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Parts category */}
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                        📦 Parts Category
                       </div>
                       <select
                         value={defaultCategory}
                         onChange={e => setDefaultCategory(e.target.value)}
-                        style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 8, padding: '10px 14px', color: '#e3e1ec', fontSize: 13, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: 'pointer' }}
+                        style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 7, padding: '8px 12px', color: '#e3e1ec', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: 'pointer' }}
                       >
                         {PART_CATEGORIES.map(c => (
                           <option key={c} value={c}>{c === '' ? '— Mixed / Multiple categories (leave blank)' : c}</option>
                         ))}
                       </select>
+                      {defaultCategory && (
+                        <div style={{ marginTop: 6, fontSize: 10, color: '#F59E0B', fontFamily: "'Inter', sans-serif" }}>
+                          📂 All rows without a Category L1 column will be tagged as: <strong>{defaultCategory}</strong>
+                        </div>
+                      )}
                     </div>
 
                     {/* Step 2 — Column match analysis */}
@@ -617,14 +719,19 @@ function CatalogTab() {
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
                         {Object.keys(fileData.colMap).length} / {fileData.headers.length} columns matched
                       </div>
-                      {defaultCategory && (
-                        <span style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
-                          📂 Default category: {defaultCategory}
+                      {defaultMake && (
+                        <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#C4B5FD', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                          🔗 {defaultMake}{defaultModel ? ` → ${defaultModel}` : ' (all models)'}
                         </span>
                       )}
-                      {Object.values(fileData.colMap).includes('vehicleMake') && (
+                      {defaultCategory && (
+                        <span style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                          📂 {defaultCategory}
+                        </span>
+                      )}
+                      {Object.values(fileData.colMap).includes('vehicleMake') && !defaultMake && (
                         <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3B82F6', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
-                          🔗 Vehicle fitment columns detected
+                          🔗 Vehicle fitment columns in sheet
                         </span>
                       )}
                       <button

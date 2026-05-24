@@ -3,27 +3,52 @@
 // NOT hardcoded in frontend components — imported as structured data.
 
 // ─── MANUFACTURERS TABLE ───
+// vehicleType: 'car' | '2wheeler' | 'commercial' | 'tractor' matches VehicleType.slug
 export const MANUFACTURERS = [
-    { id: "maruti", name: "Maruti Suzuki", country: "India/Japan", logo: "🔵" },
-    { id: "hyundai", name: "Hyundai", country: "South Korea", logo: "🔷" },
-    { id: "tata", name: "Tata", country: "India", logo: "🟦" },
-    { id: "mahindra", name: "Mahindra", country: "India", logo: "🔴" },
-    { id: "toyota", name: "Toyota", country: "Japan", logo: "🔶" },
-    { id: "honda", name: "Honda", country: "Japan", logo: "⬜" },
-    { id: "kia", name: "Kia", country: "South Korea", logo: "🟥" },
-    { id: "mg", name: "MG", country: "UK/China", logo: "🟢" },
-    { id: "skoda", name: "Skoda", country: "Czech", logo: "🟩" },
-    { id: "vw", name: "Volkswagen", country: "Germany", logo: "🔵" },
-    { id: "renault", name: "Renault", country: "France", logo: "🟡" },
-    { id: "nissan", name: "Nissan", country: "Japan", logo: "⚪" },
-    { id: "ford", name: "Ford", country: "USA", logo: "🔵" },
-    { id: "chevrolet", name: "Chevrolet", country: "USA", logo: "🟡" },
-    { id: "bmw", name: "BMW", country: "Germany", logo: "⬛" },
-    { id: "mercedes", name: "Mercedes-Benz", country: "Germany", logo: "⬛" },
-    { id: "audi", name: "Audi", country: "Germany", logo: "⬛" },
-    { id: "jeep", name: "Jeep", country: "USA", logo: "🟤" },
-    { id: "volvo", name: "Volvo", country: "Sweden", logo: "🔷" },
-    { id: "isuzu", name: "Isuzu", country: "Japan", logo: "🔴" },
+    // ── Cars / Passenger Vehicles ──
+    { id: "maruti",    name: "Maruti Suzuki",    country: "India/Japan",   logo: "🔵", vehicleType: "car" },
+    { id: "hyundai",   name: "Hyundai",          country: "South Korea",   logo: "🔷", vehicleType: "car" },
+    { id: "tata",      name: "Tata Motors",      country: "India",         logo: "🟦", vehicleType: "car" },
+    { id: "mahindra",  name: "Mahindra",         country: "India",         logo: "🔴", vehicleType: "car" },
+    { id: "toyota",    name: "Toyota",           country: "Japan",         logo: "🔶", vehicleType: "car" },
+    { id: "honda",     name: "Honda Cars",       country: "Japan",         logo: "⬜", vehicleType: "car" },
+    { id: "kia",       name: "Kia",             country: "South Korea",   logo: "🟥", vehicleType: "car" },
+    { id: "mg",        name: "MG",              country: "UK/China",      logo: "🟢", vehicleType: "car" },
+    { id: "skoda",     name: "Skoda",           country: "Czech",         logo: "🟩", vehicleType: "car" },
+    { id: "vw",        name: "Volkswagen",      country: "Germany",       logo: "🔵", vehicleType: "car" },
+    { id: "renault",   name: "Renault",         country: "France",        logo: "🟡", vehicleType: "car" },
+    { id: "nissan",    name: "Nissan",          country: "Japan",         logo: "⚪", vehicleType: "car" },
+    { id: "ford",      name: "Ford",            country: "USA",           logo: "🔵", vehicleType: "car" },
+    { id: "chevrolet", name: "Chevrolet",       country: "USA",           logo: "🟡", vehicleType: "car" },
+    { id: "bmw",       name: "BMW",             country: "Germany",       logo: "⬛", vehicleType: "car" },
+    { id: "mercedes",  name: "Mercedes-Benz",   country: "Germany",       logo: "⬛", vehicleType: "car" },
+    { id: "audi",      name: "Audi",            country: "Germany",       logo: "⬛", vehicleType: "car" },
+    { id: "jeep",      name: "Jeep",            country: "USA",           logo: "🟤", vehicleType: "car" },
+    { id: "volvo",     name: "Volvo",           country: "Sweden",        logo: "🔷", vehicleType: "car" },
+    { id: "isuzu",     name: "Isuzu",           country: "Japan",         logo: "🔴", vehicleType: "car" },
+    // ── Motorcycles / 2-Wheelers ──
+    { id: "hero",      name: "Hero",            country: "India",         logo: "🔴", vehicleType: "2wheeler" },
+    { id: "bajaj",     name: "Bajaj",           country: "India",         logo: "🔵", vehicleType: "2wheeler" },
+    { id: "tvs",       name: "TVS",             country: "India",         logo: "🟡", vehicleType: "2wheeler" },
+    { id: "honda_mc",  name: "Honda Motorcycles",country: "Japan",        logo: "⬜", vehicleType: "2wheeler" },
+    { id: "re",        name: "Royal Enfield",   country: "India",         logo: "🟢", vehicleType: "2wheeler" },
+    { id: "yamaha",    name: "Yamaha",          country: "Japan",         logo: "🔵", vehicleType: "2wheeler" },
+    { id: "suzuki_mc", name: "Suzuki Motorcycles",country: "Japan",       logo: "🔵", vehicleType: "2wheeler" },
+    { id: "ktm",       name: "KTM",             country: "Austria",       logo: "🟠", vehicleType: "2wheeler" },
+    { id: "ola",       name: "Ola Electric",    country: "India",         logo: "⚡", vehicleType: "2wheeler" },
+    { id: "ather",     name: "Ather Energy",    country: "India",         logo: "⚡", vehicleType: "2wheeler" },
+    // ── Commercial Vehicles ──
+    { id: "ashok",     name: "Ashok Leyland",   country: "India",         logo: "🔵", vehicleType: "commercial" },
+    { id: "tata_cv",   name: "Tata Commercial", country: "India",         logo: "🟦", vehicleType: "commercial" },
+    { id: "mahindra_cv",name:"Mahindra Commercial",country:"India",       logo: "🔴", vehicleType: "commercial" },
+    { id: "eicher",    name: "Eicher / VECV",   country: "India",         logo: "🟢", vehicleType: "commercial" },
+    { id: "force",     name: "Force Motors",    country: "India",         logo: "🟡", vehicleType: "commercial" },
+    // ── Tractors ──
+    { id: "mahindra_tr",name:"Mahindra Tractors",country:"India",         logo: "🔴", vehicleType: "tractor" },
+    { id: "sonalika",  name: "Sonalika",        country: "India",         logo: "🟡", vehicleType: "tractor" },
+    { id: "john_deere",name: "John Deere",      country: "USA",           logo: "🟢", vehicleType: "tractor" },
+    { id: "new_holland",name:"New Holland",     country: "USA",           logo: "🔵", vehicleType: "tractor" },
+    { id: "escorts",   name: "Escorts Kubota",  country: "India",         logo: "🟠", vehicleType: "tractor" },
 ];
 
 // ─── MODELS TABLE ───
@@ -204,9 +229,77 @@ export const MODELS = [
     { id: "s90", mfgId: "volvo", name: "S90", yearFrom: 2016, yearTo: 2025 },
 
     // ── Isuzu ──
-    { id: "dmax", mfgId: "isuzu", name: "D-Max V-Cross", yearFrom: 2016, yearTo: 2025 },
-    { id: "mu_x", mfgId: "isuzu", name: "mu-X", yearFrom: 2017, yearTo: 2025 },
-    { id: "dmax_rt", mfgId: "isuzu", name: "D-Max Regular", yearFrom: 2014, yearTo: 2025 },
+    { id: "dmax",    mfgId: "isuzu", name: "D-Max V-Cross",  yearFrom: 2016, yearTo: 2025 },
+    { id: "mu_x",   mfgId: "isuzu", name: "mu-X",           yearFrom: 2017, yearTo: 2025 },
+    { id: "dmax_rt",mfgId: "isuzu", name: "D-Max Regular",  yearFrom: 2014, yearTo: 2025 },
+
+    // ── Hero ──
+    { id: "splendor",      mfgId: "hero", name: "Splendor Plus",    yearFrom: 2005, yearTo: 2025 },
+    { id: "hf_deluxe",     mfgId: "hero", name: "HF Deluxe",        yearFrom: 2014, yearTo: 2025 },
+    { id: "passion_pro",   mfgId: "hero", name: "Passion Pro",      yearFrom: 2010, yearTo: 2025 },
+    { id: "glamour",       mfgId: "hero", name: "Glamour",          yearFrom: 2012, yearTo: 2025 },
+    { id: "xtreme_160r",   mfgId: "hero", name: "Xtreme 160R",      yearFrom: 2020, yearTo: 2025 },
+    { id: "hero_xpulse",   mfgId: "hero", name: "Xpulse 200",       yearFrom: 2019, yearTo: 2025 },
+
+    // ── Bajaj ──
+    { id: "pulsar_150",    mfgId: "bajaj", name: "Pulsar 150",       yearFrom: 2001, yearTo: 2025 },
+    { id: "pulsar_220",    mfgId: "bajaj", name: "Pulsar 220F",      yearFrom: 2007, yearTo: 2025 },
+    { id: "pulsar_ns200",  mfgId: "bajaj", name: "Pulsar NS200",     yearFrom: 2012, yearTo: 2025 },
+    { id: "platina",       mfgId: "bajaj", name: "Platina",          yearFrom: 2006, yearTo: 2025 },
+    { id: "ct100",         mfgId: "bajaj", name: "CT100",            yearFrom: 2016, yearTo: 2025 },
+    { id: "dominar_400",   mfgId: "bajaj", name: "Dominar 400",      yearFrom: 2017, yearTo: 2025 },
+
+    // ── TVS ──
+    { id: "apache_160",    mfgId: "tvs", name: "Apache RTR 160",     yearFrom: 2008, yearTo: 2025 },
+    { id: "apache_200",    mfgId: "tvs", name: "Apache RTR 200 4V",  yearFrom: 2016, yearTo: 2025 },
+    { id: "jupiter",       mfgId: "tvs", name: "Jupiter",            yearFrom: 2013, yearTo: 2025 },
+    { id: "ntorq",         mfgId: "tvs", name: "NTORQ 125",          yearFrom: 2018, yearTo: 2025 },
+    { id: "sport",         mfgId: "tvs", name: "Sport",              yearFrom: 2012, yearTo: 2025 },
+    { id: "raider",        mfgId: "tvs", name: "Raider 125",         yearFrom: 2021, yearTo: 2025 },
+
+    // ── Honda Motorcycles ──
+    { id: "activa",        mfgId: "honda_mc", name: "Activa 6G",     yearFrom: 2020, yearTo: 2025 },
+    { id: "activa_125",    mfgId: "honda_mc", name: "Activa 125",    yearFrom: 2018, yearTo: 2025 },
+    { id: "shine",         mfgId: "honda_mc", name: "Shine",         yearFrom: 2006, yearTo: 2025 },
+    { id: "unicorn",       mfgId: "honda_mc", name: "Unicorn",       yearFrom: 2004, yearTo: 2025 },
+    { id: "sp_125",        mfgId: "honda_mc", name: "SP 125",        yearFrom: 2019, yearTo: 2025 },
+    { id: "hornet_2",      mfgId: "honda_mc", name: "Hornet 2.0",    yearFrom: 2020, yearTo: 2025 },
+
+    // ── Royal Enfield ──
+    { id: "classic_350",   mfgId: "re", name: "Classic 350",         yearFrom: 2009, yearTo: 2025 },
+    { id: "bullet_350",    mfgId: "re", name: "Bullet 350",          yearFrom: 2000, yearTo: 2025 },
+    { id: "thunderbird",   mfgId: "re", name: "Thunderbird X",       yearFrom: 2012, yearTo: 2020 },
+    { id: "himalayan",     mfgId: "re", name: "Himalayan",           yearFrom: 2016, yearTo: 2025 },
+    { id: "meteor_350",    mfgId: "re", name: "Meteor 350",          yearFrom: 2020, yearTo: 2025 },
+    { id: "hunter_350",    mfgId: "re", name: "Hunter 350",          yearFrom: 2022, yearTo: 2025 },
+    { id: "scram_411",     mfgId: "re", name: "Scram 411",           yearFrom: 2022, yearTo: 2025 },
+
+    // ── Yamaha ──
+    { id: "fz_s",          mfgId: "yamaha", name: "FZ-S V3",         yearFrom: 2019, yearTo: 2025 },
+    { id: "r15",           mfgId: "yamaha", name: "R15 V4",          yearFrom: 2021, yearTo: 2025 },
+    { id: "mt15",          mfgId: "yamaha", name: "MT-15",           yearFrom: 2019, yearTo: 2025 },
+    { id: "fascino",       mfgId: "yamaha", name: "Fascino 125",     yearFrom: 2020, yearTo: 2025 },
+    { id: "ray_zr",        mfgId: "yamaha", name: "Ray-ZR 125",      yearFrom: 2017, yearTo: 2025 },
+
+    // ── Tata Commercial ──
+    { id: "ace",           mfgId: "tata_cv", name: "Ace Mini Truck",  yearFrom: 2005, yearTo: 2025 },
+    { id: "intra",         mfgId: "tata_cv", name: "Intra V30",       yearFrom: 2019, yearTo: 2025 },
+    { id: "prima",         mfgId: "tata_cv", name: "Prima Truck",     yearFrom: 2009, yearTo: 2025 },
+    { id: "lpt_1109",      mfgId: "tata_cv", name: "LPT 1109",        yearFrom: 2010, yearTo: 2025 },
+
+    // ── Mahindra Commercial ──
+    { id: "bolero_pickup", mfgId: "mahindra_cv", name: "Bolero Pickup",yearFrom: 2005, yearTo: 2025 },
+    { id: "supro",         mfgId: "mahindra_cv", name: "Supro",        yearFrom: 2015, yearTo: 2025 },
+    { id: "jeeto",         mfgId: "mahindra_cv", name: "Jeeto",        yearFrom: 2013, yearTo: 2025 },
+
+    // ── Mahindra Tractors ──
+    { id: "jivo_245",      mfgId: "mahindra_tr", name: "JIVO 245",    yearFrom: 2016, yearTo: 2025 },
+    { id: "yuvo_415",      mfgId: "mahindra_tr", name: "YUVO 415 DI", yearFrom: 2015, yearTo: 2025 },
+    { id: "arjun_605",     mfgId: "mahindra_tr", name: "ARJUN 605",   yearFrom: 2010, yearTo: 2025 },
+
+    // ── Sonalika ──
+    { id: "sika_42",       mfgId: "sonalika", name: "Sika 42 DLX",    yearFrom: 2015, yearTo: 2025 },
+    { id: "gt_26",         mfgId: "sonalika", name: "GT 26",          yearFrom: 2013, yearTo: 2025 },
 ];
 
 // ─── VARIANTS TABLE ───
