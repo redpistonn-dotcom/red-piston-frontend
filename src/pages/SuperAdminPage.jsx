@@ -367,8 +367,8 @@ function CatalogTab() {
     if (!fileData || importing) return;
     setImporting(true);
     const parts = fileData.parts;
-    let created = 0, updated = 0, skipped = 0, fitments = 0;
-    setImportProg({ done: 0, total: parts.length, created: 0, updated: 0, skipped: 0, fitments: 0 });
+    let created = 0, updated = 0, unchanged = 0, invalid = 0, fitments = 0;
+    setImportProg({ done: 0, total: parts.length, created: 0, updated: 0, unchanged: 0, invalid: 0, fitments: 0 });
     for (let i = 0; i < parts.length; i += BATCH_SIZE) {
       const batch = parts.slice(i, i + BATCH_SIZE);
       try {
@@ -398,12 +398,13 @@ function CatalogTab() {
             variant:             p.variant || null,
           })),
         });
-        created  += res.data.created;
-        updated  += res.data.updated;
-        skipped  += res.data.skipped;
-        fitments += res.data.fitments || 0;
-      } catch (err) { skipped += batch.length; }
-      setImportProg({ done: Math.min(i + BATCH_SIZE, parts.length), total: parts.length, created, updated, skipped, fitments });
+        created   += res.data.created;
+        updated   += res.data.updated;
+        unchanged += res.data.unchanged || 0;
+        invalid   += res.data.invalid   || 0;
+        fitments  += res.data.fitments  || 0;
+      } catch (err) { invalid += batch.length; }
+      setImportProg({ done: Math.min(i + BATCH_SIZE, parts.length), total: parts.length, created, updated, unchanged, invalid, fitments });
     }
     setImportDone(true); setImporting(false); fetchDbStats();
   };
@@ -787,18 +788,73 @@ function CatalogTab() {
                   </div>
 
                   {importDone ? (
-                    <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <span style={{ fontSize: 22 }}>✅</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, color: '#10B981', fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Import complete!</div>
-                        <div style={{ fontSize: 11, color: '#af8785', marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
-                          {importProg?.created ?? 0} created &nbsp;·&nbsp; {importProg?.updated ?? 0} updated &nbsp;·&nbsp; {importProg?.skipped ?? 0} skipped
-                          {(importProg?.fitments ?? 0) > 0 && <> &nbsp;·&nbsp; <span style={{ color: '#8B5CF6' }}>{importProg.fitments} fitment records</span></>}
+                    /* ── Import Complete Summary ── */
+                    <div style={{ background: '#0d0e15', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, overflow: 'hidden' }}>
+                      {/* Header */}
+                      <div style={{ background: 'rgba(16,185,129,0.08)', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(16,185,129,0.2)' }}>
+                        <span style={{ fontSize: 20 }}>✅</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, color: '#10B981', fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Import Complete</div>
+                          <div style={{ fontSize: 11, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace" }}>
+                            {(importProg?.total ?? 0).toLocaleString()} rows processed from {fileData.name}
+                          </div>
                         </div>
+                        <button onClick={() => setView('live')}
+                          style={{ background: '#FF1F3A', border: 'none', borderRadius: 8, padding: '8px 16px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", flexShrink: 0 }}>
+                          View in DB →
+                        </button>
                       </div>
-                      <button onClick={() => setView('live')} style={{ background: '#FF1F3A', border: 'none', borderRadius: 8, padding: '9px 18px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
-                        View in DB →
-                      </button>
+
+                      {/* Breakdown rows */}
+                      <div style={{ padding: '4px 0' }}>
+                        {[
+                          {
+                            icon: '✨', label: 'Newly Added',
+                            desc: 'New parts added to master catalog for the first time',
+                            value: importProg?.created ?? 0,
+                            color: '#10B981', bg: 'rgba(16,185,129,0.06)',
+                          },
+                          {
+                            icon: '✏️', label: 'Updated / Modified',
+                            desc: 'Existing parts updated with new data from this file',
+                            value: importProg?.updated ?? 0,
+                            color: '#3B82F6', bg: 'rgba(59,130,246,0.06)',
+                          },
+                          {
+                            icon: '✓', label: 'Already Exist — No Changes',
+                            desc: 'Found in database but data was identical — nothing to update',
+                            value: importProg?.unchanged ?? 0,
+                            color: '#6B7280', bg: 'transparent',
+                          },
+                          ...(importProg?.fitments ? [{
+                            icon: '🔗', label: 'Vehicle Fitment Records Created',
+                            desc: 'Part ↔ Vehicle compatibility links added to part_fitments table',
+                            value: importProg.fitments,
+                            color: '#8B5CF6', bg: 'rgba(139,92,246,0.06)',
+                          }] : []),
+                          ...(importProg?.invalid ? [{
+                            icon: '⊘', label: 'Skipped / Invalid',
+                            desc: 'Rows with no OEM Number and no Part Name, or rows that errored',
+                            value: importProg.invalid,
+                            color: '#EF4444', bg: 'rgba(239,68,68,0.04)',
+                          }] : []),
+                        ].map((row, i, arr) => (
+                          <div key={row.label} style={{
+                            display: 'flex', alignItems: 'center', gap: 14,
+                            padding: '12px 20px', background: row.bg,
+                            borderBottom: i < arr.length - 1 ? '1px solid #1e1f26' : 'none',
+                          }}>
+                            <span style={{ fontSize: 18, flexShrink: 0 }}>{row.icon}</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: row.color, fontFamily: "'Inter', sans-serif" }}>{row.label}</div>
+                              <div style={{ fontSize: 10, color: '#5e3f3d', fontFamily: "'Inter', sans-serif", marginTop: 1 }}>{row.desc}</div>
+                            </div>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: row.color, fontFamily: "'Outfit', sans-serif", flexShrink: 0 }}>
+                              {row.value.toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -808,16 +864,30 @@ function CatalogTab() {
                       </button>
                       {importProg && (
                         <div style={{ marginTop: 12 }}>
-                          <div style={{ height: 5, background: '#292931', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                            <div style={{ height: '100%', width: `${Math.round((importProg.done / importProg.total) * 100)}%`, background: '#FF1F3A', borderRadius: 4, transition: 'width 0.3s ease' }} />
+                          {/* Progress bar */}
+                          <div style={{ height: 6, background: '#292931', borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                            <div style={{ height: '100%', width: `${Math.round((importProg.done / importProg.total) * 100)}%`, background: 'linear-gradient(90deg,#FF1F3A,#FF6B35)', borderRadius: 4, transition: 'width 0.3s ease' }} />
                           </div>
-                          <div style={{ display: 'flex', gap: 16, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", flexWrap: 'wrap' }}>
-                            <span style={{ color: '#af8785' }}>{importProg.done.toLocaleString()} / {importProg.total.toLocaleString()}</span>
-                            <span style={{ color: '#10B981' }}>+{importProg.created} created</span>
-                            <span style={{ color: '#3B82F6' }}>↺ {importProg.updated} updated</span>
-                            <span style={{ color: '#5e3f3d' }}>⊘ {importProg.skipped} skipped</span>
-                            {(importProg.fitments ?? 0) > 0 && <span style={{ color: '#8B5CF6' }}>🔗 {importProg.fitments} fitments</span>}
+                          {/* Live counters while importing */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+                            {[
+                              { label: 'Processed', val: `${importProg.done.toLocaleString()} / ${importProg.total.toLocaleString()}`, color: '#af8785' },
+                              { label: 'Added',     val: importProg.created.toLocaleString(),   color: '#10B981' },
+                              { label: 'Updated',   val: importProg.updated.toLocaleString(),   color: '#3B82F6' },
+                              { label: 'Unchanged', val: importProg.unchanged.toLocaleString(), color: '#6B7280' },
+                              { label: 'Skipped',   val: importProg.invalid.toLocaleString(),   color: '#EF4444' },
+                            ].map(c => (
+                              <div key={c.label} style={{ background: '#1a1b22', borderRadius: 7, padding: '8px 10px', textAlign: 'center' }}>
+                                <div style={{ fontSize: 15, fontWeight: 700, color: c.color, fontFamily: "'Outfit', sans-serif" }}>{c.val}</div>
+                                <div style={{ fontSize: 9, color: '#5e3f3d', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.07em', marginTop: 2 }}>{c.label}</div>
+                              </div>
+                            ))}
                           </div>
+                          {(importProg.fitments ?? 0) > 0 && (
+                            <div style={{ marginTop: 8, fontSize: 11, color: '#8B5CF6', fontFamily: "'JetBrains Mono', monospace" }}>
+                              🔗 {importProg.fitments.toLocaleString()} vehicle fitment records created so far
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -876,14 +946,14 @@ function CatalogTab() {
                 <table style={{ minWidth: 780, width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
-                      {['OEM Number', 'Part Name', 'Brand', 'Category', 'GST %', 'Status', 'Shop Stock'].map(h => (
+                      {['OEM Number', 'Part Name', 'Brand', 'Category', 'GST %', 'Status', 'Shop Stock', 'Created At', 'Updated At'].map(h => (
                         <th key={h} style={{ padding: '10px 16px', fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', borderBottom: '1px solid #3F3F46', textAlign: 'left', background: '#0d0e15', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {dbLoading ? (
-                      <tr><td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#5e3f3d', fontFamily: "'Inter', sans-serif" }}>Loading…</td></tr>
+                      <tr><td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: '#5e3f3d', fontFamily: "'Inter', sans-serif" }}>Loading…</td></tr>
                     ) : dbParts.map(p => (
                       <tr key={p.masterPartId} className="admin-table-row" style={{ borderBottom: '1px solid #292931' }}>
                         <td style={{ padding: '11px 16px', fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: '#e3e1ec', whiteSpace: 'nowrap' }}>{p.primaryOemNumber || <span style={{ color: '#3F3F46' }}>—</span>}</td>
@@ -899,6 +969,12 @@ function CatalogTab() {
                           </span>
                         </td>
                         <td style={{ padding: '11px 16px', fontSize: 11, color: '#3B82F6', fontFamily: "'JetBrains Mono', monospace" }}>{p._count?.inventory ?? 0} shops</td>
+                        <td style={{ padding: '11px 16px', fontSize: 11, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>
+                          {p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : <span style={{ color: '#3F3F46' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '11px 16px', fontSize: 11, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>
+                          {p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : <span style={{ color: '#3F3F46' }}>—</span>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
