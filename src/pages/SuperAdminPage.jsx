@@ -178,6 +178,13 @@ const DETECT_MAP = {
   'long description': 'description', 'remarks': 'description', 'product description': 'description',
   'alternate oem': 'alternateOem', 'alternate oem numbers': 'alternateOem', 'alt oem': 'alternateOem', 'cross reference': 'alternateOem',
   'weight': 'weightGrams', 'weight grams': 'weightGrams', 'weight (g)': 'weightGrams', 'weight (gm)': 'weightGrams', 'wt': 'weightGrams',
+  // Vehicle fitment columns
+  'vehicle make': 'vehicleMake', 'car make': 'vehicleMake', 'applicable make': 'vehicleMake',
+  'vehicle model': 'vehicleModel', 'car model': 'vehicleModel', 'applicable model': 'vehicleModel', 'model name': 'vehicleModel',
+  'year': 'yearFrom', 'year from': 'yearFrom', 'year start': 'yearFrom', 'applicable year': 'yearFrom',
+  'year to': 'yearTo', 'year end': 'yearTo', 'to year': 'yearTo',
+  'fuel type': 'fuelType', 'fuel': 'fuelType',
+  'variant': 'variant', 'vehicle variant': 'variant', 'car variant': 'variant',
 };
 
 // Template columns shown in sample Excel
@@ -196,9 +203,47 @@ const TEMPLATE_COLS = [
   { key: 'description',  label: 'Description',           required: false, example: 'High-performance ceramic brake pads with low dust', note: 'Detailed product description' },
   { key: 'alternateOem', label: 'Alternate OEM Numbers', required: false, example: '265C0-00QAF, 34116776683',       note: 'Comma-separated cross-reference OEM numbers' },
   { key: 'weightGrams',  label: 'Weight Grams',          required: false, example: '420',                            note: 'Weight in grams (used for shipping calculation)' },
+  // ── Vehicle Fitment (optional) ───────────────────────────────────────────────
+  { key: 'vehicleMake',  label: 'Vehicle Make',           required: false, example: 'Maruti Suzuki',                  note: 'Vehicle manufacturer — creates fitment link in database' },
+  { key: 'vehicleModel', label: 'Vehicle Model',          required: false, example: 'Swift',                          note: 'Vehicle model name — must be paired with Vehicle Make' },
+  { key: 'yearFrom',     label: 'Year From',              required: false, example: '2015',                           note: 'Compatible from this year' },
+  { key: 'yearTo',       label: 'Year To',                required: false, example: '2023',                           note: 'Compatible up to this year (blank = present)' },
+  { key: 'fuelType',     label: 'Fuel Type',              required: false, example: 'Petrol',                         note: 'Petrol / Diesel / CNG / Electric' },
+  { key: 'variant',      label: 'Variant',                required: false, example: 'VXI',                            note: 'Specific trim/variant — leave blank for all variants' },
 ];
 
 const BATCH_SIZE = 200;
+
+// All DB fields used for column analysis panel
+const DB_FIELDS = [
+  { key: 'oemNumber',    label: 'OEM Number',            section: 'required' },
+  { key: 'partName',     label: 'Part Name',             section: 'required' },
+  { key: 'brand',        label: 'Brand',                 section: 'core' },
+  { key: 'categoryL1',   label: 'Category L1',           section: 'core' },
+  { key: 'categoryL2',   label: 'Category L2',           section: 'core' },
+  { key: 'categoryL3',   label: 'Category L3',           section: 'core' },
+  { key: 'hsnCode',      label: 'HSN Code',              section: 'core' },
+  { key: 'gstRate',      label: 'GST Rate',              section: 'core' },
+  { key: 'unitOfSale',   label: 'Unit of Sale',          section: 'core' },
+  { key: 'mrp',          label: 'MRP',                   section: 'core' },
+  { key: 'buyPrice',     label: 'Buy Price',             section: 'core' },
+  { key: 'description',  label: 'Description',           section: 'core' },
+  { key: 'weightGrams',  label: 'Weight (grams)',        section: 'core' },
+  { key: 'alternateOem', label: 'Alternate OEM Numbers', section: 'core' },
+  { key: 'vehicleMake',  label: 'Vehicle Make',          section: 'fitment' },
+  { key: 'vehicleModel', label: 'Vehicle Model',         section: 'fitment' },
+  { key: 'yearFrom',     label: 'Year From',             section: 'fitment' },
+  { key: 'yearTo',       label: 'Year To',               section: 'fitment' },
+  { key: 'fuelType',     label: 'Fuel Type',             section: 'fitment' },
+  { key: 'variant',      label: 'Variant',               section: 'fitment' },
+];
+
+const PART_CATEGORIES = [
+  '', 'Brakes', 'Engine', 'Filters', 'Electrical', 'Suspension', 'Steering',
+  'Transmission', 'Cooling System', 'Exhaust', 'Fuel System', 'Lighting',
+  'Body Parts', 'Tyres & Wheels', 'AC & Heating', 'Lubricants & Oils',
+  'Bearings', 'Gaskets & Seals', 'Belts & Chains', 'Clutch', 'Battery & Charging',
+];
 
 function downloadTemplate() {
   const wb = XLSX.utils.book_new();
@@ -252,6 +297,10 @@ function CatalogTab() {
   const [importProg, setImportProg] = useState(null);
   const [importDone, setImportDone] = useState(false);
 
+  // 'idle' → 'analyzing' (show column analysis + confirm) → 'confirmed' (show import button)
+  const [analysisStep, setAnalysisStep] = useState('idle');
+  const [defaultCategory, setDefaultCategory] = useState('');
+
   const [dbParts, setDbParts]     = useState([]);
   const [dbTotal, setDbTotal]     = useState(0);
   const [dbStats, setDbStats]     = useState(null);
@@ -290,7 +339,12 @@ function CatalogTab() {
     if (!file) return;
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setParseErr('Upload an Excel (.xlsx, .xls) or CSV (.csv) file'); return; }
     setParsing(true); setParseErr(''); setFileData(null); setImportDone(false); setImportProg(null);
-    try { setFileData({ name: file.name, ...(await parseExcel(file)) }); }
+    setAnalysisStep('idle'); setDefaultCategory('');
+    try {
+      const parsed = await parseExcel(file);
+      setFileData({ name: file.name, ...parsed });
+      setAnalysisStep('analyzing');
+    }
     catch (e) { setParseErr(e.message || 'Failed to parse file — check the format'); }
     setParsing(false);
   };
@@ -299,8 +353,8 @@ function CatalogTab() {
     if (!fileData || importing) return;
     setImporting(true);
     const parts = fileData.parts;
-    let created = 0, updated = 0, skipped = 0;
-    setImportProg({ done: 0, total: parts.length, created: 0, updated: 0, skipped: 0 });
+    let created = 0, updated = 0, skipped = 0, fitments = 0;
+    setImportProg({ done: 0, total: parts.length, created: 0, updated: 0, skipped: 0, fitments: 0 });
     for (let i = 0; i < parts.length; i += BATCH_SIZE) {
       const batch = parts.slice(i, i + BATCH_SIZE);
       try {
@@ -309,7 +363,7 @@ function CatalogTab() {
             partName:            p.partName || p.oemNumber,
             oemNumber:           p.oemNumber || null,
             brand:               p.brand || null,
-            categoryL1:          p.categoryL1 || null,
+            categoryL1:          p.categoryL1 || defaultCategory || null,
             categoryL2:          p.categoryL2 || null,
             categoryL3:          p.categoryL3 || null,
             hsnCode:             p.hsnCode || null,
@@ -320,11 +374,21 @@ function CatalogTab() {
             buyPrice:            p.buyPrice ? parseFloat(p.buyPrice) : undefined,
             alternateOemNumbers: p.alternateOem ? p.alternateOem.split(',').map(s => s.trim()).filter(Boolean) : undefined,
             weightGrams:         p.weightGrams ? parseInt(p.weightGrams) : undefined,
+            // Vehicle fitment — stored in part_fitments table
+            vehicleMake:         p.vehicleMake || null,
+            vehicleModel:        p.vehicleModel || null,
+            yearFrom:            p.yearFrom ? parseInt(p.yearFrom) : undefined,
+            yearTo:              p.yearTo ? parseInt(p.yearTo) : undefined,
+            fuelType:            p.fuelType || null,
+            variant:             p.variant || null,
           })),
         });
-        created += res.data.created; updated += res.data.updated; skipped += res.data.skipped;
+        created  += res.data.created;
+        updated  += res.data.updated;
+        skipped  += res.data.skipped;
+        fitments += res.data.fitments || 0;
       } catch (err) { skipped += batch.length; }
-      setImportProg({ done: Math.min(i + BATCH_SIZE, parts.length), total: parts.length, created, updated, skipped });
+      setImportProg({ done: Math.min(i + BATCH_SIZE, parts.length), total: parts.length, created, updated, skipped, fitments });
     }
     setImportDone(true); setImporting(false); fetchDbStats();
   };
@@ -404,98 +468,252 @@ function CatalogTab() {
                     {fileData.total !== fileData.mapped && <span> &nbsp;·&nbsp; {(fileData.total - fileData.mapped).toLocaleString()} skipped (no OEM and no Name)</span>}
                   </div>
                 </div>
-                <button onClick={() => { setFileData(null); setImportDone(false); setImportProg(null); setParseErr(''); }}
+                <button onClick={() => { setFileData(null); setImportDone(false); setImportProg(null); setParseErr(''); setAnalysisStep('idle'); setDefaultCategory(''); }}
                   style={{ background: 'none', border: '1px solid #3F3F46', borderRadius: 6, color: '#af8785', cursor: 'pointer', padding: '4px 10px', fontSize: 12, fontFamily: "'Inter', sans-serif" }}>
                   ✕ Clear
                 </button>
               </div>
 
-              {/* Column detection */}
-              <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 10 }}>
-                  Auto-Detected Columns — {Object.keys(fileData.colMap).length} of {fileData.headers.length} matched
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {fileData.headers.map(h => {
-                    const m = fileData.colMap[h];
-                    return (
-                      <span key={h} style={{ background: m ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${m ? 'rgba(16,185,129,0.3)' : '#292931'}`, borderRadius: 5, padding: '3px 8px', fontSize: 10, color: m ? '#10B981' : '#5e3f3d', fontFamily: "'JetBrains Mono', monospace" }}>
-                        {h}{m ? ` → ${m}` : ''}
-                      </span>
-                    );
-                  })}
-                </div>
-                {Object.keys(fileData.colMap).length === 0 && (
-                  <div style={{ marginTop: 10, fontSize: 12, color: '#EF4444', fontFamily: "'Inter', sans-serif" }}>
-                    ⚠ No columns matched. Download the sample template to see the expected column names.
-                  </div>
-                )}
-              </div>
+              {/* ── STEP 2: Column Analysis & Confirmation ──────────────── */}
+              {analysisStep === 'analyzing' && (() => {
+                const dbToExcel = {};
+                for (const [col, field] of Object.entries(fileData.colMap)) dbToExcel[field] = col;
+                const unrecognized = fileData.headers.filter(h => !fileData.colMap[h]);
+                const fitmentMapped = DB_FIELDS.filter(f => f.section === 'fitment' && dbToExcel[f.key]);
+                const missingRequired = DB_FIELDS.filter(f => f.section === 'required' && !dbToExcel[f.key]);
+                return (
+                  <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 12, padding: '20px', marginBottom: 14 }}>
 
-              {/* Preview */}
-              <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
-                <div style={{ padding: '10px 16px', borderBottom: '1px solid #292931', fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace" }}>
-                  Preview — First 5 Rows
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
-                    <thead>
-                      <tr>
-                        {fileData.headers.slice(0, 8).map(h => (
-                          <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: fileData.colMap[h] ? '#10B981' : '#5e3f3d', borderBottom: '1px solid #292931', textAlign: 'left', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>
-                            {h}
-                          </th>
+                    {/* Step 1 — Category selector */}
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 4 }}>
+                        Step 1 — What type of parts are in this file?
+                      </div>
+                      <div style={{ fontSize: 11, color: '#5e3f3d', fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
+                        This will be set as Category L1 for rows that don't already have a category column in the sheet.
+                      </div>
+                      <select
+                        value={defaultCategory}
+                        onChange={e => setDefaultCategory(e.target.value)}
+                        style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 8, padding: '10px 14px', color: '#e3e1ec', fontSize: 13, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: 'pointer' }}
+                      >
+                        {PART_CATEGORIES.map(c => (
+                          <option key={c} value={c}>{c === '' ? '— Mixed / Multiple categories (leave blank)' : c}</option>
                         ))}
-                        {fileData.headers.length > 8 && <th style={{ padding: '8px 12px', fontSize: 10, color: '#3F3F46', borderBottom: '1px solid #292931' }}>+{fileData.headers.length - 8} more</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fileData.preview.map((row, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid #1a1a22' }}>
-                          {fileData.headers.slice(0, 8).map(h => (
-                            <td key={h} style={{ padding: '7px 12px', fontSize: 11, color: '#c9c6c5', fontFamily: "'Inter', sans-serif", maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {row[h] !== null && row[h] !== undefined ? String(row[h]) : <span style={{ color: '#3F3F46' }}>—</span>}
-                            </td>
-                          ))}
-                          {fileData.headers.length > 8 && <td />}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                      </select>
+                    </div>
 
-              {importDone ? (
-                <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <span style={{ fontSize: 22 }}>✅</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700, color: '#10B981', fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Import complete!</div>
-                    <div style={{ fontSize: 11, color: '#af8785', marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {importProg?.created ?? 0} created &nbsp;·&nbsp; {importProg?.updated ?? 0} updated &nbsp;·&nbsp; {importProg?.skipped ?? 0} skipped
+                    {/* Step 2 — Column match analysis */}
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 12 }}>
+                        Step 2 — Column Analysis &nbsp;·&nbsp;
+                        <span style={{ color: '#10B981' }}>{Object.keys(fileData.colMap).length} matched</span>
+                        &nbsp;/&nbsp;{fileData.headers.length} Excel columns
+                        {unrecognized.length > 0 && <span style={{ color: '#5e3f3d' }}> &nbsp;·&nbsp; {unrecognized.length} unrecognized</span>}
+                      </div>
+
+                      {/* Required */}
+                      <div style={{ fontSize: 9, fontWeight: 700, color: '#EF4444', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>Required Fields</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: 16 }}>
+                        {DB_FIELDS.filter(f => f.section === 'required').map(f => {
+                          const col = dbToExcel[f.key];
+                          return (
+                            <div key={f.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: col ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${col ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.35)'}`, borderRadius: 7, padding: '7px 10px' }}>
+                              <span style={{ fontSize: 13, color: col ? '#10B981' : '#EF4444', flexShrink: 0, marginTop: 1 }}>{col ? '✓' : '✗'}</span>
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: col ? '#e3e1ec' : '#EF4444', fontFamily: "'Inter', sans-serif" }}>{f.label}</div>
+                                <div style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", marginTop: 1 }}>
+                                  {col ? <span style={{ color: '#10B981' }}>← "{col}"</span> : <span style={{ color: '#EF4444' }}>NOT FOUND IN FILE</span>}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Optional core */}
+                      <div style={{ fontSize: 9, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 6 }}>Optional — Parts Data</div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 16 }}>
+                        {DB_FIELDS.filter(f => f.section === 'core').map(f => {
+                          const col = dbToExcel[f.key];
+                          return (
+                            <div key={f.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '5px 8px', borderRadius: 6, background: col ? 'rgba(16,185,129,0.04)' : 'rgba(0,0,0,0.2)', border: `1px solid ${col ? 'rgba(16,185,129,0.15)' : '#1e1f26'}` }}>
+                              <span style={{ fontSize: 11, color: col ? '#10B981' : '#3F3F46', flexShrink: 0, marginTop: 1 }}>{col ? '✓' : '—'}</span>
+                              <div>
+                                <div style={{ fontSize: 10, color: col ? '#c9c6c5' : '#5e3f3d', fontFamily: "'Inter', sans-serif" }}>{f.label}</div>
+                                {col && <div style={{ fontSize: 9, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace" }}>"{col}"</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Vehicle fitment */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: fitmentMapped.length > 0 ? '#3B82F6' : '#5e3f3d', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace" }}>
+                          Vehicle Fitment
+                        </div>
+                        {fitmentMapped.length > 0
+                          ? <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3B82F6', borderRadius: 4, padding: '1px 8px', fontSize: 9, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                              🔗 {fitmentMapped.length} column{fitmentMapped.length > 1 ? 's' : ''} detected — fitment records will be created in part_fitments table
+                            </span>
+                          : <span style={{ color: '#5e3f3d', fontSize: 9, fontFamily: "'Inter', sans-serif" }}>not found — parts will import without vehicle compatibility data</span>
+                        }
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: fitmentMapped.length > 0 || unrecognized.length > 0 ? 16 : 0 }}>
+                        {DB_FIELDS.filter(f => f.section === 'fitment').map(f => {
+                          const col = dbToExcel[f.key];
+                          return (
+                            <div key={f.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '5px 8px', borderRadius: 6, background: col ? 'rgba(59,130,246,0.06)' : 'rgba(0,0,0,0.15)', border: `1px solid ${col ? 'rgba(59,130,246,0.2)' : '#1e1f26'}` }}>
+                              <span style={{ fontSize: 11, color: col ? '#3B82F6' : '#3F3F46', flexShrink: 0, marginTop: 1 }}>{col ? '✓' : '—'}</span>
+                              <div>
+                                <div style={{ fontSize: 10, color: col ? '#93C5FD' : '#5e3f3d', fontFamily: "'Inter', sans-serif" }}>{f.label}</div>
+                                {col && <div style={{ fontSize: 9, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace" }}>"{col}"</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Unrecognized columns */}
+                      {unrecognized.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: '#5e3f3d', textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 5 }}>
+                            Unrecognized Columns ({unrecognized.length}) — will be ignored during import
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                            {unrecognized.map(h => (
+                              <span key={h} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #292931', borderRadius: 4, padding: '2px 8px', fontSize: 10, color: '#5e3f3d', fontFamily: "'JetBrains Mono', monospace" }}>"{h}"</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Warning for missing required */}
+                    {missingRequired.length > 0 && (
+                      <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#EF4444', fontFamily: "'Inter', sans-serif" }}>
+                        ⚠ <strong>{missingRequired.map(f => f.label).join(' and ')}</strong> not found in your file. Rows missing both OEM Number and Part Name will be skipped.
+                      </div>
+                    )}
+
+                    {/* Confirm button */}
+                    <button
+                      onClick={() => setAnalysisStep('confirmed')}
+                      style={{ width: '100%', background: '#FF1F3A', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", letterSpacing: '0.04em', boxShadow: '0 0 20px rgba(255,31,58,0.2)' }}
+                    >
+                      ✓ Analysis Done — Proceed to Import →
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {/* ── STEP 3: Confirmed — show preview + import button ────────── */}
+              {analysisStep === 'confirmed' && (
+                <>
+                  {/* Column summary (collapsed) */}
+                  <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
+                        {Object.keys(fileData.colMap).length} / {fileData.headers.length} columns matched
+                      </div>
+                      {defaultCategory && (
+                        <span style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                          📂 Default category: {defaultCategory}
+                        </span>
+                      )}
+                      {Object.values(fileData.colMap).includes('vehicleMake') && (
+                        <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#3B82F6', borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                          🔗 Vehicle fitment columns detected
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setAnalysisStep('analyzing')}
+                        style={{ marginLeft: 'auto', background: 'none', border: '1px solid #3F3F46', borderRadius: 6, color: '#af8785', cursor: 'pointer', padding: '3px 10px', fontSize: 11, fontFamily: "'Inter', sans-serif" }}
+                      >
+                        ← Re-analyze
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
+                      {fileData.headers.map(h => {
+                        const m = fileData.colMap[h];
+                        return (
+                          <span key={h} style={{ background: m ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${m ? 'rgba(16,185,129,0.3)' : '#292931'}`, borderRadius: 5, padding: '3px 8px', fontSize: 10, color: m ? '#10B981' : '#5e3f3d', fontFamily: "'JetBrains Mono', monospace" }}>
+                            {h}{m ? ` → ${m}` : ''}
+                          </span>
+                        );
+                      })}
                     </div>
                   </div>
-                  <button onClick={() => setView('live')} style={{ background: '#FF1F3A', border: 'none', borderRadius: 8, padding: '9px 18px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
-                    View in DB →
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <button onClick={handleImport} disabled={importing || !fileData.mapped}
-                    style={{ background: (importing || !fileData.mapped) ? '#292931' : '#FF1F3A', color: (importing || !fileData.mapped) ? '#5e3f3d' : '#fff', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 13, fontWeight: 700, cursor: (importing || !fileData.mapped) ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif", letterSpacing: '0.04em', boxShadow: (importing || !fileData.mapped) ? 'none' : '0 0 20px rgba(255,31,58,0.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {importing ? `⟳ Importing… ${importProg?.done ?? 0} / ${importProg?.total ?? 0}` : `⬆ Import ${fileData.mapped.toLocaleString()} Parts to Database`}
-                  </button>
-                  {importProg && (
-                    <div style={{ marginTop: 12 }}>
-                      <div style={{ height: 5, background: '#292931', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
-                        <div style={{ height: '100%', width: `${Math.round((importProg.done / importProg.total) * 100)}%`, background: '#FF1F3A', borderRadius: 4, transition: 'width 0.3s ease' }} />
-                      </div>
-                      <div style={{ display: 'flex', gap: 16, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
-                        <span style={{ color: '#af8785' }}>{importProg.done.toLocaleString()} / {importProg.total.toLocaleString()}</span>
-                        <span style={{ color: '#10B981' }}>+{importProg.created} created</span>
-                        <span style={{ color: '#3B82F6' }}>↺ {importProg.updated} updated</span>
-                        <span style={{ color: '#5e3f3d' }}>⊘ {importProg.skipped} skipped</span>
-                      </div>
+
+                  {/* Preview table */}
+                  <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+                    <div style={{ padding: '10px 16px', borderBottom: '1px solid #292931', fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace" }}>
+                      Preview — First 5 Rows
                     </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
+                        <thead>
+                          <tr>
+                            {fileData.headers.slice(0, 8).map(h => (
+                              <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: fileData.colMap[h] ? '#10B981' : '#5e3f3d', borderBottom: '1px solid #292931', textAlign: 'left', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>
+                                {h}
+                              </th>
+                            ))}
+                            {fileData.headers.length > 8 && <th style={{ padding: '8px 12px', fontSize: 10, color: '#3F3F46', borderBottom: '1px solid #292931' }}>+{fileData.headers.length - 8} more</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fileData.preview.map((row, i) => (
+                            <tr key={i} style={{ borderBottom: '1px solid #1a1a22' }}>
+                              {fileData.headers.slice(0, 8).map(h => (
+                                <td key={h} style={{ padding: '7px 12px', fontSize: 11, color: '#c9c6c5', fontFamily: "'Inter', sans-serif", maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {row[h] !== null && row[h] !== undefined ? String(row[h]) : <span style={{ color: '#3F3F46' }}>—</span>}
+                                </td>
+                              ))}
+                              {fileData.headers.length > 8 && <td />}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {importDone ? (
+                    <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <span style={{ fontSize: 22 }}>✅</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, color: '#10B981', fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Import complete!</div>
+                        <div style={{ fontSize: 11, color: '#af8785', marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
+                          {importProg?.created ?? 0} created &nbsp;·&nbsp; {importProg?.updated ?? 0} updated &nbsp;·&nbsp; {importProg?.skipped ?? 0} skipped
+                          {(importProg?.fitments ?? 0) > 0 && <> &nbsp;·&nbsp; <span style={{ color: '#8B5CF6' }}>{importProg.fitments} fitment records</span></>}
+                        </div>
+                      </div>
+                      <button onClick={() => setView('live')} style={{ background: '#FF1F3A', border: 'none', borderRadius: 8, padding: '9px 18px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
+                        View in DB →
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button onClick={handleImport} disabled={importing || !fileData.mapped}
+                        style={{ background: (importing || !fileData.mapped) ? '#292931' : '#FF1F3A', color: (importing || !fileData.mapped) ? '#5e3f3d' : '#fff', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 13, fontWeight: 700, cursor: (importing || !fileData.mapped) ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif", letterSpacing: '0.04em', boxShadow: (importing || !fileData.mapped) ? 'none' : '0 0 20px rgba(255,31,58,0.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {importing ? `⟳ Importing… ${importProg?.done ?? 0} / ${importProg?.total ?? 0}` : `⬆ Import ${fileData.mapped.toLocaleString()} Parts to Database`}
+                      </button>
+                      {importProg && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ height: 5, background: '#292931', borderRadius: 4, overflow: 'hidden', marginBottom: 8 }}>
+                            <div style={{ height: '100%', width: `${Math.round((importProg.done / importProg.total) * 100)}%`, background: '#FF1F3A', borderRadius: 4, transition: 'width 0.3s ease' }} />
+                          </div>
+                          <div style={{ display: 'flex', gap: 16, fontSize: 11, fontFamily: "'JetBrains Mono', monospace", flexWrap: 'wrap' }}>
+                            <span style={{ color: '#af8785' }}>{importProg.done.toLocaleString()} / {importProg.total.toLocaleString()}</span>
+                            <span style={{ color: '#10B981' }}>+{importProg.created} created</span>
+                            <span style={{ color: '#3B82F6' }}>↺ {importProg.updated} updated</span>
+                            <span style={{ color: '#5e3f3d' }}>⊘ {importProg.skipped} skipped</span>
+                            {(importProg.fitments ?? 0) > 0 && <span style={{ color: '#8B5CF6' }}>🔗 {importProg.fitments} fitments</span>}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
