@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { T, FONT } from "../../theme";
 import { searchEngine } from "../api/engine";
 import { useStore } from "../../store";
+import { PartImage } from "./PartImage";
 
 const RECENT_KEY = "vl_recent_searches";
 const MAX_RECENT = 5;
@@ -198,8 +199,8 @@ export function SearchBar({ onSelectProduct, onOpenVehicleSelector }) {
                         style={{ padding: "10px 10px", borderRadius: 8, cursor: "pointer", display: "flex", gap: 12, alignItems: "center", transition: "all 0.1s" }}
                         className="mp-dropdown-hover"
                       >
-                        <div style={{ width: 40, height: 40, borderRadius: 8, background: T.surface, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0, overflow: "hidden" }}>
-                          {p.product.image ? <img src={p.product.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : "📦"}
+                        <div style={{ width: 40, height: 40, borderRadius: 8, background: T.surface, flexShrink: 0, overflow: "hidden" }}>
+                          <PartImage src={p.product.image} alt={p.product.name} size="sm" />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>

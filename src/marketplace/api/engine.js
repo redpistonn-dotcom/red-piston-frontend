@@ -1,5 +1,5 @@
 import { CATEGORIES } from "../../utils";
-import { MASTER_PRODUCTS, SHOPS, SHOP_INVENTORY, VEHICLES, DELIVERY_PARTNERS } from "./mockDatabase";
+import { DELIVERY_PARTNERS } from "./mockDatabase";
 
 // ═══════════════════════════════════════════════════════════════
 // GEO-LOCATION (Haversine Formula)
@@ -67,14 +67,10 @@ export const checkFitment = (product, vehicleCtx) => {
     return { compatible: true, type: "exact" };
   }
 
-  // Check by string matching (brand + model) for mock/seed data
+  // Check by string matching (brand + model)
   const vehicleStr = `${vehicleCtx.brand} ${vehicleCtx.model}`.toLowerCase();
   const stringMatch = compatibility.some(v => {
     if (typeof v !== "string") return false;
-    const matchVehicle = VEHICLES.find(veh => veh.id === v);
-    if (matchVehicle) {
-      return `${matchVehicle.brand} ${matchVehicle.model}`.toLowerCase() === vehicleStr;
-    }
     return v.toLowerCase().includes(vehicleStr) || vehicleStr.includes(v.toLowerCase());
   });
   if (stringMatch) return { compatible: true, type: "exact" };
@@ -233,23 +229,9 @@ export const searchEngine = (query, products, shops, vehicleCtx = null) => {
 
   const q = query.toLowerCase();
 
-  // ── Smart NLP Parse: extract vehicle info from search query ──
+  // ── Smart NLP Parse: extract vehicle brand from search query ──
   let parsedVehicle = null;
   const vehicleBrands = ["honda", "maruti", "tata", "hyundai", "mahindra", "kia", "toyota", "renault", "volkswagen", "royal enfield"];
-  const foundBrand = vehicleBrands.find(b => q.includes(b));
-  if (foundBrand) {
-    // Try to find model + year in the query
-    const matchingVehicles = VEHICLES.filter(v => q.includes(v.brand.toLowerCase()) || q.includes(v.model.toLowerCase()));
-    if (matchingVehicles.length > 0) {
-      // Check for year in query
-      const yearMatch = q.match(/\b(20\d{2})\b/);
-      if (yearMatch) {
-        const withYear = matchingVehicles.find(v => v.year === yearMatch[1]);
-        if (withYear) parsedVehicle = withYear;
-      }
-      if (!parsedVehicle) parsedVehicle = matchingVehicles[0];
-    }
-  }
 
   // Use parsed vehicle context if no explicit vehicle is selected
   const effectiveVehicle = vehicleCtx || parsedVehicle;
@@ -263,7 +245,7 @@ export const searchEngine = (query, products, shops, vehicleCtx = null) => {
   const productMatches = products.filter(p => {
     const searchFields = `${p.name} ${p.brand} ${p.sku} ${p.category} ${p.description || ""}`.toLowerCase();
     // Match if ALL non-vehicle terms are found in the product
-    const nonVehicleTerms = queryTerms.filter(t => !vehicleBrands.includes(t) && !t.match(/^\d{4}$/) && !VEHICLES.some(v => v.model.toLowerCase().includes(t)));
+    const nonVehicleTerms = queryTerms.filter(t => !vehicleBrands.includes(t) && !t.match(/^\d{4}$/));
     if (nonVehicleTerms.length === 0) {
       // Pure vehicle query — return all products
       return true;

@@ -32,8 +32,8 @@ export function mapPartToRanked(part) {
     masterPartId:    part.masterPartId,
     name:            part.partName,
     brand:           part.brand || '',
-    sku:             part.oemNumber || part.masterPartId.slice(0, 8),
-    oemNumber:       part.oemNumber || '',
+    sku:             part.primaryOemNumber || part.oemNumber || String(part.masterPartId),
+    oemNumber:       part.primaryOemNumber || part.oemNumber || '',
     oemNumbers:      part.oemNumbers || [],
     category:        part.categoryL1 || 'General',
     categoryL2:      part.categoryL2 || '',
@@ -182,5 +182,29 @@ export async function fetchVehicleModels(make) {
 
 export async function fetchVehicleVariants(make, model) {
   const res = await api.get('/api/marketplace/vehicles/variants', { make, model });
+  return (res.data || res) || [];
+}
+
+// ─── New hierarchy-based vehicle lookups ──────────────────────────────────────
+
+/**
+ * Fetch all manufacturers from vehicle_manufacturers table.
+ * @param {string} [vehicleType] — "car" | "2wheeler" | "commercial" | "tractor" | undefined = all
+ */
+export async function fetchVehicleManufacturers(vehicleType) {
+  const params = vehicleType ? { vehicleType } : {};
+  const res = await api.get('/api/marketplace/vehicles/manufacturers', params);
+  return (res.data || res) || [];
+}
+
+/**
+ * Fetch models for a manufacturer from vehicle_models table.
+ * @param {number} manufacturerId
+ * @param {string} [vehicleType]
+ */
+export async function fetchVehicleModelsByManufacturer(manufacturerId, vehicleType) {
+  const params = { manufacturerId };
+  if (vehicleType) params.vehicleType = vehicleType;
+  const res = await api.get('/api/marketplace/vehicles/models', params);
   return (res.data || res) || [];
 }

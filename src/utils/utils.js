@@ -248,7 +248,7 @@ export const getDeliveryEta = () => {
     return { text: "Tomorrow by 2 PM", fast: false };
 };
 export const getStarRating = (productId) => {
-    const hash = productId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+    const hash = String(productId).split("").reduce((a, c) => a + c.charCodeAt(0), 0);
     const rating = 3.5 + (hash % 15) / 10;
     const count = 20 + (hash % 200);
     return { rating: Math.min(rating, 4.9).toFixed(1), count };

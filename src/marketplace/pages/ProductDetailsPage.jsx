@@ -4,6 +4,7 @@ import { useStore } from "../../store";
 import { fmt, getStarRating, renderStars } from "../../utils";
 import { checkFitment, getNearDistance, getDeliveryEtaFromDistance } from "../api/engine";
 import { api } from "../../api/client.js";
+import { PartImage } from "../components/PartImage";
 
 export function ProductDetailsPage({ productId, onBack }) {
     const { products, shops, selectedVehicle, cart, saveCart } = useStore();
@@ -95,9 +96,9 @@ export function ProductDetailsPage({ productId, onBack }) {
                     masterPartId: p.masterPartId,
                     name: p.partName,
                     brand: p.brand || '',
-                    sku: p.oemNumber || p.masterPartId.slice(0, 8),
-                    oemNumber: p.oemNumber || '',
-                    oem_part_no: p.oemNumber || '',
+                    sku: p.primaryOemNumber || p.oemNumber || String(p.masterPartId),
+                    oemNumber: p.primaryOemNumber || p.oemNumber || '',
+                    oem_part_no: p.primaryOemNumber || p.oemNumber || '',
                     category: p.categoryL1 || 'General',
                     categoryL2: p.categoryL2 || '',
                     description: p.description || '',
@@ -282,14 +283,8 @@ export function ProductDetailsPage({ productId, onBack }) {
                 <div>
                     {/* Hero Image */}
                     <div style={{ background: T.surface, borderRadius: 16, overflow: "hidden", border: `1px solid ${T.border}`, marginBottom: 20 }}>
-                        <div style={{ width: "100%", height: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {master.image ? (
-                                <img src={master.image} alt={master.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            ) : (
-                                <div style={{ width: "100%", aspectRatio: "1/1", background: `linear-gradient(135deg,${T.card},${T.surface})`, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, opacity: 0.4, border: `1px solid ${T.border}` }}>
-                                    {getCategoryEmoji(master?.category)}
-                                </div>
-                            )}
+                        <div style={{ width: "100%", height: 320 }}>
+                            <PartImage src={master.image} alt={master.name} size="lg" />
                         </div>
                     </div>
 

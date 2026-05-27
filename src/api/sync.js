@@ -6,16 +6,19 @@ import { api } from './client.js';
 export function mapInventoryToProduct(inv) {
   const mp = inv.masterPart;
   // Resolve the best displayable image: catalog image URL → category emoji fallback
-  const imageVal = mp?.imageUrl || (mp?.images && mp.images[0]) || getCategoryEmoji(mp?.categoryL1);
+  const imageVal = mp?.imageUrl || getCategoryEmoji(mp?.categoryL1);
+  // oemNumbers is a single string after UUID→int migration (was text[] before)
+  const oemStr = mp?.oemNumbers || mp?.oemNumber || '';
+  const barcodesArr = mp?.barcodes ? (Array.isArray(mp.barcodes) ? mp.barcodes : [mp.barcodes]) : [];
   return {
     id: inv.inventoryId,
     inventoryId: inv.inventoryId,
     masterPartId: inv.masterPartId,
     globalSku: inv.masterPartId,
     name: mp?.partName || inv.partName || 'Unknown Part',
-    oemNumber: mp?.oemNumber || (mp?.oemNumbers && mp.oemNumbers[0]) || '',
-    oemNumbers: mp?.oemNumbers || [],
-    barcodes: mp?.barcodes || [],
+    oemNumber: oemStr,
+    oemNumbers: oemStr ? [oemStr] : [],
+    barcodes: barcodesArr,
     brand: mp?.brand || '',
     category: mp?.categoryL1 || 'General',
     categoryL2: mp?.categoryL2 || '',
@@ -35,8 +38,8 @@ export function mapInventoryToProduct(inv) {
     // Image — display either URL (<img>) or emoji text
     image: imageVal,
     imageEmoji: getCategoryEmoji(mp?.categoryL1),
-    // SKU for barcode / POS search
-    sku: mp?.oemNumber || (mp?.oemNumbers && mp.oemNumbers[0]) || inv.inventoryId?.slice(0, 8) || '',
+    // SKU for barcode / POS search — String() guards against integer inventoryId
+    sku: oemStr || String(inv.inventoryId).slice(0, 8),
   };
 }
 
@@ -218,9 +221,12 @@ export async function syncAdjustment({ inventoryId, type, qty, reason, refundMet
 }
 
 /**
- * Returns true if the ID looks like a real Postgres UUID (from the DB),
- * false if it's seed data (e.g. "p1", "p2", "s1").
+ * Returns true if the ID is a real DB record identifier.
+ * After the UUID→integer migration, all DB IDs are positive integers.
+ * Legacy UUID string format is also accepted for backwards compat.
+ * Seed/local IDs like "p1", "s1", "m123" return false.
  */
 function isDbUuid(id) {
+  if (typeof id === 'number') return Number.isInteger(id) && id > 0;
   return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 }

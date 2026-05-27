@@ -3,6 +3,7 @@ import { T, FONT, GLOBAL_CSS } from "../../theme";
 import { useStore } from "../../store";
 import { getHomeData } from "../api/engine";
 import { browseMarketplace, buildHomeDataFromApi } from "../../api/marketplace.js";
+import { PartImage } from "../components/PartImage";
 import { ProfileDropdown } from "../../components/ProfileDropdown";
 import { clearTokens } from "../../api/client.js";
 import { CATEGORIES } from "../../utils";
@@ -34,12 +35,8 @@ function SideBySideModal({ open, items, onClose }) {
             return (
               <div key={product.id} style={{ flex: 1, minWidth: 0, background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                 {/* Image */}
-                <div style={{ height: 180, background: T.surface, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                  {product.image ? (
-                    typeof product.image === "string" && product.image.length <= 4
-                      ? <span style={{ fontSize: 64 }}>{product.image}</span>
-                      : <img src={product.image} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : <span style={{ fontSize: 48, opacity: 0.3 }}>📦</span>}
+                <div style={{ height: 180, background: T.surface, position: "relative" }}>
+                  <PartImage src={product.image} alt={product.name} size="lg" />
                   {isCompatible && (
                     <div style={{ position: "absolute", top: 8, left: 8, background: `${T.emerald}dd`, color: "#fff", padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 900, fontFamily: FONT.ui }}>✓ FIT</div>
                   )}

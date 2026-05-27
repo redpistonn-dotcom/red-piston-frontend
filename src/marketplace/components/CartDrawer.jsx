@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { T, FONT } from "../../theme";
 import { useStore } from "../../store";
 import { fmt } from "../../utils";
+import { PartImage } from "./PartImage";
 
 const DELIVERY_OPTIONS = [
     { id: "express", label: "Express", desc: "~45 min", fee: 59, icon: "⚡" },
@@ -377,10 +378,7 @@ function CartItem({ item, isLast, updateQty, removeItem }) {
                 flexShrink: 0, overflow: "hidden",
                 display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-                {item.product?.image
-                    ? <img src={item.product.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" />
-                    : <span style={{ fontSize: 22, opacity: 0.35 }}>⬡</span>
-                }
+                <PartImage src={item.product?.image} alt={item.product?.name} size="sm" />
             </div>
 
             {/* Info */}

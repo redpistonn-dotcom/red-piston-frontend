@@ -5,8 +5,9 @@
  *
  * Flow:
  *   Step 1 — SEARCH:    Type name / OEM number / scan barcode → live catalog results
- *   Step 2 — CONFIGURE: Review auto-filled part details → enter ONLY price + stock
- *   Fallback:           "Not in catalog?" → contribute a new part (manual entry)
+ *   Step 2 — CONFIGURE: Review auto-filled part details → enter ONLY price + stock → Add to Cart
+ *   Fallback:           "Not in catalog?" → contribute a new part (manual entry) → Add to Cart
+ *   Cart:               Accumulate multiple parts, then "Save All" submits them all at once
  *
  * Why this matters:
  *   A human typing "Bosch brak pad" instead of "Bosch Brake Pad" creates a duplicate
@@ -144,6 +145,150 @@ function BackButton({ onClick, label = "Back to search" }) {
     >
       ← {label}
     </button>
+  );
+}
+
+// ─── sub-component: CartPanel ─────────────────────────────────────────────────
+function CartPanel({ cart, onRemove, onSaveAll, saving }) {
+  return (
+    <div style={{
+      width: 268,
+      flexShrink: 0,
+      borderLeft: `1px solid ${T.border}`,
+      paddingLeft: 20,
+      display: "flex",
+      flexDirection: "column",
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: T.t1, fontFamily: FONT.ui }}>
+          🛒 Cart
+        </div>
+        {cart.length > 0 && (
+          <span style={{
+            fontSize: 10, fontWeight: 800, color: "#000",
+            background: T.amber, borderRadius: "50%",
+            width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: FONT.mono,
+          }}>
+            {cart.length}
+          </span>
+        )}
+      </div>
+
+      {/* Empty state */}
+      {cart.length === 0 && (
+        <div style={{
+          flex: 1,
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          color: T.t4, fontSize: 12, textAlign: "center", padding: "24px 8px",
+          gap: 8,
+        }}>
+          <div style={{ fontSize: 34 }}>🛒</div>
+          <div style={{ fontWeight: 700, color: T.t3, fontSize: 13 }}>Cart is empty</div>
+          <div style={{ fontSize: 11, color: T.t4, lineHeight: 1.6 }}>
+            Search and configure parts,<br />then click "Add to Cart".<br />
+            Save everything in one go.
+          </div>
+        </div>
+      )}
+
+      {/* Items list */}
+      {cart.length > 0 && (
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 14, maxHeight: 460 }}>
+          {cart.map((item) => {
+            const name     = item.type === "catalog" ? item.part.partName  : item.form.partName;
+            const brand    = item.type === "catalog" ? item.part.brand     : item.form.brand;
+            const category = item.type === "catalog" ? item.part.categoryL1 : item.form.categoryL1;
+            const imgSrc   = item.type === "catalog"
+              ? (item.part.imageUrl || (item.part.images && item.part.images[0]))
+              : null;
+            const sellPrice = parseFloat(item.form.sellPrice) || 0;
+            const stockQty  = parseInt(item.form.stockQty) || 0;
+
+            return (
+              <div key={item.cartId} style={{
+                background: T.surface,
+                border: `1px solid ${T.border}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+              }}>
+                {/* Icon */}
+                <div style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.1 }}>
+                  {imgSrc
+                    ? <img src={imgSrc} alt="" style={{ width: 28, height: 28, borderRadius: 6, objectFit: "cover" }} onError={e => { e.currentTarget.style.display = "none"; }} />
+                    : catEmoji(category)
+                  }
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: T.t1, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {name}
+                  </div>
+                  {brand && (
+                    <div style={{ fontSize: 10, color: T.t3, marginBottom: 4 }}>{brand}</div>
+                  )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", fontSize: 10 }}>
+                    <span style={{ fontFamily: FONT.mono, color: T.emerald, fontWeight: 700 }}>
+                      ₹{fmt(sellPrice)}
+                    </span>
+                    <span style={{ color: T.t4 }}>·</span>
+                    <span style={{ color: T.t2 }}>{stockQty} units</span>
+                    {item.type === "contribution" && (
+                      <span style={{
+                        fontSize: 9, color: T.amber, fontWeight: 700,
+                        background: `${T.amber}18`, padding: "1px 5px", borderRadius: 3,
+                      }}>
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Remove */}
+                <button
+                  onClick={() => onRemove(item.cartId)}
+                  style={{
+                    background: "none", border: "none",
+                    color: T.t4, cursor: "pointer",
+                    fontSize: 13, lineHeight: 1,
+                    padding: "3px 5px", borderRadius: 5,
+                    transition: "color 0.15s, background 0.15s",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = "#EF4444"; e.currentTarget.style.background = "#EF444418"; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = T.t4; e.currentTarget.style.background = "none"; }}
+                  title="Remove from cart"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Save All CTA */}
+      {cart.length > 0 && (
+        <div style={{ paddingTop: 4 }}>
+          <Btn
+            variant="amber"
+            loading={saving}
+            onClick={onSaveAll}
+            style={{ width: "100%", justifyContent: "center" }}
+          >
+            💾 Save All ({cart.length} {cart.length === 1 ? "part" : "parts"})
+          </Btn>
+          <div style={{ fontSize: 10, color: T.t4, textAlign: "center", marginTop: 6 }}>
+            All items will be added to inventory
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -594,11 +739,11 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
         )}
       </div>
 
-      {/* Save */}
+      {/* Actions */}
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
         <Btn variant="ghost" onClick={onBack}>Cancel</Btn>
         <Btn variant="amber" loading={saving} onClick={handleSave}>
-          💾 Add to Inventory
+          🛒 Add to Cart
         </Btn>
       </div>
     </div>
@@ -711,7 +856,7 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
         <Btn variant="ghost" onClick={onBack}>Cancel</Btn>
         <Btn variant="amber" loading={saving} onClick={handleSave}>
-          📤 Contribute &amp; Add to Inventory
+          🛒 Add to Cart
         </Btn>
       </div>
     </div>
@@ -720,11 +865,12 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
 export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId }) {
-  const [step, setStep]           = useState("search"); // "search" | "configure" | "contribute"
-  const [selected, setSelected]   = useState(null);
+  const [step, setStep]               = useState("search"); // "search" | "configure" | "contribute"
+  const [selected, setSelected]       = useState(null);
   const [manualQuery, setManualQuery] = useState("");
   const [manualBarcode, setManualBarcode] = useState("");
-  const [saving, setSaving]       = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [cart, setCart]               = useState([]); // { cartId, type: 'catalog'|'contribution', part?, form }
 
   // Reset on open / close
   useEffect(() => {
@@ -734,6 +880,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
       setManualQuery("");
       setManualBarcode("");
       setSaving(false);
+      setCart([]);
     }
   }, [open]);
 
@@ -742,201 +889,216 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
     setStep("configure");
   }, []);
 
-  // name: text query or empty; barcode: scanned barcode (optional)
   const handleManual = useCallback((query, barcode = "") => {
     setManualQuery(query);
     setManualBarcode(barcode);
     setStep("contribute");
   }, []);
 
-  // ── Save from catalog-selected part ──────────────────────────────────────
-  const handleConfigureSave = useCallback(async (form) => {
+  // ── Add catalog part to cart (no API call yet) ────────────────────────────
+  const handleConfigureSave = useCallback((form) => {
+    setCart((c) => [...c, { cartId: uid(), type: "catalog", part: selected, form }]);
+    setSelected(null);
+    setStep("search");
+  }, [selected]);
+
+  // ── Add contributed part to cart (no API call yet) ────────────────────────
+  const handleContributeSave = useCallback((form) => {
+    setCart((c) => [...c, { cartId: uid(), type: "contribution", form }]);
+    setStep("search");
+  }, []);
+
+  // ── Remove item from cart ─────────────────────────────────────────────────
+  const handleRemoveFromCart = useCallback((cartId) => {
+    setCart((c) => c.filter((item) => item.cartId !== cartId));
+  }, []);
+
+  // ── Save All: process every cart item and call the API ────────────────────
+  const handleSaveAll = useCallback(async () => {
+    if (cart.length === 0) return;
     setSaving(true);
+    let savedCount = 0;
+
     try {
-      let product;
-      try {
-        const res = await addInventory({
-          masterPartId:  selected.masterPartId,
-          sellingPrice:  parseFloat(form.sellPrice),
-          buyingPrice:   parseFloat(form.buyPrice),
-          stockQty:      parseInt(form.stockQty) || 0,
-          rackLocation:  form.rackLocation || null,
-          minStockAlert: parseInt(form.minStockAlert) || 5,
-        });
+      for (const item of cart) {
+        if (item.type === "catalog") {
+          const { part, form } = item;
+          let product;
 
-        // Build a frontend-compatible product object from the API response
-        const inv = res.item;
-        product = {
-          id:           inv.inventoryId,
-          inventoryId:  inv.inventoryId,
-          masterPartId: selected.masterPartId,
-          globalSku:    selected.masterPartId,
-          name:         selected.partName,
-          oemNumber:    selected.oemNumber || (selected.oemNumbers && selected.oemNumbers[0]) || "",
-          oemNumbers:   selected.oemNumbers || [],
-          barcodes:     selected.barcodes  || [],
-          brand:        selected.brand    || "",
-          category:     selected.categoryL1 || "General",
-          categoryL2:   selected.categoryL2  || "",
-          hsnCode:      selected.hsnCode   || "",
-          gstRate:      parseFloat(selected.gstRate || 18),
-          unitOfSale:   selected.unitOfSale || "Piece",
-          specifications: selected.specifications || {},
-          sellPrice:    parseFloat(form.sellPrice),
-          buyPrice:     parseFloat(form.buyPrice),
-          stock:        parseInt(form.stockQty) || 0,
-          minStock:     parseInt(form.minStockAlert) || 5,
-          rack:         form.rackLocation || "",
-          location:     form.rackLocation || "",
-          image:        selected.imageUrl || (selected.images && selected.images[0]) || catEmoji(selected.categoryL1),
-          sku:          selected.oemNumber || (selected.oemNumbers && selected.oemNumbers[0]) || inv.inventoryId.slice(0, 8),
-          shopId:       activeShopId,
-        };
-      } catch (apiErr) {
-        // API unavailable (shop offline) — create a local-only product that syncs later
-        console.warn("[CatalogStockIn] API unavailable, saving locally:", apiErr.message);
-        const localId = "p" + uid();
-        product = {
-          id:           localId,
-          masterPartId: selected.masterPartId,
-          globalSku:    selected.masterPartId,
-          name:         selected.partName,
-          oemNumber:    selected.oemNumber || "",
-          brand:        selected.brand    || "",
-          category:     selected.categoryL1 || "General",
-          hsnCode:      selected.hsnCode   || "",
-          gstRate:      parseFloat(selected.gstRate || 18),
-          unitOfSale:   selected.unitOfSale || "Piece",
-          sellPrice:    parseFloat(form.sellPrice),
-          buyPrice:     parseFloat(form.buyPrice),
-          stock:        parseInt(form.stockQty) || 0,
-          minStock:     parseInt(form.minStockAlert) || 5,
-          rack:         form.rackLocation || "",
-          location:     form.rackLocation || "",
-          image:        catEmoji(selected.categoryL1),
-          sku:          selected.oemNumber || localId.slice(0, 8),
-          shopId:       activeShopId,
-          _pendingSync: true,
-        };
-      }
+          try {
+            const res = await addInventory({
+              masterPartId:  part.masterPartId,
+              sellingPrice:  parseFloat(form.sellPrice),
+              buyingPrice:   parseFloat(form.buyPrice),
+              stockQty:      parseInt(form.stockQty) || 0,
+              rackLocation:  form.rackLocation || null,
+              minStockAlert: parseInt(form.minStockAlert) || 5,
+            });
+            const inv = res.item;
+            product = {
+              id:             inv.inventoryId,
+              inventoryId:    inv.inventoryId,
+              masterPartId:   part.masterPartId,
+              globalSku:      part.masterPartId,
+              name:           part.partName,
+              oemNumber:      part.oemNumber || (part.oemNumbers && part.oemNumbers[0]) || "",
+              oemNumbers:     part.oemNumbers || [],
+              barcodes:       part.barcodes  || [],
+              brand:          part.brand     || "",
+              category:       part.categoryL1 || "General",
+              categoryL2:     part.categoryL2  || "",
+              hsnCode:        part.hsnCode   || "",
+              gstRate:        parseFloat(part.gstRate || 18),
+              unitOfSale:     part.unitOfSale || "Piece",
+              specifications: part.specifications || {},
+              sellPrice:      parseFloat(form.sellPrice),
+              buyPrice:       parseFloat(form.buyPrice),
+              stock:          parseInt(form.stockQty) || 0,
+              minStock:       parseInt(form.minStockAlert) || 5,
+              rack:           form.rackLocation || "",
+              location:       form.rackLocation || "",
+              image:          part.imageUrl || (part.images && part.images[0]) || catEmoji(part.categoryL1),
+              sku:            part.oemNumber || (Array.isArray(part.oemNumbers) ? part.oemNumbers[0] : part.oemNumbers) || String(inv.inventoryId).slice(0, 8),
+              shopId:         activeShopId,
+            };
+          } catch (apiErr) {
+            console.warn("[CatalogStockIn] API unavailable, saving locally:", apiErr.message);
+            const localId = "p" + uid();
+            product = {
+              id:           localId,
+              masterPartId: part.masterPartId,
+              globalSku:    part.masterPartId,
+              name:         part.partName,
+              oemNumber:    part.oemNumber || "",
+              brand:        part.brand    || "",
+              category:     part.categoryL1 || "General",
+              hsnCode:      part.hsnCode   || "",
+              gstRate:      parseFloat(part.gstRate || 18),
+              unitOfSale:   part.unitOfSale || "Piece",
+              sellPrice:    parseFloat(form.sellPrice),
+              buyPrice:     parseFloat(form.buyPrice),
+              stock:        parseInt(form.stockQty) || 0,
+              minStock:     parseInt(form.minStockAlert) || 5,
+              rack:         form.rackLocation || "",
+              location:     form.rackLocation || "",
+              image:        catEmoji(part.categoryL1),
+              sku:          part.oemNumber || localId.slice(0, 8),
+              shopId:       activeShopId,
+              _pendingSync: true,
+            };
+          }
 
-      onSave(product);
-      toast(`${selected.partName} added to inventory!`, "success", "Added from Catalog");
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  }, [selected, activeShopId, onSave, toast, onClose]);
+          onSave(product);
+          savedCount++;
 
-  // ── Save from manual "contribute" form ───────────────────────────────────
-  const handleContributeSave = useCallback(async (form) => {
-    setSaving(true);
-    try {
-      let masterPartId = null;
-      let product;
+        } else {
+          // type === "contribution"
+          const { form } = item;
+          let masterPartId = null;
+          let product;
 
-      try {
-        // Step A: Contribute to catalog (creates MasterPart with PENDING status)
-        const catalogRes = await contributePart({
-          partName:    form.partName,
-          brand:       form.brand    || undefined,
-          categoryL1:  form.categoryL1,
-          oemNumber:   form.oemNumber || undefined,
-          hsnCode:     form.hsnCode  || undefined,
-          gstRate:     parseFloat(form.gstRate || 18),
-          unitOfSale:  form.unitOfSale || "Piece",
-          description: form.description || undefined,
-          // Include scanned barcode if this contribution was triggered by a camera scan
-          ...(form._scannedBarcode && { barcodes: [form._scannedBarcode] }),
-          ...(form.oemNumber && { oemNumbers: [form.oemNumber] }),
-        });
-        masterPartId = catalogRes.part?.masterPartId;
+          try {
+            const catalogRes = await contributePart({
+              partName:    form.partName,
+              brand:       form.brand       || undefined,
+              categoryL1:  form.categoryL1,
+              oemNumber:   form.oemNumber   || undefined,
+              hsnCode:     form.hsnCode     || undefined,
+              gstRate:     parseFloat(form.gstRate || 18),
+              unitOfSale:  form.unitOfSale  || "Piece",
+              description: form.description || undefined,
+              ...(form._scannedBarcode && { barcodes: [form._scannedBarcode] }),
+              ...(form.oemNumber && { oemNumbers: [form.oemNumber] }),
+            });
+            masterPartId = catalogRes.part?.masterPartId;
 
-        // Step B: Add to shop inventory using the new MasterPart
-        if (masterPartId) {
-          const invRes = await addInventory({
-            masterPartId,
-            sellingPrice:  parseFloat(form.sellPrice),
-            buyingPrice:   parseFloat(form.buyPrice),
-            stockQty:      parseInt(form.stockQty) || 0,
-            rackLocation:  form.rackLocation || null,
-            minStockAlert: parseInt(form.minStockAlert) || 5,
-          });
+            if (masterPartId) {
+              const invRes = await addInventory({
+                masterPartId,
+                sellingPrice:  parseFloat(form.sellPrice),
+                buyingPrice:   parseFloat(form.buyPrice),
+                stockQty:      parseInt(form.stockQty) || 0,
+                rackLocation:  form.rackLocation || null,
+                minStockAlert: parseInt(form.minStockAlert) || 5,
+              });
+              product = {
+                id:           invRes.item.inventoryId,
+                inventoryId:  invRes.item.inventoryId,
+                masterPartId,
+                globalSku:    masterPartId,
+                name:         form.partName,
+                oemNumber:    form.oemNumber || "",
+                brand:        form.brand    || "",
+                category:     form.categoryL1 || "General",
+                hsnCode:      form.hsnCode   || "",
+                gstRate:      parseFloat(form.gstRate || 18),
+                unitOfSale:   form.unitOfSale || "Piece",
+                sellPrice:    parseFloat(form.sellPrice),
+                buyPrice:     parseFloat(form.buyPrice),
+                stock:        parseInt(form.stockQty) || 0,
+                minStock:     parseInt(form.minStockAlert) || 5,
+                rack:         form.rackLocation || "",
+                location:     form.rackLocation || "",
+                image:        catEmoji(form.categoryL1),
+                sku:          form.oemNumber || String(invRes.item.inventoryId).slice(0, 8),
+                shopId:       activeShopId,
+                _pendingCatalogVerification: true,
+              };
+            }
+          } catch (apiErr) {
+            console.warn("[CatalogStockIn] Contribute API failed, saving locally:", apiErr.message);
+          }
 
-          product = {
-            id:           invRes.item.inventoryId,
-            inventoryId:  invRes.item.inventoryId,
-            masterPartId,
-            globalSku:    masterPartId,
-            name:         form.partName,
-            oemNumber:    form.oemNumber || "",
-            brand:        form.brand    || "",
-            category:     form.categoryL1 || "General",
-            hsnCode:      form.hsnCode   || "",
-            gstRate:      parseFloat(form.gstRate || 18),
-            unitOfSale:   form.unitOfSale || "Piece",
-            sellPrice:    parseFloat(form.sellPrice),
-            buyPrice:     parseFloat(form.buyPrice),
-            stock:        parseInt(form.stockQty) || 0,
-            minStock:     parseInt(form.minStockAlert) || 5,
-            rack:         form.rackLocation || "",
-            location:     form.rackLocation || "",
-            image:        catEmoji(form.categoryL1),
-            sku:          form.oemNumber || invRes.item.inventoryId.slice(0, 8),
-            shopId:       activeShopId,
-            _pendingCatalogVerification: true,
-          };
+          // Fallback: local-only product if API is down
+          if (!product) {
+            const localId = "p" + uid();
+            product = {
+              id:        localId,
+              name:      form.partName,
+              oemNumber: form.oemNumber || "",
+              brand:     form.brand    || "",
+              category:  form.categoryL1 || "General",
+              hsnCode:   form.hsnCode   || "",
+              gstRate:   parseFloat(form.gstRate || 18),
+              unitOfSale: form.unitOfSale || "Piece",
+              sellPrice: parseFloat(form.sellPrice),
+              buyPrice:  parseFloat(form.buyPrice),
+              stock:     parseInt(form.stockQty) || 0,
+              minStock:  parseInt(form.minStockAlert) || 5,
+              rack:      form.rackLocation || "",
+              location:  form.rackLocation || "",
+              image:     catEmoji(form.categoryL1),
+              sku:       form.oemNumber || localId.slice(0, 8),
+              shopId:    activeShopId,
+            };
+          }
+
+          onSave(product);
+          savedCount++;
         }
-      } catch (apiErr) {
-        console.warn("[CatalogStockIn] Contribute API failed, saving locally:", apiErr.message);
       }
 
-      // Fallback: purely local product if API is down
-      if (!product) {
-        const localId = "p" + uid();
-        product = {
-          id:           localId,
-          name:         form.partName,
-          oemNumber:    form.oemNumber || "",
-          brand:        form.brand    || "",
-          category:     form.categoryL1 || "General",
-          hsnCode:      form.hsnCode   || "",
-          gstRate:      parseFloat(form.gstRate || 18),
-          unitOfSale:   form.unitOfSale || "Piece",
-          sellPrice:    parseFloat(form.sellPrice),
-          buyPrice:     parseFloat(form.buyPrice),
-          stock:        parseInt(form.stockQty) || 0,
-          minStock:     parseInt(form.minStockAlert) || 5,
-          rack:         form.rackLocation || "",
-          location:     form.rackLocation || "",
-          image:        catEmoji(form.categoryL1),
-          sku:          form.oemNumber || localId.slice(0, 8),
-          shopId:       activeShopId,
-        };
-      }
-
-      onSave(product);
       toast(
-        `${form.partName} added! Part submitted for catalog review.`,
+        `${savedCount} part${savedCount !== 1 ? "s" : ""} added to inventory!`,
         "success",
-        "Contributed & Added"
+        "Inventory Updated"
       );
       onClose();
     } finally {
       setSaving(false);
     }
-  }, [activeShopId, onSave, toast, onClose]);
+  }, [cart, activeShopId, onSave, toast, onClose]);
 
   // ── Titles ────────────────────────────────────────────────────────────────
   const titles = {
-    search:     "Add Product to Inventory",
-    configure:  selected ? `Add — ${selected.partName}` : "Configure Stock",
-    contribute: "Add New Part to Catalog",
+    search:     "Add Products to Inventory",
+    configure:  selected ? `Configure — ${selected.partName}` : "Configure Stock",
+    contribute: "Contribute New Part",
   };
   const subtitles = {
-    search:     "Search the global catalog — product details fill automatically",
-    configure:  "Enter your shop price and opening stock",
-    contribute: "Part not in catalog? Add it — it will be reviewed and verified",
+    search:     "Add multiple parts to cart, then save all at once",
+    configure:  "Enter your shop price and opening stock — then add to cart",
+    contribute: "Part not in catalog? Contribute it — reviewed by catalog team",
   };
 
   return (
@@ -945,29 +1107,43 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
       onClose={onClose}
       title={titles[step]}
       subtitle={subtitles[step]}
-      width={640}
+      width={980}
     >
-      {step === "search" && (
-        <SearchStep onSelect={handleSelect} onManual={handleManual} />
-      )}
-      {step === "configure" && selected && (
-        <ConfigureStep
-          part={selected}
-          onBack={() => setStep("search")}
-          onSave={handleConfigureSave}
+      <div style={{ display: "flex", gap: 0, alignItems: "flex-start", minHeight: 480 }}>
+
+        {/* ── Left panel: search / configure / contribute ── */}
+        <div style={{ flex: 1, minWidth: 0, paddingRight: 20, overflowY: "auto" }}>
+          {step === "search" && (
+            <SearchStep onSelect={handleSelect} onManual={handleManual} />
+          )}
+          {step === "configure" && selected && (
+            <ConfigureStep
+              part={selected}
+              onBack={() => { setSelected(null); setStep("search"); }}
+              onSave={handleConfigureSave}
+              saving={false}
+              activeShopId={activeShopId}
+            />
+          )}
+          {step === "contribute" && (
+            <ContributeStep
+              initialName={manualQuery}
+              initialBarcode={manualBarcode}
+              onBack={() => setStep("search")}
+              onSave={handleContributeSave}
+              saving={false}
+            />
+          )}
+        </div>
+
+        {/* ── Right panel: cart ── */}
+        <CartPanel
+          cart={cart}
+          onRemove={handleRemoveFromCart}
+          onSaveAll={handleSaveAll}
           saving={saving}
-          activeShopId={activeShopId}
         />
-      )}
-      {step === "contribute" && (
-        <ContributeStep
-          initialName={manualQuery}
-          initialBarcode={manualBarcode}
-          onBack={() => setStep("search")}
-          onSave={handleContributeSave}
-          saving={saving}
-        />
-      )}
+      </div>
     </Modal>
   );
 }

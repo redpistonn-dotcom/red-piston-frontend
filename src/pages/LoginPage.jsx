@@ -31,6 +31,8 @@ const STEPS = {
   PENDING:      "pending",      // Shop owner awaiting approval
   REJECTED:     "rejected",     // Shop owner rejected
   ADMIN_AUTH:   "admin_auth",   // Admin email+password login
+  LINK_PHONE:   "link_phone",   // Collect mobile after email login (no phone on account)
+  LINK_OTP:     "link_otp",     // Verify OTP to link phone to email account
 };
 
 // ─── Error message helper ─────────────────────────────────────────────────────
@@ -129,6 +131,7 @@ export default function LoginPage({ onLogin }) {
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [otp, setOtp]             = useState(["","","","","",""]);
   const [confirmResult, setConfirmResult] = useState(null);
+  const [linkConfirmResult, setLinkConfirmResult] = useState(null);
   const [resendTimer, setResendTimer]     = useState(0);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
@@ -260,6 +263,15 @@ export default function LoginPage({ onLogin }) {
       const userData = data?.user;
       if (!userData) throw new Error("Server returned an unexpected response.");
       setTokens(data.accessToken, data.refreshToken);
+      // If user has no phone number, collect and link it before entering the app
+      if (!userData.phone) {
+        setPendingUser(userData);
+        setPhone("");
+        setOtp(["","","","","",""]);
+        go(STEPS.LINK_PHONE);
+        setLoading(false);
+        return;
+      }
       localStorage.setItem("as_user", JSON.stringify(userData));
       onLogin(userData);
     } catch (e) {
@@ -363,7 +375,42 @@ export default function LoginPage({ onLogin }) {
     try {
       await api.post("/api/auth/forgot-password", { email: forgotEmail });
       setForgotSent(true);
-    } catch (e) { setError(getErr(e, "Could not send reset link.")); }
+    } catch (e) {
+      const code = e.data?.error?.code;
+      if (code === "USER_NOT_FOUND") {
+        setError("No account found with this email. Please create an account first.");
+      } else {
+        setError(getErr(e, "Could not send reset link. Try again."));
+      }
+    }
+    setLoading(false);
+  };
+
+  // ── Send OTP to link phone to existing email account ─────────────────────
+  const sendLinkOtp = async () => {
+    if (!phone || phone.length !== 10) { setError("Enter a valid 10-digit number"); return; }
+    setError(""); setLoading(true);
+    try {
+      const result = await sendPhoneOtp(phone, "recaptcha-container");
+      setLinkConfirmResult(result);
+      startResendTimer();
+      go(STEPS.LINK_OTP);
+    } catch (e) { setError(e.message || "Could not send OTP. Try again."); }
+    setLoading(false);
+  };
+
+  // ── Verify OTP and link phone to account, then complete login ────────────
+  const linkPhoneVerify = async () => {
+    const code = otp.join("");
+    if (code.length !== 6) { setError("Enter the 6-digit OTP"); return; }
+    setError(""); setLoading(true);
+    try {
+      const { token } = await verifyPhoneOtp(linkConfirmResult, code);
+      const res = await api.post("/api/auth/link-phone", { firebaseToken: token });
+      const updatedUser = { ...pendingUser, ...res.user };
+      localStorage.setItem("as_user", JSON.stringify(updatedUser));
+      onLogin(updatedUser);
+    } catch (e) { setError(e.message || "Invalid OTP. Try again."); }
     setLoading(false);
   };
 
@@ -535,8 +582,12 @@ export default function LoginPage({ onLogin }) {
                 <div style={{ fontSize: 15, fontWeight: 700, color: T.t1, marginBottom: 6 }}>Reset Password</div>
                 <div style={{ fontSize: 13, color: T.t3, marginBottom: 18 }}>Enter your email and we'll send a reset link.</div>
                 {forgotSent ? (
-                  <div style={{ background: "#0a1f0a", border: `1px solid ${T.emerald}`, borderRadius: 10, padding: "14px 16px", color: T.emerald, fontSize: 13 }}>
-                    ✅ Reset link sent! Check your inbox and spam folder.
+                  <div style={{ background: "#0a1f0a", border: `1px solid ${T.emerald}`, borderRadius: 10, padding: "14px 16px", fontSize: 13 }}>
+                    <div style={{ color: T.emerald, fontWeight: 700, marginBottom: 6 }}>✅ Link sent! Check your inbox.</div>
+                    <div style={{ color: "#9CA3AF", lineHeight: 1.5 }}>
+                      We sent a link to <strong style={{ color: T.t1 }}>{forgotEmail}</strong>.<br />
+                      Click it to set or reset your password. Check spam if you don't see it.
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -937,6 +988,92 @@ export default function LoginPage({ onLogin }) {
               disabled={loading} onClick={adminSignIn}>
               {loading ? "Signing in…" : "Access Console →"}
             </button>
+          </div>
+        );
+
+      // ══════════════════════════════════════════════════════════════════════
+      // LINK_PHONE — collect mobile number after email login
+      // ══════════════════════════════════════════════════════════════════════
+      case STEPS.LINK_PHONE:
+        return (
+          <div className="auth-card">
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>📱</div>
+              <div style={S.heading}>Add your mobile number</div>
+              <div style={{ fontSize: 13, color: "#af8785", marginTop: 6, lineHeight: 1.6 }}>
+                We need your mobile number to keep your account secure.<br />
+                You can also use it to log in later.
+              </div>
+            </div>
+            {error && <div style={S.error}>{error}</div>}
+            <label style={S.label}>Mobile Number</label>
+            <div style={{ ...S.phoneRow, marginBottom: 20 }}>
+              <div style={S.phoneFlag}>🇮🇳 +91</div>
+              <input
+                className="auth-input"
+                style={S.phoneInput}
+                type="tel" inputMode="numeric" maxLength={10}
+                placeholder="10-digit mobile number"
+                value={phone}
+                onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                onKeyDown={e => e.key === "Enter" && sendLinkOtp()}
+                autoFocus
+              />
+            </div>
+            <button
+              className="btn-primary"
+              style={S.btnPrimary(loading || phone.length !== 10)}
+              disabled={loading || phone.length !== 10}
+              onClick={sendLinkOtp}>
+              {loading ? "Sending OTP…" : "Send OTP →"}
+            </button>
+            <button
+              style={{ ...S.btnOutline, marginTop: 10, fontSize: 12 }}
+              onClick={() => { localStorage.setItem("as_user", JSON.stringify(pendingUser)); onLogin(pendingUser); }}>
+              Skip for now
+            </button>
+          </div>
+        );
+
+      // ══════════════════════════════════════════════════════════════════════
+      // LINK_OTP — verify OTP to link phone to account
+      // ══════════════════════════════════════════════════════════════════════
+      case STEPS.LINK_OTP:
+        return (
+          <div className="auth-card">
+            <button style={S.btnBack} onClick={() => go(STEPS.LINK_PHONE)}>← Change number</button>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🔐</div>
+              <div style={S.heading}>Verify your number</div>
+              <div style={{ fontSize: 13, color: "#af8785", marginTop: 6, lineHeight: 1.6 }}>
+                Enter the 6-digit OTP sent to<br />
+                <span style={{ color: "#e3e1ec", fontWeight: 700 }}>+91 {phone}</span>
+              </div>
+            </div>
+            {error && <div style={S.error}>{error}</div>}
+            <div style={S.otpRow}>
+              {otp.map((v, i) => (
+                <input key={i} ref={otpRefs[i]} className="otp-box" style={S.otpBox}
+                  type="text" inputMode="numeric" maxLength={1} value={v}
+                  onChange={e => handleOtpChange(i, e.target.value)}
+                  onKeyDown={e => handleOtpKey(i, e, linkPhoneVerify)}
+                  autoFocus={i === 0} />
+              ))}
+            </div>
+            <button
+              className="btn-primary"
+              style={S.btnPrimary(loading || otp.join("").length !== 6)}
+              disabled={loading || otp.join("").length !== 6}
+              onClick={linkPhoneVerify}>
+              {loading ? "Verifying…" : "Verify & Continue →"}
+            </button>
+            <div style={{ textAlign: "center", marginTop: 16 }}>
+              {resendTimer > 0
+                ? <span style={{ fontSize: 13, color: "#6B7280" }}>Resend in {resendTimer}s</span>
+                : <button style={{ background: "none", border: "none", color: "#FF1F3A", cursor: "pointer", fontSize: 13, fontFamily: "'Inter', sans-serif" }}
+                    onClick={sendLinkOtp}>Resend OTP</button>
+              }
+            </div>
           </div>
         );
 

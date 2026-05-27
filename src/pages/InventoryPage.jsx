@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { T, FONT } from "../theme";
 import { CATEGORIES, stockStatus, margin, fmt, downloadCSV, generateCSV, useDebounce } from "../utils";
 import { Badge, Btn, Input, Select } from "../components/ui";
@@ -6,7 +6,18 @@ import { PurchaseModal } from "../components/PurchaseModal";
 import { SaleModal } from "../components/SaleModal";
 import { StockAdjustmentModal } from "../components/StockAdjustmentModal";
 import { printBarcodeLabels } from "../barcode";
-import { MANUFACTURERS, getModelsForMfg, getYearsForModel, buildVehicleMatchStr, isProductCompatible } from "../vehicleData";
+import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
+
+// Pure helper — no fitment data = show universally (don't hide DB-backed parts)
+function isProductCompatible(product, matchStr) {
+  if (!matchStr) return "universal";
+  if (product.isUniversal) return "universal";
+  const compat = product.compatibleVehicles || [];
+  if (compat.length === 0) return "universal"; // unknown fitment → always visible
+  if (compat.some(v => v.toLowerCase() === "universal")) return "universal";
+  if (compat.some(v => v.toLowerCase().includes(matchStr.toLowerCase()))) return "compatible";
+  return false;
+}
 
 export function InventoryPage({ products, movements, activeShopId, onAdd, onEdit, onSale, onPurchase, onAdjust, toast }) {
     const [search, setSearch] = useState("");
@@ -20,16 +31,47 @@ export function InventoryPage({ products, movements, activeShopId, onAdd, onEdit
     const [showVehicleFilter, setShowVehicleFilter] = useState(false);
     const [visibleCount, setVisibleCount] = useState(50);
     // Vehicle selection state: Brand → Model → Year
-    const [selBrand, setSelBrand] = useState("");
-    const [selModel, setSelModel] = useState("");
+    const [selBrand, setSelBrand] = useState(null);   // full VehicleManufacturer object
+    const [selModel, setSelModel] = useState(null);   // full VehicleModel object
     const [selYear, setSelYear] = useState("");
     const [selectedIds, setSelectedIds] = useState([]);
 
+    // Vehicle data from DB
+    const [manufacturers, setManufacturers] = useState([]);
+    const [vehicleModels, setVehicleModels] = useState([]);
+
     const debouncedSearch = useDebounce(search, 300);
 
-    const brandModels = useMemo(() => selBrand ? getModelsForMfg(selBrand) : [], [selBrand]);
-    const modelYears = useMemo(() => selModel ? getYearsForModel(selModel) : [], [selModel]);
-    const vehicleMatchStr = useMemo(() => buildVehicleMatchStr(selBrand, selModel), [selBrand, selModel]);
+    // Load all manufacturers once on mount
+    useEffect(() => {
+        fetchVehicleManufacturers()
+            .then(data => setManufacturers(Array.isArray(data) ? data : []))
+            .catch(() => {});
+    }, []);
+
+    // Load models whenever brand changes
+    useEffect(() => {
+        if (!selBrand) { setVehicleModels([]); return; }
+        fetchVehicleModelsByManufacturer(selBrand.manufacturerId)
+            .then(data => setVehicleModels(Array.isArray(data) ? data : []))
+            .catch(() => setVehicleModels([]));
+    }, [selBrand]);
+
+    // Year list derived from selected model's year range
+    const modelYears = useMemo(() => {
+        if (!selModel) return [];
+        const from = selModel.yearFrom || 1990;
+        const to   = selModel.yearTo   || new Date().getFullYear();
+        const years = [];
+        for (let y = to; y >= from; y--) years.push(y);
+        return years;
+    }, [selModel]);
+
+    // "Maruti Suzuki Swift" string used for compatibility matching
+    const vehicleMatchStr = useMemo(() => {
+        if (!selBrand || !selModel) return null;
+        return `${selBrand.name} ${selModel.name}`;
+    }, [selBrand, selModel]);
 
     const shopProducts = useMemo(() => products.filter(p => p.shopId === activeShopId), [products, activeShopId]);
 
@@ -141,7 +183,7 @@ export function InventoryPage({ products, movements, activeShopId, onAdd, onEdit
                 {/* Pill trigger row */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     {vehicleMatchStr ? (
-                        <button onClick={() => { setSelBrand(""); setSelModel(""); setSelYear(""); setShowVehicleFilter(false); }}
+                        <button onClick={() => { setSelBrand(null); setSelModel(null); setSelYear(""); setShowVehicleFilter(false); }}
                             style={{ display: "flex", alignItems: "center", gap: 7, padding: "6px 14px", borderRadius: 20, border: `1px solid ${T.amber}`, background: T.amberGlow, color: T.amber, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s ease" }}>
                             🚗 {vehicleMatchStr}{selYear ? ` ${selYear}` : ""} <span style={{ fontSize: 14, lineHeight: 1 }}>×</span>
                         </button>
@@ -152,25 +194,35 @@ export function InventoryPage({ products, movements, activeShopId, onAdd, onEdit
                         </button>
                     )}
                     <div style={{ flex: 1 }} />
-                    <div style={{ fontSize: 11, color: T.t4 }}>{MANUFACTURERS.length} brands · {filtered.length} parts found</div>
+                    <div style={{ fontSize: 11, color: T.t4 }}>{manufacturers.length} brands · {filtered.length} parts found</div>
                 </div>
 
                 {/* Collapsible dropdowns panel */}
                 {showVehicleFilter && !vehicleMatchStr && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}`, animation: "fadeIn 0.15s ease" }}>
                         {/* Brand */}
-                        <select value={selBrand} onChange={e => { setSelBrand(e.target.value); setSelModel(""); setSelYear(""); }}
+                        <select
+                            value={selBrand?.manufacturerId || ""}
+                            onChange={e => {
+                                const mfg = manufacturers.find(m => m.manufacturerId === parseInt(e.target.value, 10));
+                                setSelBrand(mfg || null); setSelModel(null); setSelYear("");
+                            }}
                             style={{ background: T.surface, border: `1px solid ${selBrand ? T.amber + "66" : T.border}`, borderRadius: 8, padding: "7px 12px", color: selBrand ? T.t1 : T.t3, fontSize: 12, fontWeight: 600, fontFamily: FONT.ui, cursor: "pointer", minWidth: 150, outline: "none" }}>
                             <option value="">Select Brand</option>
-                            {MANUFACTURERS.map(m => <option key={m.id} value={m.id}>{m.logo} {m.name}</option>)}
+                            {manufacturers.map(m => <option key={m.manufacturerId} value={m.manufacturerId}>{m.name}</option>)}
                         </select>
 
                         {/* Model — only after Brand */}
                         {selBrand && (
-                            <select value={selModel} onChange={e => { setSelModel(e.target.value); setSelYear(""); }}
+                            <select
+                                value={selModel?.modelId || ""}
+                                onChange={e => {
+                                    const mdl = vehicleModels.find(m => m.modelId === parseInt(e.target.value, 10));
+                                    setSelModel(mdl || null); setSelYear("");
+                                }}
                                 style={{ background: T.surface, border: `1px solid ${selModel ? T.amber + "66" : T.border}`, borderRadius: 8, padding: "7px 12px", color: selModel ? T.t1 : T.t3, fontSize: 12, fontWeight: 600, fontFamily: FONT.ui, cursor: "pointer", minWidth: 150, outline: "none" }}>
                                 <option value="">Select Model</option>
-                                {brandModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                {vehicleModels.map(m => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
                             </select>
                         )}
 
@@ -184,7 +236,7 @@ export function InventoryPage({ products, movements, activeShopId, onAdd, onEdit
                         )}
 
                         {selBrand && (
-                            <button onClick={() => { setSelBrand(""); setSelModel(""); setSelYear(""); }}
+                            <button onClick={() => { setSelBrand(null); setSelModel(null); setSelYear(""); }}
                                 style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 8, padding: "7px 12px", color: T.t3, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}>
                                 ✕ Clear
                             </button>

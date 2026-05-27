@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { T, FONT } from "../../theme";
 import { fmt, getStarRating, renderStars } from "../../utils";
+import { PartImage } from "./PartImage";
 
 export function ProductCard({ item, onClick, inCompare, onCompareToggle }) {
     const { product, bestPrice, availability, shopCount, fastestEta, listings, isCompatible, fitmentType, bestShop } = item;
@@ -110,13 +111,7 @@ export function ProductCard({ item, onClick, inCompare, onCompareToggle }) {
 
             {/* IMAGE */}
             <div style={{ width: "100%", height: 160, background: T.surface, display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                {product.image ? (
-                    typeof product.image === "string" && product.image.length <= 4
-                        ? <span style={{ fontSize: 56, opacity: 0.9 }}>{product.image}</span>
-                        : <img src={product.image} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                    <span style={{ fontSize: 48, opacity: 0.3 }}>📦</span>
-                )}
+                <PartImage src={product.image} alt={product.name} size="md" />
                 {/* Shop count pill */}
                 <div style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", padding: "3px 8px", borderRadius: 6, fontSize: 10, color: T.t2, fontFamily: FONT.mono, fontWeight: 700 }}>
                     {shopCount} {shopCount === 1 ? "Seller" : "Sellers"}

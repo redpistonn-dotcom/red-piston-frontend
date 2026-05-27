@@ -23,11 +23,17 @@ export function useStoreProvider() {
     const [selectedVehicle, setSelectedVehicle] = useState(null);
     const [appMode, setAppMode] = useState("marketplace");
 
-    // ── activeShopId: initialized from localStorage so the real DB UUID persists
+    // ── activeShopId: initialized from localStorage so the real DB integer persists
     //    across page refreshes. Falls back to "s1" for demo/seed data.
-    const [activeShopId, setActiveShopId] = useState(
-        () => { try { return localStorage.getItem("vl_shopId") || "s1"; } catch { return "s1"; } }
-    );
+    //    localStorage always returns strings; parse numeric IDs back to integers so
+    //    the strict-equality filter `p.shopId === activeShopId` matches correctly.
+    const [activeShopId, setActiveShopId] = useState(() => {
+        try {
+            const val = localStorage.getItem("vl_shopId") || "s1";
+            const num = parseInt(val, 10);
+            return !isNaN(num) ? num : val;
+        } catch { return "s1"; }
+    });
 
     const [marketplacePage, setMarketplacePage] = useState("home");
     const [loaded, setL] = useState(false);

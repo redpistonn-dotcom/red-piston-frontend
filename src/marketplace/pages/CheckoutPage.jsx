@@ -4,6 +4,7 @@ import { useStore } from "../../store";
 import { fmt, uid } from "../../utils";
 import { DELIVERY_SLOTS } from "../api/mockDatabase";
 import { assignDeliveryPartner } from "../api/engine";
+import { PartImage } from "../components/PartImage";
 
 const STEPS = ["address", "delivery", "payment", "confirm", "processing", "success"];
 const STEP_LABELS = { address: "Address", delivery: "Delivery Slot", payment: "Payment", confirm: "Confirm", processing: "Processing", success: "Order Placed" };
@@ -425,8 +426,8 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                                 {group.items.map((item, i) => (
                                     <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: i > 0 ? `1px solid ${T.border}` : "none" }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                            <div style={{ width: 36, height: 36, borderRadius: 8, background: T.surface, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                                {item.product?.image ? <img src={item.product.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : <span style={{ fontSize: 18 }}>📦</span>}
+                                            <div style={{ width: 36, height: 36, borderRadius: 8, background: T.surface, overflow: "hidden", flexShrink: 0 }}>
+                                                <PartImage src={item.product?.image} alt={item.product?.name} size="sm" />
                                             </div>
                                             <div>
                                                 <div style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>{item.product?.name}</div>

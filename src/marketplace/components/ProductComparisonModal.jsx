@@ -2,6 +2,7 @@ import { useState } from "react";
 import { T, FONT } from "../../theme";
 import { fmt } from "../../utils";
 import { useStore } from "../../store";
+import { PartImage } from "./PartImage";
 
 export function ProductComparisonModal({ open, onClose, productData }) {
   const { cart, saveCart, setIsCartOpen } = useStore();
@@ -53,11 +54,7 @@ export function ProductComparisonModal({ open, onClose, productData }) {
                   <span>✓</span> EXACT FIT
                 </div>
               )}
-              {product.image ? (
-                <img src={product.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", filter: "drop-shadow(0 20px 40px rgba(0,0,0,0.5))" }} />
-              ) : (
-                <span style={{ margin: "auto", fontSize: 64, opacity: 0.2 }}>⚙️</span>
-              )}
+              <PartImage src={product.image} alt={product.name} size="lg" />
             </div>
 
             {/* Tech Specs */}

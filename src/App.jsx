@@ -16,6 +16,7 @@ import { ProfileDropdown } from "./components/ProfileDropdown";
 import { Avatar } from "./components/Avatar";
 import { ProductModal } from "./components/ProductModal";
 import { BulkStockInModal } from "./components/BulkStockInModal";
+import { CatalogStockInModal } from "./components/CatalogStockInModal";
 import { CartDrawer } from "./marketplace/components/CartDrawer";
 
 // ── Lazy-loaded pages (each becomes its own JS chunk, loaded on first visit) ──
@@ -120,6 +121,7 @@ import { AppCtx } from "./AppCtx.js";
 function ERPShell({ children }) {
   const {
     pModal, setPModal, catalogModal, setCatalogModal,
+    addProdOpen, setAddProdOpen,
     toast, toasts, removeToast,
     currentUser, handleLogout,
     saveProduct, handleBulkStockIn,
@@ -136,7 +138,12 @@ function ERPShell({ children }) {
   const lowStockProducts = useMemo(() => (products || []).filter((p) => p.shopId === activeShopId && stockSt(p) !== "ok"), [products, activeShopId]);
   const lowCount = lowStockProducts.length;
   const pendingOrders = useMemo(() => (orders || []).filter((o) => o.shopId === activeShopId && (o.status === "NEW" || o.status === "placed")).length, [orders, activeShopId]);
-  const shop = useMemo(() => (shops || []).find((s) => s.id === activeShopId) || { name: "My Shop", city: "Location" }, [shops, activeShopId]);
+  const shop = useMemo(() => {
+    const fromStore = (shops || []).find((s) => s.id === activeShopId || s.shopId === activeShopId);
+    if (fromStore) return fromStore;
+    if (currentUser?.shop) return { name: currentUser.shop.name, city: currentUser.shop.city || currentUser.shop.address || "Location" };
+    return { name: "My Shop", city: "Location" };
+  }, [shops, activeShopId, currentUser]);
   const currentPath = location.pathname;
 
   // Low stock alert banner dismiss (per session)
@@ -218,7 +225,9 @@ function ERPShell({ children }) {
 
       {/* Edit existing product */}
       <ProductModal open={pModal.open} product={pModal.product} products={products} activeShopId={activeShopId} onClose={() => setPModal({ open: false, product: null })} onSave={saveProduct} toast={toast} />
-      {/* Add new products — cart/bucket procurement flow */}
+      {/* Add single product — catalog-first 2-step flow */}
+      <CatalogStockInModal open={addProdOpen} onClose={() => setAddProdOpen(false)} onSave={saveProduct} toast={toast} activeShopId={activeShopId} />
+      {/* Bulk stock-in — cart/bucket procurement flow */}
       <BulkStockInModal open={catalogModal} onClose={() => setCatalogModal(false)} onSave={handleBulkStockIn} toast={toast} activeShopId={activeShopId} />
       <Toast items={toasts} onRemove={removeToast} />
 
@@ -602,6 +611,15 @@ function AppContent() {
         // Already have an in-memory token (HMR hot-reload, same-session nav).
         if (getAccessToken()) return;
 
+        // If we're in an active impersonation session, restore the impersonation
+        // token from sessionStorage instead of refreshing with the admin's token.
+        // sessionStorage is tab-scoped so it clears on browser/tab close naturally.
+        const impToken = sessionStorage.getItem('as_imp_token');
+        if (impToken) {
+          setTokens(impToken, null);
+          return; // Skip admin's silentRefresh — use impersonation token directly
+        }
+
         // Try to exchange the stored refresh token for a new access token.
         // Race against a 6-second timeout so we never hang the app indefinitely.
         const token = await Promise.race([
@@ -688,9 +706,16 @@ function AppContent() {
   // ── UI state ──
   const [pModal, setPModal]       = useState({ open: false, product: null });
   const [catalogModal, setCatalogModal] = useState(false);
+  const [addProdOpen, setAddProdOpen] = useState(false);
   const [shortcutOverlay, setShortcutOverlay] = useState(false);
   const [cmdPaletteOpen, setCmdPaletteOpen] = useState(false);
-  const [impersonating, setImpersonating] = useState(null); // { user: adminUser, refreshToken }
+  // Persisted to localStorage so the banner + exit button survive page refresh.
+  const [impersonating, setImpersonating] = useState(() => {
+    try {
+      const stored = localStorage.getItem('as_impersonating');
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
   const { items: toasts, add: toast, remove: removeToast } = useToast();
 
   // ── Keyboard shortcut system ──
@@ -765,9 +790,11 @@ function AppContent() {
     // Clear both auth tokens and application store data
     clearTokens();
     clearStore(); // Wipes all vl_* from localStorage and state
-    
+
     localStorage.removeItem("as_user");
     localStorage.removeItem("as_refresh_token");
+    localStorage.removeItem("as_impersonating");
+    try { sessionStorage.removeItem("as_imp_token"); } catch {}
     setCurrentUser(null);
     
     // Completely clear out the session via native reload to replace the SPA history state
@@ -782,7 +809,12 @@ function AppContent() {
     setTokens(impersonationToken, null);
     setCurrentUser(targetUser);
     localStorage.setItem('as_user', JSON.stringify(targetUser));
+    // Persist impersonation state so banner + exit button survive page refresh
     setImpersonating(adminBackup);
+    localStorage.setItem('as_impersonating', JSON.stringify(adminBackup));
+    // Store token in sessionStorage (tab-scoped — clears on browser close)
+    // so on page refresh we restore the impersonation token, NOT the admin's token
+    try { sessionStorage.setItem('as_imp_token', impersonationToken); } catch {}
     if (targetUser.shopId) {
       setActiveShopId(targetUser.shopId);
       try { localStorage.setItem('vl_shopId', targetUser.shopId); } catch {}
@@ -793,6 +825,9 @@ function AppContent() {
 
   const handleExitImpersonation = useCallback(async () => {
     if (!impersonating) return;
+    // Clean up persisted impersonation data first
+    localStorage.removeItem('as_impersonating');
+    try { sessionStorage.removeItem('as_imp_token'); } catch {}
     try {
       if (impersonating.refreshToken) {
         localStorage.setItem('as_refresh_token', impersonating.refreshToken);
@@ -1096,10 +1131,11 @@ function AppContent() {
   const appCtxValue = useMemo(() => ({
     pModal, setPModal,
     catalogModal, setCatalogModal,
+    addProdOpen, setAddProdOpen,
     toast, toasts, removeToast,
     currentUser, handleLogout,
     saveProduct, handleBulkStockIn,
-  }), [pModal, setPModal, catalogModal, setCatalogModal, toast, toasts, removeToast, currentUser, handleLogout, saveProduct, handleBulkStockIn]);
+  }), [pModal, setPModal, catalogModal, setCatalogModal, addProdOpen, setAddProdOpen, toast, toasts, removeToast, currentUser, handleLogout, saveProduct, handleBulkStockIn]);
 
   // Generate collision-proof invoice number
   const genInvoiceNo = useCallback(() => {
@@ -1252,7 +1288,7 @@ function AppContent() {
 
         {/* ERP routes — SHOP_OWNER */}
         <Route path="/dashboard" element={getUserRole(currentUser) === "SHOP_OWNER" ? <ERPShell><DashboardPage products={products} movements={movements} orders={orders} activeShopId={activeShopId} onNavigate={(p) => navigate("/" + p)} jobCards={jobCards} parties={parties} vehicles={vehicles} /></ERPShell> : <Navigate to={currentUser ? getDefaultRoute(currentUser) : "/login"} replace />} />
-        <Route path="/inventory" element={getUserRole(currentUser) === "SHOP_OWNER" ? <ERPShell><InventoryPage products={products} movements={movements} activeShopId={activeShopId} onAdd={() => setCatalogModal(true)} onEdit={(p) => setPModal({ open: true, product: p })} onSale={handleSale} onPurchase={handlePurchase} onAdjust={handleAdjustment} toast={toast} /></ERPShell> : <Navigate to={currentUser ? getDefaultRoute(currentUser) : "/login"} replace />} />
+        <Route path="/inventory" element={getUserRole(currentUser) === "SHOP_OWNER" ? <ERPShell><InventoryPage products={products} movements={movements} activeShopId={activeShopId} onAdd={() => setAddProdOpen(true)} onEdit={(p) => setPModal({ open: true, product: p })} onSale={handleSale} onPurchase={handlePurchase} onAdjust={handleAdjustment} toast={toast} /></ERPShell> : <Navigate to={currentUser ? getDefaultRoute(currentUser) : "/login"} replace />} />
         <Route path="/billing" element={getUserRole(currentUser) === "SHOP_OWNER" ? <ERPShell><POSBillingPage products={products} activeShopId={activeShopId} shop={posShop} onMultiSale={handleMultiItemSale} toast={toast} /></ERPShell> : <Navigate to={currentUser ? getDefaultRoute(currentUser) : "/login"} replace />} />
         <Route path="/parties" element={getUserRole(currentUser) === "SHOP_OWNER" ? <ERPShell><PartiesPage parties={parties} movements={movements} vehicles={vehicles} activeShopId={activeShopId} onSaveParty={(p) => { const exists = (parties || []).find((x) => x.id === p.id); saveParties(exists ? parties.map((x) => (x.id === p.id ? p : x)) : [...(parties || []), p]); logAudit(exists ? "PARTY_UPDATED" : "PARTY_CREATED", "party", p.id, p.name); }} onSaveVehicle={(v) => { const exists = (vehicles || []).find((x) => x.id === v.id); saveVehicles(exists ? vehicles.map((x) => (x.id === v.id ? v : x)) : [...(vehicles || []), v]); }} toast={toast} /></ERPShell> : <Navigate to={currentUser ? getDefaultRoute(currentUser) : "/login"} replace />} />
         <Route path="/workshop" element={getUserRole(currentUser) === "SHOP_OWNER" ? <ERPShell><WorkshopPage jobCards={jobCards} vehicles={vehicles} parties={parties} products={products} activeShopId={activeShopId} onSaveJobCard={(jc) => { const exists = (jobCards || []).find((x) => x.id === jc.id); saveJobCards(exists ? jobCards.map((x) => (x.id === jc.id ? jc : x)) : [...(jobCards || []), jc]); logAudit(exists ? "JOB_CARD_UPDATED" : "JOB_CARD_CREATED", "job_card", jc.id, `${jc.jobNumber} — ${jc.status}`); }} toast={toast} /></ERPShell> : <Navigate to={currentUser ? getDefaultRoute(currentUser) : "/login"} replace />} />

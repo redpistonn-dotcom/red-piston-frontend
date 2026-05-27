@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { VEHICLES } from "../api/mockDatabase";
 
 // A simple global state manager mimicking Zustand
 const store = {
@@ -46,10 +45,10 @@ export function useMarketplaceStore() {
         });
     }, []);
 
-    const setVehicleId = useCallback((vid) => {
-        const v = VEHICLES.find(x => x.id === vid) || null;
-        store.setState({ vehicle: v });
-        if (v) localStorage.setItem("mp_vehicle", JSON.stringify(v));
+    // Accept a full vehicle object (from API) — not a mock string ID
+    const setVehicle = useCallback((vehicleObj) => {
+        store.setState({ vehicle: vehicleObj });
+        if (vehicleObj) localStorage.setItem("mp_vehicle", JSON.stringify(vehicleObj));
         else localStorage.removeItem("mp_vehicle");
     }, []);
 
@@ -74,7 +73,7 @@ export function useMarketplaceStore() {
 
     return {
         ...state,
-        setVehicleId,
+        setVehicle,
         setSearchQuery,
         addToCart,
         toggleCart

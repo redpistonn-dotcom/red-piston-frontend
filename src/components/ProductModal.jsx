@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { T, FONT } from "../theme";
 import { uid, CATEGORIES, POSITIONS, ENGINE_TYPES, TRANSMISSIONS, EMOJIS, fmt } from "../utils";
-import { MASTER_PRODUCTS } from "../marketplace/api/mockDatabase";
+import { searchCatalog } from "../api/inventory";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 
 export function ProductModal({ open, onClose, product, products, onSave, toast, activeShopId }) {
@@ -14,6 +14,8 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
     // Global SKU search
     const [showCatalogSearch, setShowCatalogSearch] = useState(false);
     const [catalogSearch, setCatalogSearch] = useState("");
+    const [catalogResults, setCatalogResults] = useState([]);
+    const [catalogLoading, setCatalogLoading] = useState(false);
 
     useEffect(() => {
         setF(product ? { ...product, buyPrice: String(product.buyPrice), sellPrice: String(product.sellPrice), mrp: String(product.mrp || ""), stock: String(product.stock), minStock: String(product.minStock), maxStock: String(product.maxStock || 1000), reorderQty: String(product.reorderQty || 20), gstRate: String(product.gstRate || product.gst || 18), hsnCode: product.hsnCode || "", trackBatch: !!product.trackBatch, batchNumber: product.batchNumber || "", expiryDate: product.expiryDate || "", vehicles: product.vehicles || (product.compatibleVehicles || []).join(", "), oemNumber: product.oemNumber || "", position: product.position || "", engineType: product.engineType || "", transmission: product.transmission || "", condition: product.condition || "New", warranty: product.warranty || "", globalSku: product.globalSku || null } : blank);
@@ -21,6 +23,23 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
         setShowCatalogSearch(false);
         setCatalogSearch("");
     }, [product, open]);
+
+    // Fetch catalog results from real API when catalog search query changes
+    useEffect(() => {
+        if (!showCatalogSearch || catalogSearch.length < 2) {
+            setCatalogResults([]);
+            return;
+        }
+        let cancelled = false;
+        setCatalogLoading(true);
+        searchCatalog({ q: catalogSearch, limit: 8 })
+            .then(res => {
+                if (!cancelled) setCatalogResults(res?.data || res || []);
+            })
+            .catch(() => { if (!cancelled) setCatalogResults([]); })
+            .finally(() => { if (!cancelled) setCatalogLoading(false); });
+        return () => { cancelled = true; };
+    }, [catalogSearch, showCatalogSearch]);
 
     const set = k => v => setF(p => ({ ...p, [k]: v }));
     const profit = f.buyPrice && f.sellPrice ? +f.sellPrice - +f.buyPrice : null;
@@ -38,19 +57,21 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
     };
 
     const handleSelectCatalogItem = (item) => {
+        // Real API returns: partId, name, partNumber (sku), brand, category, oemNumber, mrp
         setF(prev => ({
             ...prev,
             name: item.name,
-            sku: item.sku,
-            category: item.category,
-            brand: item.brand,
-            oemNumber: item.oem_part_no || prev.oemNumber,
-            globalSku: item.id,
-            vehicles: item.compatibility ? item.compatibility.join(", ") : prev.vehicles,
-            mrp: prev.mrp || String(Math.round((item.selling_price || item.mrp || 1000) * 1.25)), // give some reasonable default if blank
-            sellPrice: prev.sellPrice || String((item.selling_price || item.mrp || 1000)),
+            sku: item.partNumber || item.sku || prev.sku,
+            category: item.category || prev.category,
+            brand: item.brand || prev.brand,
+            oemNumber: item.oemNumber || item.oem_part_no || prev.oemNumber,
+            globalSku: item.partId || item.id,
+            vehicles: prev.vehicles, // preserve existing vehicle compat — fitment is managed server-side
+            mrp: prev.mrp || String(Math.round((item.mrp || 1000) * 1.25)),
+            sellPrice: prev.sellPrice || String(item.mrp || 1000),
             // Don't overwrite stock or buyPrice
         }));
+        setCatalogResults([]);
         setShowCatalogSearch(false);
         toast(`Linked to Global Catalog: ${item.name}`, "info");
     };
@@ -107,11 +128,17 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
                         <Input value={catalogSearch} onChange={setCatalogSearch} placeholder="Search master catalog by Name or SKU..." autoFocus />
                         {catalogSearch.length >= 2 && (
                             <div style={{ marginTop: 8, background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, maxHeight: 160, overflowY: "auto" }}>
-                                {MASTER_PRODUCTS.filter(p => (p.name + p.sku + p.brand).toLowerCase().includes(catalogSearch.toLowerCase())).slice(0, 5).map(m => (
-                                    <div key={m.id} onClick={() => handleSelectCatalogItem(m)} className="row-hover" style={{ padding: "8px 12px", borderBottom: `1px solid ${T.border}`, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                {catalogLoading && (
+                                    <div style={{ padding: "10px 12px", fontSize: 12, color: T.t3 }}>Searching catalog…</div>
+                                )}
+                                {!catalogLoading && catalogResults.length === 0 && (
+                                    <div style={{ padding: "10px 12px", fontSize: 12, color: T.t3 }}>No results found.</div>
+                                )}
+                                {!catalogLoading && catalogResults.map(m => (
+                                    <div key={m.partId || m.id} onClick={() => handleSelectCatalogItem(m)} className="row-hover" style={{ padding: "8px 12px", borderBottom: `1px solid ${T.border}`, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                         <div>
                                             <div style={{ fontSize: 12, fontWeight: 700, color: T.t1 }}>{m.name}</div>
-                                            <div style={{ fontSize: 10, color: T.t3 }}>{m.brand} · {m.sku}</div>
+                                            <div style={{ fontSize: 10, color: T.t3 }}>{m.brand} · {m.sku || m.partNumber}</div>
                                         </div>
                                         <Btn size="xs" variant="subtle">Select</Btn>
                                     </div>

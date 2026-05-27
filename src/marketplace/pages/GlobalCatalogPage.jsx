@@ -3,6 +3,7 @@ import { T, FONT } from "../../theme";
 import { MASTER_PRODUCTS, BRAND_CATALOG, CATEGORIES, VEHICLES } from "../api/mockDatabase";
 import { useStore } from "../../store";
 import { uid } from "../../utils/utils";
+import { PartImage } from "../components/PartImage";
 
 const STATUS_COLORS = {
     published: { bg: `${T.emerald}18`, color: T.emerald, label: "Published" },
@@ -270,13 +271,9 @@ export function GlobalCatalogPage({ onBack }) {
                                     <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                                         <div style={{
                                             width: 40, height: 40, borderRadius: 10, overflow: "hidden",
-                                            background: T.surface, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center"
+                                            background: T.surface, flexShrink: 0,
                                         }}>
-                                            {p.image ? (
-                                                <img src={p.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                            ) : (
-                                                <span style={{ fontSize: 20, opacity: 0.4 }}>📦</span>
-                                            )}
+                                            <PartImage src={p.image} alt={p.name} size="sm" />
                                         </div>
                                         <div style={{ minWidth: 0 }}>
                                             <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>

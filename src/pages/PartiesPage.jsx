@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { T, FONT } from "../theme";
 import { fmt, fmtDate, daysAgo, uid, downloadCSV, generateCSV } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider } from "../components/ui";
-import { MANUFACTURERS, getModelsForMfg } from "../vehicleData";
+import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
 
 export function PartiesPage({ parties, movements, vehicles, activeShopId, onSaveParty, onSaveVehicle, toast }) {
     const [view, setView] = useState("customers");
@@ -13,12 +13,28 @@ export function PartiesPage({ parties, movements, vehicles, activeShopId, onSave
 
     // Add Vehicle inline form state
     const [showVehForm, setShowVehForm] = useState(false);
-    const blankVeh = { make: "", model: "", year: "", fuelType: "Petrol", registrationNumber: "", ownerId: "", engineType: "", odometer: "" };
+    const blankVeh = { makeId: "", make: "", modelId: "", model: "", year: "", fuelType: "Petrol", registrationNumber: "", ownerId: "", engineType: "", odometer: "" };
     const [vehForm, setVehForm] = useState(blankVeh);
     const setVF = k => v => setVehForm(p => ({ ...p, [k]: v }));
-    const vehModels = useMemo(() => vehForm.make ? getModelsForMfg(vehForm.make) : [], [vehForm.make]);
     const currentYear = new Date().getFullYear();
     const yearOpts = Array.from({ length: 30 }, (_, i) => currentYear - i);
+
+    // Vehicle DB data
+    const [manufacturers, setManufacturers] = useState([]);
+    const [vehModels, setVehModels] = useState([]);
+
+    useEffect(() => {
+        fetchVehicleManufacturers()
+            .then(data => setManufacturers(Array.isArray(data) ? data : []))
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        if (!vehForm.makeId) { setVehModels([]); return; }
+        fetchVehicleModelsByManufacturer(parseInt(vehForm.makeId, 10))
+            .then(data => setVehModels(Array.isArray(data) ? data : []))
+            .catch(() => setVehModels([]));
+    }, [vehForm.makeId]);
 
     const handleSaveVehicle = () => {
         if (!vehForm.make || !vehForm.model || !vehForm.registrationNumber) {
@@ -160,19 +176,29 @@ export function PartiesPage({ parties, movements, vehicles, activeShopId, onSave
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, alignItems: "end" }}>
                                 {/* Make */}
                                 <Field label="Make *">
-                                    <select value={vehForm.make} onChange={e => setVF("make")(e.target.value)}
-                                        style={{ width: "100%", background: T.surface, border: `1px solid ${vehForm.make ? T.amber + "66" : T.border}`, borderRadius: 8, padding: "9px 12px", color: vehForm.make ? T.t1 : T.t3, fontSize: 13, fontFamily: FONT.ui, outline: "none", cursor: "pointer" }}>
+                                    <select
+                                        value={vehForm.makeId}
+                                        onChange={e => {
+                                            const mfg = manufacturers.find(m => m.manufacturerId === parseInt(e.target.value, 10));
+                                            setVehForm(p => ({ ...p, makeId: e.target.value, make: mfg?.name || "", modelId: "", model: "" }));
+                                        }}
+                                        style={{ width: "100%", background: T.surface, border: `1px solid ${vehForm.makeId ? T.amber + "66" : T.border}`, borderRadius: 8, padding: "9px 12px", color: vehForm.makeId ? T.t1 : T.t3, fontSize: 13, fontFamily: FONT.ui, outline: "none", cursor: "pointer" }}>
                                         <option value="">Select make…</option>
-                                        {MANUFACTURERS.map(m => <option key={m.id} value={m.id}>{m.logo} {m.name}</option>)}
+                                        {manufacturers.map(m => <option key={m.manufacturerId} value={m.manufacturerId}>{m.name}</option>)}
                                     </select>
                                 </Field>
                                 {/* Model */}
                                 <Field label="Model *">
-                                    <select value={vehForm.model} onChange={e => setVF("model")(e.target.value)}
-                                        style={{ width: "100%", background: T.surface, border: `1px solid ${vehForm.model ? T.amber + "66" : T.border}`, borderRadius: 8, padding: "9px 12px", color: vehForm.model ? T.t1 : T.t3, fontSize: 13, fontFamily: FONT.ui, outline: "none", cursor: "pointer" }}
-                                        disabled={!vehForm.make}>
+                                    <select
+                                        value={vehForm.modelId}
+                                        onChange={e => {
+                                            const mdl = vehModels.find(m => m.modelId === parseInt(e.target.value, 10));
+                                            setVehForm(p => ({ ...p, modelId: e.target.value, model: mdl?.name || "" }));
+                                        }}
+                                        style={{ width: "100%", background: T.surface, border: `1px solid ${vehForm.modelId ? T.amber + "66" : T.border}`, borderRadius: 8, padding: "9px 12px", color: vehForm.modelId ? T.t1 : T.t3, fontSize: 13, fontFamily: FONT.ui, outline: "none", cursor: "pointer" }}
+                                        disabled={!vehForm.makeId}>
                                         <option value="">Select model…</option>
-                                        {vehModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                        {vehModels.map(m => <option key={m.modelId} value={m.modelId}>{m.name}</option>)}
                                     </select>
                                 </Field>
                                 {/* Year */}

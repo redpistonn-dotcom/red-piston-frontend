@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { T, FONT } from "../../theme";
 import { BRAND_CATALOG, MASTER_PRODUCTS, SHOP_INVENTORY, SHOPS } from "../api/mockDatabase";
+import { PartImage } from "../components/PartImage";
 
 const TIER_META = {
     premium: { label: "Premium", color: T.amber, icon: "⭐" },
@@ -309,13 +310,9 @@ export function BrandCatalogPage({ onBack, onViewProduct }) {
                                             {/* Thumbnail */}
                                             <div style={{
                                                 width: 44, height: 44, borderRadius: 10, overflow: "hidden",
-                                                background: T.bg, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center"
+                                                background: T.bg, flexShrink: 0,
                                             }}>
-                                                {p.image ? (
-                                                    <img src={p.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                                                ) : (
-                                                    <span style={{ fontSize: 18, opacity: 0.3 }}>📦</span>
-                                                )}
+                                                <PartImage src={p.image} alt={p.name} size="sm" />
                                             </div>
 
                                             {/* Info */}
