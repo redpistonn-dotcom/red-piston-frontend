@@ -1,42 +1,42 @@
 export const T = {
-  // ── Apex Performance "Dark Cockpit" palette ──────────────────────────
-  bg:          "#12131a",   // background / surface-dim
-  surface:     "#1a1b22",   // surface-container-low
-  card:        "#1e1f26",   // surface-container
-  cardHover:   "#292931",   // surface-container-high
-  border:      "#3F3F46",   // metallic-border
-  borderHi:    "#52525b",   // hover/focus border
-  // Apex Red — primary brand
-  amber:       "#FF1F3A",
-  amberDim:    "#93000a",
-  amberGlow:   "rgba(255, 31, 58, 0.2)",
-  amberSoft:   "rgba(255, 31, 58, 0.08)",
+  // ── RedPiston Light "Cream Industrial" palette ──────────────────────
+  bg:          "#FAF6F0",   // cream background
+  surface:     "#FFFFFF",   // white surface
+  card:        "#FFFFFF",   // white card
+  cardHover:   "#F0E8DF",   // cream hover
+  border:      "#E0D5C8",   // cream border
+  borderHi:    "#C8B8A8",   // hover/focus border
+  // RedPiston Crimson — primary brand accent
+  amber:       "#BE2B1A",
+  amberDim:    "#9B1F12",
+  amberGlow:   "rgba(190,43,26,0.08)",
+  amberSoft:   "rgba(190,43,26,0.05)",
   // Status — Emerald / success
-  emerald:     "#10B981",
-  emeraldDim:  "#065F46",
-  emeraldBg:   "rgba(16,185,129,0.1)",
+  emerald:     "#16A34A",
+  emeraldDim:  "#14532D",
+  emeraldBg:   "rgba(22,163,74,0.08)",
   // Status — Crimson / danger
-  crimson:     "#EF4444",
-  crimsonDim:  "#7F1D1D",
-  crimsonBg:   "rgba(239,68,68,0.1)",
+  crimson:     "#DC2626",
+  crimsonDim:  "#991B1B",
+  crimsonBg:   "rgba(220,38,38,0.08)",
   // Status — Sky / info
-  sky:         "#38BDF8",
-  skyDim:      "#0C4A6E",
-  skyBg:       "rgba(56,189,248,0.1)",
+  sky:         "#0284C7",
+  skyDim:      "#075985",
+  skyBg:       "rgba(2,132,199,0.08)",
   // Violet — accent secondary
-  violet:      "#A78BFA",
-  violetBg:    "rgba(167,139,250,0.1)",
-  // Text hierarchy (Stitch on-surface scale)
-  t1:          "#e3e1ec",   // on-surface
-  t2:          "#c9c6c5",   // secondary
-  t3:          "#af8785",   // outline
-  t4:          "#5e3f3d",   // outline-variant
+  violet:      "#7C3AED",
+  violetBg:    "rgba(124,58,237,0.08)",
+  // Text hierarchy (on-light-surface scale)
+  t1:          "#1A1205",   // primary text
+  t2:          "#5C4F40",   // secondary text
+  t3:          "#9C8C7C",   // muted / placeholder
+  t4:          "#BFB0A0",   // very muted
 };
 
 export const FONT = {
-  ui:   "'Outfit', 'Inter', system-ui, -apple-system, sans-serif",
+  ui:   "'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif",
   body: "'Inter', system-ui, -apple-system, sans-serif",
-  mono: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+  mono: "'JetBrains Mono', 'Fira Code', monospace",
 };
 
 export const GLOBAL_CSS = `
@@ -205,8 +205,8 @@ export const GLOBAL_CSS = `
   .press-feedback { transition: transform 0.1s ease; }
   .press-feedback:active { transform: scale(0.97) translateY(1px) !important; }
 
-  /* ── Admin shell: sidebar offset on desktop ── */
-  .admin-content-wrap { padding-left: 240px; min-height: 100vh; }
+  /* ── Admin shell: header offset (no sidebar) ── */
+  .admin-content-wrap { padding-top: 60px; min-height: 100vh; }
 
   /* ── Print styles (POS invoice) ── */
   @media print {

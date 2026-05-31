@@ -15,6 +15,29 @@ export const createOrder        = (data)   => api.post('/api/marketplace/orders'
 export const updateOrderStatus  = (id, status) => api.put(`/api/marketplace/orders/${id}/status`, { status });
 export const trackOrder         = (id)     => api.get(`/api/marketplace/orders/${id}/track`);
 
+// ─── Number plate → vehicle details ──────────────────────────────────────────
+// Backend proxies API Setu so the secret key never reaches the browser.
+// Returns { make, model, year, fuelType, plate } on success.
+export async function fetchShops({ q = '', city = '', lat, lng } = {}) {
+  const params = new URLSearchParams({ limit: 80 });
+  if (q)   params.set('q', q);
+  if (city) params.set('city', city);
+  if (lat)  params.set('lat', lat);
+  if (lng)  params.set('lng', lng);
+  const res = await fetch(`/api/marketplace/shops?${params}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to load shops');
+  return json.shops || [];
+}
+
+export async function lookupPlate(plate) {
+  const clean = plate.toUpperCase().replace(/\s/g, '');
+  const res = await fetch(`/api/marketplace/plate-lookup?plate=${encodeURIComponent(clean)}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Plate lookup failed');
+  return json;
+}
+
 // ─── Category → emoji fallback ────────────────────────────────────────────────
 const CATEGORY_EMOJI = {
   Brakes: '🛑', Filters: '🔘', Ignition: '⚡', Electrical: '🔋',

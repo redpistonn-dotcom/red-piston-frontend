@@ -31,7 +31,7 @@ const S = {
     padding: "10px 20px", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700,
     cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.2s",
     ...(variant === "primary"
-      ? { background: T.amber, color: "#000" }
+      ? { background: T.amber, color: "#fff" }
       : variant === "danger"
       ? { background: "transparent", border: `1.5px solid ${T.crimson}`, color: T.crimson }
       : { background: "transparent", border: `1.5px solid ${T.border}`, color: T.t2 }),

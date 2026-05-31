@@ -50,7 +50,7 @@ export function ProductComparisonModal({ open, onClose, productData }) {
           <div style={{ width: 320, display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ width: "100%", height: 320, background: T.card, borderRadius: 16, border: `1px solid ${T.border}`, overflow: "hidden", display: "flex", padding: 24, position: "relative" }}>
               {isCompatible && (
-                <div style={{ position: "absolute", top: 12, left: 12, background: T.emerald, color: "#000", padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 900, fontFamily: FONT.ui, display: "flex", gap: 4, alignItems: "center", boxShadow: `0 4px 12px ${T.emerald}44` }}>
+                <div style={{ position: "absolute", top: 12, left: 12, background: T.emerald, color: "#fff", padding: "4px 10px", borderRadius: 8, fontSize: 11, fontWeight: 900, fontFamily: FONT.ui, display: "flex", gap: 4, alignItems: "center", boxShadow: `0 4px 12px ${T.emerald}44` }}>
                   <span>✓</span> EXACT FIT
                 </div>
               )}
@@ -100,7 +100,7 @@ export function ProductComparisonModal({ open, onClose, productData }) {
                 )}
               </div>
 
-              <button onClick={() => addToCart(buyBoxWinner)} style={{ width: "100%", background: T.amber, color: "#000", border: "none", borderRadius: 12, padding: "16px", fontSize: 16, fontWeight: 900, cursor: "pointer", boxShadow: `0 8px 24px ${T.amber}44`, display: "flex", justifyContent: "center", gap: 8, transition: "all 0.2s" }} className="btn-hover-solid">
+              <button onClick={() => addToCart(buyBoxWinner)} style={{ width: "100%", background: T.amber, color: "#fff", border: "none", borderRadius: 12, padding: "16px", fontSize: 16, fontWeight: 900, cursor: "pointer", boxShadow: `0 8px 24px ${T.amber}44`, display: "flex", justifyContent: "center", gap: 8, transition: "all 0.2s" }} className="btn-hover-solid">
                 🛒 Add to Cart
               </button>
 

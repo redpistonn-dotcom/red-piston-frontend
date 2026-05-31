@@ -1,15 +1,32 @@
 import { useMemo, useState } from "react";
-import { T, FONT } from "../../theme";
+import { FONT } from "../../theme";
 import { useStore } from "../../store";
 import { fmt } from "../../utils";
 import { PartImage } from "./PartImage";
+
+// Light cream palette constants
+const C = {
+    bg:         "#FAF6F0",
+    surface:    "#FFFFFF",
+    card:       "#FAF6F0",
+    cardHover:  "#F0E8DF",
+    border:     "#E0D5C8",
+    t1:         "#1A1205",
+    t2:         "#5C4F40",
+    t3:         "#9C8C7C",
+    t4:         "#BFB0A0",
+    red:        "#BE2B1A",
+    redBg:      "rgba(190,43,26,0.08)",
+    redDim:     "#DC2626",
+    redDimBg:   "#FEF2F2",
+    green:      "#16A34A",
+};
 
 const DELIVERY_OPTIONS = [
     { id: "express", label: "Express", desc: "~45 min", fee: 59, icon: "⚡" },
     { id: "standard", label: "Standard", desc: "2-4 hrs", fee: 29, icon: "🚚" },
 ];
 
-// Compute estimated delivery date string
 function estDelivery(optionId) {
     const now = new Date();
     if (optionId === "express") {
@@ -25,7 +42,6 @@ export function CartDrawer({ onCheckout }) {
 
     const safeCart = cart || [];
 
-    // Group cart items by shop (Swiggy-style vendor splitting)
     const cartByShop = useMemo(() => {
         return safeCart.reduce((acc, item) => {
             const shopId = item.listing?.shop_id;
@@ -73,38 +89,38 @@ export function CartDrawer({ onCheckout }) {
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
             {/* Backdrop */}
             <div
-                style={{ position: "absolute", inset: 0, background: "rgba(10,15,29,0.75)", backdropFilter: "blur(6px)", animation: "fadeIn 0.2s ease both" }}
+                style={{ position: "absolute", inset: 0, background: "rgba(26,18,5,0.35)", backdropFilter: "blur(4px)", animation: "fadeIn 0.2s ease both" }}
                 onClick={() => setIsCartOpen(false)}
             />
 
             {/* Drawer panel */}
             <div style={{
                 position: "relative", width: 440, maxWidth: "92vw", height: "100%",
-                background: T.surface,
-                borderLeft: `1px solid ${T.border}`,
-                boxShadow: "-16px 0 60px rgba(0,0,0,0.6), -4px 0 16px rgba(0,0,0,0.3)",
+                background: C.surface,
+                borderLeft: `1px solid ${C.border}`,
+                boxShadow: "-8px 0 40px rgba(26,18,5,0.12), -2px 0 8px rgba(26,18,5,0.06)",
                 display: "flex", flexDirection: "column",
                 animation: "slideLeft 0.32s cubic-bezier(0.16,1,0.3,1) both",
             }}>
                 {/* Header */}
                 <div style={{
                     padding: "18px 22px 16px",
-                    borderBottom: `1px solid ${T.border}`,
+                    borderBottom: `1px solid ${C.border}`,
                     display: "flex", justifyContent: "space-between", alignItems: "flex-start",
                     flexShrink: 0,
-                    background: T.card,
+                    background: C.card,
                 }}>
                     <div>
-                        <div style={{ fontSize: 17, fontWeight: 800, color: T.t1, letterSpacing: "-0.02em", fontFamily: FONT.ui }}>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: C.t1, letterSpacing: "-0.02em", fontFamily: FONT.ui }}>
                             Cart
                             {totalItems > 0 && (
-                                <span style={{ marginLeft: 8, background: T.amberGlow, border: `1px solid ${T.amber}44`, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700, color: T.amber, fontFamily: FONT.mono }}>
+                                <span style={{ marginLeft: 8, background: C.redBg, border: `1px solid rgba(190,43,26,0.2)`, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700, color: C.red, fontFamily: FONT.mono }}>
                                     {totalItems}
                                 </span>
                             )}
                         </div>
                         {shopGroups.length > 0 && (
-                            <div style={{ fontSize: 12, color: T.t3, marginTop: 3, fontFamily: FONT.ui }}>
+                            <div style={{ fontSize: 12, color: C.t3, marginTop: 3, fontFamily: FONT.ui }}>
                                 {shopGroups.length} shipment{shopGroups.length !== 1 ? "s" : ""}
                             </div>
                         )}
@@ -118,27 +134,27 @@ export function CartDrawer({ onCheckout }) {
                                     }
                                 }}
                                 style={{
-                                    background: T.crimsonBg, border: `1px solid ${T.crimson}33`,
+                                    background: C.redDimBg, border: `1px solid rgba(220,38,38,0.2)`,
                                     borderRadius: 7, padding: "5px 10px",
-                                    color: T.crimson, cursor: "pointer", fontSize: 11,
+                                    color: C.redDim, cursor: "pointer", fontSize: 11,
                                     fontWeight: 700, fontFamily: FONT.ui, transition: "all 0.15s",
                                 }}
-                                onMouseEnter={e => { e.currentTarget.style.background = `${T.crimson}22`; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = T.crimsonBg; }}
+                                onMouseEnter={e => { e.currentTarget.style.background = "rgba(220,38,38,0.12)"; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = C.redDimBg; }}
                             >Clear</button>
                         )}
                         <button
                             onClick={() => setIsCartOpen(false)}
                             style={{
-                                width: 32, height: 32, background: T.surface,
-                                border: `1px solid ${T.border}`, borderRadius: 8,
-                                color: T.t3, cursor: "pointer", fontSize: 14,
+                                width: 32, height: 32, background: C.surface,
+                                border: `1px solid ${C.border}`, borderRadius: 8,
+                                color: C.t3, cursor: "pointer", fontSize: 14,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 transition: "all 0.15s", flexShrink: 0,
                                 fontFamily: FONT.ui,
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.background = T.cardHover; e.currentTarget.style.color = T.t1; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = T.surface; e.currentTarget.style.color = T.t3; }}
+                            onMouseEnter={e => { e.currentTarget.style.background = C.cardHover; e.currentTarget.style.color = C.t1; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = C.surface; e.currentTarget.style.color = C.t3; }}
                         >
                             ✕
                         </button>
@@ -146,32 +162,31 @@ export function CartDrawer({ onCheckout }) {
                 </div>
 
                 {/* Cart Body */}
-                <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px", minHeight: 0 }} className="custom-scroll">
+                <div style={{ flex: 1, overflowY: "auto", padding: "14px 18px", minHeight: 0, background: C.bg }} className="custom-scroll">
                     {safeCart.length === 0 ? (
-                        /* Empty state */
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "40px 24px", textAlign: "center" }}>
                             <div style={{
                                 width: 64, height: 64, borderRadius: 18,
-                                background: T.card, border: `1px solid ${T.border}`,
+                                background: C.card, border: `1px solid ${C.border}`,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 fontSize: 28, marginBottom: 20,
                             }}>
-                                ⬡
+                                🛒
                             </div>
-                            <div style={{ fontSize: 15, fontWeight: 700, color: T.t2, marginBottom: 6, fontFamily: FONT.ui }}>Cart is empty</div>
-                            <div style={{ fontSize: 13, color: T.t3, lineHeight: 1.6, maxWidth: 200, fontFamily: FONT.ui, marginBottom: 16 }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: C.t2, marginBottom: 6, fontFamily: FONT.ui }}>Cart is empty</div>
+                            <div style={{ fontSize: 13, color: C.t3, lineHeight: 1.6, maxWidth: 200, fontFamily: FONT.ui, marginBottom: 16 }}>
                                 Browse the marketplace and add auto parts
                             </div>
                             <button
                                 onClick={() => setIsCartOpen(false)}
                                 style={{
-                                    background: T.amberGlow, border: `1px solid ${T.amber}44`,
+                                    background: C.redBg, border: `1px solid rgba(190,43,26,0.2)`,
                                     borderRadius: 8, padding: "8px 18px",
-                                    color: T.amber, fontSize: 13, fontWeight: 700,
+                                    color: C.red, fontSize: 13, fontWeight: 700,
                                     cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s",
                                 }}
-                                onMouseEnter={e => { e.currentTarget.style.background = `${T.amber}22`; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = T.amberGlow; }}
+                                onMouseEnter={e => { e.currentTarget.style.background = "rgba(190,43,26,0.14)"; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = C.redBg; }}
                             >← Continue Shopping</button>
                         </div>
                     ) : (
@@ -194,35 +209,32 @@ export function CartDrawer({ onCheckout }) {
                 {safeCart.length > 0 && (
                     <div style={{
                         padding: "16px 18px 18px",
-                        borderTop: `1px solid ${T.border}`,
-                        background: T.card,
+                        borderTop: `1px solid ${C.border}`,
+                        background: C.card,
                         flexShrink: 0,
                     }}>
-                        {/* Line items */}
                         <div style={{ marginBottom: 12 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: T.t3, marginBottom: 5, fontFamily: FONT.ui }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.t3, marginBottom: 5, fontFamily: FONT.ui }}>
                                 <span>Subtotal · {totalItems} item{totalItems !== 1 ? "s" : ""}</span>
-                                <span style={{ fontFamily: FONT.mono, color: T.t2 }}>{fmt(totalSubtotal)}</span>
+                                <span style={{ fontFamily: FONT.mono, color: C.t2 }}>{fmt(totalSubtotal)}</span>
                             </div>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: T.t3, fontFamily: FONT.ui }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.t3, fontFamily: FONT.ui }}>
                                 <span>Delivery · {shopGroups.length} shipment{shopGroups.length > 1 ? "s" : ""}</span>
-                                <span style={{ fontFamily: FONT.mono, color: T.t2 }}>{totalDelivery === 0 ? "FREE" : fmt(totalDelivery)}</span>
+                                <span style={{ fontFamily: FONT.mono, color: C.t2 }}>{totalDelivery === 0 ? "FREE" : fmt(totalDelivery)}</span>
                             </div>
                         </div>
 
-                        {/* Total row */}
                         <div style={{
                             display: "flex", justifyContent: "space-between", alignItems: "center",
-                            borderTop: `1px solid ${T.border}`, paddingTop: 12, marginBottom: 14,
+                            borderTop: `1px solid ${C.border}`, paddingTop: 12, marginBottom: 14,
                         }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: T.t2, fontFamily: FONT.ui }}>Total</span>
-                            <span style={{ fontSize: 20, fontWeight: 900, color: T.amber, fontFamily: FONT.mono }}>{fmt(totalValue)}</span>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: C.t2, fontFamily: FONT.ui }}>Total</span>
+                            <span style={{ fontSize: 20, fontWeight: 900, color: C.red, fontFamily: FONT.mono }}>{fmt(totalValue)}</span>
                         </div>
 
-                        {/* Checkout CTA */}
                         <CheckoutButton totalValue={totalValue} onPress={() => { setIsCartOpen(false); onCheckout && onCheckout(); }} />
 
-                        <div style={{ textAlign: "center", fontSize: 11, color: T.t4, marginTop: 10, fontFamily: FONT.ui, letterSpacing: "0.01em" }}>
+                        <div style={{ textAlign: "center", fontSize: 11, color: C.t4, marginTop: 10, fontFamily: FONT.ui, letterSpacing: "0.01em" }}>
                             Escrow-protected · 100% secure
                         </div>
                     </div>
@@ -231,8 +243,6 @@ export function CartDrawer({ onCheckout }) {
         </div>
     );
 }
-
-// ── Sub-components kept outside CartDrawer so they don't re-declare on every render ──
 
 function CheckoutButton({ totalValue, onPress }) {
     const [active, setActive] = useState(false);
@@ -244,8 +254,8 @@ function CheckoutButton({ totalValue, onPress }) {
             onMouseLeave={() => setActive(false)}
             style={{
                 width: "100%",
-                background: `linear-gradient(135deg, ${T.amber} 0%, #D97706 100%)`,
-                color: "#000",
+                background: `linear-gradient(135deg, #BE2B1A 0%, #991b12 100%)`,
+                color: "#FFFFFF",
                 border: "none",
                 borderRadius: 10,
                 padding: "13px 16px",
@@ -254,7 +264,7 @@ function CheckoutButton({ totalValue, onPress }) {
                 cursor: "pointer",
                 fontFamily: FONT.ui,
                 letterSpacing: "-0.01em",
-                boxShadow: `0 4px 20px rgba(245,158,11,0.35), 0 1px 4px rgba(245,158,11,0.2)`,
+                boxShadow: `0 4px 20px rgba(190,43,26,0.3), 0 1px 4px rgba(190,43,26,0.15)`,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                 transition: "transform 0.12s cubic-bezier(0.16,1,0.3,1), box-shadow 0.12s",
                 transform: active ? "scale(0.98)" : "scale(1)",
@@ -276,8 +286,8 @@ function QtyButton({ children, onClick }) {
             onMouseLeave={() => setActive(false)}
             style={{
                 width: 30, height: 30,
-                background: active ? T.cardHover : T.surface,
-                border: "none", color: T.t1, cursor: "pointer", fontSize: 14,
+                background: active ? "#F0E8DF" : "#FFFFFF",
+                border: "none", color: "#1A1205", cursor: "pointer", fontSize: 14,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 transition: "background 0.1s, transform 0.1s",
                 transform: active ? "scale(0.9)" : "scale(1)",
@@ -291,30 +301,30 @@ function QtyButton({ children, onClick }) {
 
 function ShopGroup({ group, gIdx, updateQty, removeItem, updateDeliveryOption }) {
     return (
-        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: "#FFFFFF", border: `1px solid #E0D5C8`, borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 4px rgba(26,18,5,0.06)" }}>
             {/* Shop Header */}
             <div style={{
                 padding: "11px 16px",
-                background: T.surface,
-                borderBottom: `1px solid ${T.border}`,
+                background: "#FAF6F0",
+                borderBottom: `1px solid #E0D5C8`,
                 display: "flex", alignItems: "center", gap: 10,
             }}>
                 <div style={{
                     width: 28, height: 28, borderRadius: 7,
-                    background: T.amberGlow, border: `1px solid ${T.amber}33`,
+                    background: "rgba(190,43,26,0.1)", border: `1px solid rgba(190,43,26,0.2)`,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 12, flexShrink: 0,
                 }}>
-                    ◈
+                    🏪
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: T.t1, fontFamily: FONT.ui }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#1A1205", fontFamily: FONT.ui }}>
                         {group.shop?.name || "Local Shop"}
                     </div>
-                    <div style={{ fontSize: 10, color: T.t3, marginTop: 1, fontFamily: FONT.ui }}>
+                    <div style={{ fontSize: 10, color: "#9C8C7C", marginTop: 1, fontFamily: FONT.ui }}>
                         Shipment {gIdx + 1} · {group.items.length} item{group.items.length !== 1 ? "s" : ""} · {fmt(group.subtotal)}
                     </div>
-                    <div style={{ fontSize: 10, color: T.emerald, marginTop: 1, fontFamily: FONT.ui }}>
+                    <div style={{ fontSize: 10, color: "#16A34A", marginTop: 1, fontFamily: FONT.ui }}>
                         Est. delivery: {estDelivery(group.deliveryOption)}
                     </div>
                 </div>
@@ -334,8 +344,8 @@ function ShopGroup({ group, gIdx, updateQty, removeItem, updateDeliveryOption })
             </div>
 
             {/* Delivery selector */}
-            <div style={{ padding: "10px 16px 14px", background: `${T.bg}cc`, borderTop: `1px solid ${T.border}` }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: T.t4, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, fontFamily: FONT.ui }}>
+            <div style={{ padding: "10px 16px 14px", background: "#F5EFE6", borderTop: `1px solid #E0D5C8` }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#9C8C7C", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, fontFamily: FONT.ui }}>
                     Delivery Speed
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -366,7 +376,7 @@ function CartItem({ item, isLast, updateQty, removeItem }) {
         <div style={{
             display: "flex", gap: 12,
             padding: "11px 0",
-            borderBottom: isLast ? "none" : `1px solid ${T.border}22`,
+            borderBottom: isLast ? "none" : `1px solid rgba(224,213,200,0.6)`,
             opacity: removing ? 0 : 1,
             transform: removing ? "translateX(12px)" : "translateX(0)",
             transition: "opacity 0.18s, transform 0.18s",
@@ -374,7 +384,7 @@ function CartItem({ item, isLast, updateQty, removeItem }) {
             {/* Thumbnail */}
             <div style={{
                 width: 52, height: 52, borderRadius: 10,
-                background: T.surface, border: `1px solid ${T.border}`,
+                background: "#FAF6F0", border: `1px solid #E0D5C8`,
                 flexShrink: 0, overflow: "hidden",
                 display: "flex", alignItems: "center", justifyContent: "center",
             }}>
@@ -383,26 +393,26 @@ function CartItem({ item, isLast, updateQty, removeItem }) {
 
             {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT.ui }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1205", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: FONT.ui }}>
                     {item.product?.name || "Auto Part"}
                 </div>
                 {item.product?.brand && (
-                    <div style={{ fontSize: 11, color: T.t3, marginTop: 1, fontFamily: FONT.ui }}>{item.product.brand}</div>
+                    <div style={{ fontSize: 11, color: "#9C8C7C", marginTop: 1, fontFamily: FONT.ui }}>{item.product.brand}</div>
                 )}
 
                 {/* Qty controls */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
                     <div style={{
                         display: "flex", alignItems: "center",
-                        border: `1px solid ${T.border}`, borderRadius: 8,
-                        overflow: "hidden", background: T.surface,
+                        border: `1px solid #E0D5C8`, borderRadius: 8,
+                        overflow: "hidden", background: "#FFFFFF",
                     }}>
                         <QtyButton onClick={() => updateQty(item.listing, item.qty - 1)}>−</QtyButton>
                         <span style={{
                             width: 30, height: 30,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 12, fontWeight: 800, fontFamily: FONT.mono,
-                            color: T.amber, borderLeft: `1px solid ${T.border}`, borderRight: `1px solid ${T.border}`,
+                            color: "#BE2B1A", borderLeft: `1px solid #E0D5C8`, borderRight: `1px solid #E0D5C8`,
                         }}>
                             {item.qty}
                         </span>
@@ -412,12 +422,12 @@ function CartItem({ item, isLast, updateQty, removeItem }) {
                         onClick={handleRemove}
                         style={{
                             background: "transparent", border: "none",
-                            color: T.t4, fontSize: 11, fontWeight: 600,
+                            color: "#BFB0A0", fontSize: 11, fontWeight: 600,
                             cursor: "pointer", fontFamily: FONT.ui,
                             transition: "color 0.15s", padding: "2px 4px",
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.color = T.crimson; }}
-                        onMouseLeave={e => { e.currentTarget.style.color = T.t4; }}
+                        onMouseEnter={e => { e.currentTarget.style.color = "#DC2626"; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = "#BFB0A0"; }}
                     >
                         Remove
                     </button>
@@ -426,11 +436,11 @@ function CartItem({ item, isLast, updateQty, removeItem }) {
 
             {/* Price */}
             <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>
+                <div style={{ fontSize: 14, fontWeight: 900, color: "#1A1205", fontFamily: FONT.mono }}>
                     {fmt((item.listing?.selling_price || 0) * item.qty)}
                 </div>
                 {item.qty > 1 && (
-                    <div style={{ fontSize: 10, color: T.t3, marginTop: 2, fontFamily: FONT.mono }}>
+                    <div style={{ fontSize: 10, color: "#9C8C7C", marginTop: 2, fontFamily: FONT.mono }}>
                         {fmt(item.listing?.selling_price)} each
                     </div>
                 )}
@@ -449,8 +459,8 @@ function DeliveryOption({ opt, isSelected, onSelect }) {
             onMouseLeave={() => setActive(false)}
             style={{
                 flex: 1, padding: "8px 6px",
-                background: isSelected ? T.amberGlow : T.card,
-                border: `1.5px solid ${isSelected ? T.amber : T.border}`,
+                background: isSelected ? "rgba(190,43,26,0.08)" : "#FFFFFF",
+                border: `1.5px solid ${isSelected ? "#BE2B1A" : "#E0D5C8"}`,
                 borderRadius: 8, cursor: "pointer",
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                 transition: "all 0.15s cubic-bezier(0.16,1,0.3,1)",
@@ -459,9 +469,9 @@ function DeliveryOption({ opt, isSelected, onSelect }) {
             }}
         >
             <span style={{ fontSize: 13 }}>{opt.icon}</span>
-            <span style={{ fontSize: 10, fontWeight: 700, color: isSelected ? T.amber : T.t1 }}>{opt.label}</span>
-            <span style={{ fontSize: 9, color: T.t3 }}>{opt.desc}</span>
-            <span style={{ fontSize: 10, fontWeight: 800, color: isSelected ? T.amber : T.t2, fontFamily: FONT.mono }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: isSelected ? "#BE2B1A" : "#1A1205" }}>{opt.label}</span>
+            <span style={{ fontSize: 9, color: "#9C8C7C" }}>{opt.desc}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, color: isSelected ? "#BE2B1A" : "#5C4F40", fontFamily: FONT.mono }}>
                 {opt.fee === 0 ? "FREE" : `₹${opt.fee}`}
             </span>
         </button>

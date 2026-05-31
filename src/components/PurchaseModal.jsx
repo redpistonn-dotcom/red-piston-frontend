@@ -129,7 +129,7 @@ export function PurchaseModal({ open, onClose, product, products, onSave, toast 
                     <Field label="Payment Mode">
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {paymentModes.map(pm => (
-                                <button key={pm} onClick={() => set("payment")(pm)} style={{ flex: 1, minWidth: 80, background: f.payment === pm ? (pm === "Credit" ? T.crimson : T.amber) : "transparent", color: f.payment === pm ? "#000" : T.t2, border: `1px solid ${f.payment === pm ? (pm === "Credit" ? T.crimson : T.amber) : T.border}`, borderRadius: 7, padding: "8px 6px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.12s", textAlign: "center" }}>
+                                <button key={pm} onClick={() => set("payment")(pm)} style={{ flex: 1, minWidth: 80, background: f.payment === pm ? (pm === "Credit" ? T.crimson : T.amber) : "transparent", color: f.payment === pm ? "#fff" : T.t2, border: `1px solid ${f.payment === pm ? (pm === "Credit" ? T.crimson : T.amber) : T.border}`, borderRadius: 7, padding: "8px 6px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.12s", textAlign: "center" }}>
                                     {pm === "Cash" ? "💵" : pm === "UPI" ? "📱" : pm === "Bank Transfer" ? "🏦" : pm === "Cheque" ? "📝" : "💳"} {pm}
                                 </button>
                             ))}

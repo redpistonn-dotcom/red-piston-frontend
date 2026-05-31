@@ -173,7 +173,7 @@ export function SaleModal({ open, onClose, product, products, onSave, toast }) {
             {/* TYPE TOGGLE */}
             <div style={{ display: "flex", gap: 10, marginBottom: 20, background: T.surface, padding: 6, borderRadius: 10 }}>
                 {["Sale", "Quotation"].map(t => (
-                    <button key={t} onClick={() => set("type")(t)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: f.type === t ? (t === "Sale" ? T.amber : T.sky) : "transparent", color: f.type === t ? "#000" : T.t3, fontWeight: 800, cursor: "pointer", transition: "all 0.2s" }}>
+                    <button key={t} onClick={() => set("type")(t)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: f.type === t ? (t === "Sale" ? T.amber : T.sky) : "transparent", color: f.type === t ? "#fff" : T.t3, fontWeight: 800, cursor: "pointer", transition: "all 0.2s" }}>
                         {t === "Sale" ? "🧾 Tax Invoice / Cash Memo" : "📝 Estimate / Quotation"}
                     </button>
                 ))}

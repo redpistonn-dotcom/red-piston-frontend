@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, Component, createContext, useContext, useMemo, lazy, Suspense } from "react";
+import { useState, useCallback, useEffect, Component, createContext, useContext, useMemo, lazy, Suspense, Children, cloneElement } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { T, FONT, GLOBAL_CSS } from "./theme";
 import { fmt, uid } from "./utils";
@@ -81,7 +81,7 @@ class ErrorBoundary extends Component {
             <div style={{ fontSize: 20, fontWeight: 700, color: T.t1, marginBottom: 8 }}>Something went wrong</div>
             <div style={{ fontSize: 14, color: T.t3, marginBottom: 24, lineHeight: 1.6 }}>{this.state.error?.message || "An unexpected error occurred."}</div>
             <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
-              style={{ background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
+              style={{ background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
               Reload App
             </button>
           </div>
@@ -94,14 +94,14 @@ class ErrorBoundary extends Component {
 
 // ========== NAV ITEMS FOR LEFT SIDEBAR ==========
 const NAV_ITEMS = [
-  { key: "dashboard", path: "/dashboard", icon: "◈", label: "Dashboard" },
-  { key: "inventory", path: "/inventory", icon: "⬡", label: "Inventory" },
+  { key: "dashboard", path: "/dashboard", icon: "🏠", label: "Dashboard" },
+  { key: "inventory", path: "/inventory", icon: "📦", label: "Inventory" },
   { key: "pos", path: "/billing", icon: "🧾", label: "POS" },
   { key: "parties", path: "/parties", icon: "👥", label: "Parties" },
   { key: "workshop", path: "/workshop", icon: "🔧", label: "Workshop" },
-  { key: "history", path: "/history", icon: "⊞", label: "History" },
+  { key: "history", path: "/history", icon: "📋", label: "History" },
   { key: "reports", path: "/reports", icon: "📊", label: "Reports" },
-  { key: "orders", path: "/orders", icon: "◎", label: "Orders" },
+  { key: "orders", path: "/orders", icon: "🛒", label: "Orders" },
 ];
 
 const MP_NAV = [
@@ -160,7 +160,7 @@ function ERPShell({ children }) {
       <style>{GLOBAL_CSS}</style>
 
       {/* TOPBAR */}
-      <div className="erp-topbar" style={{ height: 56, background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", padding: "0 20px 0 88px", position: "sticky", top: 0, zIndex: 500, gap: 10, boxShadow: `0 4px 24px rgba(0,0,0,0.3), 0 1px 0 ${T.border}` }}>
+      <div className="erp-topbar" style={{ height: 56, background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", padding: "0 20px 0 88px", position: "sticky", top: 0, zIndex: 500, gap: 10, boxShadow: `0 1px 4px rgba(26,18,5,0.06)` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 12, position: "relative" }}>
           <div onClick={() => setShopEdit({ name: shop.name, city: shop.city })} style={{ cursor: "pointer" }} title="Edit shop details">
             <div style={{ fontSize: 14, fontWeight: 800, color: T.t1, letterSpacing: "-0.02em", display: "flex", alignItems: "center", gap: 4 }}>{shop.name} <span style={{ fontSize: 10, color: T.t4 }}>✏️</span></div>
@@ -179,7 +179,7 @@ function ERPShell({ children }) {
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setShopEdit(null)} style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 14px", color: T.t3, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}>Cancel</button>
-                <button onClick={() => { const updated = shops.map((s) => (s.id === activeShopId ? { ...s, name: shopEdit.name, city: shopEdit.city } : s)); saveShops(updated); setShopEdit(null); toast("Shop details updated!", "emerald"); }} style={{ background: T.amber, border: "none", borderRadius: 8, padding: "6px 14px", color: "#000", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: FONT.ui }}>Save</button>
+                <button onClick={() => { const updated = shops.map((s) => (s.id === activeShopId ? { ...s, name: shopEdit.name, city: shopEdit.city } : s)); saveShops(updated); setShopEdit(null); toast("Shop details updated!", "emerald"); }} style={{ background: T.amber, border: "none", borderRadius: 8, padding: "6px 14px", color: "#fff", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: FONT.ui }}>Save</button>
               </div>
             </div>
           )}
@@ -207,7 +207,7 @@ function ERPShell({ children }) {
           <button
             onClick={() => navigate("/inventory")}
             style={{
-              background: T.amber, color: "#000", border: "none", borderRadius: 6,
+              background: T.amber, color: "#fff", border: "none", borderRadius: 6,
               padding: "4px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui,
             }}
           >View All</button>
@@ -242,17 +242,15 @@ function ERPShell({ children }) {
         {/* Brand mark */}
         <div
           className="sidebar-brand"
-          title="RED PISTON"
+          title="RedPiston ERP"
           style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: `linear-gradient(145deg, ${T.amber}, ${T.amberDim})`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 17, fontWeight: 900, color: "#fff",
-            boxShadow: `0 2px 12px ${T.amber}55`, marginBottom: 3,
-            flexShrink: 0,
+            width: 40, height: 40, borderRadius: 10,
+            overflow: "hidden", border: `1.5px solid ${T.border}`,
+            marginBottom: 3, flexShrink: 0,
+            boxShadow: "0 1px 6px rgba(26,18,5,0.10)",
           }}
         >
-          {shop.name?.charAt(0) || "S"}
+          <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         </div>
         <div className="sidebar-brand" style={{ fontSize: 7, color: T.amber, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>
           ERP
@@ -314,7 +312,7 @@ function ERPShell({ children }) {
               {n.key === "inventory" && lowCount > 0 && (
                 <span style={{
                   position: "absolute", top: 3, right: 7,
-                  background: T.amber, color: "#000",
+                  background: T.amber, color: "#fff",
                   fontSize: 8, borderRadius: "50%",
                   width: 14, height: 14,
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -422,138 +420,139 @@ function AuthenticatedShell({ user, children }) {
 }
 
 // ========== ADMIN SHELL ==========
-const ADMIN_NAV = [
-  { key: "users",         icon: "👥", label: "All Users" },
-  { key: "verifications", icon: "✅", label: "Verifications" },
-  { key: "shops",         icon: "🏪", label: "Shops" },
+const ADMIN_TABS = [
+  { key: "users",         label: "All Users",    icon: "👥" },
+  { key: "verifications", label: "Verifications", icon: "✅" },
+  { key: "catalog",       label: "Parts Catalog", icon: "📦" },
 ];
+
+// Cream palette for admin UI
+const AC = {
+  bg:      "#FAF6F0",
+  surface: "#FFFFFF",
+  border:  "#E0D5C8",
+  t1:      "#1A1205",
+  t2:      "#5C4F40",
+  t3:      "#9C8C7C",
+  red:     "#BE2B1A",
+};
 
 function AdminShell({ children }) {
   const { toasts, removeToast, currentUser, handleLogout } = useContext(AppCtx);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [activeTab, setActiveTab] = useState("users");
 
   return (
     <>
       <style>{GLOBAL_CSS}</style>
       <style>{`
-        .admin-nav-item {
-          display: flex; align-items: center; gap: 12px;
-          padding: 10px 12px; border-radius: 4px;
-          font-size: 13px; font-weight: 700; cursor: pointer;
-          text-decoration: none; border: none; width: 100%;
-          text-align: left; transition: background 0.15s, color 0.15s;
-          font-family: 'Inter', sans-serif; letter-spacing: 0.02em;
-          color: #c9c6c5; background: transparent;
-          border-left: 2px solid transparent;
+        .admin-header-tab {
+          padding: 0 4px; height: 100%; display: flex; align-items: center;
+          font-size: 13px; font-weight: 600; cursor: pointer;
+          background: none; border: none; border-bottom: 2px solid transparent;
+          color: ${AC.t3}; font-family: 'Inter', sans-serif;
+          transition: color 0.15s, border-color 0.15s; white-space: nowrap;
+          text-decoration: none;
         }
-        .admin-nav-item:hover { background: #292931; color: #e3e1ec; }
-        .admin-nav-item.active {
-          border-left: 2px solid #FF1F3A;
-          background: #33343c; color: #e3e1ec;
-        }
+        .admin-header-tab:hover { color: ${AC.t1}; }
+        .admin-header-tab.active { color: ${AC.red}; border-bottom-color: ${AC.red}; }
+        .admin-signout-btn:hover { background: #FEF2F2 !important; color: ${AC.red} !important; border-color: #FECACA !important; }
       `}</style>
-      <div className="admin-content-wrap">{children}</div>
 
-      {/* ── Admin Sidebar — 240px Stitch design ── */}
-      <div className="admin-sidebar" style={{
-        position: "fixed", left: 0, top: 0, bottom: 0, width: 240, zIndex: 400,
-        background: "#1a1b22", borderRight: "1px solid #3F3F46",
-        display: "flex", flexDirection: "column",
-        fontFamily: "'Inter', sans-serif",
+      {/* ── Cream top header ── */}
+      <div style={{
+        position: "fixed", top: 0, left: 0, right: 0, height: 60, zIndex: 400,
+        background: AC.surface, borderBottom: `1px solid ${AC.border}`,
+        display: "flex", alignItems: "center", padding: "0 24px", gap: 0,
+        fontFamily: "'Inter', sans-serif", boxShadow: "0 1px 4px rgba(26,18,5,0.06)",
       }}>
         {/* Brand */}
-        <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid #3F3F46" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="admin-sidebar-logo" style={{
-              width: 32, height: 32, background: "#FF1F3A", borderRadius: 4,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 16, flexShrink: 0,
-              boxShadow: "0 0 16px rgba(255,31,58,0.25)",
-            }}>⚡</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: "#e3e1ec", fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.02em", lineHeight: 1 }}>RED PISTON</div>
-              <div className="admin-sidebar-label" style={{ fontSize: 10, color: "#c9c6c5", fontFamily: "'Inter', sans-serif", letterSpacing: "0.06em", marginTop: 2 }}>ADMIN CONSOLE</div>
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 32, flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", border: `1.5px solid ${AC.border}`, flexShrink: 0 }}>
+            <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: AC.t1, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", lineHeight: 1 }}>RedPiston</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: AC.t3, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Inter',sans-serif", marginTop: 2 }}>Admin Console</div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav style={{ flex: 1, padding: "12px 8px", overflowY: "auto" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#5e3f3d", textTransform: "uppercase", letterSpacing: "0.1em", padding: "8px 12px 6px", fontFamily: "'JetBrains Mono', monospace" }}>
-            PLATFORM
-          </div>
-          {ADMIN_NAV.map(item => (
-            <button key={item.key} className="admin-nav-item">
-              <span style={{ fontSize: 16 }}>{item.icon}</span>
-              <span>{item.label}</span>
+        {/* Divider */}
+        <div style={{ width: 1, height: 28, background: AC.border, marginRight: 28, flexShrink: 0 }} />
+
+        {/* Nav tabs */}
+        <nav style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 24, flex: 1 }}>
+          {ADMIN_TABS.map(t => (
+            <button
+              key={t.key}
+              className={`admin-header-tab${activeTab === t.key ? " active" : ""}`}
+              onClick={() => setActiveTab(t.key)}
+            >
+              <span style={{ marginRight: 6 }}>{t.icon}</span>{t.label}
             </button>
           ))}
         </nav>
 
-        {/* Bottom: user + logout */}
-        <div style={{ borderTop: "1px solid #3F3F46", padding: "16px 12px" }}>
-          {/* User info */}
-          <div className="admin-sidebar-user" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, padding: "8px 8px" }}>
-            <div style={{ border: "1px solid #3F3F46", borderRadius: "50%", padding: 1, flexShrink: 0 }}>
-              <Avatar user={currentUser} size={30} />
-            </div>
-            <div style={{ overflow: "hidden", flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#e3e1ec", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {currentUser?.name || currentUser?.email || "Admin"}
+        {/* Right: user + sign out */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Avatar user={currentUser} size={30} />
+            <div style={{ lineHeight: 1.2 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: AC.t1, whiteSpace: "nowrap" }}>
+                {currentUser?.name || currentUser?.email?.split("@")[0] || "Admin"}
               </div>
-              <div style={{ fontSize: 10, color: "#af8785", fontFamily: "'JetBrains Mono', monospace" }}>PLATFORM ADMIN</div>
+              <div style={{ fontSize: 10, color: AC.t3, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter',sans-serif" }}>Platform Admin</div>
             </div>
           </div>
-
-          {/* Logout */}
           <button
-            className="admin-sidebar-logout"
+            className="admin-signout-btn"
             onClick={() => setShowLogoutConfirm(true)}
             style={{
-              width: "100%", padding: "9px 12px", borderRadius: 6,
-              border: "1px solid #3F3F46", background: "transparent",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-              color: "#af8785", fontSize: 12, fontWeight: 700,
-              fontFamily: "'Inter', sans-serif", textTransform: "uppercase",
-              letterSpacing: "0.06em", transition: "all 0.15s",
+              padding: "7px 14px", borderRadius: 7,
+              border: `1.5px solid ${AC.border}`, background: AC.surface,
+              cursor: "pointer", color: AC.t2, fontSize: 12, fontWeight: 700,
+              fontFamily: "'Inter', sans-serif", letterSpacing: "0.04em",
+              transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6,
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#2E0A0A"; e.currentTarget.style.borderColor = "#EF4444"; e.currentTarget.style.color = "#EF4444"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#3F3F46"; e.currentTarget.style.color = "#af8785"; }}
           >
-            <span style={{ fontSize: 14 }}>⏏</span>
-            Sign Out
+            <span>⏏</span> Sign Out
           </button>
         </div>
       </div>
 
-      {/* ── Logout confirmation dialog ── */}
+      {/* Content — offset by header height */}
+      <div style={{ paddingTop: 60, minHeight: "100vh", background: AC.bg }}>
+        {Children.map(children, child => cloneElement(child, { activeTab, setActiveTab }))}
+      </div>
+
+      {/* ── Logout confirmation ── */}
       {showLogoutConfirm && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 9000,
-          background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)",
+          background: "rgba(26,18,5,0.5)", backdropFilter: "blur(6px)",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <div style={{
-            background: "#1e1f26", border: "1px solid #3F3F46",
-            borderRadius: 12, padding: "32px 28px", maxWidth: 360, width: "90%",
-            boxShadow: "0 24px 64px rgba(0,0,0,0.6)", textAlign: "center",
+            background: AC.surface, border: `1px solid ${AC.border}`,
+            borderRadius: 14, padding: "32px 28px", maxWidth: 360, width: "90%",
+            boxShadow: "0 24px 64px rgba(26,18,5,0.18)", textAlign: "center",
             fontFamily: "'Inter', sans-serif",
           }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>⏏</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#e3e1ec", marginBottom: 8, fontFamily: "'Outfit', sans-serif" }}>Sign out?</div>
-            <div style={{ fontSize: 13, color: "#af8785", lineHeight: 1.6, marginBottom: 28 }}>
+            <div style={{ fontSize: 28, marginBottom: 12 }}>⏏</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: AC.t1, marginBottom: 8, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>Sign out?</div>
+            <div style={{ fontSize: 13, color: AC.t3, lineHeight: 1.6, marginBottom: 28 }}>
               You'll be logged out of the Admin Console.<br />Your session will be securely terminated.
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={() => setShowLogoutConfirm(false)}
-                style={{ flex: 1, padding: "11px", background: "transparent", border: "1px solid #3F3F46", borderRadius: 8, color: "#c9c6c5", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}
+                style={{ flex: 1, padding: "11px", background: AC.surface, border: `1.5px solid ${AC.border}`, borderRadius: 8, color: AC.t2, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => { setShowLogoutConfirm(false); handleLogout(); }}
-                style={{ flex: 1, padding: "11px", background: "#EF4444", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}
+                style={{ flex: 1, padding: "11px", background: AC.red, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", boxShadow: "0 4px 14px rgba(190,43,26,0.3)" }}
               >
                 Sign Out
               </button>
@@ -1282,8 +1281,8 @@ function AppContent() {
       <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* Public */}
-        <Route path="/" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LandingPage />} />
-        <Route path="/login" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LoginPage onLogin={handleLogin} />} />
+        <Route path="/" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <Navigate to="/marketplace" replace />} />
+        <Route path="/login" element={<Navigate to="/marketplace" replace />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* ERP routes — SHOP_OWNER */}
@@ -1297,7 +1296,7 @@ function AppContent() {
         <Route path="/orders" element={getUserRole(currentUser) === "SHOP_OWNER" ? <ERPShell><OrdersPage /></ERPShell> : <Navigate to={currentUser ? getDefaultRoute(currentUser) : "/login"} replace />} />
 
         {/* Marketplace routes */}
-        <Route path="/marketplace" element={currentUser ? <MPShell><MarketplaceHome /></MPShell> : <Navigate to="/login" replace />} />
+        <Route path="/marketplace" element={<MarketplaceHome />} />
         <Route path="/marketplace/orders" element={currentUser ? <MPShell><OrderTrackingPage onBack={() => navigate("/marketplace")} /></MPShell> : <Navigate to="/login" replace />} />
         <Route path="/marketplace/pricing" element={currentUser ? <MPShell><PricingPage onBack={() => navigate("/marketplace")} /></MPShell> : <Navigate to="/login" replace />} />
         <Route path="/marketplace/checkout" element={currentUser ? <MPShell><CheckoutPage onBack={() => navigate("/marketplace")} onOrderPlaced={() => navigate("/marketplace/orders")} /></MPShell> : <Navigate to="/login" replace />} />

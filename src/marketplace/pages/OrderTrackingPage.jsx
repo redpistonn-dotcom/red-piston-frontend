@@ -70,7 +70,7 @@ export function OrderTrackingPage({ onBack }) {
                 <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.4 }}>📦</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: T.t1 }}>No orders yet</div>
                 <p style={{ color: T.t3, marginTop: 8 }}>Your order history will appear here after your first purchase.</p>
-                <button onClick={onBack} style={{ marginTop: 24, background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Start Shopping →</button>
+                <button onClick={onBack} style={{ marginTop: 24, background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Start Shopping →</button>
             </div>
         );
     }
@@ -227,7 +227,7 @@ export function OrderTrackingPage({ onBack }) {
                                             </div>
                                         </div>
                                         <div style={{ display: "flex", gap: 8 }}>
-                                            <button style={{ background: T.sky, color: "#000", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>📱 Call</button>
+                                            <button style={{ background: T.sky, color: "#fff", border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>📱 Call</button>
                                         </div>
                                     </div>
                                 )}

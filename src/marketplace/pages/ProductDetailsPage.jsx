@@ -1,12 +1,30 @@
 import { useState, useMemo, useEffect } from "react";
-import { T, FONT } from "../../theme";
+import { FONT } from "../../theme";
 import { useStore } from "../../store";
 import { fmt, getStarRating, renderStars } from "../../utils";
 import { checkFitment, getNearDistance, getDeliveryEtaFromDistance } from "../api/engine";
 import { api } from "../../api/client.js";
 import { PartImage } from "../components/PartImage";
 
-export function ProductDetailsPage({ productId, onBack }) {
+// Light cream palette constants for this page
+const C = {
+    bg:       "#FAF6F0",
+    surface:  "#FFFFFF",
+    card:     "#FAF6F0",
+    border:   "#E0D5C8",
+    t1:       "#1A1205",
+    t2:       "#5C4F40",
+    t3:       "#9C8C7C",
+    t4:       "#BFB0A0",
+    red:      "#BE2B1A",
+    redBg:    "rgba(190,43,26,0.08)",
+    green:    "#16A34A",
+    greenBg:  "rgba(22,163,74,0.08)",
+    crimson:  "#DC2626",
+    crimsonBg:"#FEF2F2",
+};
+
+export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
     const { products, shops, selectedVehicle, cart, saveCart } = useStore();
     const [selectedImageIdx] = useState(0);
     const [addedToCartShop, setAddedToCartShop] = useState(null);
@@ -165,7 +183,7 @@ export function ProductDetailsPage({ productId, onBack }) {
         return (
             <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 20px", textAlign: "center" }}>
                 <div style={{ fontSize: 48, marginBottom: 16, animation: "pulse 1.2s infinite" }}>⚙️</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: T.t3 }}>Loading product details…</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.t3 }}>Loading product details…</div>
             </div>
         );
     }
@@ -173,9 +191,10 @@ export function ProductDetailsPage({ productId, onBack }) {
     if (!productData) {
         return (
             <div style={{ maxWidth: 900, margin: "0 auto", padding: "60px 20px", textAlign: "center" }}>
-                <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.4 }}>🔍</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: T.t1 }}>Product not found</div>
-                <button onClick={onBack} style={{ marginTop: 24, background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>← Back to Marketplace</button>
+                <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.3 }}>🔍</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: C.t2, marginBottom: 8 }}>Product not found</div>
+                <div style={{ fontSize: 14, color: C.t3, marginBottom: 24 }}>This part may no longer be listed.</div>
+                <button onClick={onBack} style={{ background: "#BE2B1A", color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer", boxShadow: "0 4px 16px rgba(190,43,26,0.25)" }}>← Back to Marketplace</button>
             </div>
         );
     }
@@ -205,6 +224,9 @@ export function ProductDetailsPage({ productId, onBack }) {
     const { rating, count } = getStarRating(master.id);
 
     const handleAddToCart = (listing) => {
+        const currentUser = (() => { try { return JSON.parse(localStorage.getItem("as_user")); } catch { return null; } })();
+        if (!currentUser) { onRequireLogin?.(); return; }
+
         const existingCart = cart || [];
         const existing = existingCart.find(i => i.listing?.shop_id === listing.shop_id && i.listing?.product_id === listing.product_id);
 
@@ -214,7 +236,7 @@ export function ProductDetailsPage({ productId, onBack }) {
                 listing,
                 product: master,
                 qty,
-                deliveryOption: listing.eta.speed === "express" ? "express" : "standard"
+                deliveryOption: listing.eta?.speed === "express" ? "express" : "standard"
             }];
 
         saveCart(newCart);
@@ -225,27 +247,25 @@ export function ProductDetailsPage({ productId, onBack }) {
     return (
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px" }}>
             {/* ═══════ BREADCRUMB ═══════ */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16, fontSize: 12, color: T.t3 }}>
-                <span onClick={() => onBack?.()} style={{ cursor: "pointer", color: T.amber }}>Home</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16, fontSize: 12, color: C.t3 }}>
+                <span onClick={() => onBack?.()} style={{ cursor: "pointer", color: C.red }}>Home</span>
                 <span>›</span>
                 <span>{master?.category}</span>
                 <span>›</span>
                 <span>{master?.brand}</span>
                 <span>›</span>
-                <span style={{ color: T.t1 }}>{master?.name}</span>
+                <span style={{ color: C.t1 }}>{master?.name}</span>
             </div>
 
-            <button onClick={onBack} style={{ background: "transparent", border: "none", color: T.t3, fontSize: 13, cursor: "pointer", marginBottom: 20, display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={onBack} style={{ background: "transparent", border: "none", color: C.t3, fontSize: 13, cursor: "pointer", marginBottom: 20, display: "flex", alignItems: "center", gap: 6 }}>
                 ← Back to Marketplace
             </button>
 
             {/* ═══════ FITMENT BANNER ═══════ */}
             {selectedVehicle && (
                 <div style={{
-                    background: fitment.compatible
-                        ? `linear-gradient(135deg, ${T.emerald}18, ${T.emerald}08)`
-                        : `linear-gradient(135deg, ${T.crimson}18, ${T.crimson}08)`,
-                    border: `2px solid ${fitment.compatible ? T.emerald : T.crimson}44`,
+                    background: fitment.compatible ? "rgba(22,163,74,0.06)" : "rgba(220,38,38,0.06)",
+                    border: `2px solid ${fitment.compatible ? "rgba(22,163,74,0.3)" : "rgba(220,38,38,0.3)"}`,
                     borderRadius: 14,
                     padding: "16px 24px",
                     marginBottom: 24,
@@ -255,20 +275,20 @@ export function ProductDetailsPage({ productId, onBack }) {
                 }}>
                     <div style={{
                         width: 48, height: 48, borderRadius: "50%",
-                        background: fitment.compatible ? `${T.emerald}22` : `${T.crimson}22`,
+                        background: fitment.compatible ? "rgba(22,163,74,0.12)" : "rgba(220,38,38,0.12)",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: 24, flexShrink: 0
                     }}>
                         {fitment.compatible ? "✓" : "✕"}
                     </div>
                     <div>
-                        <div style={{ fontSize: 16, fontWeight: 900, color: fitment.compatible ? T.emerald : T.crimson }}>
+                        <div style={{ fontSize: 16, fontWeight: 900, color: fitment.compatible ? C.green : C.crimson }}>
                             {fitment.compatible
                                 ? (fitment.type === "universal" ? "UNIVERSAL FIT — Compatible with all vehicles" : `EXACT FIT for ${selectedVehicle.brand} ${selectedVehicle.model} ${selectedVehicle.year}${selectedVehicle.variant ? ` ${selectedVehicle.variant}` : ''}`)
                                 : `NOT COMPATIBLE with ${selectedVehicle.brand} ${selectedVehicle.model} ${selectedVehicle.year}${selectedVehicle.variant ? ` ${selectedVehicle.variant}` : ''}`
                             }
                         </div>
-                        <div style={{ fontSize: 13, color: T.t2, marginTop: 4 }}>
+                        <div style={{ fontSize: 13, color: C.t2, marginTop: 4 }}>
                             {fitment.compatible
                                 ? "This part is guaranteed to fit your vehicle."
                                 : "This part will NOT fit your selected vehicle. Please check compatibility before ordering."
@@ -278,29 +298,27 @@ export function ProductDetailsPage({ productId, onBack }) {
                 </div>
             )}
 
-            <div className="split-panel checkout-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 32 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 32 }}>
                 {/* ═══════ LEFT: Product Image & Specs ═══════ */}
                 <div>
-                    {/* Hero Image */}
-                    <div style={{ background: T.surface, borderRadius: 16, overflow: "hidden", border: `1px solid ${T.border}`, marginBottom: 20 }}>
+                    <div style={{ background: C.surface, borderRadius: 16, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 20 }}>
                         <div style={{ width: "100%", height: 320 }}>
                             <PartImage src={master.image} alt={master.name} size="lg" />
                         </div>
                     </div>
 
-                    {/* Technical Specifications */}
-                    <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24 }}>
-                        <h3 style={{ fontSize: 16, fontWeight: 900, color: T.t1, margin: "0 0 16px" }}>📋 Technical Specifications</h3>
+                    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
+                        <h3 style={{ fontSize: 16, fontWeight: 900, color: C.t1, margin: "0 0 16px" }}>📋 Technical Specifications</h3>
                         {master.specifications && Object.entries(master.specifications).map(([key, val]) => (
-                            <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.border}22` }}>
-                                <span style={{ fontSize: 13, color: T.t3, textTransform: "capitalize" }}>{key.replace(/_/g, " ")}</span>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: T.t1, fontFamily: FONT.mono }}>{val}</span>
+                            <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid rgba(224,213,200,0.6)` }}>
+                                <span style={{ fontSize: 13, color: C.t3, textTransform: "capitalize" }}>{key.replace(/_/g, " ")}</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: C.t1, fontFamily: FONT.mono }}>{val}</span>
                             </div>
                         ))}
                         {master.oem_part_no && (
-                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, background: `${T.amber}08`, margin: "8px -12px 0", padding: "10px 12px", borderRadius: 8 }}>
-                                <span style={{ fontSize: 13, color: T.amber, fontWeight: 700 }}>OEM Part Number</span>
-                                <span style={{ fontSize: 13, fontWeight: 900, color: T.amber, fontFamily: FONT.mono }}>{master.oem_part_no}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", margin: "8px -12px 0", padding: "10px 12px", borderRadius: 8, background: C.redBg }}>
+                                <span style={{ fontSize: 13, color: C.red, fontWeight: 700 }}>OEM Part Number</span>
+                                <span style={{ fontSize: 13, fontWeight: 900, color: C.red, fontFamily: FONT.mono }}>{master.oem_part_no}</span>
                             </div>
                         )}
                     </div>
@@ -308,104 +326,103 @@ export function ProductDetailsPage({ productId, onBack }) {
 
                 {/* ═══════ RIGHT: Product Info + Buy Box ═══════ */}
                 <div>
-                    {/* Product Header */}
                     <div style={{ marginBottom: 24 }}>
-                        <div style={{ fontSize: 11, color: T.sky, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ fontSize: 11, color: C.red, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
                             {master.brand}
                             {master.brandVerified && (
-                                <span style={{ background: `${T.emerald}18`, color: T.emerald, fontSize: 9, fontWeight: 900, padding: "3px 8px", borderRadius: 5, display: "inline-flex", alignItems: "center", gap: 3 }}>🛡️ Brand Verified</span>
+                                <span style={{ background: C.greenBg, color: C.green, fontSize: 9, fontWeight: 900, padding: "3px 8px", borderRadius: 5, display: "inline-flex", alignItems: "center", gap: 3 }}>🛡️ Brand Verified</span>
                             )}
                         </div>
-                        <h1 style={{ fontSize: 26, fontWeight: 900, color: T.t1, margin: "0 0 8px", lineHeight: 1.3 }}>{master.name}</h1>
-                        <div style={{ fontSize: 13, color: T.t2, lineHeight: 1.6 }}>{master.description}</div>
-                        {/* Rating */}
+                        <h1 style={{ fontSize: 26, fontWeight: 900, color: C.t1, margin: "0 0 8px", lineHeight: 1.3 }}>{master.name}</h1>
+                        <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.6 }}>{master.description}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
                             <span style={{ color: "#FBBF24", fontSize: 15, letterSpacing: 1 }}>{renderStars(+rating)}</span>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: T.t2 }}>{rating}</span>
-                            <span style={{ fontSize: 13, color: T.t3 }}>({count} ratings)</span>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: C.t2 }}>{rating}</span>
+                            <span style={{ fontSize: 13, color: C.t3 }}>({count} ratings)</span>
                         </div>
-                        {/* Fitment badge */}
                         <div style={{ marginTop: 10 }}>
                             {selectedVehicle ? (
                                 fitment.compatible ? (
-                                    <span style={{ background: T.emeraldBg, color: T.emerald, fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                    <span style={{ background: C.greenBg, color: C.green, fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 5 }}>
                                         ✓ Fits your {selectedVehicle?.make || selectedVehicle?.brand} {selectedVehicle?.model}
                                     </span>
                                 ) : null
                             ) : (
-                                <span style={{ background: T.skyBg, color: T.sky, fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                                <span style={{ background: C.redBg, color: C.red, fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 5 }}>
                                     ⊕ Universal Fit
                                 </span>
                             )}
                         </div>
                         {master.sku && (
-                            <div style={{ fontSize: 12, color: T.t3, marginTop: 8, fontFamily: FONT.mono }}>SKU: {master.sku}</div>
+                            <div style={{ fontSize: 12, color: C.t3, marginTop: 8, fontFamily: FONT.mono }}>SKU: {master.sku}</div>
                         )}
                     </div>
 
-                    {/* ═══════ BUY BOX (Winner) ═══════ */}
+                    {/* ═══════ BUY BOX ═══════ */}
                     {winner && (
                         <div style={{
-                            background: T.card, border: `2px solid ${T.amber}44`,
+                            background: C.surface, border: `2px solid rgba(190,43,26,0.2)`,
                             borderRadius: 16, padding: 24, marginBottom: 20,
-                            boxShadow: `0 4px 20px ${T.amber}11`
+                            boxShadow: "0 4px 20px rgba(190,43,26,0.08)"
                         }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                                 <div>
-                                    <div style={{ fontSize: 11, color: T.amber, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Best Offer</div>
-                                    <div style={{ fontSize: 14, fontWeight: 700, color: T.t1 }}>{winner.shop.name}</div>
-                                    <div style={{ fontSize: 12, color: T.t3, marginTop: 2 }}>
-                                        📍 {winner.distance} km away · ⭐ {winner.shop.rating} ({winner.shop.reviews} reviews)
+                                    <div style={{ fontSize: 11, color: C.red, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Best Offer</div>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{winner.shop.name}</div>
+                                    <div style={{ fontSize: 12, color: C.t3, marginTop: 2 }}>
+                                        📍 {winner.distance} km away · ⭐ {winner.shop.rating || "4.2"}
                                     </div>
                                 </div>
                                 <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontSize: 28, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>{fmt(winner.selling_price)}</div>
+                                    <div style={{ fontSize: 28, fontWeight: 900, color: C.t1, fontFamily: FONT.mono }}>{fmt(winner.selling_price)}</div>
                                     {winner.discount > 0 && (
                                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                            <span style={{ fontSize: 13, color: T.t3, textDecoration: "line-through" }}>{fmt(winner.mrp)}</span>
-                                            <span style={{ background: `${T.crimson}22`, color: T.crimson, fontSize: 11, fontWeight: 800, padding: "2px 6px", borderRadius: 4 }}>Save {winner.discount}%</span>
+                                            <span style={{ fontSize: 13, color: C.t3, textDecoration: "line-through" }}>{fmt(winner.mrp)}</span>
+                                            <span style={{ background: C.crimsonBg, color: C.crimson, fontSize: 11, fontWeight: 800, padding: "2px 6px", borderRadius: 4 }}>Save {winner.discount}%</span>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, padding: "10px 14px", background: `${T.emerald}0a`, borderRadius: 10, border: `1px solid ${T.emerald}22` }}>
-                                <span style={{ fontSize: 16 }}>⚡</span>
-                                <div>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: T.emerald }}>Get it in {winner.eta.label}</div>
-                                    <div style={{ fontSize: 11, color: T.t3 }}>from {winner.shop.name} · {winner.stock_quantity} units in stock</div>
+                            {winner.eta && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16, padding: "10px 14px", background: C.greenBg, borderRadius: 10, border: `1px solid rgba(22,163,74,0.2)` }}>
+                                    <span style={{ fontSize: 16 }}>⚡</span>
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: C.green }}>Get it in {winner.eta.label}</div>
+                                        <div style={{ fontSize: 11, color: C.t3 }}>from {winner.shop.name} · {winner.stock_quantity} units in stock</div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Quantity + Add to Cart */}
                             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                                <div style={{ display: "flex", alignItems: "center", border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-                                    <button onClick={() => setQty(Math.max(1, qty - 1))} style={{ width: 36, height: 40, background: T.surface, border: "none", color: T.t1, fontSize: 18, cursor: "pointer" }}>−</button>
-                                    <div style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontFamily: FONT.mono, color: T.t1, fontSize: 15 }}>{qty}</div>
-                                    <button onClick={() => setQty(qty + 1)} style={{ width: 36, height: 40, background: T.surface, border: "none", color: T.t1, fontSize: 18, cursor: "pointer" }}>+</button>
+                                <div style={{ display: "flex", alignItems: "center", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+                                    <button onClick={() => setQty(Math.max(1, qty - 1))} style={{ width: 36, height: 40, background: C.card, border: "none", color: C.t1, fontSize: 18, cursor: "pointer" }}>−</button>
+                                    <div style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontFamily: FONT.mono, color: C.red, fontSize: 15, borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}` }}>{qty}</div>
+                                    <button onClick={() => setQty(qty + 1)} style={{ width: 36, height: 40, background: C.card, border: "none", color: C.t1, fontSize: 18, cursor: "pointer" }}>+</button>
                                 </div>
                                 <button
                                     onClick={() => handleAddToCart(winner)}
                                     disabled={winner.stock_quantity <= 0 || (!fitment.compatible && selectedVehicle)}
                                     style={{
-                                        flex: 1, height: 44, background: addedToCartShop === winner.shop_id ? T.emerald : ((!fitment.compatible && selectedVehicle) ? T.t3 : T.amber),
+                                        flex: 1, height: 44,
+                                        background: addedToCartShop === winner.shop_id ? C.green : ((!fitment.compatible && selectedVehicle) ? C.t4 : "#BE2B1A"),
                                         border: "none", borderRadius: 12,
-                                        color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer",
-                                        boxShadow: `0 6px 20px ${T.amber}44`,
+                                        color: "#fff", fontSize: 15, fontWeight: 900, cursor: "pointer",
+                                        boxShadow: (!fitment.compatible && selectedVehicle) ? "none" : "0 6px 20px rgba(190,43,26,0.3)",
                                         transition: "all 0.2s",
                                         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                                     }}
                                 >
-                                    {addedToCartShop === winner.shop_id ? "✓ Added!" : ((!fitment.compatible && selectedVehicle) ? "🚫 Part Not Compatible" : `🛒 Add to Cart — ${fmt(winner.selling_price * qty)}`)}
+                                    {addedToCartShop === winner.shop_id ? "✓ Added!" : ((!fitment.compatible && selectedVehicle) ? "🚫 Not Compatible" : `🛒 Add to Cart — ${fmt(winner.selling_price * qty)}`)}
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    {/* ═══════ OTHER SELLERS TABLE (sorted price asc) ═══════ */}
+                    {/* ═══════ OTHER SELLERS ═══════ */}
                     {listings.length > 1 && (
-                        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: 24 }}>
-                            <h3 style={{ fontSize: 16, fontWeight: 900, color: T.t1, margin: "0 0 16px" }}>
+                        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
+                            <h3 style={{ fontSize: 16, fontWeight: 900, color: C.t1, margin: "0 0 16px" }}>
                                 🏪 Compare {listings.length} Local Sellers
                             </h3>
                             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -417,47 +434,44 @@ export function ProductDetailsPage({ productId, onBack }) {
                                             style={{
                                                 display: "flex", alignItems: "center", gap: 16,
                                                 padding: "14px 16px", borderRadius: 12,
-                                                background: isCheapest ? `${T.amber}08` : T.surface,
-                                                border: `1px solid ${isCheapest ? T.amber + "44" : T.border}`,
-                                                borderLeft: isCheapest ? `3px solid ${T.amber}` : `1px solid ${T.border}`,
+                                                background: isCheapest ? C.redBg : C.surface,
+                                                border: `1px solid ${isCheapest ? "rgba(190,43,26,0.25)" : C.border}`,
+                                                borderLeft: isCheapest ? `3px solid #BE2B1A` : `1px solid ${C.border}`,
                                                 transition: "all 0.15s"
                                             }}
                                         >
-                                            {/* Shop Info */}
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                                    <span style={{ fontSize: 14, fontWeight: 700, color: T.t1 }}>{listing.shop.name}</span>
+                                                    <span style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{listing.shop.name}</span>
                                                     {isCheapest && (
-                                                        <span style={{ background: T.amberGlow, border: `1px solid ${T.amber}44`, color: T.amber, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 99, marginLeft: 6 }}>Best Price</span>
+                                                        <span style={{ background: C.redBg, border: `1px solid rgba(190,43,26,0.2)`, color: C.red, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 99 }}>Best Price</span>
                                                     )}
                                                     {listing.shop_id === fastestShopId && listing.shop_id !== listings[cheapestIdx]?.shop_id && (
-                                                        <span style={{ background: `${T.emerald}15`, border: `1px solid ${T.emerald}44`, color: T.emerald, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 99 }}>Fastest Delivery</span>
+                                                        <span style={{ background: C.greenBg, border: `1px solid rgba(22,163,74,0.2)`, color: C.green, fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 99 }}>Fastest Delivery</span>
                                                     )}
                                                 </div>
-                                                <div style={{ fontSize: 12, color: T.t3, marginTop: 4, display: "flex", gap: 12 }}>
+                                                <div style={{ fontSize: 12, color: C.t3, marginTop: 4, display: "flex", gap: 12, flexWrap: "wrap" }}>
                                                     <span>📍 {listing.distance} km</span>
-                                                    <span>⭐ {listing.shop.rating}</span>
-                                                    <span>⚡ {listing.eta.label}</span>
-                                                    <span style={{ color: listing.stock_quantity > 5 ? T.emerald : T.amber }}>
+                                                    <span>⭐ {listing.shop.rating || "4.2"}</span>
+                                                    {listing.eta && <span>⚡ {listing.eta.label}</span>}
+                                                    <span style={{ color: listing.stock_quantity > 5 ? C.green : "#D97706" }}>
                                                         {listing.stock_quantity > 5 ? `${listing.stock_quantity} in stock` : `Only ${listing.stock_quantity} left`}
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            {/* Price */}
                                             <div style={{ textAlign: "right", marginRight: 12 }}>
-                                                <div style={{ fontSize: 18, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>{fmt(listing.selling_price)}</div>
-                                                {listing.discount > 0 && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 700 }}>-{listing.discount}%</div>}
+                                                <div style={{ fontSize: 18, fontWeight: 900, color: C.t1, fontFamily: FONT.mono }}>{fmt(listing.selling_price)}</div>
+                                                {listing.discount > 0 && <div style={{ fontSize: 11, color: C.crimson, fontWeight: 700 }}>-{listing.discount}%</div>}
                                             </div>
 
-                                            {/* Add to Cart */}
                                             <button
                                                 onClick={() => handleAddToCart(listing)}
                                                 disabled={listing.stock_quantity <= 0}
                                                 style={{
-                                                    background: addedToCartShop === listing.shop_id ? T.emerald : (isCheapest ? T.amber : T.surface),
-                                                    border: isCheapest ? "none" : `1px solid ${T.border}`,
-                                                    color: isCheapest ? "#000" : T.t1,
+                                                    background: addedToCartShop === listing.shop_id ? C.green : (isCheapest ? "#BE2B1A" : C.surface),
+                                                    border: isCheapest ? "none" : `1px solid ${C.border}`,
+                                                    color: (addedToCartShop === listing.shop_id || isCheapest) ? "#fff" : C.t1,
                                                     borderRadius: 10, padding: "10px 16px",
                                                     fontSize: 12, fontWeight: 800, cursor: "pointer",
                                                     flexShrink: 0, transition: "all 0.2s",

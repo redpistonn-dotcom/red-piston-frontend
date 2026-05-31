@@ -2,24 +2,47 @@ import { useState, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import * as XLSX from "xlsx";
 import { api } from "../api/client.js";
-import { T, FONT } from "../theme.js";
+import { T, FONT } from "../theme.js"; // T kept for any remaining tokens
 import { Avatar } from "../components/Avatar.jsx";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace.js";
 import { importStore } from "../importProgress.js";
 
-// Color map by slug — uses T.* theme tokens
+const C = {
+  bg:       "#FAF6F0",
+  surface:  "#FFFFFF",
+  card:     "#FFFFFF",
+  border:   "#E0D5C8",
+  borderLight: "#F0E8DF",
+  t1:       "#1A1205",
+  t2:       "#5C4F40",
+  t3:       "#9C8C7C",
+  t4:       "#BFB0A0",
+  red:      "#BE2B1A",
+  redBg:    "rgba(190,43,26,0.08)",
+  redDim:   "#DC2626",
+  green:    "#16A34A",
+  greenBg:  "rgba(22,163,74,0.08)",
+  amber:    "#D97706",
+  amberBg:  "rgba(217,119,6,0.08)",
+  violet:   "#7C3AED",
+  violetBg: "rgba(124,58,237,0.08)",
+  sky:      "#0284C7",
+  skyBg:    "rgba(2,132,199,0.08)",
+};
+
+// Color map by slug — uses C.* cream theme tokens
 const SLUG_COLORS = {
-  PLATFORM_ADMIN: { bg: T.violetBg, border: T.violet, text: T.violet },
-  SHOP_OWNER:     { bg: T.emeraldBg, border: T.emerald, text: T.emerald },
-  CUSTOMER:       { bg: T.skyBg,     border: T.sky,     text: T.sky     },
-  SHOP_STAFF:     { bg: "rgba(251,191,36,0.1)", border: "#D97706", text: "#FBBF24" },
+  PLATFORM_ADMIN: { bg: C.violetBg, border: C.violet, text: C.violet },
+  SHOP_OWNER:     { bg: C.greenBg,  border: C.green,  text: C.green  },
+  CUSTOMER:       { bg: C.skyBg,    border: C.sky,    text: C.sky    },
+  SHOP_STAFF:     { bg: C.amberBg,  border: C.amber,  text: C.amber  },
 };
 
 // Only show these 3 roles in filters/dropdowns
 const ALLOWED_ROLE_SLUGS = ["PLATFORM_ADMIN", "SHOP_OWNER", "CUSTOMER"];
 
 function RoleBadge({ slug, name }) {
-  const c = SLUG_COLORS[slug] || { bg: "#1a1a2e", border: "#444", text: "#aaa" };
+  const c = SLUG_COLORS[slug] || { bg: C.borderLight, border: C.border, text: C.t3 };
   return (
     <span style={{
       background: c.bg, border: `1px solid ${c.border}`, color: c.text,
@@ -34,13 +57,13 @@ function RoleBadge({ slug, name }) {
 function VerificationBadge({ status }) {
   const base = { borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, fontFamily: FONT.ui };
   if (status === "PENDING") return (
-    <span style={{ ...base, background: "rgba(251,191,36,0.1)", border: "1px solid #D97706", color: "#FBBF24" }}>⏳ Pending</span>
+    <span style={{ ...base, background: C.amberBg, border: `1px solid ${C.amber}`, color: C.amber }}>⏳ Pending</span>
   );
   if (status === "REJECTED") return (
-    <span style={{ ...base, background: T.crimsonBg, border: `1px solid ${T.crimson}`, color: T.crimson }}>✗ Rejected</span>
+    <span style={{ ...base, background: C.redBg, border: `1px solid ${C.red}`, color: C.red }}>✗ Rejected</span>
   );
   return (
-    <span style={{ ...base, background: T.emeraldBg, border: `1px solid ${T.emerald}`, color: T.emerald }}>✓ Approved</span>
+    <span style={{ ...base, background: C.greenBg, border: `1px solid ${C.green}`, color: C.green }}>✓ Approved</span>
   );
 }
 
@@ -73,36 +96,36 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
-      background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)",
+      background: "rgba(26,18,5,0.5)", backdropFilter: "blur(4px)",
       display: "flex", alignItems: "center", justifyContent: "center",
     }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{
-        background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16,
+        background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16,
         padding: 32, maxWidth: 440, width: "100%", margin: "0 16px",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-          <div style={{ fontSize: 18, fontWeight: 800, color: T.t1 }}>Add User</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: T.t3, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.t1 }}>Add User</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.t3, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
         </div>
 
         {error && (
-          <div style={{ background: "#1c0909", border: `1.5px solid ${T.crimson}`, borderRadius: 10, padding: "10px 14px", color: T.crimson, fontSize: 13, marginBottom: 16 }}>
+          <div style={{ background: C.redBg, border: `1.5px solid ${C.red}`, borderRadius: 10, padding: "10px 14px", color: C.red, fontSize: 13, marginBottom: 16 }}>
             {error}
           </div>
         )}
 
-        <label style={{ fontSize: 13, fontWeight: 600, color: T.t2, marginBottom: 6, display: "block" }}>Name <span style={{ color: T.t3, fontWeight: 400 }}>(optional)</span></label>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.t2, marginBottom: 6, display: "block" }}>Name <span style={{ color: C.t3, fontWeight: 400 }}>(optional)</span></label>
         <input
-          style={{ width: "100%", background: T.bg, border: `1.5px solid ${T.border}`, borderRadius: 10, padding: "11px 14px", color: T.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box", marginBottom: 14 }}
+          style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: "11px 14px", color: C.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box", marginBottom: 14 }}
           placeholder="e.g. Raju Sharma"
           value={name}
           onChange={e => setName(e.target.value)}
           autoFocus
         />
 
-        <label style={{ fontSize: 13, fontWeight: 600, color: T.t2, marginBottom: 6, display: "block" }}>Email *</label>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.t2, marginBottom: 6, display: "block" }}>Email *</label>
         <input
-          style={{ width: "100%", background: T.bg, border: `1.5px solid ${T.border}`, borderRadius: 10, padding: "11px 14px", color: T.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box", marginBottom: 14 }}
+          style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: "11px 14px", color: C.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box", marginBottom: 14 }}
           type="email"
           placeholder="user@example.com"
           value={email}
@@ -110,10 +133,10 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
           onKeyDown={e => e.key === "Enter" && handleSubmit()}
         />
 
-        <label style={{ fontSize: 13, fontWeight: 600, color: T.t2, marginBottom: 6, display: "block" }}>Password *</label>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.t2, marginBottom: 6, display: "block" }}>Password *</label>
         <div style={{ position: "relative", marginBottom: 14 }}>
           <input
-            style={{ width: "100%", background: T.bg, border: `1.5px solid ${T.border}`, borderRadius: 10, padding: "11px 44px 11px 14px", color: T.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box" }}
+            style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: "11px 44px 11px 14px", color: C.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box" }}
             type={showPw ? "text" : "password"}
             placeholder="Min 8 characters"
             value={password}
@@ -122,16 +145,16 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
           />
           <button
             type="button"
-            style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", color: T.t3, cursor: "pointer", fontSize: 16 }}
+            style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "transparent", color: C.t3, cursor: "pointer", fontSize: 16 }}
             onClick={() => setShowPw(v => !v)}
           >
             {showPw ? "🙈" : "👁"}
           </button>
         </div>
 
-        <label style={{ fontSize: 13, fontWeight: 600, color: T.t2, marginBottom: 6, display: "block" }}>User Type *</label>
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.t2, marginBottom: 6, display: "block" }}>User Type *</label>
         <select
-          style={{ width: "100%", background: T.bg, border: `1.5px solid ${T.border}`, borderRadius: 10, padding: "11px 14px", color: T.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box", marginBottom: 24, cursor: "pointer" }}
+          style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: "11px 14px", color: C.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box", marginBottom: 24, cursor: "pointer" }}
           value={role}
           onChange={e => setRole(e.target.value)}
         >
@@ -142,13 +165,13 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
 
         <div style={{ display: "flex", gap: 10 }}>
           <button
-            style={{ flex: 1, padding: "12px", background: "transparent", border: `1px solid ${T.border}`, borderRadius: 10, color: T.t3, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}
+            style={{ flex: 1, padding: "12px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 10, color: C.t3, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}
             onClick={onClose}
           >
             Cancel
           </button>
           <button
-            style={{ flex: 2, padding: "12px", background: loading ? T.amberDim : T.amber, border: "none", borderRadius: 10, color: loading ? "#aaa" : "#000", fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: FONT.ui }}
+            style={{ flex: 2, padding: "12px", background: loading ? C.amberBg : C.amber, border: "none", borderRadius: 10, color: loading ? C.t3 : "#fff", fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: FONT.ui }}
             onClick={handleSubmit}
             disabled={loading}
           >
@@ -544,30 +567,30 @@ function CatalogTab() {
 
       {/* ════════════ IMPORT STRIP ════════════ */}
       {parseErr && (
-        <div style={{ background: '#1c0909', border: '1px solid #EF4444', borderRadius: 8, padding: '10px 14px', color: '#EF4444', fontSize: 12, marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 8, padding: '10px 14px', color: C.red, fontSize: 12, marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
           ⚠ {parseErr}
-          <button onClick={() => setParseErr('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: 16 }}>×</button>
+          <button onClick={() => setParseErr('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: C.red, cursor: 'pointer', fontSize: 16 }}>×</button>
         </div>
       )}
 
       {/* Case 1: No file — compact drop zone */}
       {!fileData && !parsing && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, background: '#0d0e15', border: '1.5px dashed #3F3F46', borderRadius: 10, padding: '12px 16px' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, background: C.bg, border: `1.5px dashed ${C.border}`, borderRadius: 10, padding: '12px 16px' }}
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, background: dragOver ? 'rgba(255,31,58,0.04)' : '#0d0e15', border: `1.5px dashed ${dragOver ? '#FF1F3A' : '#3F3F46'}`, borderRadius: 10, padding: '12px 16px', transition: 'all 0.15s' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, background: dragOver ? C.amberBg : C.bg, border: `1.5px dashed ${dragOver ? C.amber : C.border}`, borderRadius: 10, padding: '12px 16px', transition: 'all 0.15s' }}>
           <span style={{ fontSize: 20 }}>📊</span>
-          <span style={{ fontSize: 13, color: '#af8785', fontFamily: "'Inter', sans-serif", flex: 1 }}>
+          <span style={{ fontSize: 13, color: C.t3, fontFamily: "'Inter', sans-serif", flex: 1 }}>
             Drop Excel / CSV here to import parts, or
             <button onClick={() => document.getElementById('_xls_upload').click()}
-              style={{ marginLeft: 8, background: 'rgba(255,31,58,0.1)', border: '1px solid rgba(255,31,58,0.3)', borderRadius: 6, padding: '4px 12px', color: '#FF6B6B', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
+              style={{ marginLeft: 8, background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 6, padding: '4px 12px', color: C.red, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
               Choose File
             </button>
             <input id="_xls_upload" type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }}
               onChange={e => { handleFile(e.target.files[0]); e.target.value = ''; }} />
           </span>
-          <button onClick={downloadTemplate} style={{ flexShrink: 0, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 7, padding: '7px 13px', color: '#93C5FD', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", whiteSpace: 'nowrap' }}>
+          <button onClick={downloadTemplate} style={{ flexShrink: 0, background: C.skyBg, border: `1px solid ${C.sky}`, borderRadius: 7, padding: '7px 13px', color: C.sky, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", whiteSpace: 'nowrap' }}>
             📥 Template
           </button>
         </div>
@@ -575,9 +598,9 @@ function CatalogTab() {
 
       {/* Case 2: Parsing */}
       {parsing && (
-        <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, padding: '24px', textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '24px', textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 24, marginBottom: 8 }}>⟳</div>
-          <div style={{ color: '#af8785', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>Reading and parsing file…</div>
+          <div style={{ color: C.t3, fontSize: 13, fontFamily: "'Inter', sans-serif" }}>Reading and parsing file…</div>
         </div>
       )}
 
@@ -585,17 +608,17 @@ function CatalogTab() {
       {fileData && !parsing && (
         <div style={{ marginBottom: 20 }}>
           {/* File info bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 9, padding: '10px 14px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: C.greenBg, border: `1px solid ${C.green}`, borderRadius: 9, padding: '10px 14px', marginBottom: 12 }}>
             <span style={{ fontSize: 18 }}>📄</span>
             <div style={{ flex: 1 }}>
-              <span style={{ fontWeight: 700, color: '#e3e1ec', fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>{fileData.name}</span>
-              <span style={{ fontSize: 11, color: '#af8785', marginLeft: 10, fontFamily: "'JetBrains Mono', monospace" }}>
-                {fileData.total.toLocaleString()} rows · <span style={{ color: '#10B981' }}>{fileData.mapped.toLocaleString()} ready</span>
+              <span style={{ fontWeight: 700, color: C.t1, fontSize: 13, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>{fileData.name}</span>
+              <span style={{ fontSize: 11, color: C.t3, marginLeft: 10, fontFamily: "'Inter', sans-serif" }}>
+                {fileData.total.toLocaleString()} rows · <span style={{ color: C.green }}>{fileData.mapped.toLocaleString()} ready</span>
               </span>
             </div>
             {!importing && (
               <button onClick={() => { setFileData(null); setImportProg(null); setParseErr(''); setAnalysisStep('idle'); setDefaultCategory(''); setDefaultVehicleType(''); setDefaultMake(''); setDefaultModel(''); }}
-                style={{ background: 'none', border: '1px solid #3F3F46', borderRadius: 6, color: '#af8785', cursor: 'pointer', padding: '3px 10px', fontSize: 11, fontFamily: "'Inter', sans-serif" }}>
+                style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, color: C.t3, cursor: 'pointer', padding: '3px 10px', fontSize: 11, fontFamily: "'Inter', sans-serif" }}>
                 ✕ Clear
               </button>
             )}
@@ -609,20 +632,20 @@ function CatalogTab() {
             const fitmentMapped = DB_FIELDS.filter(f => f.section === 'fitment' && dbToExcel[f.key]);
             const missingRequired = DB_FIELDS.filter(f => f.section === 'required' && !dbToExcel[f.key]);
             return (
-              <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 10, padding: '18px', marginBottom: 12 }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px', marginBottom: 12 }}>
                 {/* Vehicle + Category defaults */}
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace", marginBottom: 10 }}>Step 1 — Set Batch Defaults</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'Inter', sans-serif", marginBottom: 10 }}>Step 1 — Set Batch Defaults</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
                   <div>
-                    <div style={{ fontSize: 10, color: '#af8785', marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>Vehicle Type</div>
+                    <div style={{ fontSize: 10, color: C.t3, marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>Vehicle Type</div>
                     <select value={defaultVehicleType} onChange={e => { setDefaultVehicleType(e.target.value); setDefaultMake(''); setDefaultMakeId(''); setDefaultModel(''); }}
-                      style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 7, padding: '7px 9px', color: '#e3e1ec', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif" }}>
+                      style={{ width: '100%', background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 7, padding: '7px 9px', color: C.t1, fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif" }}>
                       <option value="">— Any Type —</option>
                       {vehicleTypes.map(t => <option key={t.slug} value={t.slug}>{t.icon} {t.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: '#af8785', marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>Manufacturer</div>
+                    <div style={{ fontSize: 10, color: C.t3, marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>Manufacturer</div>
                     <select
                       value={defaultMakeId}
                       onChange={e => {
@@ -631,44 +654,44 @@ function CatalogTab() {
                         setDefaultMake(mfg?.name || '');
                         setDefaultModel('');
                       }}
-                      style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 7, padding: '7px 9px', color: '#e3e1ec', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif" }}>
+                      style={{ width: '100%', background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 7, padding: '7px 9px', color: C.t1, fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif" }}>
                       <option value="">— Any / Mixed —</option>
                       {importManufacturers.map(m => <option key={m.manufacturerId} value={m.manufacturerId}>{m.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <div style={{ fontSize: 10, color: '#af8785', marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>Model</div>
+                    <div style={{ fontSize: 10, color: C.t3, marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>Model</div>
                     <select value={defaultModel} onChange={e => setDefaultModel(e.target.value)} disabled={!defaultMakeId}
-                      style={{ width: '100%', background: defaultMakeId ? '#1a1b22' : '#131418', border: `1.5px solid ${defaultMakeId ? '#3F3F46' : '#232328'}`, borderRadius: 7, padding: '7px 9px', color: defaultMakeId ? '#e3e1ec' : '#3F3F46', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: defaultMakeId ? 'pointer' : 'not-allowed' }}>
+                      style={{ width: '100%', background: defaultMakeId ? C.bg : C.borderLight, border: `1.5px solid ${defaultMakeId ? C.border : C.borderLight}`, borderRadius: 7, padding: '7px 9px', color: defaultMakeId ? C.t1 : C.t4, fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", cursor: defaultMakeId ? 'pointer' : 'not-allowed' }}>
                       <option value="">— All Models —</option>
                       {importModels.map(m => <option key={m.modelId} value={m.name}>{m.name}</option>)}
                     </select>
                   </div>
                 </div>
                 {defaultMake && (
-                  <div style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 11, color: '#C4B5FD', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div style={{ background: C.violetBg, border: `1px solid ${C.violet}`, borderRadius: 6, padding: '6px 10px', marginBottom: 10, fontSize: 11, color: C.violet, fontFamily: "'Inter', sans-serif" }}>
                     🔗 Fitment: <strong>{defaultMake}</strong>{defaultModel ? ` → ${defaultModel}` : ' (all models)'}
                   </div>
                 )}
-                <div style={{ fontSize: 10, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", marginBottom: 5, textTransform: 'uppercase' }}>Parts Category (default)</div>
+                <div style={{ fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif", marginBottom: 5, textTransform: 'uppercase' }}>Parts Category (default)</div>
                 <select value={defaultCategory} onChange={e => setDefaultCategory(e.target.value)}
-                  style={{ width: '100%', background: '#1a1b22', border: '1.5px solid #3F3F46', borderRadius: 7, padding: '7px 10px', color: '#e3e1ec', fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", marginBottom: 16 }}>
+                  style={{ width: '100%', background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 7, padding: '7px 10px', color: C.t1, fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", marginBottom: 16 }}>
                   {PART_CATEGORIES.map(c => <option key={c} value={c}>{c === '' ? '— Mixed / Multiple (leave blank)' : c}</option>)}
                 </select>
 
                 {/* Column analysis */}
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace', marginBottom: 10" }}>
-                  Step 2 — Column Match &nbsp;·&nbsp; <span style={{ color: '#10B981' }}>{Object.keys(fileData.colMap).length} matched</span> / {fileData.headers.length} total
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'Inter', sans-serif", marginBottom: 10 }}>
+                  Step 2 — Column Match &nbsp;·&nbsp; <span style={{ color: C.green }}>{Object.keys(fileData.colMap).length} matched</span> / {fileData.headers.length} total
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
                   {DB_FIELDS.filter(f => f.section === 'required').map(f => {
                     const col = dbToExcel[f.key];
                     return (
-                      <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 7, background: col ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${col ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.35)'}`, borderRadius: 6, padding: '6px 9px' }}>
-                        <span style={{ color: col ? '#10B981' : '#EF4444', fontSize: 12 }}>{col ? '✓' : '✗'}</span>
+                      <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 7, background: col ? C.greenBg : C.redBg, border: `1px solid ${col ? C.green : C.red}`, borderRadius: 6, padding: '6px 9px' }}>
+                        <span style={{ color: col ? C.green : C.red, fontSize: 12 }}>{col ? '✓' : '✗'}</span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: col ? '#e3e1ec' : '#EF4444', fontFamily: "'Inter', sans-serif" }}>{f.label}</div>
-                          <div style={{ fontSize: 9, fontFamily: "'JetBrains Mono', monospace", color: col ? '#10B981' : '#EF4444' }}>{col ? `← "${col}"` : 'NOT FOUND'}</div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: col ? C.t1 : C.red, fontFamily: "'Inter', sans-serif" }}>{f.label}</div>
+                          <div style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: col ? C.green : C.red }}>{col ? `← "${col}"` : 'NOT FOUND'}</div>
                         </div>
                       </div>
                     );
@@ -678,25 +701,25 @@ function CatalogTab() {
                   {DB_FIELDS.filter(f => f.section === 'core').map(f => {
                     const col = dbToExcel[f.key];
                     return (
-                      <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 5, background: col ? 'rgba(16,185,129,0.04)' : 'transparent', border: `1px solid ${col ? 'rgba(16,185,129,0.15)' : '#1e1f26'}` }}>
-                        <span style={{ fontSize: 10, color: col ? '#10B981' : '#3F3F46' }}>{col ? '✓' : '—'}</span>
-                        <span style={{ fontSize: 10, color: col ? '#c9c6c5' : '#5e3f3d', fontFamily: "'Inter', sans-serif" }}>{f.label}{col ? <span style={{ color: '#6B7280', fontFamily: "'JetBrains Mono', monospace" }}> "{col}"</span> : ''}</span>
+                      <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 5, background: col ? C.greenBg : 'transparent', border: `1px solid ${col ? C.green : C.border}` }}>
+                        <span style={{ fontSize: 10, color: col ? C.green : C.t4 }}>{col ? '✓' : '—'}</span>
+                        <span style={{ fontSize: 10, color: col ? C.t2 : C.t4, fontFamily: "'Inter', sans-serif" }}>{f.label}{col ? <span style={{ color: C.t3, fontFamily: "'Inter', sans-serif" }}> "{col}"</span> : ''}</span>
                       </div>
                     );
                   })}
                 </div>
                 {fitmentMapped.length > 0 && (
-                  <div style={{ fontSize: 10, color: '#3B82F6', fontFamily: "'JetBrains Mono', monospace", marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: C.sky, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                     🔗 {fitmentMapped.length} fitment column{fitmentMapped.length > 1 ? 's' : ''} detected: {fitmentMapped.map(f => dbToExcel[f.key]).join(', ')}
                   </div>
                 )}
                 {missingRequired.length > 0 && (
-                  <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 7, padding: '8px 12px', marginBottom: 10, fontSize: 11, color: '#EF4444', fontFamily: "'Inter', sans-serif" }}>
+                  <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 7, padding: '8px 12px', marginBottom: 10, fontSize: 11, color: C.red, fontFamily: "'Inter', sans-serif" }}>
                     ⚠ <strong>{missingRequired.map(f => f.label).join(' & ')}</strong> not found — rows missing both will be skipped.
                   </div>
                 )}
                 <button onClick={() => setAnalysisStep('confirmed')}
-                  style={{ width: '100%', background: '#FF1F3A', color: '#fff', border: 'none', borderRadius: 9, padding: '11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", boxShadow: '0 0 18px rgba(255,31,58,0.2)' }}>
+                  style={{ width: '100%', background: C.red, color: '#fff', border: 'none', borderRadius: 9, padding: '11px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", boxShadow: `0 0 18px ${C.redBg}` }}>
                   ✓ Analysis Done — Proceed to Import →
                 </button>
               </div>
@@ -707,32 +730,32 @@ function CatalogTab() {
           {analysisStep === 'confirmed' && !importing && (
             <div style={{ marginBottom: 12 }}>
               {/* Collapsed column summary */}
-              <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 9, padding: '10px 14px', marginBottom: 10 }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 9, padding: '10px 14px', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#af8785', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: C.t3, fontFamily: "'Inter', sans-serif", textTransform: 'uppercase' }}>
                     {Object.keys(fileData.colMap).length}/{fileData.headers.length} cols matched
                   </span>
-                  {defaultMake && <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#C4B5FD', borderRadius: 4, padding: '2px 7px', fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>🔗 {defaultMake}{defaultModel ? ` → ${defaultModel}` : ' (all)'}</span>}
-                  {defaultCategory && <span style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#F59E0B', borderRadius: 4, padding: '2px 7px', fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>📂 {defaultCategory}</span>}
+                  {defaultMake && <span style={{ background: C.violetBg, border: `1px solid ${C.violet}`, color: C.violet, borderRadius: 4, padding: '2px 7px', fontSize: 10, fontFamily: "'Inter', sans-serif" }}>🔗 {defaultMake}{defaultModel ? ` → ${defaultModel}` : ' (all)'}</span>}
+                  {defaultCategory && <span style={{ background: C.amberBg, border: `1px solid ${C.amber}`, color: C.amber, borderRadius: 4, padding: '2px 7px', fontSize: 10, fontFamily: "'Inter', sans-serif" }}>📂 {defaultCategory}</span>}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: 1 }}>
-                    {fileData.headers.map(h => { const m = fileData.colMap[h]; return <span key={h} style={{ background: m ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${m ? 'rgba(16,185,129,0.3)' : '#292931'}`, borderRadius: 4, padding: '2px 6px', fontSize: 9, color: m ? '#10B981' : '#5e3f3d', fontFamily: "'JetBrains Mono', monospace" }}>{h}{m ? ` → ${m}` : ''}</span>; })}
+                    {fileData.headers.map(h => { const m = fileData.colMap[h]; return <span key={h} style={{ background: m ? C.greenBg : C.borderLight, border: `1px solid ${m ? C.green : C.border}`, borderRadius: 4, padding: '2px 6px', fontSize: 9, color: m ? C.green : C.t4, fontFamily: "'Inter', sans-serif" }}>{h}{m ? ` → ${m}` : ''}</span>; })}
                   </div>
-                  <button onClick={() => setAnalysisStep('analyzing')} style={{ background: 'none', border: '1px solid #3F3F46', borderRadius: 6, color: '#af8785', cursor: 'pointer', padding: '3px 9px', fontSize: 10, fontFamily: "'Inter', sans-serif", flexShrink: 0 }}>← Re-analyze</button>
+                  <button onClick={() => setAnalysisStep('analyzing')} style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 6, color: C.t3, cursor: 'pointer', padding: '3px 9px', fontSize: 10, fontFamily: "'Inter', sans-serif", flexShrink: 0 }}>← Re-analyze</button>
                 </div>
               </div>
               {/* Preview table */}
-              <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 9, overflow: 'hidden', marginBottom: 12 }}>
-                <div style={{ padding: '8px 14px', borderBottom: '1px solid #292931', fontSize: 9, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'JetBrains Mono', monospace" }}>Preview — First 5 Rows</div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 9, overflow: 'hidden', marginBottom: 12 }}>
+                <div style={{ padding: '8px 14px', borderBottom: `1px solid ${C.border}`, fontSize: 9, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'Inter', sans-serif" }}>Preview — First 5 Rows</div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
-                    <thead><tr>{fileData.headers.slice(0, 8).map(h => <th key={h} style={{ padding: '7px 11px', fontSize: 9, fontWeight: 700, color: fileData.colMap[h] ? '#10B981' : '#5e3f3d', borderBottom: '1px solid #292931', textAlign: 'left', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>{h}</th>)}{fileData.headers.length > 8 && <th style={{ padding: '7px 11px', fontSize: 9, color: '#3F3F46', borderBottom: '1px solid #292931' }}>+{fileData.headers.length - 8}</th>}</tr></thead>
-                    <tbody>{fileData.preview.map((row, i) => <tr key={i} style={{ borderBottom: '1px solid #1a1a22' }}>{fileData.headers.slice(0, 8).map(h => <td key={h} style={{ padding: '6px 11px', fontSize: 11, color: '#c9c6c5', fontFamily: "'Inter', sans-serif", maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row[h] != null ? String(row[h]) : <span style={{ color: '#3F3F46' }}>—</span>}</td>)}{fileData.headers.length > 8 && <td />}</tr>)}</tbody>
+                    <thead><tr>{fileData.headers.slice(0, 8).map(h => <th key={h} style={{ padding: '7px 11px', fontSize: 9, fontWeight: 700, color: fileData.colMap[h] ? C.green : C.t4, borderBottom: `1px solid ${C.border}`, textAlign: 'left', whiteSpace: 'nowrap', fontFamily: "'Inter', sans-serif" }}>{h}</th>)}{fileData.headers.length > 8 && <th style={{ padding: '7px 11px', fontSize: 9, color: C.t4, borderBottom: `1px solid ${C.border}` }}>+{fileData.headers.length - 8}</th>}</tr></thead>
+                    <tbody>{fileData.preview.map((row, i) => <tr key={i} style={{ borderBottom: `1px solid ${C.borderLight}` }}>{fileData.headers.slice(0, 8).map(h => <td key={h} style={{ padding: '6px 11px', fontSize: 11, color: C.t2, fontFamily: "'Inter', sans-serif", maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row[h] != null ? String(row[h]) : <span style={{ color: C.t4 }}>—</span>}</td>)}{fileData.headers.length > 8 && <td />}</tr>)}</tbody>
                   </table>
                 </div>
               </div>
               {/* Import button */}
               <button onClick={handleImport} disabled={!fileData.mapped}
-                style={{ background: '#FF1F3A', color: '#fff', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", letterSpacing: '0.04em', boxShadow: '0 0 20px rgba(255,31,58,0.25)', width: '100%' }}>
+                style={{ background: C.red, color: '#fff', border: 'none', borderRadius: 10, padding: '13px 28px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", letterSpacing: '0.04em', boxShadow: `0 0 20px ${C.redBg}`, width: '100%' }}>
                 ⬆ Import {fileData.mapped.toLocaleString('en-IN')} Parts to Database
               </button>
             </div>
@@ -742,7 +765,7 @@ function CatalogTab() {
           {importing && importProg && (
             <div style={{ marginBottom: 14 }}>
               {/* Progress bar — animated fill */}
-              <div style={{ position: 'relative', height: 24, marginBottom: 10, borderRadius: 8, background: '#0d0e15', border: '1px solid #2a2b32', overflow: 'hidden' }}>
+              <div style={{ position: 'relative', height: 24, marginBottom: 10, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
                 {/* Fill — always shimmer-animated while importing */}
                 {(() => {
                   const pct = (importProg.done / importProg.total) * 100;
@@ -760,15 +783,15 @@ function CatalogTab() {
               {/* Live counters */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
                 {[
-                  { label: 'Processed', val: `${importProg.done.toLocaleString('en-IN')}/${importProg.total.toLocaleString('en-IN')}`, color: '#af8785' },
-                  { label: 'Added',     val: importProg.created.toLocaleString('en-IN'),   color: '#10B981' },
-                  { label: 'Updated',   val: importProg.updated.toLocaleString('en-IN'),   color: '#3B82F6' },
-                  { label: 'Unchanged', val: importProg.unchanged.toLocaleString('en-IN'), color: '#6B7280' },
-                  { label: 'Skipped',   val: importProg.invalid.toLocaleString('en-IN'),   color: '#EF4444' },
+                  { label: 'Processed', val: `${importProg.done.toLocaleString('en-IN')}/${importProg.total.toLocaleString('en-IN')}`, color: C.t3 },
+                  { label: 'Added',     val: importProg.created.toLocaleString('en-IN'),   color: C.green },
+                  { label: 'Updated',   val: importProg.updated.toLocaleString('en-IN'),   color: C.sky },
+                  { label: 'Unchanged', val: importProg.unchanged.toLocaleString('en-IN'), color: C.t3 },
+                  { label: 'Skipped',   val: importProg.invalid.toLocaleString('en-IN'),   color: C.red },
                 ].map(c => (
-                  <div key={c.label} style={{ background: '#1a1b22', borderRadius: 7, padding: '7px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: c.color, fontFamily: "'Outfit', sans-serif", lineHeight: 1.2 }}>{c.val}</div>
-                    <div style={{ fontSize: 8, color: '#5e3f3d', fontFamily: "'JetBrains Mono', monospace", textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{c.label}</div>
+                  <div key={c.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, padding: '7px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: c.color, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", lineHeight: 1.2 }}>{c.val}</div>
+                    <div style={{ fontSize: 8, color: C.t4, fontFamily: "'Inter', sans-serif", textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{c.label}</div>
                   </div>
                 ))}
               </div>
@@ -778,20 +801,20 @@ function CatalogTab() {
       )}
 
       {/* ── divider ── */}
-      <div style={{ height: 1, background: '#1e1f26', margin: '4px 0 20px' }} />
+      <div style={{ height: 1, background: C.border, margin: '4px 0 20px' }} />
 
       {/* ════════════ LIVE DATABASE ════════════ */}
       {dbStats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
           {[
-            { label: 'Total Parts',    val: dbStats.total,    color: '#FF1F3A' },
-            { label: 'Verified',       val: dbStats.verified, color: '#10B981' },
-            { label: 'Pending Review', val: dbStats.pending,  color: '#F59E0B' },
-            { label: 'Rejected',       val: dbStats.rejected, color: '#EF4444' },
+            { label: 'Total Parts',    val: dbStats.total,    color: C.red   },
+            { label: 'Verified',       val: dbStats.verified, color: C.green },
+            { label: 'Pending Review', val: dbStats.pending,  color: C.amber },
+            { label: 'Rejected',       val: dbStats.rejected, color: C.red   },
           ].map(s => (
-            <div key={s.label} style={{ background: 'linear-gradient(145deg, #1e1f26 0%, #12131a 100%)', border: '1px solid #3F3F46', borderTop: `2px solid ${s.color}`, borderRadius: 10, padding: '14px 16px' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: s.color, fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em' }}>{s.val?.toLocaleString('en-IN') ?? '—'}</div>
-              <div style={{ fontSize: 10, color: '#af8785', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'JetBrains Mono', monospace", marginTop: 3 }}>{s.label}</div>
+            <div key={s.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderTop: `2px solid ${s.color}`, borderRadius: 10, padding: '14px 16px' }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: s.color, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: '-0.02em' }}>{s.val?.toLocaleString('en-IN') ?? '—'}</div>
+              <div style={{ fontSize: 10, color: C.t3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: "'Inter', sans-serif", marginTop: 3 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -799,20 +822,20 @@ function CatalogTab() {
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
         <div style={{ flex: 1, position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#5e3f3d', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.t4, fontSize: 13, pointerEvents: 'none' }}>🔍</span>
           <input value={dbSearch} onChange={e => setDbSearch(e.target.value)} placeholder="Search by part name, OEM or brand…"
-            style={{ width: '100%', background: '#1e1f26', border: '1.5px solid #3F3F46', borderRadius: 10, padding: '10px 14px 10px 36px', color: '#e3e1ec', fontSize: 13, outline: 'none', fontFamily: "'Inter', sans-serif", boxSizing: 'border-box' }} />
+            style={{ width: '100%', background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: '10px 14px 10px 36px', color: C.t1, fontSize: 13, outline: 'none', fontFamily: "'Inter', sans-serif", boxSizing: 'border-box' }} />
         </div>
         <button onClick={() => fetchDbParts(dbSearch, dbOffset)}
-          style={{ background: 'transparent', border: '1px solid #3F3F46', borderRadius: 8, padding: '9px 14px', color: '#c9c6c5', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>↺ Refresh</button>
-        <span style={{ fontSize: 11, color: '#af8785', fontFamily: "'JetBrains Mono', monospace" }}>{dbTotal.toLocaleString('en-IN')} parts</span>
+          style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '9px 14px', color: C.t2, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>↺ Refresh</button>
+        <span style={{ fontSize: 11, color: C.t3, fontFamily: "'Inter', sans-serif" }}>{dbTotal.toLocaleString('en-IN')} parts</span>
       </div>
 
       {dbTotal === 0 && !dbLoading && (
-        <div style={{ background: '#0d0e15', border: '1px solid #292931', borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '40px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>📦</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#e3e1ec', marginBottom: 6, fontFamily: "'Outfit', sans-serif" }}>Master catalog is empty</div>
-          <div style={{ fontSize: 12, color: '#af8785', fontFamily: "'Inter', sans-serif" }}>Upload a supplier Excel file above to get started.</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, marginBottom: 6, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>Master catalog is empty</div>
+          <div style={{ fontSize: 12, color: C.t3, fontFamily: "'Inter', sans-serif" }}>Upload a supplier Excel file above to get started.</div>
         </div>
       )}
 
@@ -823,24 +846,24 @@ function CatalogTab() {
               <thead>
                 <tr>
                   {['OEM Number', 'Part Name', 'Brand', 'Category', 'GST %', 'Status', 'Shops', 'Created', 'Updated'].map(h => (
-                    <th key={h} style={{ padding: '10px 14px', fontSize: 10, fontWeight: 700, color: '#af8785', textTransform: 'uppercase', letterSpacing: '0.09em', borderBottom: '1px solid #3F3F46', textAlign: 'left', background: '#0d0e15', whiteSpace: 'nowrap', fontFamily: "'JetBrains Mono', monospace" }}>{h}</th>
+                    <th key={h} style={{ padding: '10px 14px', fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', borderBottom: `1px solid ${C.border}`, textAlign: 'left', background: C.bg, whiteSpace: 'nowrap', fontFamily: "'Inter', sans-serif" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {dbLoading ? (
-                  <tr><td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: '#5e3f3d', fontFamily: "'Inter', sans-serif" }}>Loading…</td></tr>
+                  <tr><td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: C.t4, fontFamily: "'Inter', sans-serif" }}>Loading…</td></tr>
                 ) : dbParts.map(p => (
-                  <tr key={p.masterPartId} className="admin-table-row" style={{ borderBottom: '1px solid #292931' }}>
-                    <td style={{ padding: '10px 14px', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#e3e1ec', whiteSpace: 'nowrap' }}>{p.primaryOemNumber || <span style={{ color: '#3F3F46' }}>—</span>}</td>
-                    <td style={{ padding: '10px 14px', fontSize: 12, color: '#e3e1ec', fontFamily: "'Inter', sans-serif", maxWidth: 240 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.partName}</div></td>
-                    <td style={{ padding: '10px 14px', fontSize: 11, color: '#c9c6c5', fontFamily: "'Inter', sans-serif" }}>{p.brand || <span style={{ color: '#3F3F46' }}>—</span>}</td>
-                    <td style={{ padding: '10px 14px', fontSize: 10, color: '#af8785', fontFamily: "'Inter', sans-serif" }}>{p.categoryL1 || <span style={{ color: '#3F3F46' }}>—</span>}</td>
-                    <td style={{ padding: '10px 14px', fontSize: 11, color: '#F59E0B', fontFamily: "'JetBrains Mono', monospace" }}>{p.gstRate}%</td>
-                    <td style={{ padding: '10px 14px' }}><span style={{ background: p.status === 'VERIFIED' ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)', border: `1px solid ${p.status === 'VERIFIED' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`, color: p.status === 'VERIFIED' ? '#10B981' : '#F59E0B', borderRadius: 5, padding: '2px 7px', fontSize: 9, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{p.status}</span></td>
-                    <td style={{ padding: '10px 14px', fontSize: 10, color: '#3B82F6', fontFamily: "'JetBrains Mono', monospace" }}>{p._count?.inventory ?? 0}</td>
-                    <td style={{ padding: '10px 14px', fontSize: 10, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-                    <td style={{ padding: '10px 14px', fontSize: 10, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", whiteSpace: 'nowrap' }}>{p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                  <tr key={p.masterPartId} className="admin-table-row" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+                    <td style={{ padding: '10px 14px', fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.t1, whiteSpace: 'nowrap' }}>{p.primaryOemNumber || <span style={{ color: C.t4 }}>—</span>}</td>
+                    <td style={{ padding: '10px 14px', fontSize: 12, color: C.t1, fontFamily: "'Inter', sans-serif", maxWidth: 240 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.partName}</div></td>
+                    <td style={{ padding: '10px 14px', fontSize: 11, color: C.t2, fontFamily: "'Inter', sans-serif" }}>{p.brand || <span style={{ color: C.t4 }}>—</span>}</td>
+                    <td style={{ padding: '10px 14px', fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif" }}>{p.categoryL1 || <span style={{ color: C.t4 }}>—</span>}</td>
+                    <td style={{ padding: '10px 14px', fontSize: 11, color: C.amber, fontFamily: "'Inter', sans-serif" }}>{p.gstRate}%</td>
+                    <td style={{ padding: '10px 14px' }}><span style={{ background: p.status === 'VERIFIED' ? C.greenBg : C.amberBg, border: `1px solid ${p.status === 'VERIFIED' ? C.green : C.amber}`, color: p.status === 'VERIFIED' ? C.green : C.amber, borderRadius: 5, padding: '2px 7px', fontSize: 9, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>{p.status}</span></td>
+                    <td style={{ padding: '10px 14px', fontSize: 10, color: C.sky, fontFamily: "'Inter', sans-serif" }}>{p._count?.inventory ?? 0}</td>
+                    <td style={{ padding: '10px 14px', fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif", whiteSpace: 'nowrap' }}>{p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                    <td style={{ padding: '10px 14px', fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif", whiteSpace: 'nowrap' }}>{p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -850,13 +873,13 @@ function CatalogTab() {
       )}
       {dbTotal > DB_LIMIT && (
         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 14, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#af8785', fontFamily: "'JetBrains Mono', monospace", marginRight: 8 }}>
+          <span style={{ fontSize: 11, color: C.t3, fontFamily: "'Inter', sans-serif", marginRight: 8 }}>
             {dbOffset + 1}–{Math.min(dbOffset + DB_LIMIT, dbTotal)} of {dbTotal.toLocaleString('en-IN')}
           </span>
           <button disabled={dbOffset === 0} onClick={() => { const o = dbOffset - DB_LIMIT; setDbOffset(o); fetchDbParts(dbSearch, o); }}
-            style={{ background: 'transparent', border: '1px solid #3F3F46', borderRadius: 7, padding: '6px 13px', color: dbOffset === 0 ? '#3F3F46' : '#c9c6c5', fontSize: 12, fontWeight: 600, cursor: dbOffset === 0 ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif" }}>← Prev</button>
+            style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 13px', color: dbOffset === 0 ? C.t4 : C.t2, fontSize: 12, fontWeight: 600, cursor: dbOffset === 0 ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif" }}>← Prev</button>
           <button disabled={dbOffset + DB_LIMIT >= dbTotal} onClick={() => { const o = dbOffset + DB_LIMIT; setDbOffset(o); fetchDbParts(dbSearch, o); }}
-            style={{ background: 'transparent', border: '1px solid #3F3F46', borderRadius: 7, padding: '6px 13px', color: dbOffset + DB_LIMIT >= dbTotal ? '#3F3F46' : '#c9c6c5', fontSize: 12, fontWeight: 600, cursor: dbOffset + DB_LIMIT >= dbTotal ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif" }}>Next →</button>
+            style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 7, padding: '6px 13px', color: dbOffset + DB_LIMIT >= dbTotal ? C.t4 : C.t2, fontSize: 12, fontWeight: 600, cursor: dbOffset + DB_LIMIT >= dbTotal ? 'not-allowed' : 'pointer', fontFamily: "'Inter', sans-serif" }}>Next →</button>
         </div>
       )}
     </>
@@ -865,8 +888,10 @@ function CatalogTab() {
 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function SuperAdminPage({ onImpersonate, currentUser }) {
-  const [activeTab, setActiveTab] = useState("users"); // "users" | "verifications"
+export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab, setActiveTab: propSetTab }) {
+  const [localTab, setLocalTab] = useState("users"); // "users" | "verifications"
+  const activeTab = propTab ?? localTab;
+  const setActiveTab = propSetTab ?? setLocalTab;
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [userTypes, setUserTypes] = useState([]);
@@ -1010,10 +1035,10 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
   };
 
   const S = {
-    page: { minHeight: "100vh", background: T.bg, color: T.t1, fontFamily: FONT.body },
+    page: { minHeight: "100vh", background: C.bg, color: C.t1, fontFamily: FONT.body },
     header: {
-      background: "#0d0e15",
-      borderBottom: `1px solid ${T.border}`,
+      background: C.surface,
+      borderBottom: `1px solid ${C.border}`,
       padding: "0 28px",
       position: "sticky", top: 0, zIndex: 99,
       display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -1022,98 +1047,98 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
     title: { display: "flex", alignItems: "center", gap: 12 },
     badge: {
       width: 32, height: 32, borderRadius: 6,
-      background: `#FF1F3A`,
+      background: C.red,
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 16, boxShadow: `0 0 16px rgba(255,31,58,0.25)`,
+      fontSize: 16, boxShadow: `0 0 16px ${C.redBg}`,
       flexShrink: 0,
     },
-    titleText: { fontSize: 15, fontWeight: 700, color: T.t1, fontFamily: "'Outfit', sans-serif" },
-    titleSub: { fontSize: 10, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'JetBrains Mono', monospace" },
+    titleText: { fontSize: 15, fontWeight: 700, color: C.t1, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" },
+    titleSub: { fontSize: 10, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Inter', sans-serif" },
     body: { padding: "28px 28px", maxWidth: 1300, margin: "0 auto" },
     statsGrid: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 28 },
     statCard: (color) => ({
-      background: "linear-gradient(145deg, #1e1f26 0%, #12131a 100%)",
-      border: `1px solid #3F3F46`,
+      background: C.surface,
+      border: `1px solid ${C.border}`,
       borderTop: `2px solid ${color}`,
       borderRadius: 12,
       padding: "18px 20px",
       transition: "border-color 0.2s, box-shadow 0.2s",
       cursor: "default",
     }),
-    statVal: { fontSize: 26, fontWeight: 700, color: T.t1, marginBottom: 4, fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.02em" },
-    statLabel: { fontSize: 10, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: "'Inter', sans-serif" },
+    statVal: { fontSize: 26, fontWeight: 700, color: C.t1, marginBottom: 4, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.02em" },
+    statLabel: { fontSize: 10, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: "'Inter', sans-serif" },
     controls: { display: "flex", gap: 10, marginBottom: 18, alignItems: "center", flexWrap: "wrap" },
     searchWrap: {
       flex: 1, minWidth: 220, position: "relative", display: "flex", alignItems: "center",
     },
     searchInput: {
-      flex: 1, minWidth: 220, background: T.card, border: `1.5px solid ${T.border}`,
-      borderRadius: 10, padding: "10px 14px 10px 38px", color: T.t1, fontSize: 14,
+      flex: 1, minWidth: 220, background: C.surface, border: `1.5px solid ${C.border}`,
+      borderRadius: 10, padding: "10px 14px 10px 38px", color: C.t1, fontSize: 14,
       outline: "none", fontFamily: FONT.ui, width: "100%",
     },
     searchIcon: {
-      position: "absolute", left: 13, color: T.t3, fontSize: 14, pointerEvents: "none",
+      position: "absolute", left: 13, color: C.t3, fontSize: 14, pointerEvents: "none",
     },
     select: {
-      background: T.card, border: `1.5px solid ${T.border}`, borderRadius: 10,
-      padding: "10px 14px", color: T.t1, fontSize: 13, outline: "none",
+      background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 10,
+      padding: "10px 14px", color: C.t1, fontSize: 13, outline: "none",
       fontFamily: FONT.ui, cursor: "pointer",
     },
     table: { width: "100%", borderCollapse: "collapse" },
     th: {
-      padding: "11px 16px", fontSize: 10, fontWeight: 700, color: T.t3,
+      padding: "11px 16px", fontSize: 10, fontWeight: 700, color: C.t3,
       textTransform: "uppercase", letterSpacing: "0.09em",
-      borderBottom: `1px solid ${T.border}`, textAlign: "left",
-      background: T.card, whiteSpace: "nowrap",
+      borderBottom: `1px solid ${C.border}`, textAlign: "left",
+      background: C.surface, whiteSpace: "nowrap",
     },
     td: {
-      padding: "13px 16px", fontSize: 13, color: T.t2,
-      borderBottom: `1px solid ${T.border}`,
+      padding: "13px 16px", fontSize: 13, color: C.t2,
+      borderBottom: `1px solid ${C.border}`,
       fontFamily: FONT.ui, verticalAlign: "middle",
     },
     row: { transition: "background 0.12s", cursor: "default" },
     btnImpersonate: {
-      background: "rgba(124,58,237,0.12)",
-      border: `1px solid rgba(124,58,237,0.35)`,
+      background: C.violetBg,
+      border: `1px solid ${C.violet}`,
       borderRadius: 7, padding: "5px 11px",
-      color: "#A78BFA", fontSize: 11, fontWeight: 700, cursor: "pointer",
+      color: C.violet, fontSize: 11, fontWeight: 700, cursor: "pointer",
       fontFamily: FONT.ui, transition: "all 0.15s", whiteSpace: "nowrap",
     },
     btnToggle: (isActive) => ({
-      background: isActive ? "rgba(239,68,68,0.08)" : "rgba(16,185,129,0.08)",
-      border: `1px solid ${isActive ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.3)"}`,
+      background: isActive ? C.redBg : C.greenBg,
+      border: `1px solid ${isActive ? C.red : C.green}`,
       borderRadius: 7, padding: "5px 10px",
-      color: isActive ? T.crimson : T.emerald,
+      color: isActive ? C.red : C.green,
       fontSize: 11, fontWeight: 600,
       cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap",
     }),
     pagination: { display: "flex", gap: 8, justifyContent: "space-between", marginTop: 18, alignItems: "center", flexWrap: "wrap" },
     pageBtn: (active) => ({
-      background: active ? T.amber : "transparent",
-      border: `1px solid ${active ? T.amber : T.border}`,
-      borderRadius: 8, padding: "7px 16px", color: active ? "#000" : T.t2,
+      background: active ? C.amber : "transparent",
+      border: `1px solid ${active ? C.amber : C.border}`,
+      borderRadius: 8, padding: "7px 16px", color: active ? "#fff" : C.t2,
       fontSize: 12, fontWeight: 700, cursor: active ? "default" : "pointer", fontFamily: FONT.ui,
       transition: "all 0.15s",
     }),
     btnAddUser: {
-      background: T.amber, border: "none", borderRadius: 8, padding: "9px 18px",
+      background: C.amber, border: "none", borderRadius: 8, padding: "9px 18px",
       color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif",
       display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
       textTransform: "uppercase", letterSpacing: "0.06em",
       transition: "filter 0.15s, transform 0.15s",
-      boxShadow: "0 0 16px rgba(255,31,58,0.2)",
+      boxShadow: `0 0 16px ${C.amberBg}`,
     },
     tab: (active) => ({
       padding: "12px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
       border: "none", background: "none", fontFamily: FONT.ui,
-      color: active ? T.amber : T.t3,
-      borderBottom: active ? `2px solid ${T.amber}` : "2px solid transparent",
+      color: active ? C.amber : C.t3,
+      borderBottom: active ? `2px solid ${C.amber}` : "2px solid transparent",
       transition: "all 0.15s",
     }),
     statusBadge: (isActive) => ({
-      background: isActive ? T.emeraldBg : T.crimsonBg,
-      border: `1px solid ${isActive ? "rgba(16,185,129,0.35)" : "rgba(239,68,68,0.35)"}`,
-      color: isActive ? T.emerald : T.crimson,
+      background: isActive ? C.greenBg : C.redBg,
+      border: `1px solid ${isActive ? C.green : C.red}`,
+      color: isActive ? C.green : C.red,
       borderRadius: 20, padding: "3px 10px", fontSize: 10, fontWeight: 700, fontFamily: FONT.ui,
       letterSpacing: "0.04em", whiteSpace: "nowrap",
     }),
@@ -1125,8 +1150,8 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
 
   const ADMIN_CSS = `
     /* ── Stats grid ── */
-    .admin-stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 28px; }
-    .admin-stat-card:hover { border-color: ${T.borderHi} !important; }
+    .admin-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px; }
+    .admin-stat-card:hover { border-color: ${C.amber} !important; }
 
     /* ── Admin controls row ── */
     .admin-controls-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; flex-wrap: wrap; }
@@ -1136,10 +1161,10 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
     .admin-add-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
     /* ── Table ── */
-    .admin-table-wrap { background: linear-gradient(145deg, #1e1f26 0%, #12131a 100%); border: 1px solid #3F3F46; border-radius: 12px; overflow: hidden; }
+    .admin-table-wrap { background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px; overflow: hidden; }
     .admin-table-wrap-inner { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .admin-table-wrap-inner table { min-width: 900px; width: 100%; border-collapse: collapse; }
-    .admin-table-row:hover { background: ${T.cardHover} !important; }
+    .admin-table-row:hover { background: ${C.borderLight} !important; }
 
     /* ── User card layout for mobile ── */
     .admin-user-card { display: none; }
@@ -1148,12 +1173,12 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
     .admin-pagination { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; align-items: center; flex-wrap: wrap; }
 
     /* ── Impersonate / toggle btn hover ── */
-    .btn-impersonate:hover { background: rgba(124,58,237,0.22) !important; border-color: rgba(124,58,237,0.6) !important; }
-    .btn-toggle-active:hover { background: rgba(239,68,68,0.16) !important; }
-    .btn-toggle-inactive:hover { background: rgba(16,185,129,0.16) !important; }
+    .btn-impersonate:hover { background: ${C.violetBg} !important; border-color: ${C.violet} !important; }
+    .btn-toggle-active:hover { background: rgba(190,43,26,0.14) !important; }
+    .btn-toggle-inactive:hover { background: rgba(22,163,74,0.14) !important; }
 
     /* ── Section heading ── */
-    .admin-section-title { font-size: 14px; font-weight: 700; color: ${T.t1}; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .admin-section-title { font-size: 14px; font-weight: 700; color: ${C.t1}; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 
     @media (max-width: 1280px) {
       .admin-stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
@@ -1170,7 +1195,7 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
         align-items: center !important;
         padding: 0 14px !important;
         border-right: none !important;
-        border-bottom: 1px solid ${T.border} !important;
+        border-bottom: 1px solid ${C.border} !important;
         gap: 10px !important;
       }
       .admin-sidebar-label { display: none !important; }
@@ -1203,56 +1228,35 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
   `;
 
   const STAT_CONFIG = [
-    { label: "Total Users",  key: "totalUsers",  color: T.violet,  icon: "👥",  glow: "rgba(167,139,250,0.25)" },
-    { label: "Shop Owners",  key: "shopOwners",  color: T.emerald, icon: "🏪",  glow: "rgba(16,185,129,0.25)" },
-    { label: "Customers",    key: "customers",   color: T.sky,     icon: "🛒",  glow: "rgba(56,189,248,0.25)" },
-    { label: "Total Shops",  key: "totalShops",  color: T.amber,   icon: "📦",  glow: "rgba(227,24,55,0.25)" },
-    { label: "Active Users", key: "activeUsers", color: T.emerald, icon: "✅",  glow: "rgba(16,185,129,0.25)" },
-    { label: "Admins",       key: "admins",      color: "#A78BFA", icon: "🛡️", glow: "rgba(167,139,250,0.25)" },
+    { label: "Total Users",  key: "totalUsers",  color: C.violet, icon: "👥",  glow: C.violetBg },
+    { label: "Shop Owners",  key: "shopOwners",  color: C.green,  icon: "🏪",  glow: C.greenBg  },
+    { label: "Customers",    key: "customers",   color: C.sky,    icon: "🛒",  glow: C.skyBg    },
+    { label: "Total Shops",  key: "totalShops",  color: C.amber,  icon: "📦",  glow: C.amberBg  },
+    { label: "Admins",       key: "admins",      color: C.violet, icon: "🛡️", glow: C.violetBg },
   ];
 
   return (
     <div style={S.page}>
       <style>{ADMIN_CSS}</style>
 
-      {/* ── Header ── */}
-      <div className="admin-page-sticky-header" style={S.header}>
-        <div style={S.title}>
-          <div style={S.badge}>⚡</div>
-          <div>
-            <div style={S.titleText}>Admin Console</div>
-            <div style={S.titleSub}>PLATFORM MANAGEMENT</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
-            <span style={{ color: T.t1, fontWeight: 700 }}>{total}</span> users total
-          </div>
-          {currentUser && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Avatar user={currentUser} size={28} />
-              <span style={{ fontSize: 12, color: T.t2, fontWeight: 600 }}>{currentUser.name || currentUser.email}</span>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Header removed — brand + nav live in AdminShell header */}
 
       <div className="admin-page-body" style={S.body}>
 
         {/* Global error / success */}
         {error && (
-          <div style={{ background: "rgba(239,68,68,0.07)", border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.crimson, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 10, padding: "11px 16px", color: C.red, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
             <span>⚠</span> {error}
           </div>
         )}
         {successMsg && (
-          <div style={{ background: "rgba(16,185,129,0.07)", border: `1px solid rgba(16,185,129,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.emerald, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ background: C.greenBg, border: `1px solid ${C.green}`, borderRadius: 10, padding: "11px 16px", color: C.green, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
             <span>✓</span> {successMsg}
           </div>
         )}
 
-        {/* ── Stats Grid ── */}
-        {stats && (
+        {/* ── Stats Grid — only on All Users tab ── */}
+        {activeTab === "users" && stats && (
           <div className="admin-stats-grid">
             {STAT_CONFIG.map((sc) => (
               <div key={sc.label} className="admin-stat-card" style={S.statCard(sc.color, sc.glow)}>
@@ -1266,21 +1270,23 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
           </div>
         )}
 
-        {/* ── Tabs ── */}
-        <div style={{ display: "flex", borderBottom: `1px solid ${T.border}`, marginBottom: 24, gap: 0 }}>
-          <button style={S.tab(activeTab === "users")} onClick={() => setActiveTab("users")}>
-            Users
-          </button>
-          <button style={S.tab(activeTab === "verifications")} onClick={() => setActiveTab("verifications")}>
-            Verifications
-            {pendingCount > 0 && (
-              <span style={{ marginLeft: 7, background: T.amber, color: "#000", borderRadius: 20, padding: "1px 7px", fontSize: 10, fontWeight: 800 }}>{pendingCount}</span>
-            )}
-          </button>
-          <button style={S.tab(activeTab === "catalog")} onClick={() => setActiveTab("catalog")}>
-            Parts Catalog
-          </button>
-        </div>
+        {/* ── Tabs — hidden when parent controls tabs via propTab ── */}
+        {!propTab && (
+          <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: 24, gap: 0 }}>
+            <button style={S.tab(activeTab === "users")} onClick={() => setActiveTab("users")}>
+              Users
+            </button>
+            <button style={S.tab(activeTab === "verifications")} onClick={() => setActiveTab("verifications")}>
+              Verifications
+              {pendingCount > 0 && (
+                <span style={{ marginLeft: 7, background: C.amber, color: "#fff", borderRadius: 20, padding: "1px 7px", fontSize: 10, fontWeight: 800 }}>{pendingCount}</span>
+              )}
+            </button>
+            <button style={S.tab(activeTab === "catalog")} onClick={() => setActiveTab("catalog")}>
+              Parts Catalog
+            </button>
+          </div>
+        )}
 
         {/* ─── USERS TAB ─── */}
         {activeTab === "users" && (
@@ -1328,14 +1334,14 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                     {loading ? (
                       Array.from({ length: 5 }).map((_, i) => (
                         <tr key={i}><td colSpan={8} style={{ ...S.td, padding: 0 }}>
-                          <div style={{ height: 56, background: `linear-gradient(90deg, ${T.card} 25%, ${T.cardHover} 50%, ${T.card} 75%)`, backgroundSize: "200% 100%", animation: "shimmer 1.5s ease infinite" }} />
+                          <div style={{ height: 56, background: `linear-gradient(90deg, ${C.surface} 25%, ${C.borderLight} 50%, ${C.surface} 75%)`, backgroundSize: "200% 100%", animation: "shimmer 1.5s ease infinite" }} />
                         </td></tr>
                       ))
                     ) : users.length === 0 ? (
-                      <tr><td colSpan={8} style={{ ...S.td, textAlign: "center", padding: "48px 24px", color: T.t3 }}>
+                      <tr><td colSpan={8} style={{ ...S.td, textAlign: "center", padding: "48px 24px", color: C.t3 }}>
                         <div style={{ fontSize: 36, marginBottom: 8 }}>🔍</div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: T.t2 }}>No users found</div>
-                        <div style={{ fontSize: 12, color: T.t4, marginTop: 4 }}>Try adjusting your search or filter</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.t2 }}>No users found</div>
+                        <div style={{ fontSize: 12, color: C.t4, marginTop: 4 }}>Try adjusting your search or filter</div>
                       </td></tr>
                     ) : users.map(u => (
                       <tr
@@ -1347,8 +1353,8 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                             <Avatar user={u} size={36} />
                             <div>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, marginBottom: 2 }}>{u.name || <span style={{ color: T.t4, fontStyle: "italic" }}>No name</span>}</div>
-                              <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono }}>{u.email || u.phone || "—"}</div>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 2 }}>{u.name || <span style={{ color: C.t4, fontStyle: "italic" }}>No name</span>}</div>
+                              <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.mono }}>{u.email || u.phone || "—"}</div>
                             </div>
                           </div>
                         </td>
@@ -1356,7 +1362,7 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                         <td style={S.td}>
                           <select
                             style={{
-                              background: T.card, color: T.t1, border: `1px solid ${T.border}`,
+                              background: C.surface, color: C.t1, border: `1px solid ${C.border}`,
                               borderRadius: 7, padding: "4px 8px", fontSize: 12, fontFamily: FONT.ui,
                               cursor: currentUser?.userId === u.userId ? "not-allowed" : "pointer",
                               opacity: currentUser?.userId === u.userId ? 0.5 : 1, outline: "none",
@@ -1374,15 +1380,15 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                         <td style={S.td}>
                           {u.shop ? (
                             <div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: T.t1 }}>{u.shop.name}</div>
-                              <div style={{ fontSize: 11, color: T.t3 }}>{u.shop.city}</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: C.t1 }}>{u.shop.name}</div>
+                              <div style={{ fontSize: 11, color: C.t3 }}>{u.shop.city}</div>
                             </div>
-                          ) : <span style={{ color: T.t4 }}>—</span>}
+                          ) : <span style={{ color: C.t4 }}>—</span>}
                         </td>
-                        <td style={{ ...S.td, color: T.t3 }}>
-                          {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : <span style={{ color: T.t4 }}>Never</span>}
+                        <td style={{ ...S.td, color: C.t3 }}>
+                          {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : <span style={{ color: C.t4 }}>Never</span>}
                         </td>
-                        <td style={{ ...S.td, textAlign: "center", color: T.t2, fontWeight: 700 }}>{u.loginCount ?? 0}</td>
+                        <td style={{ ...S.td, textAlign: "center", color: C.t2, fontWeight: 700 }}>{u.loginCount ?? 0}</td>
                         <td style={S.td}>
                           <span style={S.statusBadge(u.isActive)}>
                             {u.isActive ? "Active" : "Inactive"}
@@ -1419,12 +1425,12 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
               {/* Mobile cards (shown via CSS when table is hidden) */}
               <div className="admin-user-card">
                 {loading ? (
-                  <div style={{ textAlign: "center", padding: 40, color: T.t3 }}>Loading users...</div>
+                  <div style={{ textAlign: "center", padding: 40, color: C.t3 }}>Loading users...</div>
                 ) : users.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: 40, color: T.t3 }}>No users found</div>
+                  <div style={{ textAlign: "center", padding: 40, color: C.t3 }}>No users found</div>
                 ) : users.map(u => (
                   <div key={u.userId} style={{
-                    borderBottom: `1px solid ${T.border}`,
+                    borderBottom: `1px solid ${C.border}`,
                     padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10,
                     background: "transparent", transition: "background 0.12s",
                   }}>
@@ -1432,8 +1438,8 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <Avatar user={u} size={38} />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: T.t1, fontFamily: FONT.ui }}>{u.name || <span style={{ color: T.t4, fontStyle: "italic" }}>No name</span>}</div>
-                        <div style={{ fontSize: 12, color: T.t3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || u.phone || "—"}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: C.t1, fontFamily: FONT.ui }}>{u.name || <span style={{ color: C.t4, fontStyle: "italic" }}>No name</span>}</div>
+                        <div style={{ fontSize: 12, color: C.t3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email || u.phone || "—"}</div>
                       </div>
                       <span style={{ ...S.statusBadge(u.isActive), flexShrink: 0 }}>
                         {u.isActive ? "Active" : "Inactive"}
@@ -1444,7 +1450,7 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                       <RoleBadge slug={u.userType?.slug || u.role} name={u.userType?.name} />
                       <select
                         style={{
-                          background: T.card, color: T.t1, border: `1px solid ${T.border}`,
+                          background: C.surface, color: C.t1, border: `1px solid ${C.border}`,
                           borderRadius: 7, padding: "5px 8px", fontSize: 12, fontFamily: FONT.ui,
                           cursor: currentUser?.userId === u.userId ? "not-allowed" : "pointer",
                           opacity: currentUser?.userId === u.userId ? 0.5 : 1, outline: "none",
@@ -1459,7 +1465,7 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                         ))}
                       </select>
                       {u.shop && (
-                        <span style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>🏪 {u.shop.name}, {u.shop.city}</span>
+                        <span style={{ fontSize: 12, color: C.t3, fontFamily: FONT.ui }}>🏪 {u.shop.name}, {u.shop.city}</span>
                       )}
                     </div>
                     {/* Row 3: Actions */}
@@ -1488,8 +1494,8 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
             {/* Pagination */}
             {pages > 1 && (
               <div className="admin-pagination" style={S.pagination}>
-                <span style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
-                  Showing <span style={{ color: T.t1, fontWeight: 700 }}>{offset + 1}–{Math.min(offset + LIMIT, total)}</span> of <span style={{ color: T.t1, fontWeight: 700 }}>{total}</span> users
+                <span style={{ fontSize: 12, color: C.t3, fontFamily: FONT.ui }}>
+                  Showing <span style={{ color: C.t1, fontWeight: 700 }}>{offset + 1}–{Math.min(offset + LIMIT, total)}</span> of <span style={{ color: C.t1, fontWeight: 700 }}>{total}</span> users
                 </span>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
@@ -1519,12 +1525,12 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
         {activeTab === "verifications" && (
           <>
             {verError && (
-              <div style={{ background: "rgba(239,68,68,0.07)", border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.crimson, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: 10, padding: "11px 16px", color: C.red, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
                 <span>⚠</span> {verError}
               </div>
             )}
             {verSuccess && (
-              <div style={{ background: "rgba(16,185,129,0.07)", border: `1px solid rgba(16,185,129,0.3)`, borderRadius: 10, padding: "11px 16px", color: T.emerald, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ background: C.greenBg, border: `1px solid ${C.green}`, borderRadius: 10, padding: "11px 16px", color: C.green, fontSize: 13, marginBottom: 20, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 10 }}>
                 <span>✓</span> {verSuccess}
               </div>
             )}
@@ -1532,31 +1538,31 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
             {verLoading ? (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} style={{ height: 160, borderRadius: 14, background: T.card, border: `1px solid ${T.border}`, animation: "shimmer 1.5s ease infinite", backgroundImage: `linear-gradient(90deg, ${T.card} 25%, ${T.cardHover} 50%, ${T.card} 75%)`, backgroundSize: "200% 100%" }} />
+                  <div key={i} style={{ height: 160, borderRadius: 14, background: C.surface, border: `1px solid ${C.border}`, animation: "shimmer 1.5s ease infinite", backgroundImage: `linear-gradient(90deg, ${C.surface} 25%, ${C.borderLight} 50%, ${C.surface} 75%)`, backgroundSize: "200% 100%" }} />
                 ))}
               </div>
             ) : verifications.length === 0 ? (
-              <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: "60px 24px", textAlign: "center" }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: "60px 24px", textAlign: "center" }}>
                 <div style={{ fontSize: 44, marginBottom: 14 }}>🎉</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: T.t1, marginBottom: 6, fontFamily: FONT.ui }}>Queue is clear!</div>
-                <div style={{ fontSize: 13, color: T.t3, fontFamily: FONT.ui }}>No pending shop owner applications to review.</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: C.t1, marginBottom: 6, fontFamily: FONT.ui }}>Queue is clear!</div>
+                <div style={{ fontSize: 13, color: C.t3, fontFamily: FONT.ui }}>No pending shop owner applications to review.</div>
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
                 {verifications.map(v => (
                   <div key={v.userId} style={{
-                    background: T.card, border: `1px solid ${T.border}`,
+                    background: C.surface, border: `1px solid ${C.border}`,
                     borderRadius: 16, overflow: "hidden",
-                    boxShadow: v.verificationStatus === "PENDING" ? `0 0 0 1px rgba(251,191,36,0.2), 0 4px 20px rgba(0,0,0,0.3)` : "0 4px 20px rgba(0,0,0,0.2)",
+                    boxShadow: v.verificationStatus === "PENDING" ? `0 0 0 1px ${C.amberBg}, 0 4px 20px rgba(26,18,5,0.1)` : `0 4px 20px rgba(26,18,5,0.06)`,
                     transition: "box-shadow 0.2s",
                   }}>
                     {/* Card top bar */}
-                    <div style={{ padding: "14px 18px", background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ padding: "14px 18px", background: C.bg, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <Avatar user={v} size={40} />
                         <div>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: T.t1 }}>{v.name || <span style={{ fontStyle: "italic", color: T.t4 }}>No name</span>}</div>
-                          <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>{v.email || "—"}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{v.name || <span style={{ fontStyle: "italic", color: C.t4 }}>No name</span>}</div>
+                          <div style={{ fontSize: 11, color: C.t3, marginTop: 2 }}>{v.email || "—"}</div>
                         </div>
                       </div>
                       <VerificationBadge status={v.verificationStatus} />
@@ -1566,15 +1572,15 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                     <div style={{ padding: "14px 18px" }}>
                       <div style={{ display: "flex", gap: 20, marginBottom: 14 }}>
                         <div>
-                          <div style={{ fontSize: 10, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Registered</div>
-                          <div style={{ fontSize: 12, color: T.t2 }}>
+                          <div style={{ fontSize: 10, color: C.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Registered</div>
+                          <div style={{ fontSize: 12, color: C.t2 }}>
                             {v.createdAt ? new Date(v.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
                           </div>
                         </div>
                         {v.verificationStatus === "REJECTED" && v.verificationNote && (
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 10, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Rejection Reason</div>
-                            <div style={{ fontSize: 12, color: T.crimson, lineHeight: 1.4 }}>{v.verificationNote}</div>
+                            <div style={{ fontSize: 10, color: C.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Rejection Reason</div>
+                            <div style={{ fontSize: 12, color: C.red, lineHeight: 1.4 }}>{v.verificationNote}</div>
                           </div>
                         )}
                       </div>
@@ -1582,17 +1588,17 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                       {rejectingId !== v.userId ? (
                         <div style={{ display: "flex", gap: 8 }}>
                           <button
-                            style={{ flex: 1, background: "rgba(16,185,129,0.1)", border: `1px solid rgba(16,185,129,0.35)`, color: T.emerald, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}
-                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(16,185,129,0.2)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = "rgba(16,185,129,0.1)"; }}
+                            style={{ flex: 1, background: C.greenBg, border: `1px solid ${C.green}`, color: C.green, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(22,163,74,0.15)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = C.greenBg; }}
                             onClick={() => handleVerify(v.userId, "APPROVE")}
                           >
                             ✓ Approve
                           </button>
                           <button
-                            style={{ flex: 1, background: "rgba(239,68,68,0.08)", border: `1px solid rgba(239,68,68,0.3)`, color: T.crimson, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}
-                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; }}
+                            style={{ flex: 1, background: C.redBg, border: `1px solid ${C.red}`, color: C.red, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(190,43,26,0.14)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = C.redBg; }}
                             onClick={() => { setRejectingId(v.userId); setRejectReason(""); setVerError(""); }}
                           >
                             ✗ Reject
@@ -1600,9 +1606,9 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                         </div>
                       ) : (
                         <div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: T.crimson, marginBottom: 8 }}>Rejection reason (required)</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.red, marginBottom: 8 }}>Rejection reason (required)</div>
                           <textarea
-                            style={{ width: "100%", background: T.bg, border: `1.5px solid rgba(239,68,68,0.4)`, borderRadius: 10, padding: "10px 14px", color: T.t1, fontSize: 13, fontFamily: FONT.ui, outline: "none", resize: "vertical", minHeight: 72, boxSizing: "border-box", marginBottom: 10 }}
+                            style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.red}`, borderRadius: 10, padding: "10px 14px", color: C.t1, fontSize: 13, fontFamily: FONT.ui, outline: "none", resize: "vertical", minHeight: 72, boxSizing: "border-box", marginBottom: 10 }}
                             placeholder="Explain why this application is being rejected..."
                             value={rejectReason}
                             onChange={e => setRejectReason(e.target.value)}
@@ -1610,14 +1616,14 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
                           />
                           <div style={{ display: "flex", gap: 8 }}>
                             <button
-                              style={{ flex: 1, background: T.crimson, border: "none", color: "#fff", borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
+                              style={{ flex: 1, background: C.red, border: "none", color: "#fff", borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
                               onClick={() => {
                                 if (!rejectReason.trim()) { setVerError("A rejection reason is required"); return; }
                                 handleVerify(v.userId, "REJECT", rejectReason);
                               }}
                             >Confirm Reject</button>
                             <button
-                              style={{ flex: 1, background: "transparent", border: `1px solid ${T.border}`, color: T.t3, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}
+                              style={{ flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.t3, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}
                               onClick={() => { setRejectingId(null); setRejectReason(""); }}
                             >Cancel</button>
                           </div>
@@ -1648,67 +1654,67 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
       {bgImport?.popup && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 10000,
-          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+          background: 'rgba(26,18,5,0.5)', backdropFilter: 'blur(6px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
         }}>
-          <div style={{ background: '#13141c', border: '1px solid rgba(16,185,129,0.4)', borderRadius: 18, width: '100%', maxWidth: 480, overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(16,185,129,0.1)' }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.green}`, borderRadius: 18, width: '100%', maxWidth: 480, overflow: 'hidden', boxShadow: `0 24px 80px rgba(26,18,5,0.18), 0 0 40px ${C.greenBg}` }}>
             {/* Header */}
-            <div style={{ background: 'rgba(16,185,129,0.08)', padding: '20px 24px', borderBottom: '1px solid rgba(16,185,129,0.2)', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ background: C.greenBg, padding: '20px 24px', borderBottom: `1px solid ${C.green}`, display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 30 }}>✅</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 17, fontWeight: 800, color: '#10B981', fontFamily: "'Outfit', sans-serif" }}>Import Complete!</div>
-                <div style={{ fontSize: 11, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", marginTop: 3 }}>
-                  {bgImport.total.toLocaleString('en-IN')} rows processed from <span style={{ color: '#af8785' }}>{bgImport.filename}</span>
+                <div style={{ fontSize: 17, fontWeight: 800, color: C.green, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>Import Complete!</div>
+                <div style={{ fontSize: 11, color: C.t3, fontFamily: "'Inter', sans-serif", marginTop: 3 }}>
+                  {bgImport.total.toLocaleString('en-IN')} rows processed from <span style={{ color: C.t2 }}>{bgImport.filename}</span>
                 </div>
               </div>
               <button
                 onClick={() => importStore.set({ ...bgImport, popup: false })}
-                style={{ background: 'transparent', border: '1px solid #3F3F46', borderRadius: 8, padding: '7px 11px', color: '#6B7280', fontSize: 14, cursor: 'pointer', lineHeight: 1 }}>
+                style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 11px', color: C.t3, fontSize: 14, cursor: 'pointer', lineHeight: 1 }}>
                 ✕
               </button>
             </div>
             {/* Stat rows — only show rows with non-zero values */}
             <div style={{ padding: '6px 0' }}>
               {[
-                { icon: '✨', label: 'Newly Added',          value: bgImport.created,   color: '#10B981', bg: 'rgba(16,185,129,0.06)' },
-                { icon: '✏️', label: 'Updated / Modified',   value: bgImport.updated,   color: '#3B82F6', bg: 'rgba(59,130,246,0.06)' },
-                { icon: '✓',  label: 'No Changes',           value: bgImport.unchanged, color: '#6B7280', bg: 'transparent' },
-                { icon: '🔗', label: 'Fitment Links Created', value: bgImport.fitments,  color: '#8B5CF6', bg: 'rgba(139,92,246,0.06)' },
-                { icon: '⊘',  label: 'Skipped / Invalid',    value: bgImport.invalid,   color: '#EF4444', bg: 'rgba(239,68,68,0.04)' },
+                { icon: '✨', label: 'Newly Added',          value: bgImport.created,   color: C.green,  bg: C.greenBg  },
+                { icon: '✏️', label: 'Updated / Modified',   value: bgImport.updated,   color: C.sky,    bg: C.skyBg    },
+                { icon: '✓',  label: 'No Changes',           value: bgImport.unchanged, color: C.t3,     bg: 'transparent' },
+                { icon: '🔗', label: 'Fitment Links Created', value: bgImport.fitments,  color: C.violet, bg: C.violetBg },
+                { icon: '⊘',  label: 'Skipped / Invalid',    value: bgImport.invalid,   color: C.red,    bg: C.redBg    },
               ].filter(row => row.value > 0).map((row, i, arr) => (
-                <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 24px', background: row.bg, borderBottom: i < arr.length - 1 ? '1px solid #1e1f26' : 'none' }}>
+                <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 24px', background: row.bg, borderBottom: i < arr.length - 1 ? `1px solid ${C.borderLight}` : 'none' }}>
                   <span style={{ fontSize: 20, flexShrink: 0, width: 24 }}>{row.icon}</span>
-                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#c9c6c5', fontFamily: "'Inter', sans-serif" }}>{row.label}</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: row.color, fontFamily: "'Outfit', sans-serif", letterSpacing: '-0.02em' }}>{row.value.toLocaleString('en-IN')}</div>
+                  <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: C.t2, fontFamily: "'Inter', sans-serif" }}>{row.label}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: row.color, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: '-0.02em' }}>{row.value.toLocaleString('en-IN')}</div>
                 </div>
               ))}
             </div>
             {/* Duplicates section */}
             {bgImport.duplicates?.length > 0 && (
-              <div style={{ borderTop: '1px solid #1e1f26' }}>
+              <div style={{ borderTop: `1px solid ${C.border}` }}>
                 <div style={{ padding: '10px 24px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Inter', sans-serif" }}>
                     ⚠ {bgImport.duplicates.length} Duplicate OEM{bgImport.duplicates.length > 1 ? 's' : ''} in File
                   </div>
-                  <div style={{ fontSize: 10, color: '#6B7280', fontFamily: "'Inter', sans-serif" }}>only first occurrence imported</div>
+                  <div style={{ fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif" }}>only first occurrence imported</div>
                 </div>
-                <div style={{ maxHeight: 180, overflowY: 'auto', margin: '0 16px 12px', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8, background: 'rgba(245,158,11,0.04)' }}>
+                <div style={{ maxHeight: 180, overflowY: 'auto', margin: '0 16px 12px', border: `1px solid ${C.amber}`, borderRadius: 8, background: C.amberBg }}>
                   {/* Header */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 48px', padding: '6px 12px', borderBottom: '1px solid rgba(245,158,11,0.15)', background: 'rgba(245,158,11,0.08)' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 48px', padding: '6px 12px', borderBottom: `1px solid ${C.border}`, background: C.amberBg }}>
                     {['OEM Number', 'Part Name', 'Count'].map(h => (
-                      <div key={h} style={{ fontSize: 9, fontWeight: 700, color: '#F59E0B', textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'JetBrains Mono', monospace" }}>{h}</div>
+                      <div key={h} style={{ fontSize: 9, fontWeight: 700, color: C.amber, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: "'Inter', sans-serif" }}>{h}</div>
                     ))}
                   </div>
                   {/* Rows — cap at 50, show remainder note */}
                   {bgImport.duplicates.slice(0, 50).map((d, i) => (
-                    <div key={d.oemNumber} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 48px', padding: '6px 12px', borderBottom: i < Math.min(bgImport.duplicates.length, 50) - 1 ? '1px solid rgba(245,158,11,0.08)' : 'none', alignItems: 'center' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#F59E0B', fontFamily: "'JetBrains Mono', monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.oemNumber}</div>
-                      <div style={{ fontSize: 11, color: '#c9c6c5', fontFamily: "'Inter', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{d.partName || '—'}</div>
-                      <div style={{ fontSize: 12, fontWeight: 800, color: '#EF4444', fontFamily: "'Outfit', sans-serif", textAlign: 'right' }}>×{d.count}</div>
+                    <div key={d.oemNumber} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 48px', padding: '6px 12px', borderBottom: i < Math.min(bgImport.duplicates.length, 50) - 1 ? `1px solid ${C.borderLight}` : 'none', alignItems: 'center' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, fontFamily: "'Inter', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.oemNumber}</div>
+                      <div style={{ fontSize: 11, color: C.t2, fontFamily: "'Inter', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 8 }}>{d.partName || '—'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: C.red, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", textAlign: 'right' }}>×{d.count}</div>
                     </div>
                   ))}
                   {bgImport.duplicates.length > 50 && (
-                    <div style={{ padding: '6px 12px', fontSize: 10, color: '#6B7280', fontFamily: "'Inter', sans-serif", textAlign: 'center' }}>
+                    <div style={{ padding: '6px 12px', fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif", textAlign: 'center' }}>
                       +{bgImport.duplicates.length - 50} more duplicates not shown
                     </div>
                   )}
@@ -1717,16 +1723,16 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
             )}
 
             {/* Actions */}
-            <div style={{ padding: '16px 24px', display: 'flex', gap: 10, borderTop: '1px solid #1e1f26' }}>
+            <div style={{ padding: '16px 24px', display: 'flex', gap: 10, borderTop: `1px solid ${C.border}` }}>
               <button
                 onClick={() => { importStore.set({ ...bgImport, popup: false }); setActiveTab('catalog'); }}
-                style={{ flex: 1, background: '#10B981', border: 'none', borderRadius: 9, padding: '12px 0', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
+                style={{ flex: 1, background: C.green, border: 'none', borderRadius: 9, padding: '12px 0', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
                 🗄 View in Database
               </button>
               {/* Note: "View in Database" keeps fileData so user can see what was imported; only "Import Another File" resets state */}
               <button
                 onClick={() => importStore.set({ clearUI: true })}
-                style={{ flex: 1, background: 'transparent', border: '1px solid #3F3F46', borderRadius: 9, padding: '12px 0', color: '#c9c6c5', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
+                style={{ flex: 1, background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 9, padding: '12px 0', color: C.t2, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}>
                 Import Another File
               </button>
             </div>
@@ -1738,10 +1744,10 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
       {bgImport && !bgImport.popup && (
         <div style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 9999,
-          width: 320, background: '#13141c',
-          border: `1px solid ${bgImport.active ? 'rgba(255,31,58,0.35)' : 'rgba(16,185,129,0.5)'}`,
+          width: 320, background: C.surface,
+          border: `1px solid ${bgImport.active ? C.red : C.green}`,
           borderRadius: 14, padding: '14px 16px',
-          boxShadow: bgImport.active ? '0 8px 40px rgba(0,0,0,0.5)' : '0 8px 40px rgba(0,0,0,0.5), 0 0 24px rgba(16,185,129,0.15)',
+          boxShadow: bgImport.active ? `0 8px 40px rgba(26,18,5,0.12)` : `0 8px 40px rgba(26,18,5,0.1), 0 0 24px ${C.greenBg}`,
           display: 'flex', flexDirection: 'column', gap: 10,
           fontFamily: "'Inter', sans-serif",
           transition: 'border-color 0.3s, box-shadow 0.3s',
@@ -1751,10 +1757,10 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ fontSize: 18, flexShrink: 0 }}>{bgImport.active ? '📥' : '✅'}</span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: bgImport.active ? '#e3e1ec' : '#10B981', fontFamily: "'Outfit', sans-serif" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: bgImport.active ? C.t1 : C.green, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
                   {bgImport.active ? 'Importing Parts…' : 'Import Complete'}
                 </div>
-                <div style={{ fontSize: 10, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190 }}>
+                <div style={{ fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190 }}>
                   {bgImport.filename}
                 </div>
               </div>
@@ -1762,41 +1768,41 @@ export function SuperAdminPage({ onImpersonate, currentUser }) {
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               {bgImport.active && activeTab !== 'catalog' && (
                 <button onClick={() => setActiveTab('catalog')} style={{
-                  background: 'rgba(255,31,58,0.1)', border: '1px solid rgba(255,31,58,0.3)',
-                  borderRadius: 6, padding: '4px 10px', color: '#FF6B6B', fontSize: 10,
+                  background: C.redBg, border: `1px solid ${C.red}`,
+                  borderRadius: 6, padding: '4px 10px', color: C.red, fontSize: 10,
                   fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif", whiteSpace: 'nowrap',
                 }}>View →</button>
               )}
               {!bgImport.active && (
                 <button onClick={() => importStore.set(null)} style={{
-                  background: 'transparent', border: '1px solid #3F3F46', borderRadius: 6,
-                  padding: '4px 8px', color: '#6B7280', fontSize: 10, cursor: 'pointer', lineHeight: 1,
+                  background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 6,
+                  padding: '4px 8px', color: C.t3, fontSize: 10, cursor: 'pointer', lineHeight: 1,
                 }}>✕</button>
               )}
             </div>
           </div>
 
           {/* Progress bar */}
-          <div style={{ position: 'relative', height: 8, borderRadius: 4, background: '#1a1b22', border: '1px solid #2a2b32', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', height: 8, borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`, overflow: 'hidden' }}>
             <div style={{ position: 'absolute', inset: 0, width: `${Math.round((bgImport.done / bgImport.total) * 100)}%`, background: bgImport.active ? 'linear-gradient(90deg,#FF1F3A 0%,#FF6B35 50%,#FFB347 100%)' : '#10B981', backgroundSize: bgImport.active ? '300% auto' : '100% auto', animation: bgImport.active ? 'rp-shimmer 1.2s linear infinite' : 'none', borderRadius: 4, transition: 'width 0.4s ease' }} />
           </div>
 
           {/* Row count + percent */}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 11, color: '#af8785', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 11, color: C.t3, fontFamily: "'Inter', sans-serif" }}>
               {bgImport.done.toLocaleString('en-IN')} / {bgImport.total.toLocaleString('en-IN')} rows
             </span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: bgImport.active ? '#FF6B35' : '#10B981', fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: bgImport.active ? C.amber : C.green, fontFamily: "'Inter', sans-serif" }}>
               {Math.round((bgImport.done / bgImport.total) * 100)}%
             </span>
           </div>
 
           {/* Mini counters */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, color: '#10B981', fontFamily: "'JetBrains Mono', monospace" }}>✨ {bgImport.created.toLocaleString()} new</span>
-            <span style={{ fontSize: 10, color: '#3B82F6', fontFamily: "'JetBrains Mono', monospace" }}>✏️ {bgImport.updated.toLocaleString()} updated</span>
-            <span style={{ fontSize: 10, color: '#6B7280', fontFamily: "'JetBrains Mono', monospace" }}>✓ {bgImport.unchanged.toLocaleString()} same</span>
-            {bgImport.invalid > 0 && <span style={{ fontSize: 10, color: '#EF4444', fontFamily: "'JetBrains Mono', monospace" }}>⊘ {bgImport.invalid.toLocaleString()} skipped</span>}
+            <span style={{ fontSize: 10, color: C.green, fontFamily: "'Inter', sans-serif" }}>✨ {bgImport.created.toLocaleString()} new</span>
+            <span style={{ fontSize: 10, color: C.sky, fontFamily: "'Inter', sans-serif" }}>✏️ {bgImport.updated.toLocaleString()} updated</span>
+            <span style={{ fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif" }}>✓ {bgImport.unchanged.toLocaleString()} same</span>
+            {bgImport.invalid > 0 && <span style={{ fontSize: 10, color: C.red, fontFamily: "'Inter', sans-serif" }}>⊘ {bgImport.invalid.toLocaleString()} skipped</span>}
           </div>
         </div>
       )}

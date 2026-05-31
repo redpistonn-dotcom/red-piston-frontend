@@ -137,7 +137,7 @@ function SettingsTab({ shops, resetAll }) {
                                         width: 38, height: 38, borderRadius: 10,
                                         background: `linear-gradient(135deg, ${T.amber}, ${T.amberDim})`,
                                         display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 16, fontWeight: 900, color: "#000"
+                                        fontSize: 16, fontWeight: 900, color: "#fff"
                                     }}>{shop.name?.charAt(0) || "S"}</div>
                                     <div>
                                         <div style={{ fontSize: 14, fontWeight: 700, color: T.t1 }}>{shop.name}</div>

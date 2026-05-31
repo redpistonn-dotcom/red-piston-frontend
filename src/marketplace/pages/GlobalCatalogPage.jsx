@@ -116,7 +116,7 @@ export function GlobalCatalogPage({ onBack }) {
                     <button
                         onClick={() => setShowAddModal(true)}
                         style={{
-                            background: T.amber, color: "#000", border: "none", borderRadius: 12,
+                            background: T.amber, color: "#fff", border: "none", borderRadius: 12,
                             padding: "12px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer",
                             display: "flex", alignItems: "center", gap: 8,
                             boxShadow: `0 4px 16px ${T.amber}44`
@@ -443,7 +443,7 @@ export function GlobalCatalogPage({ onBack }) {
                                         {/* Action Buttons */}
                                         <div style={{ display: "flex", gap: 10, marginTop: 20, paddingTop: 16, borderTop: `1px solid ${T.border}` }}>
                                             <button style={{
-                                                background: T.amber, color: "#000", border: "none", borderRadius: 10,
+                                                background: T.amber, color: "#fff", border: "none", borderRadius: 10,
                                                 padding: "10px 20px", fontSize: 13, fontWeight: 800, cursor: "pointer",
                                                 display: "flex", alignItems: "center", gap: 6
                                             }}>✏️ Edit Product</button>
@@ -551,11 +551,11 @@ export function GlobalCatalogPage({ onBack }) {
                                 borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer"
                             }}>Cancel</button>
                             <button style={{
-                                background: T.amber, color: "#000", border: "none", borderRadius: 10,
+                                background: T.amber, color: "#fff", border: "none", borderRadius: 10,
                                 padding: "12px 24px", fontSize: 14, fontWeight: 800, cursor: "pointer"
                             }}>Save as Draft</button>
                             <button style={{
-                                background: T.emerald, color: "#000", border: "none", borderRadius: 10,
+                                background: T.emerald, color: "#fff", border: "none", borderRadius: 10,
                                 padding: "12px 24px", fontSize: 14, fontWeight: 800, cursor: "pointer"
                             }}>Publish</button>
                         </div>
@@ -870,7 +870,7 @@ function ImportModal({ onClose, existingProducts, activeShopId, onImport }) {
                                     </div>
                                 </div>
                                 <button onClick={downloadTemplate} style={{
-                                    background: T.sky, color: "#000", border: "none", borderRadius: 10,
+                                    background: T.sky, color: "#fff", border: "none", borderRadius: 10,
                                     padding: "10px 20px", fontSize: 13, fontWeight: 800, cursor: "pointer",
                                     whiteSpace: "nowrap",
                                 }}>
@@ -1094,7 +1094,7 @@ function ImportModal({ onClose, existingProducts, activeShopId, onImport }) {
                                 You can now manage them in the Inventory page of the Shop ERP.
                             </p>
                             <button onClick={onClose} style={{
-                                background: T.emerald, color: "#000", border: "none", borderRadius: 12,
+                                background: T.emerald, color: "#fff", border: "none", borderRadius: 12,
                                 padding: "14px 36px", fontSize: 15, fontWeight: 800, cursor: "pointer",
                             }}>
                                 Close
@@ -1127,7 +1127,7 @@ function ImportModal({ onClose, existingProducts, activeShopId, onImport }) {
                                     disabled={validRows.length === 0 || importing}
                                     style={{
                                         background: validRows.length === 0 ? T.t4 : T.emerald,
-                                        color: "#000", border: "none", borderRadius: 10,
+                                        color: "#fff", border: "none", borderRadius: 10,
                                         padding: "12px 28px", fontSize: 14, fontWeight: 800,
                                         cursor: validRows.length === 0 ? "not-allowed" : "pointer",
                                         display: "flex", alignItems: "center", gap: 8,

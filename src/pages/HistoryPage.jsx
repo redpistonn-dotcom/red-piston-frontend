@@ -346,7 +346,7 @@ export function HistoryPage({ movements, activeShopId }) {
                     return (
                         <button key={v} onClick={() => setFilter(v)} style={{
                             background: isActive ? chipColor : "transparent",
-                            color: isActive ? "#000" : T.t2,
+                            color: isActive ? "#fff" : T.t2,
                             border: `1px solid ${isActive ? chipColor : T.border}`,
                             borderRadius: 7, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.12s"
                         }}>{l}</button>
@@ -373,7 +373,7 @@ export function HistoryPage({ movements, activeShopId }) {
                             padding: "3px 11px", borderRadius: 99, border: "none", cursor: "pointer",
                             fontSize: 11, fontWeight: 600, transition: "all 0.15s", fontFamily: FONT.ui,
                             background: typeFilter.includes(t) ? T.amber : T.surface,
-                            color: typeFilter.includes(t) ? "#000" : T.t3,
+                            color: typeFilter.includes(t) ? "#fff" : T.t3,
                         }}>{t}</button>
                 ))}
                 {typeFilter.length > 0 && (

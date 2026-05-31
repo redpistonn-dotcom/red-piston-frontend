@@ -171,7 +171,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                                 background: isDone ? T.emerald : isActive ? T.amber : T.surface,
                                 border: `2px solid ${isDone ? T.emerald : isActive ? T.amber : T.border}`,
                                 display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 14, fontWeight: 900, color: isDone || isActive ? "#000" : T.t3,
+                                fontSize: 14, fontWeight: 900, color: isDone || isActive ? "#fff" : T.t3,
                                 transition: "all 0.3s"
                             }}>
                                 {isDone ? "✓" : i + 1}
@@ -197,7 +197,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                 <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.4 }}>🛒</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: T.t1 }}>Your cart is empty</div>
                 <p style={{ color: T.t3, marginTop: 8 }}>Add some parts before checking out.</p>
-                <button onClick={onBack} style={{ marginTop: 24, background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>← Browse Parts</button>
+                <button onClick={onBack} style={{ marginTop: 24, background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>← Browse Parts</button>
             </div>
         );
     }
@@ -253,7 +253,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                         </div>
                         <button
                             onClick={() => { if (validateAddress()) setStep("delivery"); }}
-                            style={{ marginTop: 28, width: "100%", background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 900, cursor: "pointer", boxShadow: `0 6px 20px ${T.amber}44` }}
+                            style={{ marginTop: 28, width: "100%", background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 900, cursor: "pointer", boxShadow: `0 6px 20px ${T.amber}44` }}
                         >
                             Select Delivery Slot →
                         </button>
@@ -300,7 +300,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                         </div>
                         <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
                             <button onClick={() => setStep("address")} style={{ flex: 1, background: T.surface, border: `1px solid ${T.border}`, color: T.t2, borderRadius: 10, padding: "14px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>← Back</button>
-                            <button onClick={() => setStep("payment")} style={{ flex: 2, background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 900, cursor: "pointer", boxShadow: `0 6px 20px ${T.amber}44` }}>Continue to Payment →</button>
+                            <button onClick={() => setStep("payment")} style={{ flex: 2, background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 900, cursor: "pointer", boxShadow: `0 6px 20px ${T.amber}44` }}>Continue to Payment →</button>
                         </div>
                     </div>
                     {renderOrderSummary()}
@@ -346,7 +346,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                         </div>
                         <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
                             <button onClick={() => setStep("delivery")} style={{ flex: 1, background: T.surface, border: `1px solid ${T.border}`, color: T.t2, borderRadius: 10, padding: "14px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>← Back</button>
-                            <button onClick={() => setStep("confirm")} style={{ flex: 2, background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 900, cursor: "pointer", boxShadow: `0 6px 20px ${T.amber}44` }}>Review Order →</button>
+                            <button onClick={() => setStep("confirm")} style={{ flex: 2, background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "14px", fontSize: 15, fontWeight: 900, cursor: "pointer", boxShadow: `0 6px 20px ${T.amber}44` }}>Review Order →</button>
                         </div>
                     </div>
                     {renderOrderSummary()}
@@ -371,7 +371,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                                     </div>
                                 </div>
                                 {stockoutError.alternative && (
-                                    <button style={{ background: T.sky, color: "#000", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+                                    <button style={{ background: T.sky, color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
                                         🔄 {stockoutError.alternative.shopName} has it for ₹{stockoutError.alternative.priceDiff > 0 ? `${stockoutError.alternative.priceDiff} more` : "less"} — Update Cart
                                     </button>
                                 )}
@@ -455,7 +455,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                         </div>
                         <button
                             onClick={handlePlaceOrder}
-                            style={{ marginTop: 24, width: "100%", background: T.amber, color: "#000", border: "none", borderRadius: 12, padding: "16px", fontSize: 16, fontWeight: 900, cursor: "pointer", boxShadow: `0 8px 28px ${T.amber}55`, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                            style={{ marginTop: 24, width: "100%", background: T.amber, color: "#fff", border: "none", borderRadius: 12, padding: "16px", fontSize: 16, fontWeight: 900, cursor: "pointer", boxShadow: `0 8px 28px ${T.amber}55`, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                         >
                             🔒 Place Order — {fmt(totalValue)}
                         </button>
@@ -501,7 +501,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap" }}>
-                        <button onClick={() => onOrderPlaced && onOrderPlaced(orderIds)} style={{ background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "12px 32px", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: FONT.ui }}>
+                        <button onClick={() => onOrderPlaced && onOrderPlaced(orderIds)} style={{ background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "12px 32px", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: FONT.ui }}>
                             Track Order →
                         </button>
                         <button onClick={onBack} style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.t2, borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>Continue Shopping</button>

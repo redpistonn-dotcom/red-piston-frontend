@@ -2,9 +2,9 @@ import { useState } from "react";
 import { T, FONT } from "../../theme";
 
 const BTN_STYLES = {
-    amber:   { bg: T.amber,    text: "#000", border: "none",                                    shadow: "rgba(245,158,11,0.4)" },
-    emerald: { bg: T.emerald,  text: "#000", border: "none",                                    shadow: "rgba(16,185,129,0.35)" },
-    sky:     { bg: T.sky,      text: "#000", border: "none",                                    shadow: "rgba(56,189,248,0.35)" },
+    amber:   { bg: T.amber,    text: "#fff", border: "none",                                    shadow: "rgba(190,43,26,0.35)" },
+    emerald: { bg: T.emerald,  text: "#fff", border: "none",                                    shadow: "rgba(22,163,74,0.35)" },
+    sky:     { bg: T.sky,      text: "#fff", border: "none",                                    shadow: "rgba(2,132,199,0.35)" },
     crimson: { bg: T.crimson,  text: "#fff", border: "none",                                    shadow: "rgba(239,68,68,0.35)" },
     danger:  { bg: T.crimson,  text: "#fff", border: "none",                                    shadow: "rgba(239,68,68,0.35)" },
     ghost:   { bg: "transparent", text: T.t2, border: `1px solid ${T.border}`,                  shadow: "none" },
@@ -82,7 +82,7 @@ export function Btn({ children, onClick, variant = "amber", size = "md", full, d
                     height: 12,
                     borderRadius: "50%",
                     border: "2px solid transparent",
-                    borderTopColor: variant === "amber" || variant === "danger" || variant === "crimson" ? "#000" : T.amber,
+                    borderTopColor: variant === "amber" || variant === "danger" || variant === "crimson" ? "#fff" : T.amber,
                     display: "inline-block",
                     animation: "spin 0.7s linear infinite",
                     flexShrink: 0,

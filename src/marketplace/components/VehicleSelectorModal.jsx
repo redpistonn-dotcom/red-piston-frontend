@@ -223,7 +223,7 @@ export function VehicleSelectorModal({ open, onClose }) {
                       : null;
             return (
               <div key={label} style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{ width: 24, height: 24, borderRadius: "50%", background: isDone ? T.emerald : isActive ? T.amber : T.border, color: isDone || isActive ? "#000" : T.t3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, flexShrink: 0 }}>
+                <div style={{ width: 24, height: 24, borderRadius: "50%", background: isDone ? T.emerald : isActive ? T.amber : T.border, color: isDone || isActive ? "#fff" : T.t3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, flexShrink: 0 }}>
                   {isDone ? "✓" : stepNum}
                 </div>
                 <div style={{ minWidth: 0 }}>
@@ -265,7 +265,7 @@ export function VehicleSelectorModal({ open, onClose }) {
               <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 2 }}>
                 {VEHICLE_TYPE_TABS.map(tab => (
                   <button key={tab.id} onClick={() => setVehicleTypeFilter(tab.id)}
-                    style={{ background: vehicleTypeFilter === tab.id ? T.amber : T.bg, color: vehicleTypeFilter === tab.id ? "#000" : T.t2, border: `1px solid ${vehicleTypeFilter === tab.id ? T.amber : T.border}`, borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s", flexShrink: 0 }}>
+                    style={{ background: vehicleTypeFilter === tab.id ? T.amber : T.bg, color: vehicleTypeFilter === tab.id ? "#fff" : T.t2, border: `1px solid ${vehicleTypeFilter === tab.id ? T.amber : T.border}`, borderRadius: 20, padding: "5px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s", flexShrink: 0 }}>
                     {tab.emoji} {tab.label}
                   </button>
                 ))}

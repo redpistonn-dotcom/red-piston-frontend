@@ -186,7 +186,7 @@ export function WorkshopPage({ jobCards, vehicles, parties, products, activeShop
                         <button key={m} onClick={() => setViewMode(m)} style={{
                             padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
                             background: viewMode === m ? T.amber : "transparent",
-                            color: viewMode === m ? "#000" : T.t3,
+                            color: viewMode === m ? "#fff" : T.t3,
                             fontWeight: viewMode === m ? 700 : 500,
                             fontSize: 11, fontFamily: FONT.ui, transition: "all 0.15s",
                         }}>{m === "list" ? "☰ List" : "⊞ Board"}</button>

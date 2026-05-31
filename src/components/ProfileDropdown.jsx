@@ -40,7 +40,7 @@ function MenuItem({ icon, label, onClick, danger = false }) {
         fontFamily: FONT.ui, transition: "background 0.12s",
         borderRadius: 0,
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "#EF444412" : `${T.surface}`)}
+      onMouseEnter={(e) => (e.currentTarget.style.background = danger ? "#EF444412" : T.cardHover)}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <span style={{ fontSize: 16, width: 20, textAlign: "center" }}>{icon}</span>

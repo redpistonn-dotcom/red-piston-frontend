@@ -43,7 +43,7 @@ function StatusStepper({ currentStatus }) {
                             width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
                             background: isComplete ? meta.color : T.surface,
                             border: `2px solid ${isComplete ? meta.color : T.border}`,
-                            fontSize: 12, color: isComplete ? "#000" : T.t4, fontWeight: 800,
+                            fontSize: 12, color: isComplete ? "#fff" : T.t4, fontWeight: 800,
                             boxShadow: isCurrent ? `0 0 12px ${meta.color}66` : "none",
                             transition: "all 0.2s",
                         }}>
@@ -236,7 +236,7 @@ export function OrdersPage() {
                             {cnt > 0 && (
                                 <span style={{
                                     background: isActive ? (meta?.color || T.amber) : T.border,
-                                    color: isActive ? "#000" : T.t3,
+                                    color: isActive ? "#fff" : T.t3,
                                     fontSize: 11, fontWeight: 900, padding: "2px 8px",
                                     borderRadius: 99
                                 }}>{cnt}</span>

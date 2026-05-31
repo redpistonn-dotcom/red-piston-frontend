@@ -101,10 +101,10 @@ function ScanButton({ onClick }) {
       onMouseLeave={() => setActive(false)}
       style={{
         flexShrink: 0,
-        background: `linear-gradient(135deg, ${T.amber}, #D97706)`,
+        background: `linear-gradient(135deg, ${T.amber}, #9B1F12)`,
         border: "none",
         borderRadius: 10,
-        color: "#000",
+        color: "#fff",
         fontWeight: 800,
         fontSize: 12,
         fontFamily: FONT.ui,
@@ -115,7 +115,7 @@ function ScanButton({ onClick }) {
         gap: 6,
         whiteSpace: "nowrap",
         minHeight: 46,
-        boxShadow: active ? "0 1px 6px rgba(245,158,11,0.2)" : "0 3px 14px rgba(245,158,11,0.35)",
+        boxShadow: active ? "0 1px 6px rgba(190,43,26,0.2)" : "0 3px 14px rgba(190,43,26,0.35)",
         transform: active ? "scale(0.97) translateY(1px)" : "scale(1) translateY(0)",
         transition: "transform 0.1s cubic-bezier(0.16,1,0.3,1), box-shadow 0.1s",
         willChange: "transform",
@@ -166,7 +166,7 @@ function CartPanel({ cart, onRemove, onSaveAll, saving }) {
         </div>
         {cart.length > 0 && (
           <span style={{
-            fontSize: 10, fontWeight: 800, color: "#000",
+            fontSize: 10, fontWeight: 800, color: "#fff",
             background: T.amber, borderRadius: "50%",
             width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: FONT.mono,

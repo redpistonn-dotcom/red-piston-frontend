@@ -364,7 +364,7 @@ export function POSBillingPage({ products, activeShopId, shop, onMultiSale, toas
                             <button key={t} onClick={() => setBillType(t)} style={{
                                 padding: "7px 20px", borderRadius: 8, border: "none", cursor: "pointer",
                                 background: billType === t ? T.amber : "transparent",
-                                color: billType === t ? "#000" : T.t3,
+                                color: billType === t ? "#fff" : T.t3,
                                 fontWeight: billType === t ? 700 : 500, fontSize: 13, transition: "all 0.15s", fontFamily: FONT.ui
                             }}>{t}</button>
                         ))}
@@ -395,10 +395,10 @@ export function POSBillingPage({ products, activeShopId, shop, onMultiSale, toas
                   title="Scan barcode with camera"
                   style={{
                     flexShrink: 0,
-                    background: `linear-gradient(135deg, ${T.amber}, #D97706)`,
+                    background: `linear-gradient(135deg, ${T.amber}, #9B1F12)`,
                     border: "none",
                     borderRadius: 12,
-                    color: "#000",
+                    color: "#fff",
                     fontWeight: 800,
                     fontSize: 13,
                     fontFamily: FONT.ui,

@@ -362,7 +362,7 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
               <button onClick={addToCart}
                 style={{
                   background: T.amber, border: 'none', borderRadius: 10, padding: '11px 0',
-                  fontSize: 13, fontWeight: 800, color: '#000', cursor: 'pointer', fontFamily: FONT.ui,
+                  fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', fontFamily: FONT.ui,
                   width: '100%', marginTop: 4,
                 }}>
                 {editIdx !== null ? 'Update Cart Item' : '＋ Add to Cart'}
@@ -434,7 +434,7 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
             style={{
               background: cart.length > 0 ? T.amber : T.surface, border: 'none', borderRadius: 10,
               padding: '11px 0', fontSize: 13, fontWeight: 800,
-              color: cart.length > 0 ? '#000' : T.t4, cursor: cart.length > 0 ? 'pointer' : 'not-allowed',
+              color: cart.length > 0 ? '#fff' : T.t4, cursor: cart.length > 0 ? 'pointer' : 'not-allowed',
               fontFamily: FONT.ui, width: '100%', transition: 'all 0.15s',
             }}>
             Proceed to Supplier Details →
@@ -548,7 +548,7 @@ function SupplierPhase({ cart, onBack, onSubmit, submitting }) {
         <button onClick={() => onSubmit(form)} disabled={submitting}
           style={{
             background: submitting ? T.amberDim : T.amber, border: 'none', borderRadius: 10,
-            padding: '11px 32px', fontSize: 13, fontWeight: 800, color: '#000',
+            padding: '11px 32px', fontSize: 13, fontWeight: 800, color: '#fff',
             cursor: submitting ? 'not-allowed' : 'pointer', fontFamily: FONT.ui, minWidth: 160,
           }}>
           {submitting ? '⏳ Saving…' : `✓ Stock In ${cart.length} Products`}
@@ -775,7 +775,7 @@ export function BulkStockInModal({ open, onClose, onSave, toast, activeShopId })
                   width: 24, height: 24, borderRadius: '50%', fontSize: 11, fontWeight: 800,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: FONT.ui,
                   background: phase >= p ? T.amber : T.surface,
-                  color: phase >= p ? '#000' : T.t4,
+                  color: phase >= p ? '#fff' : T.t4,
                   border: `2px solid ${phase >= p ? T.amber : T.border}`,
                 }}>
                   {phase > p ? '✓' : p}

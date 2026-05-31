@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { T, FONT, GLOBAL_CSS } from "../../theme";
+import { useNavigate } from "react-router-dom";
 import { useStore } from "../../store";
 import { getHomeData } from "../api/engine";
-import { browseMarketplace, buildHomeDataFromApi } from "../../api/marketplace.js";
+import { browseMarketplace, buildHomeDataFromApi, lookupPlate, fetchShops } from "../../api/marketplace.js";
 import { PartImage } from "../components/PartImage";
 import { ProfileDropdown } from "../../components/ProfileDropdown";
 import { clearTokens } from "../../api/client.js";
 import { CATEGORIES } from "../../utils";
+import { CartDrawer } from "../components/CartDrawer";
+import { LoginModal } from "../components/LoginModal";
 
 // Components
-import { SearchBar } from "../components/SearchBar";
 import { VehicleSelectorModal } from "../components/VehicleSelectorModal";
 import { ProductComparisonModal } from "../components/ProductComparisonModal";
 import { ProductCard } from "../components/ProductCard";
@@ -18,49 +19,44 @@ import { CustomerProfile } from "./CustomerProfile";
 import { ProductDetailsPage } from "./ProductDetailsPage";
 import { fmt } from "../../utils";
 
+const MAKES = ["Maruti Suzuki", "Hyundai", "Tata Motors", "Mahindra", "Honda", "Toyota", "Kia", "Renault", "Skoda", "Volkswagen", "MG", "Ford"];
+const YEARS = Array.from({ length: 20 }, (_, i) => String(2024 - i));
+
 function SideBySideModal({ open, items, onClose }) {
   if (!open || !items?.length) return null;
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.2s" }}>
-      <div style={{ position: "absolute", inset: 0, background: "rgba(10,15,29,0.85)", backdropFilter: "blur(6px)" }} onClick={onClose} />
-      <div style={{ position: "relative", background: T.surface, borderRadius: 20, border: `1px solid ${T.border}`, boxShadow: "0 24px 80px rgba(0,0,0,0.6)", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "90vh", width: Math.min(340 * items.length + 48, 1100), animation: "scaleIn 0.3s cubic-bezier(0.16,1,0.3,1)" }}>
-        <div style={{ padding: "16px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: T.card }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: T.t1, textTransform: "uppercase", letterSpacing: "1.5px" }}>Compare Products ({items.length})</div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: T.t3, fontSize: 24, cursor: "pointer" }}>✕</button>
+    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(26,18,5,0.5)", backdropFilter: "blur(4px)" }} onClick={onClose} />
+      <div style={{ position: "relative", background: "#fff", borderRadius: 16, border: "1px solid #E0D5C8", boxShadow: "0 24px 80px rgba(0,0,0,0.2)", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "90vh", width: Math.min(340 * items.length + 48, 1100) }}>
+        <div style={{ padding: "16px 24px", borderBottom: "1px solid #E0D5C8", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#FAF6F0" }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#1A1205", textTransform: "uppercase", letterSpacing: "1.5px" }}>Compare Products ({items.length})</div>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#9C8C7C", fontSize: 22, cursor: "pointer" }}>✕</button>
         </div>
-        <div style={{ padding: 24, overflowY: "auto", display: "flex", gap: 16, background: T.bg }}>
+        <div style={{ padding: 24, overflowY: "auto", display: "flex", gap: 16, background: "#F5EFE6" }}>
           {items.map(item => {
-            const { product, bestPrice, listings, isCompatible } = item;
+            const { product, bestPrice, listings } = item;
             const buyBox = listings?.[0];
             return (
-              <div key={product.id} style={{ flex: 1, minWidth: 0, background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                {/* Image */}
-                <div style={{ height: 180, background: T.surface, position: "relative" }}>
+              <div key={product.id} style={{ flex: 1, minWidth: 0, background: "#fff", border: "1px solid #E0D5C8", borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{ height: 180, background: "#FAF6F0", position: "relative" }}>
                   <PartImage src={product.image} alt={product.name} size="lg" />
-                  {isCompatible && (
-                    <div style={{ position: "absolute", top: 8, left: 8, background: `${T.emerald}dd`, color: "#fff", padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 900, fontFamily: FONT.ui }}>✓ FIT</div>
-                  )}
                 </div>
-                {/* Info */}
-                <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
-                  <div style={{ fontSize: 10, color: T.sky, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em" }}>{product.brand}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.t1, lineHeight: 1.35 }}>{product.name}</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>{fmt(bestPrice)}</div>
-                  {/* Specs */}
+                <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "#BE2B1A", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{product.brand}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1205", lineHeight: 1.35 }}>{product.name}</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: "#BE2B1A" }}>{fmt(bestPrice)}</div>
                   {product.specifications && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${T.border}`, paddingTop: 10, marginTop: 4 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5, borderTop: "1px solid #E0D5C8", paddingTop: 8, marginTop: 4 }}>
                       {Object.entries(product.specifications).slice(0, 5).map(([k, v]) => (
                         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-                          <span style={{ color: T.t3, textTransform: "capitalize" }}>{k}</span>
-                          <span style={{ color: T.t2, fontWeight: 600, fontFamily: FONT.mono }}>{v}</span>
+                          <span style={{ color: "#9C8C7C", textTransform: "capitalize" }}>{k}</span>
+                          <span style={{ color: "#1A1205", fontWeight: 600 }}>{v}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                  {/* Best seller */}
-                  <div style={{ fontSize: 11, color: T.t3, marginTop: "auto", paddingTop: 8 }}>
+                  <div style={{ fontSize: 11, color: "#9C8C7C", marginTop: "auto", paddingTop: 6 }}>
                     <span>📍 {buyBox?.shop?.name || "Local Shop"}</span>
-                    <span style={{ marginLeft: 8, color: T.emerald }}>⚡ {buyBox?.delivery_time || "Same Day"}</span>
                   </div>
                 </div>
               </div>
@@ -73,194 +69,664 @@ function SideBySideModal({ open, items, onClose }) {
 }
 
 export function MarketplaceHome() {
-  const { products, shops, selectedVehicle, toggleCart, cart } = useStore();
+  const navigate = useNavigate();
+  const { products, shops, selectedVehicle, saveVehicle, toggleCart, cart } = useStore();
 
-  // Get user from localStorage (set during login)
   const [currentUser, setCurrentUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('as_user')); } catch { return null; }
+    try { return JSON.parse(localStorage.getItem("as_user")); } catch { return null; }
   });
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
 
-  // Simple Internal Routing
-  const [page, setPage] = useState("home"); // "home" | "profile" | "pdp"
+  const [page, setPage] = useState("home");
   const [pdpProductId, setPdpProductId] = useState(null);
 
-  // UI Modals State
   const [vehModalOpen, setVehModalOpen] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
 
-  // Faceted Filter State
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState([]);
-  const [sortBy, setSortBy] = useState("relevance"); // relevance | price_asc | price_desc | newest
+  const [sortBy, setSortBy] = useState("relevance");
 
-  // Compare State (max 3 items)
   const [compareList, setCompareList] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
+
+  const [heroTab, setHeroTab] = useState("vehicle");
+  const [heroMake, setHeroMake] = useState("");
+  const [heroYear, setHeroYear] = useState("");
+  const [plateSearch, setPlateSearch] = useState("");
+  const [navSearch, setNavSearch] = useState("");
+  const [plateLookupLoading, setPlateLookupLoading] = useState(false);
+  const [plateLookupError, setPlateLookupError] = useState("");
+  const [plateVehicleResult, setPlateVehicleResult] = useState(null);
+  const [suppliersData, setSuppliersData] = useState([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
+  const [suppliersSearch, setSuppliersSearch] = useState("");
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+
   const handleCompareToggle = (item) => {
     setCompareList(prev => {
       const exists = prev.some(p => p.product?.id === item.product?.id);
       if (exists) return prev.filter(p => p.product?.id !== item.product?.id);
-      if (prev.length >= 3) return prev; // max 3
+      if (prev.length >= 3) return prev;
       return [...prev, item];
     });
   };
 
-  // Track user geo for distance sorting (best-effort, no permission required)
+  const handlePlateLookup = async () => {
+    if (!plateSearch || plateSearch.length < 6) return;
+    setPlateLookupLoading(true);
+    setPlateLookupError("");
+    setPlateVehicleResult(null);
+    try {
+      const vehicle = await lookupPlate(plateSearch);
+      setPlateVehicleResult(vehicle);
+    } catch (err) {
+      setPlateLookupError(err.message || "Could not find vehicle for this plate. Try the Vehicle Selector instead.");
+    } finally {
+      setPlateLookupLoading(false);
+    }
+  };
+
   const userGeoRef = useRef(null);
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         pos => { userGeoRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude }; },
-        () => {} // silently ignore denial
+        () => {}
       );
     }
   }, []);
 
-  // Load home data — tries real API first, falls back to local engine
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-
     (async () => {
       try {
         const opts = { limit: 60 };
-        // Pass vehicle context if selected
         if (selectedVehicle) {
           opts.make     = selectedVehicle.brand || selectedVehicle.make;
           opts.model    = selectedVehicle.model;
           opts.year     = selectedVehicle.year;
           opts.fuelType = selectedVehicle.fuel || selectedVehicle.fuelType;
         }
-        // Pass user location for distance sort
         if (userGeoRef.current) {
           opts.lat = userGeoRef.current.lat;
           opts.lng = userGeoRef.current.lng;
         }
-
         const browsed = await browseMarketplace(opts);
         if (cancelled) return;
-
         if (browsed.parts.length > 0) {
-          // ✅ Real API data
           const resp = buildHomeDataFromApi(browsed, selectedVehicle, CATEGORIES);
           setData(resp);
           setLoading(false);
           return;
         }
       } catch (err) {
-        // API unavailable — fall through to mock engine
-        console.warn('[Marketplace] API browse failed, using mock data:', err.message);
+        console.warn("[Marketplace] API browse failed, using mock data:", err.message);
       }
-
       if (cancelled) return;
-      // 🔄 Fallback: local engine with seed/localStorage products
       const resp = getHomeData(products, shops, selectedVehicle);
       setData(resp);
       setLoading(false);
     })();
-
     return () => { cancelled = true; };
   }, [products, shops, selectedVehicle]);
 
+  const MP_CSS = `
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body, #root {
+      background-color: #F5EFE6 !important;
+      color: #1A1205 !important;
+    }
+
+    /* Scrollbar — light cream theme */
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #EDE5DA; }
+    ::-webkit-scrollbar-thumb { background: #C8B8A8; border-radius: 8px; }
+    ::-webkit-scrollbar-thumb:hover { background: #BE2B1A; }
+    * { scrollbar-width: thin; scrollbar-color: #C8B8A8 #EDE5DA; }
+
+    .mp-root {
+      background: #F5EFE6;
+      color: #1A1205;
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    .mp-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+      background: #FFFFFF;
+      border-bottom: 1px solid #E0D5C8;
+      box-shadow: 0 2px 12px rgba(190,43,26,0.06);
+      height: 64px;
+    }
+    .mp-page-body { padding-top: 64px; }
+    .mp-nav-inner {
+      max-width: 100%; margin: 0; height: 100%;
+      padding: 0 28px 0 0;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .mp-logo-wrap {
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer; flex-shrink: 0; text-decoration: none;
+      height: 64px; padding: 0 14px 0 0;
+      border-right: 1px solid #E0D5C8;
+    }
+    .mp-logo-img { height: 64px; width: auto; display: block; border: none; outline: none; object-fit: cover; mix-blend-mode: multiply; }
+    .mp-logo-text {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 17px; font-weight: 900;
+      color: #1A1205; letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .mp-nav-divider {
+      width: 1px; height: 28px;
+      background: #E0D5C8; flex-shrink: 0; margin: 0 4px;
+    }
+    .mp-nav-links {
+      display: flex; align-items: center; height: 64px; gap: 0;
+    }
+    .mp-nav-link {
+      height: 100%; display: flex; align-items: center;
+      padding: 0 14px; font-size: 14px; font-weight: 500;
+      color: #5C4F40; background: none; border: none;
+      border-bottom: 2.5px solid transparent;
+      cursor: pointer; white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+      margin-bottom: -1px;
+    }
+    .mp-nav-link:hover { color: #1A1205; }
+    .mp-nav-link.active { color: #BE2B1A; border-bottom-color: #BE2B1A; font-weight: 600; }
+
+    .mp-nav-search {
+      flex: 1; max-width: 380px; position: relative;
+    }
+    .mp-nav-search-input {
+      width: 100%;
+      padding: 8px 12px 8px 34px;
+      border: 1px solid #E0D5C8; border-radius: 6px;
+      background: #FAF6F0;
+      font-size: 13px; color: #1A1205; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .mp-nav-search-input:focus {
+      border-color: #BE2B1A;
+      box-shadow: 0 0 0 3px rgba(190,43,26,0.08);
+    }
+    .mp-nav-search-input::placeholder { color: #B8A898; }
+    .mp-nav-search-icon {
+      position: absolute; left: 10px; top: 50%;
+      transform: translateY(-50%); font-size: 13px;
+      color: #B8A898; pointer-events: none;
+    }
+
+    .mp-nav-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+    .mp-icon-btn {
+      width: 36px; height: 36px; border-radius: 7px;
+      background: transparent; border: 1px solid #E0D5C8;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; cursor: pointer; transition: all 0.15s;
+      color: #5C4F40; position: relative; flex-shrink: 0;
+    }
+    .mp-icon-btn:hover { border-color: #BE2B1A; color: #BE2B1A; }
+    .mp-cart-badge {
+      position: absolute; top: -5px; right: -5px;
+      background: #BE2B1A; color: #fff;
+      width: 16px; height: 16px; border-radius: 50%;
+      font-size: 9px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mp-btn-outline {
+      padding: 7px 16px;
+      border: 1.5px solid #1A1205; border-radius: 6px;
+      background: transparent; font-size: 13px; font-weight: 600;
+      color: #1A1205; cursor: pointer; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .mp-btn-outline:hover { background: #1A1205; color: #fff; }
+    .mp-btn-solid {
+      padding: 7px 16px;
+      background: #BE2B1A; border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600;
+      color: #fff; cursor: pointer; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .mp-btn-solid:hover { background: #9B1F12; }
+
+    /* ── HERO ── */
+    .mp-hero {
+      background: #F5EFE6;
+      display: flex; align-items: stretch;
+      min-height: calc(100vh - 64px);
+      overflow: hidden;
+    }
+    .mp-hero-split {
+      flex: 1; display: grid;
+      grid-template-columns: 56fr 44fr;
+      max-width: 1440px; margin: 0 auto; width: 100%;
+    }
+    .mp-hero-left {
+      padding: 64px 56px 64px 28px;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .mp-hero-eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: #BE2B1A;
+      margin-bottom: 18px;
+    }
+    .mp-hero-h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 54px; font-weight: 800;
+      line-height: 1.08; color: #1A1205;
+      margin: 0 0 18px;
+    }
+    .mp-hero-h1-accent { color: #BE2B1A; display: block; }
+    .mp-hero-sub {
+      font-size: 16px; color: #5C4F40; line-height: 1.65;
+      max-width: 500px; margin-bottom: 36px;
+    }
+    .mp-tabs-row {
+      display: flex; gap: 0;
+      border-bottom: 1.5px solid #E0D5C8;
+      margin-bottom: 24px;
+    }
+    .mp-tab-btn {
+      padding: 9px 22px; font-size: 14px; font-weight: 600;
+      color: #9C8C7C; background: none; border: none;
+      border-bottom: 2.5px solid transparent;
+      cursor: pointer; margin-bottom: -1.5px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .mp-tab-btn.active { color: #BE2B1A; border-bottom-color: #BE2B1A; }
+    .mp-tab-btn:hover:not(.active) { color: #1A1205; }
+
+    .mp-vsel-form { display: flex; flex-direction: column; gap: 12px; max-width: 460px; }
+    .mp-vsel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mp-vsel-select, .mp-plate-input {
+      padding: 11px 14px;
+      border: 1.5px solid #E0D5C8; border-radius: 7px;
+      background: #FFFFFF; font-size: 13px; color: #1A1205;
+      appearance: none; cursor: pointer; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      font-family: 'Inter', sans-serif;
+    }
+    .mp-vsel-select:focus, .mp-plate-input:focus {
+      border-color: #BE2B1A;
+      box-shadow: 0 0 0 3px rgba(190,43,26,0.08);
+    }
+    .mp-plate-input { width: 100%; font-weight: 600; letter-spacing: 0.06em; }
+    .mp-plate-input::placeholder { font-weight: 400; letter-spacing: 0; color: #B8A898; }
+    .mp-search-parts-btn {
+      width: 100%; padding: 13px;
+      background: #BE2B1A; color: #fff; border: none; border-radius: 7px;
+      font-size: 14px; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      cursor: pointer; transition: background 0.15s, box-shadow 0.15s;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .mp-search-parts-btn:hover {
+      background: #9B1F12;
+      box-shadow: 0 6px 20px rgba(190,43,26,0.3);
+    }
+    .mp-or-divider {
+      display: flex; align-items: center; gap: 10px;
+      color: #9C8C7C; font-size: 12px;
+    }
+    .mp-or-divider::before, .mp-or-divider::after {
+      content: ''; flex: 1; height: 1px; background: #E0D5C8;
+    }
+    .mp-open-selector {
+      width: 100%; padding: 11px;
+      border: 1.5px dashed #BE2B1A; border-radius: 7px;
+      background: rgba(190,43,26,0.04); color: #BE2B1A;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .mp-open-selector:hover { background: rgba(190,43,26,0.08); }
+
+    /* ── HERO RIGHT ── */
+    .mp-hero-right {
+      position: relative; overflow: hidden; background: #5C1A0F;
+    }
+    .mp-hero-right-img {
+      width: 100%; height: 100%; object-fit: cover;
+      opacity: 0.55; display: block;
+    }
+    .mp-hero-right-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(160deg, rgba(92,26,15,0.45) 0%, rgba(20,6,2,0.85) 100%);
+    }
+    .mp-hero-right-badge {
+      position: absolute; top: 32px; left: 32px;
+      background: rgba(255,255,255,0.1); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 8px;
+      padding: 12px 18px; color: #fff;
+    }
+    .mp-hero-right-badge-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.15em;
+      text-transform: uppercase; color: rgba(255,220,210,0.8);
+      margin-bottom: 4px;
+    }
+    .mp-hero-right-badge-val {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 28px; font-weight: 800; color: #fff; line-height: 1;
+    }
+    .mp-hero-right-badge-sub { font-size: 11px; color: rgba(255,220,210,0.7); margin-top: 2px; }
+    .mp-hero-stats {
+      position: absolute; bottom: 32px; left: 0; right: 0;
+      display: flex; justify-content: center; gap: 0;
+      padding: 0 24px;
+    }
+    .mp-hero-stat {
+      flex: 1; text-align: center; padding: 14px 8px;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    .mp-hero-stat:last-child { border-right: none; }
+    .mp-hero-stat-num {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 20px; font-weight: 800; color: #fff;
+    }
+    .mp-hero-stat-lbl { font-size: 10px; color: rgba(255,220,210,0.7); margin-top: 2px; }
+
+    /* ── SECTIONS ── */
+    .mp-sections { max-width: 1440px; margin: 0 auto; padding: 56px 28px 80px; }
+    .mp-section-block { margin-bottom: 52px; }
+    .mp-section-hdr {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 20px;
+    }
+    .mp-section-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 22px; font-weight: 700; color: #1A1205;
+    }
+    .mp-view-all {
+      font-size: 13px; color: #BE2B1A; font-weight: 600;
+      background: none; border: none; cursor: pointer;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .mp-view-all:hover { color: #9B1F12; }
+
+    /* ── CATEGORY CARDS ── */
+    .mp-cat-card {
+      background: #FFFFFF; border: 1.5px solid #E0D5C8;
+      border-radius: 12px; padding: 22px 30px;
+      min-width: 130px; display: flex; flex-direction: column;
+      align-items: center; gap: 10px; cursor: pointer;
+      transition: all 0.18s;
+    }
+    .mp-cat-card:hover {
+      border-color: #BE2B1A;
+      box-shadow: 0 6px 20px rgba(190,43,26,0.1);
+      transform: translateY(-2px);
+    }
+    .mp-cat-icon { font-size: 30px; }
+    .mp-cat-label { font-size: 13px; font-weight: 600; color: #1A1205; }
+
+    /* ── VEHICLE SELECTED results ── */
+    .mp-results-wrap {
+      max-width: 1440px; margin: 0 auto;
+      padding: 80px 28px 48px;
+    }
+    .mp-results-header {
+      margin-bottom: 28px;
+      display: flex; justify-content: space-between; align-items: flex-end;
+    }
+    .mp-results-title { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 26px; font-weight: 800; color: #1A1205; margin: 0 0 6px; }
+    .mp-results-sub { font-size: 14px; color: #9C8C7C; }
+
+    /* ── COMPARE BAR ── */
+    .mp-compare-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 900;
+      background: #1A1205; border-top: 1px solid #E0D5C8;
+      padding: 12px 28px; display: flex; align-items: center; gap: 14px;
+      box-shadow: 0 -8px 32px rgba(26,18,5,0.15);
+      animation: slideUp 0.2s ease;
+    }
+
+    /* ── FILTER DRAWER ── */
+    .mp-filter-panel {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 501;
+      width: 300px; background: #fff; border-right: 1px solid #E0D5C8;
+      box-shadow: 8px 0 32px rgba(26,18,5,0.12); display: flex; flex-direction: column;
+      animation: slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1);
+    }
+
+    /* ── LOADING SKELETON ── */
+    .mp-loading-wrap { max-width: 1440px; margin: 0 auto; padding: 120px 28px 48px; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1024px) {
+      .mp-hero-h1 { font-size: 40px !important; }
+      .mp-hero-left { padding: 48px 32px 48px 24px !important; }
+    }
+    @media (max-width: 768px) {
+      .mp-hero-split { grid-template-columns: 1fr !important; }
+      .mp-hero-right { display: none !important; }
+      .mp-nav-links { display: none !important; }
+      .mp-hero-h1 { font-size: 32px !important; }
+      .mp-hero-left { padding: 40px 20px !important; }
+      .mp-btn-outline { display: none !important; }
+    }
+
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  `;
+
+  const catIcons = { Brakes: "🛑", Engine: "⚙️", Filters: "💨", Electrical: "⚡", Suspension: "🛞", default: "🔧" };
+
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: FONT.ui, color: T.t1, paddingBottom: 80 }}>
-      {/* GLOBAL CSS INJECTION (Since this is a sub-app, ensure styles exist) */}
-      <style>{GLOBAL_CSS}</style>
+    <div className="mp-root">
+      <style>{MP_CSS}</style>
 
-      {/* TOP NAVIGATION */}
-      <div style={{ background: T.surface, borderBottom: `1px solid ${T.border}`, position: "sticky", top: 0, zIndex: 100, boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
-        <div className="mp-nav-inner" style={{ maxWidth: 1200, margin: "0 auto", padding: "12px 20px", display: "flex", alignItems: "center", gap: 16 }}>
+      {/* ── Navigation ── */}
+      <nav className="mp-nav">
+        <div className="mp-nav-inner">
           {/* Logo */}
-          <div className="mp-nav-logo" onClick={() => setPage("home")} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexShrink: 0 }}>
-            <div style={{ width: 36, height: 36, background: `linear-gradient(135deg, ${T.amber}, ${T.amberDim})`, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: "#000", boxShadow: `0 4px 16px ${T.amber}66` }}>
-              ⚙️
-            </div>
-            <div className="topbar-secondary">
-              <div style={{ fontSize: 15, fontWeight: 900, color: T.t1, letterSpacing: "-0.02em" }}>Velvet Parts</div>
-              <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, letterSpacing: "0.1em" }}>MARKETPLACE</div>
-            </div>
+          <div className="mp-logo-wrap" onClick={() => setPage("home")}>
+            <img src="/logo.png" alt="Red Piston" className="mp-logo-img" />
+            <span className="mp-logo-text">RED PISTON</span>
           </div>
 
-          {/* Search Engine */}
-          <div className="mp-search-row" style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
-            <SearchBar onSelectProduct={(p) => {
-              setPdpProductId(p.product.id);
-              setPage("pdp");
-            }} onOpenVehicleSelector={() => setVehModalOpen(true)} />
+          <div className="mp-nav-divider" />
+
+          {/* Nav links */}
+          <div className="mp-nav-links">
+            {["Marketplace", "Suppliers"].map((lbl, i) => (
+              <button
+                key={lbl}
+                className={`mp-nav-link${page === lbl.toLowerCase() || (lbl === "Marketplace" && page === "home") ? " active" : ""}`}
+                onClick={() => {
+                  if (lbl === "Suppliers") {
+                    setPage("suppliers");
+                    if (suppliersData.length === 0) {
+                      setSuppliersLoading(true);
+                      fetchShops({ lat: userGeoRef.current?.lat, lng: userGeoRef.current?.lng })
+                        .then(shops => { setSuppliersData(shops); setSuppliersLoading(false); })
+                        .catch(() => setSuppliersLoading(false));
+                    }
+                  } else {
+                    setPage("home");
+                  }
+                }}
+              >{lbl}</button>
+            ))}
           </div>
 
-          {/* Right Actions */}
-          <div className="mp-nav-right" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            <div
-              onClick={() => setVehModalOpen(true)}
-              style={{ display: "flex", alignItems: "center", gap: 8, background: selectedVehicle ? `${T.emerald}22` : T.card, border: `1px solid ${selectedVehicle ? T.emerald : T.border}`, padding: "7px 12px", borderRadius: 10, cursor: "pointer", transition: "all 0.2s" }}
-              className="mp-card-hover"
-            >
-              <span style={{ fontSize: 18 }}>{selectedVehicle ? (selectedVehicle.type === "Car" ? "🚙" : "🏍️") : "🚘"}</span>
-              <div className="veh-selector-text" style={{ display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 10, color: selectedVehicle ? T.emerald : T.t3, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {selectedVehicle ? "Saved" : "Vehicle"}
-                </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: T.t1, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model}` : "Select"}
-                </span>
-              </div>
-            </div>
-
-            <ProfileDropdown
-              user={currentUser}
-              onLogout={() => {
-                clearTokens();
-                localStorage.removeItem('as_user');
-                setCurrentUser(null);
-                window.location.href = '/login';
-              }}
+          {/* Search */}
+          <div className="mp-nav-search">
+            <span className="mp-nav-search-icon">🔍</span>
+            <input
+              className="mp-nav-search-input"
+              placeholder="Search by Part Number, VIN, or Category..."
+              value={navSearch}
+              onChange={e => setNavSearch(e.target.value)}
             />
+          </div>
 
-            <button onClick={toggleCart} style={{ width: 40, height: 40, borderRadius: "50%", background: T.card, border: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, cursor: "pointer", position: "relative", flexShrink: 0 }}>
+          {/* Actions */}
+          <div className="mp-nav-actions">
+            <button className="mp-icon-btn" title="Cart" onClick={toggleCart} style={{ position: "relative" }}>
               🛒
-              {cart.length > 0 && (
-                <span style={{ position: "absolute", top: -2, right: -2, background: T.amber, color: "#000", width: 18, height: 18, borderRadius: "50%", fontSize: 10, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>{cart.length}</span>
-              )}
+              {cart.length > 0 && <span className="mp-cart-badge">{cart.length}</span>}
             </button>
+            {currentUser ? (
+              <ProfileDropdown
+                user={currentUser}
+                onLogout={() => { clearTokens(); localStorage.removeItem("as_user"); setCurrentUser(null); window.location.href = "/login"; }}
+              />
+            ) : (
+              <>
+                <button className="mp-btn-outline" onClick={() => setLoginModalOpen(true)}>Sign In</button>
+                <button className="mp-btn-solid" onClick={() => setLoginModalOpen(true)}>Get Started</button>
+              </>
+            )}
           </div>
         </div>
-      </div>
+      </nav>
 
+      {/* ── Page body (offset for fixed nav) ── */}
+      <div className="mp-page-body">
+
+      {/* ── Sub-pages ── */}
       {page === "profile" && <CustomerProfile />}
-      {page === "pdp" && <ProductDetailsPage productId={pdpProductId} onBack={() => setPage("home")} />}
-      {page === "home" && (
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 24px" }}>
+      {page === "pdp" && <ProductDetailsPage productId={pdpProductId} onBack={() => setPage("home")} onRequireLogin={() => setLoginModalOpen(true)} />}
 
+      {/* ── Suppliers page ── */}
+      {page === "suppliers" && (
+        <div style={{ maxWidth: 1440, margin: "0 auto", padding: "40px 28px 80px", animation: "fadeUp 0.3s ease-out" }}>
+          <div style={{ marginBottom: 28 }}>
+            <h1 style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 28, fontWeight: 800, color: "#1A1205", margin: "0 0 6px" }}>Suppliers & Shops</h1>
+            <p style={{ fontSize: 14, color: "#9C8C7C", margin: 0 }}>Browse all verified auto parts suppliers on Red Piston</p>
+          </div>
+
+          {/* Search */}
+          <div style={{ position: "relative", maxWidth: 420, marginBottom: 28 }}>
+            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#B8A898" }}>🔍</span>
+            <input
+              value={suppliersSearch}
+              onChange={e => setSuppliersSearch(e.target.value)}
+              placeholder="Search by shop name or city..."
+              style={{ width: "100%", padding: "10px 12px 10px 34px", border: "1.5px solid #E0D5C8", borderRadius: 8, background: "#fff", fontSize: 13, color: "#1A1205", outline: "none" }}
+              onFocus={e => e.target.style.borderColor = "#BE2B1A"}
+              onBlur={e => e.target.style.borderColor = "#E0D5C8"}
+            />
+          </div>
+
+          {suppliersLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px,1fr))", gap: 16 }}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="pulse" style={{ height: 130, background: "#F0E8DF", borderRadius: 12, border: "1px solid #E0D5C8" }} />
+              ))}
+            </div>
+          ) : suppliersData.length === 0 ? (
+            <EmptyState title="No suppliers found" desc="No verified shops in the database yet." variant="light" />
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px,1fr))", gap: 16 }}>
+              {suppliersData
+                .filter(s => !suppliersSearch || s.name?.toLowerCase().includes(suppliersSearch.toLowerCase()) || s.city?.toLowerCase().includes(suppliersSearch.toLowerCase()))
+                .map(shop => (
+                  <div key={shop.id} style={{ background: "#fff", border: "1.5px solid #E0D5C8", borderRadius: 12, padding: 18, display: "flex", flexDirection: "column", gap: 10, cursor: "pointer", transition: "all 0.18s", boxShadow: "0 2px 8px rgba(26,18,5,0.05)" }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = "#BE2B1A"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(190,43,26,0.12)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "#E0D5C8"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(26,18,5,0.05)"; }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ width: 42, height: 42, borderRadius: 10, background: "rgba(190,43,26,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#BE2B1A", fontSize: 18, border: "1.5px solid rgba(190,43,26,0.2)" }}>
+                        {shop.name?.charAt(0)?.toUpperCase()}
+                      </div>
+                      {shop.is_verified && (
+                        <div style={{ background: "rgba(22,163,74,0.1)", color: "#16A34A", fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 5, textTransform: "uppercase" }}>✓ Verified</div>
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#1A1205", marginBottom: 3 }}>{shop.name}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "#9C8C7C" }}>
+                        <span style={{ color: "#FBBF24" }}>⭐</span>
+                        <span style={{ fontWeight: 700, color: "#1A1205" }}>{(shop.rating || 4.2).toFixed(1)}</span>
+                        <span>· {shop.parts_count || 0} parts listed</span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#BE2B1A", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                      📍 {shop.city || shop.address || "Local Shop"}
+                      {shop.distance != null && <span style={{ color: "#9C8C7C", fontWeight: 500 }}> · {shop.distance} km away</span>}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Home ── */}
+      {page === "home" && (
+        <>
           {loading ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
-              <div>
-                <div style={{ width: 220, height: 28, background: T.border, borderRadius: 8, marginBottom: 20 }} className="pulse" />
-                <SkeletonLoader type="product" count={5} />
-              </div>
-              <div>
-                <div style={{ width: 180, height: 28, background: T.border, borderRadius: 8, marginBottom: 20 }} className="pulse" />
-                <SkeletonLoader type="shop" count={5} />
+            <div className="mp-loading-wrap">
+              <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
+                <div>
+                  <div style={{ width: 240, height: 24, background: "#E0D5C8", borderRadius: 6, marginBottom: 16 }} className="pulse" />
+                  <SkeletonLoader type="product" count={5} variant="light" />
+                </div>
               </div>
             </div>
           ) : (
             <>
-              {/* VIEW A: VEHICLE SELECTED -> SHOW COMPATIBLE PARTS RANKED */}
+              {/* VIEW A: VEHICLE SELECTED */}
               {selectedVehicle && data?.compatibleParts ? (
-                <div style={{ animation: "fadeUp 0.4s ease-out" }}>
-                  <div style={{ marginBottom: 32, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                <div className="mp-results-wrap" style={{ animation: "fadeUp 0.35s ease-out" }}>
+                  {/* Vehicle KPI card — always shown when a vehicle is active */}
+                  <div style={{ display: "flex", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+                    {[
+                      ["🚗 Vehicle", `${selectedVehicle.brand || selectedVehicle.make || ""} ${selectedVehicle.model || ""}`.trim()],
+                      ["📅 Year", selectedVehicle.year || "—"],
+                      ["⛽ Fuel", (selectedVehicle.fuel || selectedVehicle.fuelType || "—").toUpperCase()],
+                      ...(selectedVehicle.plate ? [["🔖 Plate", selectedVehicle.plate]] : []),
+                    ].map(([label, val]) => (
+                      <div key={label} style={{ background: "#fff", border: "1px solid #E0D5C8", borderRadius: 10, padding: "10px 18px", display: "flex", flexDirection: "column", gap: 2, boxShadow: "0 1px 4px rgba(26,18,5,0.05)" }}>
+                        <div style={{ fontSize: 10, color: "#9C8C7C", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
+                        <div style={{ fontSize: 14, fontWeight: 800, color: "#1A1205" }}>{val}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mp-results-header">
                     <div>
-                      <h1 style={{ fontSize: 28, fontWeight: 900, color: T.t1, margin: "0 0 8px 0" }}>Parts for {selectedVehicle.brand} {selectedVehicle.model}{selectedVehicle.variant ? ` ${selectedVehicle.variant}` : ''}</h1>
-                      <div style={{ fontSize: 15, color: T.t3 }}>Showing {data.compatibleParts.length} verified compatible parts sorted by lowest price & nearest shops.</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                        <h1 className="mp-results-title">
+                          Parts for {selectedVehicle.brand} {selectedVehicle.model}
+                          {selectedVehicle.variant ? ` ${selectedVehicle.variant}` : ""}
+                        </h1>
+                        <button
+                          onClick={() => { saveVehicle(null); setPlateVehicleResult(null); }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 5,
+                            background: "#FEF2F2", border: "1.5px solid #FECACA",
+                            color: "#BE2B1A", borderRadius: 20, padding: "4px 12px",
+                            fontSize: 12, fontWeight: 700, cursor: "pointer",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "#BE2B1A"; e.currentTarget.style.color = "#fff"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "#FEF2F2"; e.currentTarget.style.color = "#BE2B1A"; }}
+                        >
+                          × Clear Vehicle
+                        </button>
+                      </div>
+                      <div className="mp-results-sub">
+                        {data.compatibleParts.length} verified compatible parts — sorted by price & proximity
+                      </div>
                     </div>
-                    <div className="filter-bar" style={{ display: "flex", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 8 }}>
                       <select
                         value={sortBy}
                         onChange={e => setSortBy(e.target.value)}
-                        style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, color: T.t1, cursor: "pointer", fontFamily: FONT.ui, appearance: "none" }}
+                        style={{ padding: "8px 12px", border: "1.5px solid #E0D5C8", borderRadius: 7, background: "#fff", fontSize: 13, color: "#1A1205", cursor: "pointer", outline: "none" }}
                       >
                         <option value="relevance">Sort: Relevance</option>
                         <option value="price_asc">Price: Low → High</option>
@@ -269,140 +735,54 @@ export function MarketplaceHome() {
                       </select>
                       <button
                         onClick={() => setFilterDrawerOpen(!filterDrawerOpen)}
-                        style={{ background: filterDrawerOpen ? T.amber : T.card, border: `1px solid ${filterDrawerOpen ? T.amber : T.border}`, borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 700, color: filterDrawerOpen ? "#000" : T.t2, cursor: "pointer", transition: "all 0.15s" }}
-                        className={filterDrawerOpen ? "" : "btn-hover"}
+                        style={{ padding: "8px 16px", border: `1.5px solid ${filterDrawerOpen ? "#BE2B1A" : "#E0D5C8"}`, borderRadius: 7, background: filterDrawerOpen ? "#BE2B1A" : "#fff", color: filterDrawerOpen ? "#fff" : "#1A1205", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
                       >
-                        Filter {filterDrawerOpen ? "↓" : "⚙️"}
+                        Filter ⚙
                       </button>
                     </div>
                   </div>
 
-                  {/* FILTER SIDEBAR — slide in from left */}
                   {filterDrawerOpen && (
                     <>
-                      {/* Backdrop */}
-                      <div
-                        onClick={() => setFilterDrawerOpen(false)}
-                        style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(10,15,29,0.6)", backdropFilter: "blur(2px)" }}
-                      />
-                      {/* Panel */}
-                      <div style={{
-                        position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 501,
-                        width: 300, background: T.surface, borderRight: `1px solid ${T.border}`,
-                        boxShadow: "8px 0 32px rgba(0,0,0,0.4)", display: "flex", flexDirection: "column",
-                        animation: "slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1)"
-                      }}>
-                        {/* Header */}
-                        <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: T.t1, textTransform: "uppercase", letterSpacing: "1.5px" }}>Filters</div>
+                      <div onClick={() => setFilterDrawerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(26,18,5,0.3)", backdropFilter: "blur(2px)" }} />
+                      <div className="mp-filter-panel">
+                        <div style={{ padding: "18px 20px 14px", borderBottom: "1px solid #E0D5C8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1205" }}>Filters</div>
                           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                            {activeFilters.length > 0 && (
-                              <button onClick={() => setActiveFilters([])} style={{ background: "transparent", border: "none", color: T.sky, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Clear All</button>
-                            )}
-                            <button onClick={() => setFilterDrawerOpen(false)} style={{ background: "transparent", border: "none", color: T.t3, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>✕</button>
+                            {activeFilters.length > 0 && <button onClick={() => setActiveFilters([])} style={{ background: "none", border: "none", color: "#BE2B1A", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Clear All</button>}
+                            <button onClick={() => setFilterDrawerOpen(false)} style={{ background: "none", border: "none", color: "#9C8C7C", fontSize: 20, cursor: "pointer" }}>✕</button>
                           </div>
                         </div>
-
-                        {/* Scrollable Content */}
-                        <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 28 }}>
-
-                          {/* Active Filter Chips */}
-                          {activeFilters.length > 0 && (
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              {activeFilters.map(f => (
-                                <div key={f.value} style={{ background: `${T.amber}22`, border: `1px solid ${T.amber}55`, color: T.amber, padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", gap: 5 }}>
-                                  {f.value}
-                                  <button onClick={() => setActiveFilters(activeFilters.filter(a => a.value !== f.value))} style={{ background: "transparent", border: "none", color: T.amber, cursor: "pointer", fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Price Range */}
+                        <div style={{ flex: 1, overflowY: "auto", padding: 20, display: "flex", flexDirection: "column", gap: 24 }}>
                           <div>
-                            <div style={{ fontSize: 11, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12 }}>Price Range</div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <input type="number" placeholder="Min" style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 10px", color: T.t1, fontSize: 13, fontFamily: FONT.mono }} />
-                              <span style={{ color: T.t3, flexShrink: 0 }}>–</span>
-                              <input type="number" placeholder="Max" style={{ flex: 1, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 10px", color: T.t1, fontSize: 13, fontFamily: FONT.mono }} />
-                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#9C8C7C", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: 10 }}>Brand</div>
+                            {["Bosch", "NGK", "Purolator", "Mahle", "Monroe", "Denso"].map(b => (
+                              <label key={b} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#1A1205", cursor: "pointer", marginBottom: 8 }}>
+                                <input type="checkbox" checked={activeFilters.some(f => f.value === b)} onChange={e => { if (e.target.checked) setActiveFilters(p => [...p, { label: "Brand", value: b }]); else setActiveFilters(p => p.filter(f => f.value !== b)); }} style={{ accentColor: "#BE2B1A", width: 15, height: 15 }} />
+                                {b}
+                              </label>
+                            ))}
                           </div>
-
-                          {/* Brands */}
                           <div>
-                            <div style={{ fontSize: 11, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12 }}>Brand</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                              {["Bosch", "NGK", "Purolator", "Mahle", "Monroe", "Denso"].map(b => (
-                                <label key={b} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: T.t1, cursor: "pointer" }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={activeFilters.some(f => f.value === b)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) setActiveFilters(p => [...p, { label: "Brand", value: b }]);
-                                      else setActiveFilters(p => p.filter(f => f.value !== b));
-                                    }}
-                                    style={{ accentColor: T.amber, width: 16, height: 16, flexShrink: 0 }}
-                                  />
-                                  {b}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Category */}
-                          <div>
-                            <div style={{ fontSize: 11, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12 }}>Category</div>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#9C8C7C", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: 10 }}>Category</div>
+                            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                               {["Filters", "Brakes", "Electrical", "Engine", "Suspension", "Tyres"].map(c => (
-                                <button
-                                  key={c}
-                                  onClick={() => {
-                                    if (activeFilters.some(f => f.value === c)) setActiveFilters(p => p.filter(f => f.value !== c));
-                                    else setActiveFilters(p => [...p, { label: "Category", value: c }]);
-                                  }}
-                                  style={{
-                                    background: activeFilters.some(f => f.value === c) ? `${T.amber}22` : T.bg,
-                                    border: `1px solid ${activeFilters.some(f => f.value === c) ? T.amber : T.border}`,
-                                    color: activeFilters.some(f => f.value === c) ? T.amber : T.t2,
-                                    borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s"
-                                  }}
-                                >
-                                  {c}
-                                </button>
+                                <button key={c} onClick={() => { if (activeFilters.some(f => f.value === c)) setActiveFilters(p => p.filter(f => f.value !== c)); else setActiveFilters(p => [...p, { label: "Category", value: c }]); }} style={{ background: activeFilters.some(f => f.value === c) ? "#BE2B1A" : "#F5EFE6", border: `1.5px solid ${activeFilters.some(f => f.value === c) ? "#BE2B1A" : "#E0D5C8"}`, color: activeFilters.some(f => f.value === c) ? "#fff" : "#1A1205", borderRadius: 6, padding: "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{c}</button>
                               ))}
                             </div>
                           </div>
-
-                          {/* Availability */}
                           <div>
-                            <div style={{ fontSize: 11, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 12 }}>Availability</div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                              {[["In Stock Only", "instock"], ["Same Day Delivery", "sameday"]].map(([label, val]) => (
-                                <label key={val} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: T.t1, cursor: "pointer" }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={activeFilters.some(f => f.value === val)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) setActiveFilters(p => [...p, { label: "Avail", value: val }]);
-                                      else setActiveFilters(p => p.filter(f => f.value !== val));
-                                    }}
-                                    style={{ accentColor: T.amber, width: 16, height: 16, flexShrink: 0 }}
-                                  />
-                                  {label}
-                                </label>
-                              ))}
-                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#9C8C7C", textTransform: "uppercase", letterSpacing: "1.2px", marginBottom: 10 }}>Availability</div>
+                            {[["In Stock Only", "instock"], ["Same Day Delivery", "sameday"]].map(([label, val]) => (
+                              <label key={val} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 14, color: "#1A1205", cursor: "pointer", marginBottom: 8 }}>
+                                <input type="checkbox" checked={activeFilters.some(f => f.value === val)} onChange={e => { if (e.target.checked) setActiveFilters(p => [...p, { label: "Avail", value: val }]); else setActiveFilters(p => p.filter(f => f.value !== val)); }} style={{ accentColor: "#BE2B1A", width: 15, height: 15 }} />
+                                {label}
+                              </label>
+                            ))}
                           </div>
-
                         </div>
-
-                        {/* Apply footer */}
-                        <div style={{ padding: "16px 20px", borderTop: `1px solid ${T.border}`, flexShrink: 0 }}>
-                          <button
-                            onClick={() => setFilterDrawerOpen(false)}
-                            style={{ width: "100%", background: T.amber, color: "#000", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: FONT.ui }}
-                            className="btn-hover-solid"
-                          >
+                        <div style={{ padding: "14px 20px", borderTop: "1px solid #E0D5C8" }}>
+                          <button onClick={() => setFilterDrawerOpen(false)} style={{ width: "100%", background: "#BE2B1A", color: "#fff", border: "none", borderRadius: 8, padding: "11px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
                             Apply Filters {activeFilters.length > 0 ? `(${activeFilters.length})` : ""}
                           </button>
                         </div>
@@ -411,27 +791,25 @@ export function MarketplaceHome() {
                   )}
 
                   {data.compatibleParts.length === 0 ? (
-                    <EmptyState title="No parts found" desc="We currently don't have any parts explicitly listed for this vehicle model in your area." />
+                    <EmptyState title="No parts found" desc="No parts listed for this vehicle in your area yet." variant="light" />
                   ) : (
-                    <div className="mp-product-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 24 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20 }}>
                       {data.compatibleParts.filter(p => {
                         if (activeFilters.length === 0) return true;
-                        const brandFilters = activeFilters.filter(f => f.label === "Brand").map(f => f.value);
-                        const catFilters = activeFilters.filter(f => f.label === "Category").map(f => f.value);
-                        const brandMatch = brandFilters.length === 0 || brandFilters.includes(p.product.brand);
-                        const catMatch = catFilters.length === 0 || catFilters.includes(p.product.category);
-                        return brandMatch && catMatch;
+                        const bf = activeFilters.filter(f => f.label === "Brand").map(f => f.value);
+                        const cf = activeFilters.filter(f => f.label === "Category").map(f => f.value);
+                        return (bf.length === 0 || bf.includes(p.product.brand)) && (cf.length === 0 || cf.includes(p.product.category));
                       }).sort((a, b) => {
                         if (sortBy === "price_asc") return a.bestPrice - b.bestPrice;
                         if (sortBy === "price_desc") return b.bestPrice - a.bestPrice;
                         if (sortBy === "newest") return (b.product.createdAt || 0) - (a.product.createdAt || 0);
-                        return (b.rankScore || 0) - (a.rankScore || 0); // relevance
+                        return (b.rankScore || 0) - (a.rankScore || 0);
                       }).map(p => (
                         <div key={p.product.id} style={{ position: "relative" }}>
-                          <div style={{ position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)", zIndex: 10, background: T.emerald, color: "#000", padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 900, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 6, boxShadow: `0 4px 12px ${T.emerald}44`, whiteSpace: "nowrap" }}>
-                            <span>✓</span> Exact Fit for {selectedVehicle.brand} {selectedVehicle.model}{selectedVehicle.variant ? ` ${selectedVehicle.variant}` : ''}
+                          <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", zIndex: 10, background: "#16A34A", color: "#fff", padding: "3px 10px", borderRadius: 20, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", boxShadow: "0 3px 10px rgba(22,163,74,0.35)" }}>
+                            ✓ Exact Fit — {selectedVehicle.brand} {selectedVehicle.model}
                           </div>
-                          <ProductCard item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} inCompare={compareList.some(c => c.product?.id === p.product?.id)} onCompareToggle={handleCompareToggle} />
+                          <ProductCard item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} inCompare={compareList.some(c => c.product?.id === p.product?.id)} onCompareToggle={handleCompareToggle} variant="light" />
                         </div>
                       ))}
                     </div>
@@ -439,136 +817,277 @@ export function MarketplaceHome() {
                 </div>
               ) : null}
 
-              {/* VIEW B: NO VEHICLE SELECTED -> SHOW DYNAMIC MARKETPLACE */}
+              {/* VIEW B: NO VEHICLE → HERO + MARKETPLACE */}
               {!selectedVehicle && data ? (
-                <div style={{ animation: "fadeUp 0.4s ease-out" }}>
+                <div style={{ animation: "fadeUp 0.35s ease-out" }}>
 
-                  {/* Hero Split Banner */}
-                  <div className="hero-banner" style={{ width: "100%", borderRadius: 20, background: `linear-gradient(135deg, ${T.surface} 60%, #0f172a)`, border: `1px solid ${T.sky}33`, marginBottom: 48, display: "flex", alignItems: "stretch", overflow: "hidden", position: "relative", minHeight: 260 }}>
-                    {/* Left: Headline */}
-                    <div className="hero-left" style={{ flex: 1, padding: "40px 48px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 20, position: "relative", zIndex: 10 }}>
-                      <div style={{ display: "inline-block", alignSelf: "flex-start", background: `${T.amber}22`, color: T.amber, padding: "6px 14px", borderRadius: 8, fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.12em" }}>Hyperlocal Auto Parts</div>
-                      <h1 style={{ fontSize: 32, fontWeight: 900, color: "#fff", margin: 0, lineHeight: 1.1 }}>
-                        Find the right part.<br />
-                        <span style={{ color: T.amber }}>Guaranteed to fit.</span>
-                      </h1>
-                      <div style={{ fontSize: 14, color: T.t3, maxWidth: 380, lineHeight: 1.6 }}>
-                        Verified fitment for your exact vehicle. Compare prices across trusted local shops.
+                  {/* ── Hero ── */}
+                  <section className="mp-hero">
+                    <div className="mp-hero-split">
+                      {/* LEFT */}
+                      <div className="mp-hero-left">
+                        <div className="mp-hero-eyebrow">INDIA'S PREMIER AUTO PARTS PLATFORM</div>
+                        <h1 className="mp-hero-h1">
+                          Precision Parts for
+                          <span className="mp-hero-h1-accent">Industrial Reliability.</span>
+                        </h1>
+                        <p className="mp-hero-sub">
+                          Direct access to authentic OEM and OES components. Engineered for performance, delivered for speed.
+                        </p>
+
+                        {/* Tabs */}
+                        <div className="mp-tabs-row">
+                          <button className={`mp-tab-btn${heroTab === "vehicle" ? " active" : ""}`} onClick={() => setHeroTab("vehicle")}>Vehicle Selector</button>
+                          <button className={`mp-tab-btn${heroTab === "plate" ? " active" : ""}`} onClick={() => setHeroTab("plate")}>Number Plate Search</button>
+                        </div>
+
+                        {/* Vehicle Selector Tab */}
+                        {heroTab === "vehicle" && (
+                          <div className="mp-vsel-form">
+                            <div className="mp-vsel-row">
+                              <select className="mp-vsel-select" value={heroMake} onChange={e => setHeroMake(e.target.value)}>
+                                <option value="">Select Make</option>
+                                {MAKES.map(m => <option key={m} value={m}>{m}</option>)}
+                              </select>
+                              <select className="mp-vsel-select" value={heroYear} onChange={e => setHeroYear(e.target.value)}>
+                                <option value="">Select Year</option>
+                                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                              </select>
+                            </div>
+                            <button className="mp-search-parts-btn" onClick={() => setVehModalOpen(true)}>
+                              Search Parts →
+                            </button>
+                            <div className="mp-or-divider">or</div>
+                            <button className="mp-open-selector" onClick={() => setVehModalOpen(true)}>
+                              📋 Browse Full Vehicle Selector
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Number Plate Search Tab */}
+                        {heroTab === "plate" && (
+                          <div className="mp-vsel-form">
+                            {!plateVehicleResult ? (
+                              <>
+                                <input
+                                  className="mp-plate-input"
+                                  placeholder="Enter number plate (e.g. MH01AB1234)"
+                                  value={plateSearch}
+                                  onChange={e => { setPlateSearch(e.target.value.toUpperCase()); setPlateLookupError(""); }}
+                                  maxLength={12}
+                                  onKeyDown={e => e.key === "Enter" && plateSearch.length >= 6 && handlePlateLookup()}
+                                />
+                                {plateLookupError && (
+                                  <div style={{ fontSize: 12, color: "#BE2B1A", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "8px 12px" }}>
+                                    {plateLookupError}
+                                  </div>
+                                )}
+                                <button
+                                  className="mp-search-parts-btn"
+                                  onClick={handlePlateLookup}
+                                  disabled={plateLookupLoading || plateSearch.length < 6}
+                                  style={{ opacity: plateSearch.length < 6 ? 0.6 : 1 }}
+                                >
+                                  {plateLookupLoading ? "Looking up plate..." : "Find Parts by Plate →"}
+                                </button>
+                              </>
+                            ) : (
+                              /* ── Vehicle found — detail card ── */
+                              <div style={{ background: "#fff", border: "1.5px solid #E0D5C8", borderRadius: 12, overflow: "hidden", maxWidth: 460 }}>
+                                {/* Header strip */}
+                                <div style={{ background: "#BE2B1A", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                  <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", letterSpacing: "0.12em" }}>
+                                    🚗 {plateVehicleResult.plate}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.75)", fontWeight: 600, background: "rgba(255,255,255,0.15)", borderRadius: 4, padding: "2px 8px" }}>
+                                    VEHICLE FOUND
+                                  </div>
+                                </div>
+                                {/* KPI grid */}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
+                                  {[
+                                    ["Make", plateVehicleResult.make || "—"],
+                                    ["Model", plateVehicleResult.model || "—"],
+                                    ["Year", plateVehicleResult.year || "—"],
+                                    ["Fuel Type", (plateVehicleResult.fuelType || "—").toUpperCase()],
+                                  ].map(([label, val], i) => (
+                                    <div key={label} style={{
+                                      padding: "12px 16px",
+                                      borderBottom: i < 2 ? "1px solid #F0E8DF" : "none",
+                                      borderRight: i % 2 === 0 ? "1px solid #F0E8DF" : "none",
+                                    }}>
+                                      <div style={{ fontSize: 10, color: "#9C8C7C", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>{label}</div>
+                                      <div style={{ fontSize: 14, fontWeight: 800, color: "#1A1205" }}>{val}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                                {/* Actions */}
+                                <div style={{ padding: "12px 16px", display: "flex", gap: 8, borderTop: "1px solid #F0E8DF" }}>
+                                  <button
+                                    onClick={() => {
+                                      saveVehicle({ brand: plateVehicleResult.make, make: plateVehicleResult.make, model: plateVehicleResult.model, year: plateVehicleResult.year, fuel: plateVehicleResult.fuelType, plate: plateVehicleResult.plate });
+                                    }}
+                                    style={{ flex: 1, background: "#BE2B1A", color: "#fff", border: "none", borderRadius: 7, padding: "11px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+                                  >
+                                    Find Parts for this Vehicle →
+                                  </button>
+                                  <button
+                                    onClick={() => { setPlateVehicleResult(null); setPlateSearch(""); }}
+                                    style={{ padding: "11px 14px", background: "#F5EFE6", border: "1.5px solid #E0D5C8", borderRadius: 7, fontSize: 13, color: "#5C4F40", cursor: "pointer", fontWeight: 600 }}
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                        {["✓ Exact Fitment", "✓ Local Shops", "✓ Same Day Delivery"].map(f => (
-                          <span key={f} style={{ fontSize: 12, color: T.emerald, fontWeight: 700 }}>{f}</span>
+
+                      {/* RIGHT — product image panel */}
+                      <div className="mp-hero-right">
+                        <img
+                          src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&q=80&w=900"
+                          alt="Auto parts"
+                          className="mp-hero-right-img"
+                        />
+                        <div className="mp-hero-right-overlay" />
+                        <div className="mp-hero-right-badge">
+                          <div className="mp-hero-right-badge-label">Parts in Catalogue</div>
+                          <div className="mp-hero-right-badge-val">1.2L+</div>
+                          <div className="mp-hero-right-badge-sub">Verified OEM & OES parts</div>
+                        </div>
+                        <div className="mp-hero-stats">
+                          {[["500+", "Shops"], ["₹2Cr+", "GMV/mo"], ["99.9%", "Uptime"]].map(([n, l]) => (
+                            <div key={l} className="mp-hero-stat">
+                              <div className="mp-hero-stat-num">{n}</div>
+                              <div className="mp-hero-stat-lbl">{l}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* ── Sections ── */}
+                  <div className="mp-sections">
+
+                    {/* Popular Categories */}
+                    <div className="mp-section-block">
+                      <div className="mp-section-hdr">
+                        <div className="mp-section-title">Popular Categories</div>
+                        <button className="mp-view-all">View all →</button>
+                      </div>
+                      <SectionCarousel title="" variant="light">
+                        {data.popularCategories.map(c => (
+                          <div key={c} className="mp-cat-card">
+                            <span className="mp-cat-icon">{catIcons[c] || catIcons.default}</span>
+                            <span className="mp-cat-label">{c}</span>
+                          </div>
                         ))}
-                      </div>
+                      </SectionCarousel>
                     </div>
 
-                    {/* Divider */}
-                    <div className="topbar-secondary" style={{ width: 1, background: `linear-gradient(to bottom, transparent, ${T.border}, transparent)`, flexShrink: 0 }} />
-
-                    {/* Right: Vehicle Selector Card */}
-                    <div className="hero-right" style={{ width: 300, padding: "32px 28px", display: "flex", flexDirection: "column", justifyContent: "center", gap: 16, background: `${T.card}88`, backdropFilter: "blur(8px)", flexShrink: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: T.t1, display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 22 }}>🚘</span> Select Your Vehicle
+                    {/* Top Selling */}
+                    <div className="mp-section-block">
+                      <div className="mp-section-hdr">
+                        <div className="mp-section-title">Top Selling Parts</div>
+                        <button className="mp-view-all">View all →</button>
                       </div>
-                      <div style={{ fontSize: 13, color: T.t3, lineHeight: 1.5 }}>
-                        Tell us your vehicle and we'll show only parts that fit — no guesswork.
-                      </div>
-                      <button
-                        onClick={() => setVehModalOpen(true)}
-                        style={{ background: T.amber, color: "#000", border: "none", borderRadius: 12, padding: "14px 20px", fontSize: 15, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: `0 8px 24px ${T.amber}44`, transition: "all 0.2s", fontFamily: FONT.ui }}
-                        className="btn-hover-solid"
-                      >
-                        Get Exact Fit →
-                      </button>
-                      <div style={{ fontSize: 11, color: T.t4, textAlign: "center" }}>
-                        Cars, Bikes, Trucks — all supported
-                      </div>
+                      <SectionCarousel title="" variant="light">
+                        {data.topSelling.map(p => (
+                          <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} variant="light" />
+                        ))}
+                      </SectionCarousel>
                     </div>
 
-                    {/* BG decoration */}
-                    <div style={{ position: "absolute", left: -20, bottom: -40, fontSize: 200, opacity: 0.04, pointerEvents: "none" }}>⚙️</div>
+                    {/* Best Deals */}
+                    {data.bestDeals.length > 0 && (
+                      <div className="mp-section-block">
+                        <div className="mp-section-hdr">
+                          <div className="mp-section-title">Best Deals Today</div>
+                          <button className="mp-view-all">View all →</button>
+                        </div>
+                        <SectionCarousel title="" variant="light">
+                          {data.bestDeals.map(p => (
+                            <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} variant="light" />
+                          ))}
+                        </SectionCarousel>
+                      </div>
+                    )}
+
+                    {/* Trending Near You */}
+                    <div className="mp-section-block">
+                      <div className="mp-section-hdr">
+                        <div className="mp-section-title">Trending Near You</div>
+                        <button className="mp-view-all">View all →</button>
+                      </div>
+                      <SectionCarousel title="" variant="light">
+                        {data.trendingNearYou.map(p => (
+                          <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} variant="light" />
+                        ))}
+                      </SectionCarousel>
+                    </div>
+
+                    {/* Trusted Shops */}
+                    <div className="mp-section-block">
+                      <div className="mp-section-hdr">
+                        <div className="mp-section-title">Trusted Shops Near You</div>
+                        <button className="mp-view-all">View all →</button>
+                      </div>
+                      <SectionCarousel title="" variant="light">
+                        {data.trendingNearYou
+                          .filter((v, i, a) => a.findIndex(t => t.listings[0].shop_id === v.listings[0].shop_id) === i)
+                          .map(p => <ShopCard key={p.listings[0].shop_id} shop={p.listings[0].shop} variant="light" />)}
+                      </SectionCarousel>
+                    </div>
+
                   </div>
-
-                  {/* Popular Categories Mock */}
-                  <SectionCarousel title="Popular Categories">
-                    {data.popularCategories.map(c => (
-                      <div key={c} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: "24px 32px", minWidth: 160, display: "flex", flexDirection: "column", alignItems: "center", gap: 12, cursor: "pointer" }} className="mp-card-hover">
-                        <span style={{ fontSize: 32 }}>{c === "Brakes" ? "🛑" : c === "Engine" ? "⚙️" : c === "Filters" ? "💨" : c === "Electrical" ? "⚡" : c === "Suspension" ? "🛞" : "🔧"}</span>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>{c}</span>
-                      </div>
-                    ))}
-                  </SectionCarousel>
-
-                  {/* Top Selling Overall */}
-                  <SectionCarousel title="🔥 Global Top Selling Parts">
-                    {data.topSelling.map(p => (
-                      <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} />
-                    ))}
-                  </SectionCarousel>
-
-                  {/* Best Deals */}
-                  {data.bestDeals.length > 0 && (
-                    <SectionCarousel title="💰 Best Deals Today">
-                      {data.bestDeals.map(p => (
-                        <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} />
-                      ))}
-                    </SectionCarousel>
-                  )}
-
-                  {/* Trending Local */}
-                  <SectionCarousel title="⚡ Trending Near You">
-                    {data.trendingNearYou.map(p => (
-                      <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} />
-                    ))}
-                  </SectionCarousel>
-
-                  {/* Nearby Shops Preview */}
-                  <SectionCarousel title="🏪 Trusted Shops Near You">
-                    {data.trendingNearYou.filter((v, i, a) => a.findIndex(t => (t.listings[0].shop_id === v.listings[0].shop_id)) === i).map(p => (
-                      <ShopCard key={p.listings[0].shop_id} shop={p.listings[0].shop} />
-                    ))}
-                  </SectionCarousel>
-
                 </div>
               ) : null}
             </>
           )}
-        </div>
+        </>
       )}
 
-      {/* FLOATING COMPARE BAR */}
+      </div>{/* end mp-page-body */}
+
+      {/* ── Compare Bar ── */}
       {compareList.length > 0 && (
-        <div style={{
-          position: "fixed", bottom: 0, left: 68, right: 0, zIndex: 900,
-          background: T.surface, borderTop: `1px solid ${T.border}`,
-          padding: "12px 24px", display: "flex", alignItems: "center", gap: 16,
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.4)", animation: "fadeUp 0.2s ease"
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "1px", marginRight: 8, flexShrink: 0 }}>
+        <div className="mp-compare-bar">
+          <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(245,239,230,0.7)", textTransform: "uppercase", letterSpacing: "1px", flexShrink: 0 }}>
             Comparing {compareList.length}/3
           </div>
           {compareList.map(item => (
-            <div key={item.product?.id} style={{ display: "flex", alignItems: "center", gap: 8, background: T.card, border: `1px solid ${T.border}`, borderRadius: 8, padding: "6px 12px", flexShrink: 0 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: T.t1 }}>{item.product?.name?.slice(0, 22)}</span>
-              <button onClick={() => handleCompareToggle(item)} style={{ background: "none", border: "none", color: T.t4, cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+            <div key={item.product?.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(245,239,230,0.08)", border: "1px solid rgba(245,239,230,0.2)", borderRadius: 7, padding: "6px 12px", flexShrink: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "#F5EFE6" }}>{item.product?.name?.slice(0, 20)}</span>
+              <button onClick={() => handleCompareToggle(item)} style={{ background: "none", border: "none", color: "rgba(245,239,230,0.5)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
             </div>
           ))}
           <div style={{ flex: 1 }} />
           {compareList.length > 1 && (
-            <button onClick={() => setCompareOpen(true)} style={{ background: T.amber, color: "#000", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
+            <button onClick={() => setCompareOpen(true)} style={{ background: "#BE2B1A", color: "#fff", border: "none", borderRadius: 7, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
               Compare Now →
             </button>
           )}
-          <button onClick={() => setCompareList([])} style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 14px", fontSize: 12, color: T.t3, cursor: "pointer", fontFamily: FONT.ui }}>
+          <button onClick={() => setCompareList([])} style={{ background: "transparent", border: "1px solid rgba(245,239,230,0.25)", borderRadius: 7, padding: "8px 14px", fontSize: 12, color: "rgba(245,239,230,0.6)", cursor: "pointer" }}>
             Clear
           </button>
         </div>
       )}
 
-      {/* MODALS */}
+      {/* ── Modals ── */}
       <VehicleSelectorModal open={vehModalOpen} onClose={() => setVehModalOpen(false)} />
       <ProductComparisonModal open={!!activeProduct} productData={activeProduct} onClose={() => setActiveProduct(null)} />
       <SideBySideModal open={compareOpen} items={compareList} onClose={() => setCompareOpen(false)} />
+      <CartDrawer onCheckout={() => navigate("/marketplace/checkout")} />
+
+      {loginModalOpen && (
+        <LoginModal
+          onClose={() => setLoginModalOpen(false)}
+          onLogin={(user) => { setCurrentUser(user); setLoginModalOpen(false); }}
+        />
+      )}
     </div>
   );
 }
