@@ -254,13 +254,15 @@ export function MarketplacePage() {
   const currentUser = ctx?.currentUser;
 
   // Filters
-  const [priceMax,    setPriceMax]    = useState(50000);
-  const [sortBy,      setSortBy]      = useState('Relevance');
-  const [partTypes,   setPartTypes]   = useState({ OEM: true, OES: true });
-  const [activeCateg, setActiveCateg] = useState<string | null>(null);
-  const [viewMode,    setViewMode]    = useState<'grid' | 'list'>('grid');
-  const [page,        setPage]        = useState(1);
+  const [priceMax,      setPriceMax]      = useState(50000);
+  const [sortBy,        setSortBy]        = useState('Relevance');
+  const [partTypes,     setPartTypes]     = useState({ OEM: true, OES: true });
+  const [activeCateg,   setActiveCateg]   = useState<string | null>(null);
+  const [viewMode,      setViewMode]      = useState<'grid' | 'list'>('grid');
+  const [page,          setPage]          = useState(1);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const urlQuery = params.get('q') || '';
+  const [search, setSearch] = useState(urlQuery);
 
   // Real catalog data from backend
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
