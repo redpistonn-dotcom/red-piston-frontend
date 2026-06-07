@@ -1,0 +1,979 @@
+import { useState, useMemo, useEffect, useContext, useCallback } from "react";
+import { T, FONT, SHADOWS } from "../theme";
+import { fmt, fmtDate, uid, JOB_STATUS, generateCSV, downloadCSV } from "../utils";
+import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
+import { useStore } from "../store";
+import { AppCtx } from "../AppCtx";
+
+// ─── Status config for table ──────────────────────────────────────────────────
+const STATUS_DISPLAY: Record<string, { label: string; dot: string; color: string }> = {
+    draft:       { label: "Draft",           dot: T.t3,     color: T.t3     },
+    estimated:   { label: "Diagnosed",       dot: T.sky,    color: T.sky    },
+    approved:    { label: "Waiting for Parts", dot: "#F59E0B", color: "#D97706" },
+    in_progress: { label: "In Progress",     dot: T.crimson, color: T.crimson },
+    completed:   { label: "Completed",       dot: T.emerald, color: T.emerald },
+    invoiced:    { label: "Invoiced",        dot: T.violet,  color: T.violet  },
+    cancelled:   { label: "Cancelled",       dot: T.t4,      color: T.t3     },
+};
+
+// ─── Avatar circle from name ──────────────────────────────────────────────────
+function Avatar({ name, size = 32 }: { name: string; size?: number }) {
+    const initials = (name || "?").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+    // Deterministic pastel bg from name
+    const colors = ["#1C1B1B","#374151","#1e3a5f","#3b1f5e","#1f4e3b"];
+    const bg = colors[(name || "").charCodeAt(0) % colors.length];
+    return (
+        <div style={{ width: size, height: size, borderRadius: "50%", background: bg, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: size * 0.38, fontWeight: 700, fontFamily: FONT.ui, flexShrink: 0 }}>
+            {initials}
+        </div>
+    );
+}
+
+// ─── Service type badge ───────────────────────────────────────────────────────
+function ServiceBadge({ label }: { label: string }) {
+    const text = label?.slice(0, 22) || "Service";
+    return (
+        <span style={{ display: "inline-block", background: T.surfaceContainerHigh, color: T.t2, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 7, fontFamily: FONT.ui, whiteSpace: "nowrap", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {text}
+        </span>
+    );
+}
+
+// ─── Status badge ─────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: string }) {
+    const cfg = STATUS_DISPLAY[status] || STATUS_DISPLAY.draft;
+    return (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: cfg.color, fontFamily: FONT.ui }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.dot, flexShrink: 0, display: "inline-block" }} />
+            {cfg.label}
+        </span>
+    );
+}
+
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+function KpiCard({ label, main, sub, subColor, icon }: { label: string; main: string; sub: string; subColor?: string; icon: string }) {
+    return (
+        <div className="card-hover" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, padding: "22px 22px 18px", boxShadow: SHADOWS.xs }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>{label}</span>
+                <span style={{ fontSize: 26, opacity: 0.55, flexShrink: 0 }}>{icon}</span>
+            </div>
+            <div style={{ fontSize: 36, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, letterSpacing: "-0.04em", lineHeight: 1, marginBottom: 10 }}>{main}</div>
+            <div style={{ fontSize: 12, color: subColor || T.t3, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 5 }}>
+                {subColor && subColor !== T.t3 && <span style={{ fontSize: 14 }}>{subColor === T.emerald ? "↗" : subColor === T.crimson ? "🔴" : ""}</span>}
+                {sub}
+            </div>
+        </div>
+    );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export function WorkshopPage() {
+    const { jobCards, vehicles, parties, products, activeShopId, saveJobCards, saveProducts, logAudit } = useStore();
+    const { toast } = useContext(AppCtx);
+
+    const onSaveJobCard = useCallback((jc: any) => {
+        const exists = (jobCards || []).find((x: any) => x.id === jc.id);
+        saveJobCards(exists ? jobCards.map((x: any) => (x.id === jc.id ? jc : x)) : [...(jobCards || []), jc]);
+        logAudit(exists ? "JOB_CARD_UPDATED" : "JOB_CARD_CREATED", "job_card", jc.id, `${jc.jobNumber} — ${jc.status}`);
+    }, [jobCards, saveJobCards, logAudit]);
+
+    const [workshopTab, setWorkshopTab]   = useState<"jobs" | "marketplace">("jobs");
+    const [expandedId, setExpandedId]     = useState<string | null>(null);
+    const [showCreate, setShowCreate]     = useState(false);
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [search, setSearch]             = useState("");
+    const [now, setNow]                   = useState(Date.now());
+
+    // Parts Marketplace state
+    const [mpSearch, setMpSearch]         = useState("");
+    const [mpFilter, setMpFilter]         = useState<"all" | "live" | "offline">("all");
+    const [goLiveProd, setGoLiveProd]     = useState<any>(null);   // product being listed
+    const [glQty, setGlQty]               = useState(0);
+    const [glPrice, setGlPrice]           = useState(0);
+
+    useEffect(() => {
+        const t = setInterval(() => setNow(Date.now()), 30000);
+        return () => clearInterval(t);
+    }, []);
+
+    const shopJobs     = useMemo(() => (jobCards || []).filter((j: any) => j.shopId === activeShopId), [jobCards, activeShopId]);
+    const shopVehicles = useMemo(() => (vehicles || []).filter((v: any) => v.shopId === activeShopId), [vehicles, activeShopId]);
+    const shopParties  = useMemo(() => (parties  || []).filter((p: any) => p.shopId === activeShopId), [parties,  activeShopId]);
+
+    const getVehicle = (id: string) => shopVehicles.find((v: any) => v.id === id);
+    const getParty   = (id: string) => shopParties.find((p: any) => p.id === id);
+
+    // KPI data
+    const kpi = useMemo(() => {
+        const active      = shopJobs.filter((j: any) => ["in_progress","approved","estimated"].includes(j.status));
+        const technicians = [...new Set(shopJobs.filter((j: any) => j.assignedTo).map((j: any) => j.assignedTo))];
+        const pending     = shopJobs.filter((j: any) => j.status === "completed");
+        const overdue     = shopJobs.filter((j: any) => j.status === "completed" && j.completedAt && (Date.now() - j.completedAt) > 86400000 * 2);
+        return {
+            activeCount:   active.length,
+            techAvail:     technicians.length,
+            techOnLeave:   0,
+            pendingDel:    pending.length,
+            overdueDel:    overdue.length,
+        };
+    }, [shopJobs]);
+
+    // Filtered jobs for the table
+    const filtered = useMemo(() => {
+        let list = [...shopJobs].sort((a: any, b: any) => b.createdAt - a.createdAt);
+        if (statusFilter !== "all") list = list.filter((j: any) => j.status === statusFilter);
+        if (search.trim()) {
+            const q = search.toLowerCase();
+            list = list.filter((j: any) => {
+                const v = getVehicle(j.vehicleId);
+                const c = getParty(j.customerId);
+                return (
+                    (j.jobNumber || "").toLowerCase().includes(q) ||
+                    (j.complaints || "").toLowerCase().includes(q) ||
+                    (v ? `${v.make} ${v.model} ${v.registrationNumber}`.toLowerCase().includes(q) : false) ||
+                    (c ? c.name.toLowerCase().includes(q) : false)
+                );
+            });
+        }
+        return list;
+    }, [shopJobs, statusFilter, search]);
+
+    const handleExportCSV = () => {
+        const headers = ["Job ID","Vehicle","Customer","Service Type","Status","Technician","Estimated"];
+        const rows = filtered.map((j: any) => {
+            const v = getVehicle(j.vehicleId);
+            const c = getParty(j.customerId);
+            return [
+                j.jobNumber,
+                v ? `${v.make} ${v.model} ${v.registrationNumber}` : "—",
+                c?.name || "Walk-in",
+                j.complaints || "—",
+                STATUS_DISPLAY[j.status]?.label || j.status,
+                j.assignedTo || "—",
+                j.estimatedAmount || 0,
+            ];
+        });
+        downloadCSV(`Workshop_Jobs_${Date.now()}.csv`, generateCSV(headers, rows));
+        toast?.("Exported as CSV", "success");
+    };
+
+    const handleStatusChange = (job: any, newStatus: string) => {
+        const updated = { ...job, status: newStatus };
+        if (newStatus === "in_progress" && !job.startedAt) updated.startedAt = Date.now();
+        if (newStatus === "completed") updated.completedAt = Date.now();
+        onSaveJobCard(updated);
+        toast?.(`Job ${job.jobNumber} → ${STATUS_DISPLAY[newStatus]?.label || newStatus}`, "success");
+    };
+
+    const getNextActions = (status: string) => {
+        const flow: Record<string,string[]> = {
+            draft:       ["estimated"],
+            estimated:   ["approved","cancelled"],
+            approved:    ["in_progress","cancelled"],
+            in_progress: ["completed"],
+            completed:   ["invoiced"],
+        };
+        return flow[status] || [];
+    };
+
+    const getElapsed = (job: any) => {
+        if (!job.startedAt) return null;
+        const ms = (job.completedAt || now) - job.startedAt;
+        const h = ms / 3600000;
+        return h < 1 ? `${Math.floor(h * 60)}m` : `${h.toFixed(1)}h`;
+    };
+
+    // ─── STATUS FILTER TABS DATA ──────────────────────────────────────────────
+    const STATUS_TABS = [
+        { key: "all",         label: "All" },
+        { key: "in_progress", label: "In Progress" },
+        { key: "approved",    label: "Waiting Parts" },
+        { key: "completed",   label: "Completed" },
+        { key: "invoiced",    label: "Invoiced" },
+    ];
+
+    // Parts marketplace helpers
+    const shopProducts = useMemo(() => (products || []).filter((p: any) => p.shopId === activeShopId && p.isActive !== false), [products, activeShopId]);
+
+    // Open the "Go Live" modal to collect qty + price before publishing
+    const openGoLive = (prod: any) => {
+        setGoLiveProd(prod);
+        setGlQty(prod.marketplaceQty || prod.stock || 0);
+        setGlPrice(prod.marketplacePrice || prod.sellPrice || 0);
+    };
+
+    // Confirm go-live from the modal
+    const confirmGoLive = () => {
+        if (!goLiveProd) return;
+        if (glQty <= 0) { toast?.("Please enter a valid quantity", "warning"); return; }
+        if (glPrice <= 0) { toast?.("Please enter a valid price", "warning"); return; }
+        const updated = { ...goLiveProd, marketplaceLive: true, marketplaceQty: glQty, marketplacePrice: glPrice };
+        saveProducts?.((products || []).map((p: any) => p.id === goLiveProd.id ? updated : p));
+        toast?.(`🚀 ${goLiveProd.name} is now LIVE on marketplace!`, "success");
+        setGoLiveProd(null);
+    };
+
+    // Take a live item offline directly (no confirmation needed)
+    const takeOffline = (prod: any) => {
+        const updated = { ...prod, marketplaceLive: false, marketplaceQty: 0 };
+        saveProducts?.((products || []).map((p: any) => p.id === prod.id ? updated : p));
+        toast?.(`⏸ ${prod.name} removed from marketplace.`, "info");
+    };
+
+    const updateMpField = (prod: any, field: string, val: number) => {
+        const updated = { ...prod, [field]: Math.max(0, val) };
+        saveProducts?.((products || []).map((p: any) => p.id === prod.id ? updated : p));
+    };
+
+    const mpFiltered = useMemo(() => {
+        let list = [...shopProducts];
+        if (mpSearch.trim()) { const q = mpSearch.toLowerCase(); list = list.filter((p: any) => [p.name, p.sku, p.category, p.brand].some((s: any) => (s || "").toLowerCase().includes(q))); }
+        if (mpFilter === "live")    list = list.filter((p: any) => p.marketplaceLive);
+        if (mpFilter === "offline") list = list.filter((p: any) => !p.marketplaceLive);
+        return list;
+    }, [shopProducts, mpSearch, mpFilter]);
+
+    const mpKpi = useMemo(() => {
+        const live  = shopProducts.filter((p: any) => p.marketplaceLive);
+        const value = live.reduce((s: number, p: any) => s + (p.marketplacePrice || p.sellPrice) * (p.marketplaceQty || 0), 0);
+        return { liveCount: live.length, liveValue: value, totalStock: live.reduce((s: number, p: any) => s + (p.marketplaceQty || 0), 0) };
+    }, [shopProducts]);
+
+    const isMobile = useIsMobile();
+
+    return (
+        <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
+
+            {/* ── PAGE TAB SWITCHER ── */}
+            <div style={{ display: "flex", gap: 6 }}>
+                {([["jobs", "🔧", "Job Cards"], ["marketplace", "🌐", "Parts Marketplace"]] as const).map(([id, icon, label]) => (
+                    <button key={id} onClick={() => setWorkshopTab(id)}
+                        style={{ height: 40, padding: "0 18px", borderRadius: 9, border: `1.5px solid ${workshopTab === id ? T.amber : T.border}`, background: workshopTab === id ? T.amber : "#FFFFFF", color: workshopTab === id ? "#FFFFFF" : T.t2, fontSize: 13, fontWeight: workshopTab === id ? 700 : 500, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s" }}>
+                        <span>{icon}</span> {label}
+                        {id === "marketplace" && mpKpi.liveCount > 0 && (
+                            <span style={{ background: T.emerald, color: "#fff", fontSize: 10, fontWeight: 800, padding: "1px 7px", borderRadius: 20, marginLeft: 2 }}>{mpKpi.liveCount} LIVE</span>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── PARTS MARKETPLACE TAB ── */}
+            {workshopTab === "marketplace" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {/* KPI strip */}
+                    <div className="kpi-grid-3" style={{ display: "grid" }}>
+                        {[
+                            { label: "Items Live", val: String(mpKpi.liveCount), sub: mpKpi.liveCount > 0 ? "Active on marketplace" : "None listed yet", color: mpKpi.liveCount > 0 ? T.emerald : T.t3, icon: "🟢" },
+                            { label: "Live Stock Value", val: `₹${(mpKpi.liveValue/1000).toFixed(1)}k`, sub: `${mpKpi.totalStock} units available`, color: T.sky, icon: "📦" },
+                            { label: "Total SKUs", val: String(shopProducts.length), sub: `${shopProducts.length - mpKpi.liveCount} offline / unlisted`, color: T.t3, icon: "🏷" },
+                        ].map(k => (
+                            <div key={k.label} className="card-hover" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, padding: "18px 22px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>{k.label}</span>
+                                    <span style={{ fontSize: 22, opacity: 0.55 }}>{k.icon}</span>
+                                </div>
+                                <div style={{ fontSize: 30, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, letterSpacing: "-0.04em", lineHeight: 1, marginBottom: 8 }}>{k.val}</div>
+                                <div style={{ fontSize: 12, color: k.color, fontWeight: 600, fontFamily: FONT.ui }}>{k.sub}</div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Info banner */}
+                    <div style={{ background: `${T.sky}10`, border: `1px solid ${T.sky}33`, borderRadius: 10, padding: "11px 16px", display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: T.sky, fontWeight: 600, fontFamily: FONT.ui }}>
+                        <span style={{ fontSize: 18 }}>ℹ</span>
+                        Toggle any inventory item <strong>LIVE</strong> to list it on the marketplace. Set the quantity and price customers will see. Changes apply instantly.
+                    </div>
+
+                    {/* Parts table card */}
+                    <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.xs }}>
+
+                        {/* Toolbar */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: `1px solid ${T.border}`, flexWrap: "wrap" }}>
+                            {/* Search */}
+                            <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 9, padding: "0 12px", height: 36 }}>
+                                <span style={{ fontSize: 13, color: T.t3, flexShrink: 0 }}>🔍</span>
+                                <input value={mpSearch} onChange={e => setMpSearch(e.target.value)}
+                                    placeholder="Search by name, SKU, category…"
+                                    style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13, color: T.t1, fontFamily: FONT.ui }} />
+                                {mpSearch && <button onClick={() => setMpSearch("")} style={{ background: "none", border: "none", color: T.t3, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>}
+                            </div>
+                            {/* Filter pills */}
+                            <div style={{ display: "flex", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 9, padding: 3, gap: 2 }}>
+                                {(["all","live","offline"] as const).map(f => {
+                                    const counts = { all: shopProducts.length, live: mpKpi.liveCount, offline: shopProducts.length - mpKpi.liveCount };
+                                    const active = mpFilter === f;
+                                    return (
+                                        <button key={f} onClick={() => setMpFilter(f)}
+                                            style={{ height: 28, padding: "0 12px", borderRadius: 7, border: "none", background: active ? (f === "live" ? T.emerald : f === "offline" ? T.t2 : T.amber) : "transparent", color: active ? "#FFFFFF" : T.t3, fontSize: 11, fontWeight: active ? 700 : 500, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 5, transition: "all 0.13s" }}>
+                                            {f === "live" && <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? "#FFFFFF" : T.emerald, display: "inline-block", flexShrink: 0 }} />}
+                                            {f === "all" ? "All" : f === "live" ? "Live" : "Offline"}
+                                            <span style={{ background: active ? "rgba(255,255,255,0.25)" : T.border, color: active ? "#fff" : T.t3, fontSize: 10, fontWeight: 700, padding: "0px 5px", borderRadius: 10 }}>{counts[f]}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Table */}
+                        <div className="table-scroll">
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                <thead>
+                                    <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                                        {[
+                                            { label: "Product",  w: "auto" },
+                                            { label: "SKU",      w: 140   },
+                                            { label: "Category", w: 110   },
+                                            { label: "Stock",    w: 70    },
+                                            { label: "Sell Price", w: 100 },
+                                            { label: "Marketplace Listing", w: 200 },
+                                            { label: "Action",   w: 160   },
+                                        ].map(h => (
+                                            <th key={h.label} className="th-cell" style={{ width: h.w === "auto" ? undefined : h.w }}>{h.label}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {mpFiltered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} style={{ padding: "56px 24px", textAlign: "center" }}>
+                                                <div style={{ fontSize: 44, opacity: 0.2, marginBottom: 14 }}>📦</div>
+                                                <div style={{ fontSize: 14, fontWeight: 700, color: T.t2, marginBottom: 6 }}>
+                                                    {mpSearch ? `No results for "${mpSearch}"` : mpFilter === "live" ? "No items live yet" : "No inventory items"}
+                                                </div>
+                                                <div style={{ fontSize: 12, color: T.t3 }}>
+                                                    {mpSearch ? "Try a different search term" : mpFilter === "live" ? "Click 🚀 Go Live on any product to list it" : "Add products to inventory first"}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : mpFiltered.map((prod: any) => {
+                                        const isLive  = !!prod.marketplaceLive;
+                                        const mpPrice = prod.marketplacePrice || prod.sellPrice || 0;
+                                        const mpQty   = prod.marketplaceQty ?? 0;
+                                        const lowStock = prod.stock <= 5;
+                                        const hasImage = typeof prod.image === "string" && prod.image.startsWith("http");
+                                        return (
+                                            <tr key={prod.id} className="trow" style={{ borderBottom: `1px solid ${T.border}`, borderLeft: `3px solid ${isLive ? T.emerald : "transparent"}`, background: isLive ? `${T.emerald}05` : "transparent", transition: "background 0.15s" }}>
+
+                                                {/* PRODUCT */}
+                                                <td style={{ padding: "12px 16px" }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                                        <div style={{ width: 40, height: 40, borderRadius: 9, background: T.bg, border: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+                                                            {hasImage
+                                                                ? <img src={prod.image} alt={prod.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                                : <span style={{ fontSize: 18, opacity: 0.4 }}>🔧</span>
+                                                            }
+                                                        </div>
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ fontWeight: 700, color: T.t1, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{prod.name}</div>
+                                                            <div style={{ fontSize: 10, color: T.t3, marginTop: 2 }}>{prod.brand || "Generic"}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                {/* SKU */}
+                                                <td style={{ padding: "12px 16px" }}>
+                                                    <span style={{ fontFamily: FONT.mono, fontSize: 11, color: T.t3, background: T.bg, padding: "3px 7px", borderRadius: 5 }}>{prod.sku || "—"}</span>
+                                                </td>
+
+                                                {/* CATEGORY */}
+                                                <td style={{ padding: "12px 16px" }}>
+                                                    <span style={{ background: T.surfaceContainerHigh, color: T.t2, fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6 }}>{prod.category || "General"}</span>
+                                                </td>
+
+                                                {/* STOCK */}
+                                                <td style={{ padding: "12px 16px" }}>
+                                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
+                                                        <span style={{ fontFamily: FONT.mono, fontSize: 14, fontWeight: 900, color: lowStock ? T.crimson : T.t1 }}>{prod.stock ?? 0}</span>
+                                                        {lowStock && <span style={{ fontSize: 9, color: T.crimson, fontWeight: 700, letterSpacing: "0.06em" }}>LOW</span>}
+                                                    </div>
+                                                </td>
+
+                                                {/* SELL PRICE */}
+                                                <td style={{ padding: "12px 16px", fontFamily: FONT.mono, fontSize: 13, color: T.t2 }}>{fmt(prod.sellPrice)}</td>
+
+                                                {/* MARKETPLACE LISTING — shows summary pill when live */}
+                                                <td style={{ padding: "12px 16px" }}>
+                                                    {isLive ? (
+                                                        <div style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                                <span style={{ width: 7, height: 7, borderRadius: "50%", background: T.emerald, flexShrink: 0, display: "inline-block" }} />
+                                                                <span style={{ fontSize: 13, fontWeight: 900, color: T.emerald, fontFamily: FONT.mono }}>{fmt(mpPrice)}</span>
+                                                            </div>
+                                                            <div style={{ fontSize: 10, color: T.t3, fontFamily: FONT.ui }}>
+                                                                {mpQty} unit{mpQty !== 1 ? "s" : ""} listed · {mpQty > 0 && prod.buyPrice > 0 ? `+${(((mpPrice - prod.buyPrice) / prod.buyPrice) * 100).toFixed(0)}% margin` : ""}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ fontSize: 12, color: T.t4, fontStyle: "italic" }}>Not listed yet</span>
+                                                    )}
+                                                </td>
+
+                                                {/* ACTION */}
+                                                <td style={{ padding: "12px 16px" }}>
+                                                    {isLive ? (
+                                                        <div style={{ display: "flex", gap: 6 }}>
+                                                            <button onClick={() => openGoLive(prod)}
+                                                                style={{ height: 32, padding: "0 12px", borderRadius: 7, border: `1.5px solid ${T.amber}`, background: T.amberGlow, color: T.amber, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>
+                                                                ✏ Edit
+                                                            </button>
+                                                            <button onClick={() => takeOffline(prod)}
+                                                                style={{ height: 32, padding: "0 12px", borderRadius: 7, border: `1.5px solid ${T.crimson}44`, background: `${T.crimson}0D`, color: T.crimson, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>
+                                                                ⏸ Off
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button onClick={() => openGoLive(prod)}
+                                                            style={{ height: 34, padding: "0 18px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${T.amber}, #6A020A)`, color: "#FFFFFF", fontSize: 12, fontWeight: 800, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(139,30,30,0.25)", display: "flex", alignItems: "center", gap: 6, transition: "opacity 0.15s" }}
+                                                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "0.88"; }}
+                                                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = "1"; }}>
+                                                            🚀 Go Live
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{ padding: "10px 20px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONT.ui }}>
+                                Showing {mpFiltered.length} of {shopProducts.length} products
+                            </span>
+                            <span style={{ fontSize: 10, fontFamily: FONT.ui, fontWeight: 700, display: "flex", alignItems: "center", gap: 6, color: mpKpi.liveCount > 0 ? T.emerald : T.t4 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: mpKpi.liveCount > 0 ? T.emerald : T.t4, display: "inline-block" }} />
+                                {mpKpi.liveCount > 0 ? `${mpKpi.liveCount} live listing${mpKpi.liveCount > 1 ? "s" : ""} on marketplace` : "No live listings yet"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {workshopTab === "jobs" && (<>
+
+            {/* ── 3 KPI CARDS ── */}
+            <div className="kpi-grid-3" style={{ display: "grid" }}>
+                <KpiCard
+                    label="Active Jobs"
+                    main={String(kpi.activeCount).padStart(2, "0")}
+                    sub={kpi.activeCount > 0 ? `+${kpi.activeCount} active this week` : "No active jobs"}
+                    subColor={kpi.activeCount > 0 ? T.emerald : T.t3}
+                    icon="👥"
+                />
+                <KpiCard
+                    label="Technicians Available"
+                    main={`${String(kpi.techAvail).padStart(2, "0")}/${Math.max(kpi.techAvail + 4, 12)}`}
+                    sub={`${kpi.techOnLeave > 0 ? kpi.techOnLeave : "—"} on scheduled leave`}
+                    icon="👤"
+                />
+                <KpiCard
+                    label="Pending Deliveries"
+                    main={String(kpi.pendingDel).padStart(2, "0")}
+                    sub={kpi.overdueDel > 0 ? `${kpi.overdueDel} Critical (Overdue)` : "All on schedule"}
+                    subColor={kpi.overdueDel > 0 ? T.crimson : T.t3}
+                    icon="🚚"
+                />
+            </div>
+
+            {/* ── ACTIVE JOB CARDS TABLE ── */}
+            <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.xs }}>
+
+                {/* Table header row */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${T.border}`, gap: 12, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 16, fontWeight: 800, color: T.t1, fontFamily: FONT.display }}>Active Job Cards</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: T.emerald, background: T.emeraldBg, border: "1px solid rgba(22,163,74,0.2)", padding: "3px 10px", borderRadius: 20, letterSpacing: "0.07em", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 5 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.emerald, display: "inline-block" }} />
+                            LIVE DATA
+                        </span>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        {/* Search */}
+                        <div style={{ position: "relative" }}>
+                            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: T.t3, pointerEvents: "none" }}>🔍</span>
+                            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search jobs..."
+                                style={{ height: 34, width: 180, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px 0 30px", fontSize: 12, color: T.t1, fontFamily: FONT.ui, outline: "none", background: T.bg }}
+                                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }}
+                            />
+                        </div>
+                        {/* Filter dropdown */}
+                        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+                            style={{ height: 34, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", fontSize: 12, color: T.t2, fontFamily: FONT.ui, outline: "none", background: "#FFFFFF", cursor: "pointer" }}>
+                            {STATUS_TABS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                        </select>
+                        {/* Export CSV */}
+                        <button onClick={handleExportCSV}
+                            style={{ height: 34, padding: "0 14px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 6 }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
+                            ⬆ Export CSV
+                        </button>
+                        {/* New Job */}
+                        <button onClick={() => setShowCreate(true)}
+                            style={{ height: 34, padding: "0 14px", background: T.amber, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 6 }}>
+                            + New Job
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile card view */}
+                {isMobile && filtered.length === 0 && (
+                    <div style={{ padding: "40px 20px", textAlign: "center" }}>
+                        <div style={{ fontSize: 42, opacity: 0.25, marginBottom: 16 }}>🔧</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: T.t2, marginBottom: 6 }}>No job cards found</div>
+                        <button onClick={() => setShowCreate(true)} style={{ background: T.amber, border: "none", borderRadius: 9, padding: "10px 22px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ New Job Card</button>
+                    </div>
+                )}
+                {isMobile && filtered.length > 0 && (
+                    <MobileCardList>
+                        {filtered.map((job: any) => {
+                            const vehicle  = getVehicle(job.vehicleId);
+                            const customer = getParty(job.customerId);
+                            const sd = STATUS_DISPLAY[job.status];
+                            const partsTotal  = (job.parts  || []).reduce((s: number, p: any) => s + p.qty * p.price, 0);
+                            const labourTotal = (job.labour || []).reduce((s: number, l: any) => s + l.amount, 0);
+                            return (
+                                <MobileCard key={job.id} accent={sd?.dot}>
+                                    {/* Header row */}
+                                    <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                        <div>
+                                            <span style={{ fontFamily: FONT.mono, fontWeight: 800, fontSize: 14, color: T.amber }}>{job.jobNumber || "—"}</span>
+                                            {getElapsed(job) && <span style={{ fontSize: 10, color: T.sky, marginLeft: 8 }}>⏱ {getElapsed(job)}</span>}
+                                        </div>
+                                        <span style={{ fontSize: 11, fontWeight: 700, background: `${sd?.dot}18`, color: sd?.dot, padding: "3px 9px", borderRadius: 99 }}>{sd?.label || job.status}</span>
+                                    </div>
+                                    {/* Vehicle */}
+                                    <CardField label="Vehicle" width="full" value={vehicle ? `${vehicle.year ? vehicle.year + " " : ""}${vehicle.make} ${vehicle.model} · ${vehicle.registrationNumber}` : "No vehicle"} bold />
+                                    <CardField label="Customer" value={customer?.name || "Walk-in"} />
+                                    <CardField label="Technician" value={job.assignedTo || "—"} />
+                                    <CardField label="Parts" value={fmt(partsTotal)} mono />
+                                    <CardField label="Labour" value={fmt(labourTotal)} mono />
+                                    <CardActions>
+                                        {getNextActions(job.status).map((next: string) => (
+                                            <button key={next} onClick={() => handleStatusChange(job, next)} style={{ flex: 1, height: 38, borderRadius: 8, border: "none", background: next === "cancelled" ? T.crimson : next === "completed" ? T.emerald : next === "invoiced" ? T.violet : T.amber, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
+                                                {STATUS_DISPLAY[next]?.label || next} →
+                                            </button>
+                                        ))}
+                                    </CardActions>
+                                </MobileCard>
+                            );
+                        })}
+                    </MobileCardList>
+                )}
+
+                {/* Desktop Table */}
+                {!isMobile && <div className="table-scroll">
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                            <tr>
+                                {["Job ID","Vehicle Details","Customer","Service Type","Status","Technician","Actions"].map(h => (
+                                    <th key={h} className="th-cell">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} style={{ padding: "64px 24px", textAlign: "center" }}>
+                                        <div style={{ fontSize: 42, opacity: 0.25, marginBottom: 16 }}>🔧</div>
+                                        <div style={{ fontSize: 15, fontWeight: 700, color: T.t2, marginBottom: 6 }}>No job cards found</div>
+                                        <div style={{ fontSize: 12, color: T.t3, marginBottom: 18 }}>
+                                            {search || statusFilter !== "all" ? "Try clearing filters" : "Create your first job card to get started"}
+                                        </div>
+                                        <button onClick={() => setShowCreate(true)}
+                                            style={{ background: T.amber, border: "none", borderRadius: 9, padding: "9px 22px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
+                                            + New Job Card
+                                        </button>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtered.map((job: any, i: number) => {
+                                    const vehicle  = getVehicle(job.vehicleId);
+                                    const customer = getParty(job.customerId);
+                                    const isExpanded = expandedId === job.id;
+                                    const partsTotal  = (job.parts  || []).reduce((s: number, p: any) => s + p.qty * p.price, 0);
+                                    const labourTotal = (job.labour || []).reduce((s: number, l: any) => s + l.amount, 0);
+                                    const custName = customer?.name || "Walk-in";
+                                    const serviceLabel = job.complaints || (JOB_STATUS as any)[job.status]?.label || "Service";
+                                    const isLast = i === filtered.length - 1;
+
+                                    return (
+                                        <>
+                                            <tr key={job.id} className="trow"
+                                                onClick={() => setExpandedId(isExpanded ? null : job.id)}
+                                                style={{ borderBottom: isExpanded ? "none" : (!isLast ? `1px solid ${T.border}` : "none"), cursor: "pointer", borderLeft: `3px solid ${STATUS_DISPLAY[job.status]?.dot || T.border}` }}>
+
+                                                {/* JOB ID */}
+                                                <td style={{ padding: "14px 16px", whiteSpace: "nowrap" }}>
+                                                    <span style={{ fontFamily: FONT.mono, fontWeight: 800, fontSize: 13, color: T.amber }}>{job.jobNumber || "—"}</span>
+                                                    {getElapsed(job) && (
+                                                        <div style={{ fontSize: 10, color: T.sky, marginTop: 2 }}>⏱ {getElapsed(job)}</div>
+                                                    )}
+                                                </td>
+
+                                                {/* VEHICLE DETAILS */}
+                                                <td style={{ padding: "14px 16px" }}>
+                                                    {vehicle ? (
+                                                        <>
+                                                            <div style={{ fontWeight: 700, fontSize: 13, color: T.t1 }}>{vehicle.year ? `${vehicle.year} ` : ""}{vehicle.make} {vehicle.model}</div>
+                                                            <div style={{ fontSize: 11, color: T.t3, marginTop: 2, fontFamily: FONT.mono }}>Plate: {vehicle.registrationNumber}</div>
+                                                        </>
+                                                    ) : (
+                                                        <span style={{ color: T.t4, fontSize: 12 }}>No vehicle</span>
+                                                    )}
+                                                </td>
+
+                                                {/* CUSTOMER */}
+                                                <td style={{ padding: "14px 16px" }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                                                        <Avatar name={custName} size={30} />
+                                                        <span style={{ fontSize: 13, fontWeight: 600, color: T.t1 }}>{custName}</span>
+                                                    </div>
+                                                </td>
+
+                                                {/* SERVICE TYPE */}
+                                                <td style={{ padding: "14px 16px" }}>
+                                                    <ServiceBadge label={serviceLabel} />
+                                                </td>
+
+                                                {/* STATUS */}
+                                                <td style={{ padding: "14px 16px" }}>
+                                                    <StatusBadge status={job.status} />
+                                                </td>
+
+                                                {/* TECHNICIAN */}
+                                                <td style={{ padding: "14px 16px", fontSize: 13, color: T.t2, fontWeight: 500 }}>
+                                                    {job.assignedTo || <span style={{ color: T.t4 }}>Unassigned</span>}
+                                                </td>
+
+                                                {/* ACTIONS */}
+                                                <td style={{ padding: "14px 16px" }}>
+                                                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                                        <button title={isExpanded ? "Collapse" : "Expand"} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2 }}
+                                                            onClick={e => { e.stopPropagation(); setExpandedId(isExpanded ? null : job.id); }}>
+                                                            {isExpanded ? "▲" : "⋯"}
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+
+                                            {/* Expanded Detail */}
+                                            {isExpanded && (
+                                                <tr key={`${job.id}-detail`}>
+                                                    <td colSpan={7} style={{ background: T.bg, borderBottom: `1px solid ${T.border}`, padding: 0 }}>
+                                                        <div style={{ padding: "18px 20px 20px", display: "flex", flexDirection: "column", gap: 14, animation: "fadeIn 0.15s ease" }}>
+                                                            {/* Top info grid */}
+                                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                                                                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                                                                    <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Customer Complaint</div>
+                                                                    <div style={{ fontSize: 13, color: T.t1 }}>{job.complaints || "—"}</div>
+                                                                </div>
+                                                                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                                                                    <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Diagnosis</div>
+                                                                    <div style={{ fontSize: 13, color: T.t1 }}>{job.diagnosis || "—"}</div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Checklist */}
+                                                            {(job.checklist || []).length > 0 && (
+                                                                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                                                                    <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Service Checklist</div>
+                                                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                                                        {(job.checklist || []).map((item: any, idx: number) => (
+                                                                            <div key={idx} onClick={() => {
+                                                                                const checklist = [...job.checklist];
+                                                                                checklist[idx] = { ...checklist[idx], status: checklist[idx].status === "done" ? "pending" : "done" };
+                                                                                onSaveJobCard({ ...job, checklist });
+                                                                            }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 7, border: `1px solid ${T.border}`, background: item.status === "done" ? T.emeraldBg : "transparent", cursor: "pointer", fontSize: 12, color: item.status === "done" ? T.emerald : T.t2 }}>
+                                                                                <span>{item.status === "done" ? "☑" : "☐"}</span>
+                                                                                <span style={{ textDecoration: item.status === "done" ? "line-through" : "none" }}>{item.task}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Parts + Labour + Total */}
+                                                            <div className="rp-grid-3" style={{ display: "grid" }}>
+                                                                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                                                                    <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Parts</div>
+                                                                    {(job.parts || []).length === 0 ? <span style={{ fontSize: 12, color: T.t4 }}>None</span> : (job.parts || []).map((p: any, i: number) => (
+                                                                        <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                                                                            <span style={{ color: T.t2 }}>{p.name} ×{p.qty}</span>
+                                                                            <span style={{ fontFamily: FONT.mono, color: T.amber, fontWeight: 700 }}>{fmt(p.qty * p.price)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px" }}>
+                                                                    <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Labour</div>
+                                                                    {(job.labour || []).length === 0 ? <span style={{ fontSize: 12, color: T.t4 }}>None</span> : (job.labour || []).map((l: any, i: number) => (
+                                                                        <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                                                                            <span style={{ color: T.t2 }}>{l.description}</span>
+                                                                            <span style={{ fontFamily: FONT.mono, color: T.sky, fontWeight: 700 }}>{fmt(l.amount)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                                <div style={{ background: T.amberGlow, border: `1px solid rgba(139,30,30,0.15)`, borderRadius: 10, padding: "12px 16px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center" }}>
+                                                                    <div style={{ fontSize: 9, color: T.amber, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Grand Total</div>
+                                                                    <div style={{ fontSize: 22, fontWeight: 900, color: T.amber, fontFamily: FONT.mono }}>{fmt(partsTotal + labourTotal)}</div>
+                                                                    {job.startedAt && <div style={{ fontSize: 10, color: T.t3, marginTop: 6 }}>Started: {fmtDate(job.startedAt)}</div>}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Action buttons */}
+                                                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                                                {getNextActions(job.status).map((next: string) => (
+                                                                    <button key={next} onClick={() => handleStatusChange(job, next)}
+                                                                        style={{ height: 34, padding: "0 16px", borderRadius: 8, border: "none", background: next === "cancelled" ? T.crimson : next === "completed" ? T.emerald : next === "invoiced" ? T.violet : T.amber, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
+                                                                        {STATUS_DISPLAY[next]?.label || next} →
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>}
+
+                {/* Footer */}
+                <div style={{ padding: "10px 20px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                        {filtered.length} of {shopJobs.length} total jobs
+                    </span>
+                    <span style={{ fontSize: 11, color: T.emerald, fontFamily: FONT.mono, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.emerald, display: "inline-block" }} />
+                        SHOP ENGINE 2.4.0
+                    </span>
+                </div>
+            </div>
+
+            </>)} {/* end workshopTab === "jobs" */}
+
+            {/* ── Go Live Confirmation Modal ── */}
+            {goLiveProd && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {/* Backdrop */}
+                    <div onClick={() => setGoLiveProd(null)} style={{ position: "absolute", inset: 0, background: "rgba(28,27,27,0.55)", backdropFilter: "blur(3px)" }} />
+
+                    {/* Modal card */}
+                    <div style={{ position: "relative", background: "#FFFFFF", borderRadius: 18, width: "100%", maxWidth: 480, boxShadow: "0 24px 60px rgba(0,0,0,0.22)", overflow: "hidden", animation: "fadeUp 0.2s ease" }}>
+
+                        {/* Header */}
+                        <div style={{ background: `linear-gradient(135deg, ${T.amber}, #6A020A)`, padding: "22px 24px 18px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                                <span style={{ fontSize: 22 }}>🚀</span>
+                                <div>
+                                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>List on Marketplace</div>
+                                    <div style={{ fontSize: 17, fontWeight: 900, color: "#FFFFFF", fontFamily: FONT.display, letterSpacing: "-0.01em" }}>{goLiveProd.name}</div>
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                                {goLiveProd.sku && <span style={{ background: "rgba(255,255,255,0.18)", color: "#FFFFFF", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, fontFamily: FONT.mono }}>{goLiveProd.sku}</span>}
+                                {goLiveProd.category && <span style={{ background: "rgba(255,255,255,0.18)", color: "#FFFFFF", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, fontFamily: FONT.ui }}>{goLiveProd.category}</span>}
+                                <span style={{ background: "rgba(255,255,255,0.18)", color: "#FFFFFF", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, fontFamily: FONT.ui }}>📦 {goLiveProd.stock} in stock</span>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div style={{ padding: "24px 24px 20px" }}>
+                            {/* Quantity */}
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8, fontFamily: FONT.ui }}>
+                                    How many units to list?
+                                </label>
+                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                    <button onClick={() => setGlQty(q => Math.max(0, q - 1))}
+                                        style={{ width: 38, height: 38, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.t2 }}>−</button>
+                                    <input type="number" value={glQty} min={0} max={goLiveProd.stock}
+                                        onChange={e => setGlQty(Math.min(goLiveProd.stock, Math.max(0, +e.target.value)))}
+                                        style={{ flex: 1, height: 48, background: T.bg, border: `2px solid ${T.amber}`, borderRadius: 10, textAlign: "center", fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, outline: "none" }} />
+                                    <button onClick={() => setGlQty(q => Math.min(goLiveProd.stock, q + 1))}
+                                        style={{ width: 38, height: 38, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.t2 }}>+</button>
+                                    <button onClick={() => setGlQty(goLiveProd.stock)}
+                                        style={{ height: 38, padding: "0 12px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 11, fontWeight: 700, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>All ({goLiveProd.stock})</button>
+                                </div>
+                                <div style={{ fontSize: 11, color: T.t3, marginTop: 6, fontFamily: FONT.ui }}>Max {goLiveProd.stock} units available in stock</div>
+                            </div>
+
+                            {/* Price */}
+                            <div style={{ marginBottom: 24 }}>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8, fontFamily: FONT.ui }}>
+                                    Marketplace price per unit
+                                </label>
+                                <div style={{ position: "relative" }}>
+                                    <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 18, color: T.t3, fontWeight: 700, pointerEvents: "none" }}>₹</span>
+                                    <input type="number" value={glPrice} min={0}
+                                        onChange={e => setGlPrice(Math.max(0, +e.target.value))}
+                                        style={{ width: "100%", height: 52, background: T.bg, border: `2px solid ${T.amber}`, borderRadius: 10, padding: "0 16px 0 34px", fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" }} />
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                                    <span style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>Your sell price: ₹{(goLiveProd.sellPrice || 0).toLocaleString("en-IN")}</span>
+                                    {glPrice > 0 && goLiveProd.buyPrice > 0 && (
+                                        <span style={{ fontSize: 11, fontWeight: 700, color: glPrice > goLiveProd.buyPrice ? T.emerald : T.crimson, fontFamily: FONT.ui }}>
+                                            {glPrice > goLiveProd.buyPrice ? `+${(((glPrice - goLiveProd.buyPrice) / goLiveProd.buyPrice) * 100).toFixed(1)}% margin` : "⚠ Below cost"}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Preview strip */}
+                            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>Marketplace listing preview</div>
+                                <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 900, color: T.amber }}>₹{glPrice.toLocaleString("en-IN")}</div>
+                                    <div style={{ fontSize: 11, color: T.t3 }}>{glQty} units · {goLiveProd.name?.slice(0, 24)}</div>
+                                </div>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div style={{ display: "flex", gap: 10 }}>
+                                <button onClick={() => setGoLiveProd(null)}
+                                    style={{ flex: 1, height: 44, background: "#FFFFFF", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
+                                    Cancel
+                                </button>
+                                <button onClick={confirmGoLive}
+                                    disabled={glQty <= 0 || glPrice <= 0}
+                                    style={{ flex: 2, height: 44, background: glQty > 0 && glPrice > 0 ? `linear-gradient(135deg, ${T.amber}, #6A020A)` : T.surfaceContainerHigh, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, color: glQty > 0 && glPrice > 0 ? "#FFFFFF" : T.t3, cursor: glQty > 0 && glPrice > 0 ? "pointer" : "not-allowed", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: glQty > 0 && glPrice > 0 ? "0 3px 12px rgba(139,30,30,0.35)" : "none" }}>
+                                    🚀 Confirm & Go Live
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Create Job Card Modal */}
+            <JobCardCreateModal
+                open={showCreate}
+                onClose={() => setShowCreate(false)}
+                vehicles={shopVehicles}
+                parties={shopParties}
+                products={(products || []).filter((p: any) => p.shopId === activeShopId)}
+                activeShopId={activeShopId}
+                existingCount={shopJobs.length}
+                onSave={(jc: any) => { onSaveJobCard(jc); setShowCreate(false); toast?.(`Job Card ${jc.jobNumber} created!`, "success", "🔧 Workshop"); }}
+            />
+        </div>
+    );
+}
+
+// ─── Create Job Card Modal (unchanged logic) ──────────────────────────────────
+function JobCardCreateModal({ open, onClose, vehicles, parties, products, activeShopId, existingCount, onSave }: any) {
+    const [vehicleId, setVehicleId]       = useState("");
+    const [customerId, setCustomerId]     = useState("");
+    const [complaints, setComplaints]     = useState("");
+    const [diagnosis, setDiagnosis]       = useState("");
+    const [assignedTo, setAssignedTo]     = useState("");
+    const [selectedParts, setSelectedParts] = useState<any[]>([]);
+    const [labourDesc, setLabourDesc]     = useState("");
+    const [labourAmt, setLabourAmt]       = useState("");
+
+    const handleAddPart = (pId: string) => {
+        const prod = products.find((p: any) => p.id === pId);
+        if (prod && !selectedParts.find(sp => sp.itemId === pId)) {
+            setSelectedParts(prev => [...prev, { itemId: pId, name: prod.name, qty: 1, price: prod.sellPrice }]);
+        }
+    };
+
+    const handleSave = () => {
+        if (!vehicleId || !complaints.trim()) return;
+        const labour = labourDesc && labourAmt ? [{ description: labourDesc, amount: +labourAmt }] : [];
+        const estimated = selectedParts.reduce((s, p) => s + p.qty * p.price, 0) + labour.reduce((s, l) => s + l.amount, 0);
+        onSave({
+            id: "jc_" + uid(),
+            shopId: activeShopId,
+            jobNumber: `#RP-${String(9000 + existingCount + 1)}`,
+            vehicleId,
+            customerId: customerId || vehicles.find((v: any) => v.id === vehicleId)?.ownerId || "",
+            status: "draft",
+            assignedTo: assignedTo || null,
+            estimatedAmount: estimated,
+            actualAmount: null,
+            complaints,
+            diagnosis,
+            checklist: [
+                { task: "Initial inspection",  status: "pending" },
+                { task: "Parts procurement",   status: "pending" },
+                { task: "Repair / Service",    status: "pending" },
+                { task: "Quality check",       status: "pending" },
+                { task: "Test drive",          status: "pending" },
+            ],
+            parts: selectedParts,
+            labour,
+            startedAt: null,
+            completedAt: null,
+            createdAt: Date.now(),
+        });
+        setVehicleId(""); setCustomerId(""); setComplaints(""); setDiagnosis(""); setAssignedTo(""); setSelectedParts([]); setLabourDesc(""); setLabourAmt("");
+    };
+
+    const customers = parties.filter((p: any) => p.type === "customer" || p.type === "both");
+
+    return (
+        <Modal open={open} onClose={onClose} title="🔧 New Job Card" subtitle="Create a workshop job card" width={640}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <Field label="Vehicle" required>
+                    <Select value={vehicleId} onChange={(v: string) => { setVehicleId(v); const veh = vehicles.find((x: any) => x.id === v); if (veh) setCustomerId(veh.ownerId); }}
+                        options={[{ value: "", label: "Select vehicle…" }, ...vehicles.map((v: any) => ({ value: v.id, label: `${v.registrationNumber} — ${v.make} ${v.model}` }))]} />
+                </Field>
+                <Field label="Customer">
+                    <Select value={customerId} onChange={setCustomerId}
+                        options={[{ value: "", label: "Auto from vehicle" }, ...customers.map((c: any) => ({ value: c.id, label: c.name }))]} />
+                </Field>
+                <Field label="Technician">
+                    <Input value={assignedTo} onChange={setAssignedTo} placeholder="e.g. David K." />
+                </Field>
+                <div style={{ display: "flex", alignItems: "flex-end" }}>
+                    <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>Job # auto-assigned as <span style={{ fontFamily: FONT.mono, color: T.amber }}>#RP-{9001 + existingCount}</span></div>
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                    <Field label="Customer Complaint" required>
+                        <Input value={complaints} onChange={setComplaints} placeholder="Describe the issue…" />
+                    </Field>
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                    <Field label="Diagnosis">
+                        <Input value={diagnosis} onChange={setDiagnosis} placeholder="Your assessment…" />
+                    </Field>
+                </div>
+
+                <Divider label="Parts" />
+                <div style={{ gridColumn: "span 2" }}>
+                    <Select value="" onChange={handleAddPart}
+                        options={[{ value: "", label: "Add part…" }, ...products.filter((p: any) => p.stock > 0).map((p: any) => ({ value: p.id, label: `${p.name} (${p.stock} in stock) — ${fmt(p.sellPrice)}` }))]} />
+                    {selectedParts.length > 0 && (
+                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                            {selectedParts.map((sp, i) => (
+                                <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 10px", background: T.bg, borderRadius: 6, fontSize: 12 }}>
+                                    <span style={{ flex: 1, color: T.t1 }}>{sp.name}</span>
+                                    <Input type="number" value={String(sp.qty)} onChange={(v: string) => { const arr = [...selectedParts]; arr[i] = { ...arr[i], qty: +v || 1 }; setSelectedParts(arr); }} style={{ width: 60 }} />
+                                    <span style={{ fontFamily: FONT.mono, color: T.amber }}>{fmt(sp.qty * sp.price)}</span>
+                                    <button onClick={() => setSelectedParts(prev => prev.filter((_, idx) => idx !== i))} style={{ background: "none", border: "none", color: T.crimson, cursor: "pointer", fontSize: 16 }}>✕</button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <Divider label="Labour" />
+                <Field label="Labour Description"><Input value={labourDesc} onChange={setLabourDesc} placeholder="e.g. Full service labour" /></Field>
+                <Field label="Labour Amount (₹)"><Input type="number" value={labourAmt} onChange={setLabourAmt} prefix="₹" /></Field>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 22, paddingTop: 18, borderTop: `1px solid ${T.border}` }}>
+                <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+                <Btn variant="amber" onClick={handleSave}>🔧 Create Job Card</Btn>
+            </div>
+        </Modal>
+    );
+}

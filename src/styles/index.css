@@ -1,3 +1,4 @@
+/* ── Base reset ──────────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -6,10 +7,11 @@
   padding: 0;
 }
 
+/* ── Root — warm cream ERP palette (NOT dark) ────────────────────────────── */
 :root {
-  color-scheme: dark;
-  color: #F0F4F8;
-  background-color: #0A0F1D;
+  color-scheme: light;
+  color: #1C1B1B;
+  background-color: #F5F5F0;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,6 +21,7 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -26,25 +29,17 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  background: #F5F5F0;
+  color: #1C1B1B;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Prevent layout shift from scrollbar */
-html {
-  scrollbar-gutter: stable;
-}
-
-/* Print styles for invoices */
+/* ── Print styles for invoices ───────────────────────────────────────────── */
 @media print {
   body {
     background: #fff !important;
     color: #000 !important;
   }
-
-  .no-print {
-    display: none !important;
-  }
-
-  .print-only {
-    display: block !important;
-  }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
 }

@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
+  test: {
+    // Run tests in a pure Node environment — billing utils have no DOM dependency
+    environment: 'node',
+    include: ['src/tests/**/*.test.js'],
+  },
   plugins: [react()],
   server: {
     proxy: {

@@ -1,0 +1,306 @@
+/**
+ * Data bridging layer: maps backend API shapes → typed frontend store shapes.
+ *
+ * WHY this file matters most for TypeScript: every field name here is a contract
+ * between the backend API and the frontend store. Before TS, renaming
+ * `sellingPrice` to `sellPrice` in the backend silently broke every price display.
+ * Now it's a compile error you see before committing.
+ */
+import type { Product, Movement, Party } from '../types';
+import { api } from './client.js';
+
+// ─── Backend API shapes (what the server returns) ─────────────────────────────
+// These mirror the Prisma select fields in inventory.js / parties.js.
+
+interface BackendInventory {
+  inventoryId: number;
+  masterPartId?: number | null;
+  shopId: number;
+  sellingPrice: number | string;
+  buyingPrice: number | string;
+  stockQty?: number;
+  computedStock?: number;
+  minStockAlert?: number;
+  rackLocation?: string | null;
+  isMarketplaceListed?: boolean;
+  masterPart?: BackendMasterPart | null;
+  partName?: string;
+  movements?: BackendMovement[];
+}
+
+interface BackendMasterPart {
+  partName?: string;
+  brand?: string;
+  categoryL1?: string;
+  categoryL2?: string;
+  hsnCode?: string;
+  gstRate?: number | string;
+  unitOfSale?: string;
+  description?: string;
+  imageUrl?: string | null;
+  oemNumbers?: string | null;
+  oemNumber?: string | null;
+  barcodes?: string | string[] | null;
+  specifications?: Record<string, unknown>;
+}
+
+interface BackendMovement {
+  movementId?: string | number;
+  id?: string | number;
+  shopId?: number;
+  inventoryId?: number;
+  productId?: string | number;
+  type: string;
+  qty: number;
+  unitPrice?: number | string;
+  totalAmount?: number | string;
+  total?: number | string;
+  gstAmount?: number | string;
+  profit?: number | string;
+  paymentMode?: string;
+  notes?: string;
+  createdAt?: string;
+  invoiceId?: string;
+  inventory?: { masterPart?: { partName?: string } };
+  productName?: string;
+}
+
+interface BackendParty {
+  partyId: string | number;
+  name: string;
+  phone?: string | null;
+  gstin?: string | null;
+  address?: string | null;
+  type?: string;
+  creditLimit?: number | string;
+  outstanding?: number | string;
+  notes?: string | null;
+  shopId: number;
+}
+
+interface InventoryApiResponse {
+  inventory?: BackendInventory[];
+}
+
+interface PartiesApiResponse {
+  parties?: BackendParty[];
+}
+
+// ─── Mappers ──────────────────────────────────────────────────────────────────
+
+export function mapInventoryToProduct(inv: BackendInventory): Product {
+  const mp = inv.masterPart;
+  const imageVal = mp?.imageUrl || getCategoryEmoji(mp?.categoryL1);
+  const oemStr = mp?.oemNumbers || mp?.oemNumber || '';
+  const barcodesArr = mp?.barcodes
+    ? (Array.isArray(mp.barcodes) ? mp.barcodes : [mp.barcodes])
+    : [];
+
+  return {
+    id: inv.inventoryId,
+    inventoryId: inv.inventoryId,
+    masterPartId: inv.masterPartId ?? undefined,
+    globalSku: String(inv.masterPartId ?? ''),
+    name: mp?.partName || inv.partName || 'Unknown Part',
+    oemNumber: oemStr || null,
+    barcodes: barcodesArr as string[],
+    brand: mp?.brand || null,
+    category: mp?.categoryL1 || 'General',
+    hsnCode: mp?.hsnCode || null,
+    gstRate: parseFloat(String(mp?.gstRate ?? 18)),
+    unitOfSale: mp?.unitOfSale || null,
+    description: mp?.description || null,
+    sellPrice: parseFloat(String(inv.sellingPrice ?? 0)),
+    buyPrice: parseFloat(String(inv.buyingPrice ?? 0)),
+    stock: inv.computedStock ?? inv.stockQty ?? 0,
+    minStock: inv.minStockAlert ?? 5,
+    rack: inv.rackLocation || null,
+    location: inv.rackLocation || null,
+    isMarketplaceListed: inv.isMarketplaceListed ?? false,
+    shopId: inv.shopId,
+    image: imageVal,
+    imageEmoji: getCategoryEmoji(mp?.categoryL1),
+    sku: oemStr || String(inv.inventoryId).slice(0, 8),
+  };
+}
+
+function getCategoryEmoji(category?: string | null): string {
+  const map: Record<string, string> = {
+    'Brakes': '🛑', 'Filters': '🔘', 'Ignition': '⚡', 'Electrical': '🔋',
+    'Engine': '⚙️', 'Suspension': '🔩', 'Body & Exterior': '🚗',
+    'Engine Oils': '🛢️', 'Fluids': '💧', 'Clutch & Transmission': '⚙️',
+  };
+  return (category && map[category]) || '🔧';
+}
+
+export function mapMovement(m: BackendMovement): Movement {
+  return {
+    id: String(m.movementId || m.id),
+    shopId: m.shopId ?? 0,
+    productId: m.inventoryId || m.productId || null,
+    productName: m.inventory?.masterPart?.partName || m.productName || '',
+    type: m.type as Movement['type'],
+    qty: m.qty,
+    unitPrice: parseFloat(String(m.unitPrice ?? 0)),
+    sellingPrice: parseFloat(String(m.unitPrice ?? 0)),
+    total: parseFloat(String(m.totalAmount ?? m.total ?? 0)),
+    gstAmount: parseFloat(String(m.gstAmount ?? 0)),
+    profit: parseFloat(String(m.profit ?? 0)),
+    payment: m.paymentMode || null,
+    paymentMode: m.paymentMode || null,
+    paymentStatus: 'paid',
+    note: m.notes || '',
+    date: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+    invoiceNo: m.invoiceId || null,
+  };
+}
+
+export function mapParty(p: BackendParty): Party {
+  return {
+    id: p.partyId,
+    partyId: p.partyId,
+    name: p.name,
+    phone: p.phone || null,
+    gstin: p.gstin || null,
+    address: p.address || null,
+    type: (p.type as Party['type']) || 'CUSTOMER',
+    creditLimit: parseFloat(String(p.creditLimit ?? 0)),
+    outstanding: parseFloat(String(p.outstanding ?? 0)),
+    notes: p.notes || null,
+    shopId: p.shopId,
+  };
+}
+
+// ─── Fetch helpers ────────────────────────────────────────────────────────────
+
+export async function fetchInventory(): Promise<Product[] | null> {
+  try {
+    const data = await api.get<InventoryApiResponse>('/api/shop/inventory');
+    return (data.inventory || []).map(mapInventoryToProduct);
+  } catch (err: unknown) {
+    console.warn('[Sync] Could not fetch inventory:', (err as Error).message);
+    return null;
+  }
+}
+
+export async function fetchParties(): Promise<Party[] | null> {
+  try {
+    const data = await api.get<PartiesApiResponse>('/api/shop/parties');
+    return (data.parties || []).map(mapParty);
+  } catch (err: unknown) {
+    console.warn('[Sync] Could not fetch parties:', (err as Error).message);
+    return null;
+  }
+}
+
+export async function fetchMovements(): Promise<null> {
+  return null; // Global movements endpoint not yet available
+}
+
+export async function syncProductSave(product: Partial<Product>): Promise<void> {
+  try {
+    if (product.inventoryId) {
+      await api.put(`/api/shop/inventory/${product.inventoryId}`, {
+        sellingPrice: product.sellPrice,
+        buyingPrice: product.buyPrice,
+        rackLocation: product.rack,
+        minStockAlert: product.minStock,
+        isMarketplaceListed: product.isMarketplaceListed,
+      });
+    }
+  } catch (err: unknown) {
+    console.warn('[Sync] Product save to API failed:', (err as Error).message);
+  }
+}
+
+// ─── Fire-and-forget sync helpers ─────────────────────────────────────────────
+
+interface SyncInvoiceParams {
+  items: { inventoryId: string | number; qty: number; unitPrice: number; discount?: number }[];
+  partyId?: string;
+  partyName?: string;
+  partyPhone?: string;
+  paymentMode?: string;
+  cashAmount?: number;
+  upiAmount?: number;
+  creditAmount?: number;
+  notes?: string;
+}
+
+export async function syncInvoice(params: SyncInvoiceParams): Promise<void> {
+  const hasRealIds = params.items?.every(item => isDbId(item.inventoryId));
+  if (!hasRealIds) return;
+  try {
+    await api.post('/api/billing/invoice', {
+      items: params.items.map(item => ({
+        inventoryId: item.inventoryId,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        discount: item.discount || 0,
+      })),
+      partyId: params.partyId || undefined,
+      partyName: params.partyName || undefined,
+      partyPhone: params.partyPhone || undefined,
+      paymentMode: params.paymentMode || 'CASH',
+      cashAmount: params.cashAmount || undefined,
+      upiAmount: params.upiAmount || undefined,
+      creditAmount: params.creditAmount || undefined,
+      notes: params.notes || undefined,
+    });
+  } catch (err: unknown) {
+    console.error('[Sync] Invoice sync failed — saved locally, backend out of sync:', (err as Error).message);
+  }
+}
+
+interface SyncPurchaseParams {
+  inventoryId: string | number;
+  qty: number;
+  buyingPrice: number;
+  newSellingPrice?: number;
+  supplier?: string;
+  invoiceNo?: string;
+  payment?: string;
+  creditDays?: number;
+  notes?: string;
+}
+
+export async function syncPurchase(params: SyncPurchaseParams): Promise<void> {
+  if (!isDbId(params.inventoryId)) return;
+  try {
+    await api.post('/api/shop/inventory/purchase', params);
+  } catch (err: unknown) {
+    console.error('[Sync] Purchase sync failed — saved locally, backend out of sync:', (err as Error).message);
+  }
+}
+
+interface SyncAdjustmentParams {
+  inventoryId: string | number;
+  type: string;
+  qty: number;
+  reason?: string;
+  refundMethod?: string;
+  refundAmount?: number;
+  supplierName?: string;
+  originalInvoice?: string;
+  notes?: string;
+}
+
+export async function syncAdjustment(params: SyncAdjustmentParams): Promise<void> {
+  if (!isDbId(params.inventoryId)) return;
+  try {
+    await api.post('/api/shop/inventory/adjust', params);
+  } catch (err: unknown) {
+    console.error('[Sync] Adjustment sync failed — saved locally, backend out of sync:', (err as Error).message);
+  }
+}
+
+function isDbId(id: string | number | undefined | null): boolean {
+  if (typeof id === 'number') return Number.isInteger(id) && id > 0;
+  if (typeof id === 'string') {
+    // Positive integer string
+    if (/^\d+$/.test(id)) return parseInt(id, 10) > 0;
+    // Legacy UUID
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  }
+  return false;
+}

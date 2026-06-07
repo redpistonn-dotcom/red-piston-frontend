@@ -1,0 +1,96 @@
+/* Tailwind v3 — preflight disabled so ERP pages are not affected */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Full reset scoped to the landing page wrapper ─────────────────
+   Since preflight is off, browser defaults bleed in:
+   - html/body get margin:8px (shows as black border around page)
+   - <button> gets native OS appearance (gray background, border)
+   - <select> gets native OS appearance
+   These rules reset ONLY inside .lp-root                           */
+.lp-root {
+  display: block;
+  position: relative;
+}
+
+/* Remove body/html margin that creates the black "border" */
+html:has(.lp-root),
+body:has(.lp-root) {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background-color: #fcf9f8 !important;
+}
+
+.lp-root *, .lp-root *::before, .lp-root *::after {
+  box-sizing: border-box;
+}
+
+/* Strip native button styles inside landing page */
+.lp-root button {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  margin: 0;
+  outline: none;
+}
+
+/* Strip native select styles and add custom chevron */
+.lp-root select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%238b716e' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  /* Inline styles set padding-right: 36px — this ensures chevron doesn't overlap */
+  outline: none;
+  color: #1c1b1b !important;
+}
+
+.lp-root select option {
+  color: #1c1b1b;
+  background-color: #ffffff;
+}
+
+/* Focus ring for selects */
+.lp-root select:focus {
+  border-color: #8b1e1e !important;
+  box-shadow: 0 0 0 2px rgba(139, 30, 30, 0.15);
+}
+
+/* Focus ring for inputs */
+.lp-root input:focus {
+  border-color: #8b1e1e !important;
+  box-shadow: 0 0 0 2px rgba(139, 30, 30, 0.15);
+  outline: none;
+}
+
+/* ── Custom utilities (same as the design's <style> block) ───────── */
+.industrial-grid {
+  background-image: radial-gradient(#e5e2e1 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.bg-maroon    { background-color: #8b1e1e; }
+.text-maroon  { color: #8b1e1e; }
+.border-maroon{ border-color: #8b1e1e; }
+.bg-cream     { background-color: #fcf9f8; }
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+.material-symbols-outlined.fill {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
