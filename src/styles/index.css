@@ -34,6 +34,26 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+/* ── Global loading spinner ──────────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Usage: <span className="rp-spinner rp-spinner-sm|md|lg" /> */
+.rp-spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 2.5px solid rgba(139, 113, 110, 0.2);
+  border-top-color: #8b1e1e;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.rp-spinner-sm { width: 14px; height: 14px; }
+.rp-spinner-md { width: 18px; height: 18px; }
+.rp-spinner-lg { width: 48px; height: 48px; border-width: 4px; }
+
 /* ── Print styles for invoices ───────────────────────────────────────────── */
 @media print {
   body {

@@ -94,3 +94,129 @@ body:has(.lp-root) {
 .material-symbols-outlined.fill {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
+
+/* ── CSS loading spinner (font-independent) ──────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.rp-spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 2.5px solid rgba(139, 113, 110, 0.2);
+  border-top-color: #8b1e1e;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.rp-spinner-sm { width: 14px; height: 14px; }
+.rp-spinner-md { width: 18px; height: 18px; }
+.rp-spinner-lg { width: 48px; height: 48px; border-width: 4px; }
+
+/* ── PublicHeader responsive classes ─────────────────────────────────── */
+
+/* Desktop: hamburger hidden, nav + search + right visible */
+.ph-hamburger     { display: none !important; }
+.ph-nav           { display: flex !important; }
+.ph-search        { display: block !important; }
+.ph-right         { display: flex !important; }
+
+/* Marketplace filter button: hidden on desktop */
+.mp-filter-btn    { display: none !important; }
+
+/* Mobile drawer — hidden by default, JS shows it */
+.ph-mobile-drawer {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-bottom: 2px solid #dfbfbc;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+  z-index: 200;
+  flex-direction: column;
+  gap: 0;
+}
+.ph-mobile-drawer.ph-open { display: flex; }
+
+/* ── Global iOS zoom fix: prevent auto-zoom on focused inputs ─────────── */
+@media (max-width: 767px) {
+  .lp-root input,
+  .lp-root select,
+  .lp-root textarea { font-size: 16px !important; }
+
+  /* PublicHeader: swap desktop → hamburger layout */
+  .ph-hamburger { display: flex !important; }
+  .ph-nav       { display: none !important; }
+  .ph-search    { display: none !important; }
+  .ph-right     { display: none !important; }
+
+  /* Landing page auth modal: hide left panel at narrow widths */
+  .auth-left-panel { display: none !important; }
+
+  /* Supplier hero: stack vertically */
+  .sp-hero-inner  { flex-direction: column !important; gap: 32px !important; }
+  .sp-stat-grid   { width: 100% !important; }
+
+  /* Supplier cards: stack vertically */
+  .sp-supplier-card { flex-direction: column !important; }
+  .sp-supplier-img  { width: 100% !important; height: 200px !important; }
+  .sp-supplier-body { flex-direction: column !important; align-items: flex-start !important; }
+  .sp-supplier-btns { flex-direction: row !important; width: 100% !important; align-items: stretch !important; }
+  .sp-supplier-btns button { flex: 1 !important; }
+
+  /* Benefits grid: 2-col on tablet/phone */
+  .sp-benefits-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* Section header rows: allow wrap */
+  .lp-section-header { flex-wrap: wrap !important; gap: 8px !important; }
+
+  /* Hero CTA button rows */
+  .lp-cta-row { flex-wrap: wrap !important; }
+
+  /* Marketplace sidebar: hidden by default, shown via JS toggle */
+  .mp-sidebar-hidden { display: none !important; }
+  .mp-sidebar-open   { display: block !important; width: 100% !important; }
+  /* When sidebar is open on mobile, make it full-width (override inline width:260) */
+  .mp-sidebar-open aside,
+  .mp-sidebar-open { width: 100% !important; }
+
+  /* Mobile filters button: show on mobile */
+  .mp-filter-btn { display: flex !important; }
+
+  /* Marketplace main layout: column on mobile */
+  .mp-main-layout { flex-direction: column !important; padding: 16px 12px 40px !important; }
+
+  /* Login toast: full-width */
+  .mp-login-toast { width: calc(100vw - 32px) !important; min-width: unset !important; left: 16px !important; right: 16px !important; transform: none !important; }
+
+  /* Checkout grid */
+  .checkout-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
+  .inner-grid-2  { grid-template-columns: 1fr !important; }
+  .inner-grid-3  { grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 480px) {
+  /* Benefits grid: 1-col on very small phones */
+  .sp-benefits-grid { grid-template-columns: 1fr !important; }
+  /* Product grid: 1 col on very small phones */
+  .mp-grid-2col { grid-template-columns: 1fr !important; }
+}
+
+/* ── LandingPage specific ─────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Vehicle selector inner grid: already using Tailwind but ensure override */
+  .lp-root .lp-vehicle-grid { grid-template-columns: 1fr !important; }
+
+  /* Number plate input font size */
+  .lp-root .lp-plate-input { font-size: clamp(14px, 4vw, 20px) !important; letter-spacing: clamp(0.08em, 1vw, 0.18em) !important; }
+}
+
+/* ── Safe-area insets for iPhone notch / home bar ─────────────────────── */
+.lp-root header { padding-top: env(safe-area-inset-top, 0px); }
+.lp-root footer,
+.lp-cta-footer  { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* min-width floor so page never shrinks below 320px */
+.lp-root { min-width: 320px; }

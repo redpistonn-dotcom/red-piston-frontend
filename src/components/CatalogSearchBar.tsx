@@ -57,6 +57,12 @@ export function CatalogSearchBar({
 
   const results: CatalogPart[] = data || [];
 
+  // Show spinner as soon as the user types 2+ chars — don't wait for the debounce.
+  // query !== debouncedQuery  → user typed, debounce pending (300ms gap)
+  // isFetching                → debounce fired, fetch in flight
+  const showSpinner =
+    query.trim().length >= 2 && (query !== debouncedQuery || isFetching);
+
   // Show dropdown when we have results and the input is focused
   const showDropdown = open && focused && debouncedQuery.trim().length >= 2;
 
@@ -88,10 +94,10 @@ export function CatalogSearchBar({
         }
       }}
     >
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-        {/* Search icon */}
+      <div style={{ position: 'relative', width: '100%', height: 48, lineHeight: 0 }}>
+        {/* Search icon — absolute so it floats inside without breaking layout */}
         <span className="material-symbols-outlined"
-          style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 20, color: iconColor, pointerEvents: 'none', zIndex: 1 }}>
+          style={{ position: 'absolute', left: 14, top: 14, fontSize: 20, color: iconColor, pointerEvents: 'none', zIndex: 1 }}>
           search
         </span>
 
@@ -104,8 +110,10 @@ export function CatalogSearchBar({
           onKeyDown={handleKey}
           placeholder={placeholder}
           style={{
-            width: '100%', height: 48, paddingLeft: 44, paddingRight: isFetching ? 44 : 14,
-            backgroundColor: '#f6f3f2', border: `1.5px solid ${focused ? '#8b1e1e' : '#dfbfbc'}`,
+            width: '100%', height: 48,
+            paddingLeft: 44, paddingRight: showSpinner ? 44 : 16,
+            backgroundColor: '#f6f3f2',
+            border: `1.5px solid ${focused ? '#8b1e1e' : '#dfbfbc'}`,
             borderRadius: 12, fontSize: 14, color: '#1c1b1b', outline: 'none',
             fontFamily: 'Inter, sans-serif', boxSizing: 'border-box' as const,
             transition: 'border-color 0.15s',
@@ -113,12 +121,10 @@ export function CatalogSearchBar({
           }}
         />
 
-        {/* Loading spinner */}
-        {isFetching && (
-          <span className="material-symbols-outlined"
-            style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: '#8b716e', animation: 'spin 0.8s linear infinite' }}>
-            sync
-          </span>
+        {/* Loading spinner — shown instantly on keypress, not after debounce */}
+        {showSpinner && (
+          <span className="rp-spinner rp-spinner-md"
+            style={{ position: 'absolute', right: 14, top: 15 }} />
         )}
       </div>
 
@@ -186,7 +192,6 @@ export function CatalogSearchBar({
         </div>
       )}
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg) translateY(-50%); } to { transform: rotate(360deg) translateY(-50%); } }`}</style>
     </div>
   );
 }

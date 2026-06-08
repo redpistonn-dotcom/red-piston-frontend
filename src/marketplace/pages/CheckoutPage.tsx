@@ -467,7 +467,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
             {/* ════════ PROCESSING STEP ════════ */}
             {step === "processing" && (
                 <div style={{ textAlign: "center", padding: "80px 20px" }}>
-                    <div style={{ fontSize: 64, marginBottom: 24, animation: "spin 1.5s linear infinite" }}>⏳</div>
+                    <span className="rp-spinner rp-spinner-lg" style={{ marginBottom: 24, display: 'block', margin: '0 auto 24px' }} />
                     <div style={{ fontSize: 22, fontWeight: 900, color: T.t1 }}>Processing your order...</div>
                     <div style={{ fontSize: 14, color: T.t3, marginTop: 8 }}>Verifying stock & securing payment</div>
                     <div style={{ width: 200, height: 4, background: T.surface, borderRadius: 4, margin: "28px auto 0", overflow: "hidden", position: "relative" }}>

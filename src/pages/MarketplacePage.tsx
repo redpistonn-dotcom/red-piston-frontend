@@ -14,82 +14,46 @@ import { useCart } from '../context/CartContext';
 import { AppCtx } from '../context/AppCtx';
 import { api } from '../api/client';
 import { CatalogSearchBar } from '../components/CatalogSearchBar';
+import { PublicHeader } from '../components/PublicHeader';
 
 /* ── Shared icon shorthand ─────────────────────────────────────────── */
 function Icon({ n, style }: { n: string; style?: React.CSSProperties }) {
   return <span className="material-symbols-outlined" style={style}>{n}</span>;
 }
 
-/* ── Shared nav bar ────────────────────────────────────────────────── */
+/* ── Nav bar — uses shared PublicHeader ─────────────────────────── */
 function MarketplaceNav({
-  search, onSearch, onCartClick, onAuthClick, cartCount, currentUser,
+  onCartClick, onAuthClick, cartCount, currentUser,
 }: {
-  search: string;
-  onSearch: (v: string) => void;
   onCartClick: () => void;
   onAuthClick: () => void;
   cartCount: number;
   currentUser: any;
 }) {
-  const navigate = useNavigate();
   return (
-    <header style={{
-      backgroundColor: '#fcf9f8', borderBottom: '1px solid #dfbfbc',
-      position: 'sticky', top: 0, zIndex: 50,
-      width: '100%', height: 72,
-    }}>
-      <div style={{
-        maxWidth: 1440, margin: '0 auto',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 24px', height: '100%', gap: 24,
-      }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 32, flexShrink: 0 }}>
-          <img
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHoRqueT7rYQ9UU0uaqdoukDlx38GMecl-iaxA_YPsKta4MkYIh1zNn8Cq0sPsr7M4RgQ_U9qftq7c7PW05n3PYedVKG1_Cpvw5_kyltJtcea9-H5bNgTqs1NRGHFnhX112m_HSJaZ_F722rFQmkTxVmCCp4R5IZWlInV5SCBfQPTQHPO3YJFw6En0MQgRNEFl44PmMZH8bZyTjh0btvYW3gM2r1JgFZvpQS67UpJr1SYz_N81ByrPkXv3k89WFF_7n0z5A0S4BE4"
-            alt="RedPiston"
-            style={{ height: 40, width: 'auto', objectFit: 'contain', cursor: 'pointer' }}
-            onClick={() => navigate('/')}
-          />
-          <div style={{ display: 'flex', gap: 24 }}>
-            {[
-              { label: 'Marketplace', href: '/marketplace' },
-              { label: 'OEM Parts',   href: '/oem-parts' },
-              { label: 'Suppliers',   href: '/suppliers' },
-            ].map(({ label: l, href }) => (
-              <a key={l} href={href} style={{ color: l === 'Marketplace' ? '#8b1e1e' : '#58413f', fontSize: 14, fontWeight: l === 'Marketplace' ? 700 : 500, textDecoration: 'none', borderBottom: l === 'Marketplace' ? '2px solid #8b1e1e' : '2px solid transparent', paddingBottom: 4 }}>{l}</a>
-            ))}
-          </div>
-        </div>
-
-        {/* Search — connected to master catalog via CatalogSearchBar */}
-        <div style={{ flex: 1, maxWidth: 600 }}>
-          <CatalogSearchBar placeholder="Search by Part Name, OEM Number, or Brand..." />
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {/* Wishlist */}
-          <button style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
-            <Icon n="favorite_border" style={{ color: '#58413f', fontSize: 22 }} />
-          </button>
-          {/* Cart */}
-          <button onClick={onCartClick}
-            style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', position: 'relative' }}>
-            <Icon n="shopping_cart" style={{ color: '#58413f', fontSize: 22 }} />
-            {cartCount > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{cartCount}</span>
-            )}
-          </button>
-          {/* Auth */}
-          <button onClick={onAuthClick}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '1px solid #dfbfbc', borderRadius: 8, backgroundColor: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>
-            <Icon n="account_circle" style={{ fontSize: 20, color: '#58413f' }} />
-            {currentUser ? (currentUser.name || currentUser.email?.split('@')[0] || 'Account') : 'Log In'}
-          </button>
-        </div>
-      </div>
-    </header>
+    <PublicHeader
+      searchPlaceholder="Search by Part Name, OEM Number, or Brand..."
+      rightSlot={<>
+        {/* Wishlist */}
+        <button style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
+          <Icon n="favorite_border" style={{ color: '#58413f', fontSize: 22 }} />
+        </button>
+        {/* Cart */}
+        <button onClick={onCartClick}
+          style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', position: 'relative' }}>
+          <Icon n="shopping_cart" style={{ color: '#58413f', fontSize: 22 }} />
+          {cartCount > 0 && (
+            <span style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{cartCount}</span>
+          )}
+        </button>
+        {/* Auth */}
+        <button onClick={onAuthClick}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '1px solid #dfbfbc', borderRadius: 8, backgroundColor: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>
+          <Icon n="account_circle" style={{ fontSize: 20, color: '#58413f' }} />
+          {currentUser ? (currentUser.name || currentUser.email?.split('@')[0] || 'Account') : 'Log In'}
+        </button>
+      </>}
+    />
   );
 }
 
@@ -230,10 +194,10 @@ function LoginToast({ onLogin, onClose }: { onLogin: () => void; onClose: () => 
   return (
     <div style={{
       position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-      backgroundColor: '#1c1b1b', color: '#fff', borderRadius: 12, padding: '16px 24px',
+      backgroundColor: '#1c1b1b', color: '#fff', borderRadius: 12, padding: '16px 20px',
       boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 9999,
-      display: 'flex', alignItems: 'center', gap: 16, fontFamily: 'Inter, sans-serif',
-      fontSize: 14, minWidth: 360,
+      display: 'flex', alignItems: 'center', gap: 14, fontFamily: 'Inter, sans-serif',
+      fontSize: 14, width: 'calc(100vw - 32px)', maxWidth: 420,
     }}>
       <Icon n="shopping_cart" style={{ fontSize: 22, color: '#ffb3ad' }} />
       <span style={{ flex: 1 }}>Sign in to add items to your cart</span>
@@ -261,7 +225,11 @@ export function MarketplacePage() {
   const [viewMode,      setViewMode]      = useState<'grid' | 'list'>('grid');
   const [page,          setPage]          = useState(1);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const urlQuery = params.get('q') || '';
+  const urlMake  = params.get('make')  || '';
+  const urlModel = params.get('model') || '';
+  const urlYear  = params.get('year')  || '';
   const [search, setSearch] = useState(urlQuery);
 
   // Real catalog data from backend
@@ -275,16 +243,24 @@ export function MarketplacePage() {
   // Login wall
   const [showLoginToast, setShowLoginToast] = useState(false);
 
-  // Load vehicle from localStorage if user is logged in
+  // Pre-populate vehicle filter from URL params (set by LandingPage "Find Compatible Parts")
   useEffect(() => {
-    if (currentUser) {
+    if (urlMake) {
+      const label = `${urlMake}${urlModel ? ' · ' + urlModel : ''}${urlYear ? ' ' + urlYear : ''}`;
+      setVehicleFilter(label);
+    }
+  }, [urlMake, urlModel, urlYear]);
+
+  // Also load from localStorage for logged-in users (only if no URL vehicle was given)
+  useEffect(() => {
+    if (currentUser && !urlMake) {
       try {
         const vehicles = JSON.parse(localStorage.getItem('vl_vehicles') || '[]');
         const defaultV = vehicles[0];
         if (defaultV?.make) setVehicleFilter(`${defaultV.make}${defaultV.model ? ' · ' + defaultV.model : ''}${defaultV.year ? ' ' + defaultV.year : ''}`);
       } catch {}
     }
-  }, [currentUser]);
+  }, [currentUser, urlMake]);
 
   // Fetch from /api/catalog/search when URL query or filters change
   useEffect(() => {
@@ -292,8 +268,13 @@ export function MarketplacePage() {
       setCatalogLoading(true);
       try {
         const queryParams = new URLSearchParams();
-        if (urlQuery) queryParams.set('q', urlQuery);
+        // Vehicle filter from home page takes priority as the search term
+        if (urlMake) queryParams.set('q', [urlMake, urlModel].filter(Boolean).join(' '));
+        else if (urlQuery) queryParams.set('q', urlQuery);
         else queryParams.set('q', 'brake'); // default browse
+        if (urlMake)  queryParams.set('make',  urlMake);
+        if (urlModel) queryParams.set('model', urlModel);
+        if (urlYear)  queryParams.set('year',  urlYear);
         if (activeCateg) queryParams.set('category', activeCateg);
         queryParams.set('limit', '24');
         queryParams.set('offset', String((page - 1) * 24));
@@ -358,18 +339,18 @@ export function MarketplacePage() {
   return (
     <div className="lp-root" style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#fcf9f8', minHeight: '100vh' }}>
       <MarketplaceNav
-        search={search}
-        onSearch={v => { setSearch(v); setPage(1); }}
         onCartClick={() => navigate('/cart')}
         onAuthClick={() => currentUser ? null : setAuthModalOpen(true)}
         cartCount={cartCount}
         currentUser={currentUser}
       />
 
-      <main style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', gap: 24, padding: '24px 24px 48px' }}>
+      <main className="mp-main-layout" style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', gap: 24, padding: '24px 24px 48px' }}>
 
         {/* ── SIDEBAR FILTERS ──────────────────────────────────────── */}
-        <aside style={{ width: 260, flexShrink: 0 }}>
+        {/* mp-sidebar-hidden hides on mobile; mp-sidebar-open shows when toggled */}
+        <aside className={`mp-sidebar-hidden${sidebarOpen ? ' mp-sidebar-open' : ''}`}
+          style={{ width: 260, flexShrink: 0 }}>
           <div style={{
             backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 12, padding: 24,
             position: 'sticky', top: 88,
@@ -462,8 +443,21 @@ export function MarketplacePage() {
 
         {/* ── RESULTS ──────────────────────────────────────────────── */}
         <section style={{ flex: 1, minWidth: 0 }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24 }}>
+          {/* Mobile Filters button — hidden on desktop via .mp-filter-btn CSS class */}
+          <button className="mp-filter-btn"
+            onClick={() => setSidebarOpen(o => !o)}
+            style={{
+              display: 'none', // shown via CSS on mobile
+              alignItems: 'center', gap: 8, padding: '10px 18px', marginBottom: 16,
+              border: '1.5px solid #dfbfbc', borderRadius: 10, backgroundColor: '#fff',
+              color: '#1c1b1b', fontWeight: 600, fontSize: 14, cursor: 'pointer', minHeight: 44,
+            }}>
+            <Icon n="tune" style={{ fontSize: 18, color: '#8b1e1e' }} />
+            {sidebarOpen ? 'Hide Filters' : 'Filters'}
+          </button>
+
+          {/* Header: wraps on mobile */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
             <div>
               {/* Breadcrumb */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#8b716e', marginBottom: 8 }}>
@@ -473,9 +467,9 @@ export function MarketplacePage() {
                 <Icon n="chevron_right" style={{ fontSize: 16 }} />
                 <span style={{ color: '#1c1b1b' }}>Search Results</span>
               </div>
-              <h1 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 28, fontWeight: 700, color: '#1c1b1b', margin: 0 }}>
+              <h1 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(18px, 5vw, 28px)', fontWeight: 700, color: '#1c1b1b', margin: 0 }}>
                 {urlQuery ? `Results for "${urlQuery}"` : 'Industrial Parts'}{' '}
-                <span style={{ fontWeight: 400, color: '#8b716e', fontSize: 24 }}>
+                <span style={{ fontWeight: 400, color: '#8b716e', fontSize: 'clamp(14px, 3.5vw, 24px)' }}>
                   {catalogLoading ? '(loading…)' : `(${filtered.length} results)`}
                 </span>
               </h1>
@@ -504,7 +498,9 @@ export function MarketplacePage() {
           ) : (
             <div style={{
               display: 'grid',
-              gridTemplateColumns: viewMode === 'grid' ? 'repeat(3, 1fr)' : '1fr',
+              gridTemplateColumns: viewMode === 'grid'
+                ? 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))'
+                : '1fr',
               gap: 20,
             }}>
               {filtered.map(p => <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} />)}
@@ -529,10 +525,15 @@ export function MarketplacePage() {
         </section>
       </main>
 
-      {/* Login wall toast */}
+      {/* Login wall toast — Sign In navigates to /login which opens the auth modal */}
       {showLoginToast && (
         <LoginToast
-          onLogin={() => { setShowLoginToast(false); setAuthModalOpen(true); }}
+          onLogin={() => {
+            setShowLoginToast(false);
+            // /login renders LandingPage with openAuth=true; state carries the
+            // return URL so the user lands back on /marketplace after signing in.
+            navigate('/login', { state: { returnTo: '/marketplace' } });
+          }}
           onClose={() => setShowLoginToast(false)}
         />
       )}

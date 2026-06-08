@@ -7,13 +7,14 @@
  */
 import '../styles/landing.css';
 import { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, isFirebaseConfigured } from '../config/firebase';
 import { api, setTokens } from '../api/client';
 import { getDefaultRoute } from '../components/routes';
 import { AppCtx } from '../context/AppCtx';
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from '../api/marketplace';
 import { CatalogSearchBar } from '../components/CatalogSearchBar';
+import { PublicHeader } from '../components/PublicHeader';
 
 /* ── Load fonts + Material Symbols exactly as the design does ──────── */
 function useDesignFonts() {
@@ -340,7 +341,7 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
         </div>
 
         {/* ── RIGHT: form panel ──────────────────────────────────── */}
-        <div style={{ flex: 1, backgroundColor: '#fcf9f8', padding: '24px 32px 20px', display: 'flex', flexDirection: 'column', position: 'relative', overflowY: 'auto', maxHeight: '90vh' }}>
+        <div className="auth-right-panel" style={{ flex: 1, backgroundColor: '#fcf9f8', padding: '24px 32px 20px', display: 'flex', flexDirection: 'column', position: 'relative', overflowY: 'auto', maxHeight: '90vh' }}>
           <button onClick={onClose} style={{ position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: '50%', border: '1px solid #dfbfbc', backgroundColor: '#fff', cursor: 'pointer', fontSize: 16, color: '#8b716e', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>×</button>
 
           {/* Logo — explicit size so it's always visible */}
@@ -391,7 +392,7 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
               style={{ width: '100%', height: 52, border: '1.5px solid #dfbfbc', backgroundColor: '#fff', borderRadius: 12, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontSize: 14, fontWeight: 600, color: '#1c1b1b', marginBottom: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', transition: 'background 0.15s' }}
               onMouseEnter={e => !loading && (e.currentTarget.style.backgroundColor = '#f6f3f2')}
               onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}>
-              {loading ? <><span className="material-symbols-outlined" style={{ fontSize: 18, animation: 'spin 1s linear infinite' }}>sync</span> Please wait…</>
+              {loading ? <><span className="rp-spinner rp-spinner-md" /> Please wait…</>
                : <><svg width="20" height="20" viewBox="0 0 18 18"><path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/><path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/><path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/><path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/></svg>Continue with Google</>}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -487,7 +488,7 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
               <ErrBox />
               <button type="submit" style={pBtn(loading)} disabled={loading}>
                 {loading
-                  ? <><span className="material-symbols-outlined" style={{ fontSize: 17, animation: 'spin 1s linear infinite' }}>sync</span> Please wait…</>
+                  ? <><span className="rp-spinner rp-spinner-md" /> Please wait…</>
                   : authMode === 'signin'
                     ? 'Secure Login →'
                     : 'Continue to Details →'
@@ -530,8 +531,8 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
                     {MAKES.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
-                {/* Model + Year row */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {/* Model + Year row — collapses to 1-col on mobile via lp-vehicle-grid */}
+                <div className="lp-vehicle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <label style={lbl}>Model</label>
                     <input type="text" placeholder="e.g. Swift, Creta" value={vModel} onChange={e => setVModel(e.target.value)} style={inp} />
@@ -558,14 +559,14 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
                 </div>
                 <ErrBox />
                 <button type="submit" style={pBtn(loading)} disabled={loading}>
-                  {loading ? <><span className="material-symbols-outlined" style={{ fontSize: 17, animation: 'spin 1s linear infinite' }}>sync</span> Saving…</> : 'Get Started →'}
+                  {loading ? <><span className="rp-spinner rp-spinner-md" /> Saving…</> : 'Get Started →'}
                 </button>
               </form>
             </>)}
           </>)}
 
           {/* Footer */}
-          <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid #e5e2e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18 }}>
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid #e5e2e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: '#9c8c7c' }}>© 2024 RedPiston Industrial.</span>
             <div style={{ display: 'flex', gap: 12 }}>
               {['Privacy','Compliance','Contact'].map(l => <a key={l} href="#" style={{ fontSize: 11, color: '#9c8c7c', textDecoration: 'none' }}>{l}</a>)}
@@ -574,9 +575,12 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
         </div>
       </div>
       <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .auth-left-panel { display: flex !important; flex-direction: column; justify-content: flex-end; }
-        @media (max-width: 680px) { .auth-left-panel { display: none !important; } }
+        @media (max-width: 600px) { .auth-left-panel { display: none !important; } }
+        @media (max-width: 480px) {
+          .auth-right-panel { padding: 20px 16px !important; }
+          .auth-modal-inner { grid-template-columns: 1fr !important; }
+        }
       `}</style>
     </div>
   );
@@ -584,7 +588,8 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
 
 export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
   useDesignFonts();
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const { pathname } = useLocation();
   const [tab, setTab] = useState<'vehicle' | 'plate'>('vehicle');
 
   /* ── Hero vehicle selector — fetched from DB ────────────────────── */
@@ -653,78 +658,27 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
         />
       )}
 
-      {/* ═══════════════════════════════════════════════════════════
-          TOP NAV BAR — sticky, white surface, logo + links + search
-      ═══════════════════════════════════════════════════════════ */}
-      <nav className="sticky top-0 z-50 bg-surface border-b border-outline-variant w-full h-huge flex items-center"
-           style={{ backgroundColor: '#fff', borderColor: '#dfbfbc' }}>
-        <div className="max-w-7xl mx-auto px-lg flex justify-between items-center w-full">
-
-          {/* Logo + nav links */}
-          <div className="flex items-center gap-xl">
-            <span
-              className="font-display-lg text-[24px] font-black tracking-tighter cursor-pointer"
-              onClick={() => navigate('/')}
-              style={{ fontFamily: 'Poppins, sans-serif' }}
-            >
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHoRqueT7rYQ9UU0uaqdoukDlx38GMecl-iaxA_YPsKta4MkYIh1zNn8Cq0sPsr7M4RgQ_U9qftq7c7PW05n3PYedVKG1_Cpvw5_kyltJtcea9-H5bNgTqs1NRGHFnhX112m_HSJaZ_F722rFQmkTxVmCCp4R5IZWlInV5SCBfQPTQHPO3YJFw6En0MQgRNEFl44PmMZH8bZyTjh0btvYW3gM2r1JgFZvpQS67UpJr1SYz_N81ByrPkXv3k89WFF_7n0z5A0S4BE4"
-                alt="RedPiston Logo"
-                className="h-8 w-auto object-contain"
-              />
-            </span>
-            <div className="hidden lg:flex gap-lg items-center ml-xl">
-              {/* Active link: bottom border only — NO text-decoration/underline */}
-              {[
-                { label: 'Marketplace', href: '/marketplace', active: true  },
-                { label: 'OEM Parts',   href: '/oem-parts',   active: false },
-                { label: 'Suppliers',   href: '/suppliers',   active: false },
-              ].map(({ label, href, active }) => (
-                <a key={label} href={href}
-                  style={{
-                    color: active ? '#8b1e1e' : '#58413f',
-                    fontWeight: active ? 700 : 500,
-                    fontSize: 14,
-                    textDecoration: 'none',               /* no underline */
-                    borderBottom: active ? '2px solid #8b1e1e' : '2px solid transparent',
-                    paddingBottom: 4,
-                    transition: 'color 0.15s, border-color 0.15s',
-                  }}
-                  onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.color = '#8b1e1e'; (e.currentTarget as HTMLAnchorElement).style.borderBottomColor = 'rgba(139,30,30,0.3)'; }}}
-                  onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLAnchorElement).style.color = '#58413f'; (e.currentTarget as HTMLAnchorElement).style.borderBottomColor = 'transparent'; }}}
-                >
-                  {label}
-                </a>
-              ))}
-            </div>
-          </div>
-
-          {/* Search — real-time catalog search with autocomplete */}
-          <div className="flex-1 max-w-xl mx-xl hidden md:block">
-            <CatalogSearchBar placeholder="Search by Part Number, VIN, or Category..." />
-          </div>
-
-          {/* CTAs */}
-          <div className="flex items-center gap-md">
-            <button
-              onClick={() => setAuthModal({ open: true, mode: 'signin' })}
-              style={{ color: '#8b1e1e', padding: '0 16px', height: 44, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, transition: 'background 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#eae7e7')}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => setAuthModal({ open: true, mode: 'signup' })}
-              style={{ backgroundColor: '#8b1e1e', color: '#fff', padding: '0 16px', height: 44, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 14, transition: 'opacity 0.2s' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-            >
-              Get Started
-            </button>
-          </div>
-        </div>
-      </nav>
+      <PublicHeader
+        searchPlaceholder="Search by Part Number, VIN, or Category..."
+        rightSlot={<>
+          <button
+            onClick={() => setAuthModal({ open: true, mode: 'signin' })}
+            style={{ color: '#8b1e1e', padding: '0 16px', height: 44, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, transition: 'background 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#eae7e7')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => setAuthModal({ open: true, mode: 'signup' })}
+            style={{ backgroundColor: '#8b1e1e', color: '#fff', padding: '0 16px', height: 44, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 14, transition: 'opacity 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
+            Get Started
+          </button>
+        </>}
+      />
 
       {/* ═══════════════════════════════════════════════════════════
           HERO — industrial dot grid, two-column layout
@@ -740,7 +694,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               Precision Parts for{' '}
               <span style={{ color: '#8b1e1e' }}>Industrial Reliability.</span>
             </h1>
-            <p className="text-on-surface-variant text-title-lg mb-xl max-w-lg" style={{ color: '#58413f', fontSize: 20 }}>
+            <p className="text-on-surface-variant text-title-lg mb-xl max-w-lg" style={{ color: '#58413f', fontSize: 'clamp(15px, 4vw, 20px)' }}>
               Direct access to authentic OEM and OES components. Engineered for performance, delivered for speed.
             </p>
 
@@ -775,7 +729,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
 
               {/* ── Vehicle Selector — data fetched from DB ─────────────── */}
               {tab === 'vehicle' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="lp-vehicle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   {/* Make */}
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1c1b1b', marginBottom: 5 }}>Make</label>
@@ -840,9 +794,16 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                     />
                   </div>
 
-                  {/* CTA */}
+                  {/* CTA — redirects to /marketplace with vehicle filters as query params */}
                   <button
                     disabled={!selectedMake}
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      if (selectedMake)  params.set('make',  selectedMake);
+                      if (selectedModel) params.set('model', selectedModel);
+                      if (selectedYear)  params.set('year',  selectedYear);
+                      navigate(`/marketplace?${params.toString()}`);
+                    }}
                     style={{ gridColumn: 'span 2', height: 50, backgroundColor: selectedMake ? '#8b1e1e' : '#c9bab8', color: '#fff', borderRadius: 12, marginTop: 6, fontWeight: 700, fontSize: 14, border: 'none', cursor: selectedMake ? 'pointer' : 'not-allowed', transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 18 }}>search</span>
@@ -869,7 +830,8 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                         onChange={e => setPlateNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9\s]/g, ''))}
                         placeholder="MH 12 AB 1234"
                         maxLength={13}
-                        style={{ flex: 1, height: 52, border: 'none', outline: 'none', padding: '0 16px', fontSize: 20, fontWeight: 800, letterSpacing: '0.18em', color: '#1c1b1b', backgroundColor: 'transparent', fontFamily: 'JetBrains Mono, Inter, monospace' }}
+                        className="lp-plate-input"
+                        style={{ flex: 1, height: 52, border: 'none', outline: 'none', padding: '0 16px', fontSize: 'clamp(14px, 4vw, 20px)', fontWeight: 800, letterSpacing: 'clamp(0.08em, 1vw, 0.18em)', color: '#1c1b1b', backgroundColor: 'transparent', fontFamily: 'JetBrains Mono, Inter, monospace' }}
                       />
                     </div>
                     <p style={{ fontSize: 12, color: '#58413f', marginTop: 6 }}>
@@ -907,7 +869,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       ═══════════════════════════════════════════════════════════ */}
       <section className="py-huge bg-surface-container-low" style={{ backgroundColor: '#f6f3f2' }}>
         <div className="max-w-7xl mx-auto px-lg">
-          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
+          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
             Popular Categories
           </h2>
           {/* Exact layout from design: 6-column grid, white card, icon circle + label */}
@@ -978,10 +940,10 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       ═══════════════════════════════════════════════════════════ */}
       <section className="py-giant">
         <div className="max-w-7xl mx-auto px-lg">
-          <div className="flex justify-between items-end mb-xl">
+          <div className="flex flex-wrap justify-between items-end mb-xl gap-2">
             <div>
               <h2 className="font-headline-md text-headline-md"
-                  style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b' }}>
+                  style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b' }}>
                 Global Top Selling Parts
               </h2>
               <p style={{ color: '#58413f' }}>Authenticated OEM components sourced from tier-1 global suppliers.</p>
@@ -1039,9 +1001,9 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       <section className="py-giant" style={{ backgroundColor: '#fcf9f8' }}>
         <div className="max-w-7xl mx-auto px-lg">
           {/* Header row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+          <div className="lp-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
             <div>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b', margin: '0 0 4px' }}>
+              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', margin: '0 0 4px' }}>
                 Trending Near You
               </h2>
               <p style={{ color: '#58413f', fontSize: 14, margin: 0 }}>
@@ -1168,7 +1130,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       <section className="py-giant industrial-grid">
         <div className="max-w-7xl mx-auto px-lg">
           <h2 className="font-headline-md text-headline-md mb-xl text-center"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b', marginBottom: 24, textAlign: 'center' }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24, textAlign: 'center' }}>
             Services Near You
           </h2>
           <div className="flex flex-wrap justify-center gap-lg">
@@ -1181,7 +1143,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             ].map(s => (
               <div key={s.title}
                    className="bg-surface border border-outline-variant p-xl rounded-xxl shadow-sm text-center hover:border-maroon transition-all cursor-pointer"
-                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', padding: 24, borderRadius: 16, width: 224, textAlign: 'center' }}>
+                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', padding: 24, borderRadius: 16, width: 'clamp(160px, 40vw, 224px)', textAlign: 'center' }}>
                 <span className="material-symbols-outlined text-maroon mb-md" style={{ fontSize: 48, color: '#8b1e1e', display: 'block', marginBottom: 12 }}>{s.icon}</span>
                 <h4 className="font-bold" style={{ fontWeight: 700 }}>{s.title}</h4>
                 <p className="text-sm text-on-surface-variant mt-sm" style={{ fontSize: 14, color: '#58413f', marginTop: 8 }}>{s.desc}</p>
@@ -1197,7 +1159,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       <section className="py-huge bg-surface-container-low" style={{ backgroundColor: '#f6f3f2' }}>
         <div className="max-w-7xl mx-auto px-lg">
           <h2 className="font-headline-md text-headline-md mb-xl"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
             Trusted Shops Near You
           </h2>
           <div className="grid lg:grid-cols-2 gap-xl">
@@ -1209,7 +1171,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                    className="flex flex-col sm:flex-row bg-surface border border-outline-variant rounded-xxl overflow-hidden hover:shadow-lg transition-all"
                    style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', borderRadius: 16 }}>
                 <img className="w-full sm:w-64 object-cover" src={shop.img}
-                     style={{ width: 256, objectFit: 'cover', flexShrink: 0 }} />
+                     style={{ objectFit: 'cover', flexShrink: 0 }} />
                 <div className="p-xl flex flex-col justify-between" style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -1247,7 +1209,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
         <div className="max-w-7xl mx-auto px-lg">
           {/* OEM */}
           <h2 className="font-headline-md text-headline-md mb-xl"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
             Popular OEM Brands
           </h2>
           <div className="flex gap-xl overflow-x-auto pb-lg hide-scrollbar">
@@ -1272,7 +1234,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
 
           {/* OES */}
           <h2 className="font-headline-md text-headline-md mb-xl mt-giant"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b', marginBottom: 24, marginTop: 64 }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24, marginTop: 64 }}>
             Popular OES Brands
           </h2>
           <div className="flex gap-xl overflow-x-auto pb-lg hide-scrollbar">
@@ -1301,7 +1263,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                style={{ backgroundColor: '#f6f3f2' }}>
         <div className="max-w-7xl mx-auto px-lg">
           <h2 className="text-center mb-huge"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 32, fontWeight: 700, color: '#1c1b1b', marginBottom: 48, textAlign: 'center' }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 48, textAlign: 'center' }}>
             Why Choose Us
           </h2>
           <div className="grid md:grid-cols-3 gap-xl">
@@ -1422,8 +1384,8 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             ))}
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-lg py-lg border-t flex justify-between items-center"
-             style={{ borderTop: '1px solid rgba(255,255,255,0.1)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="max-w-7xl mx-auto px-lg py-lg border-t flex flex-wrap justify-between items-center gap-2"
+             style={{ borderTop: '1px solid rgba(255,255,255,0.1)', padding: '16px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <span style={{ color: '#fff', fontSize: 14 }}>© 2024 RedPiston Industrial. All rights reserved.</span>
           <div style={{ display: 'flex', gap: 16 }}>
             <span className="material-symbols-outlined cursor-pointer" style={{ color: '#fff', cursor: 'pointer', fontSize: 24 }}>language</span>
