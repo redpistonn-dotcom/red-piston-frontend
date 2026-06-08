@@ -227,3 +227,15 @@ body:has(.lp-root) {
 
 /* min-width floor so page never shrinks below 320px */
 .lp-root { min-width: 320px; }
+
+/* ── Compact spacing to match ERP operations dashboard density ─────────────
+   Tailwind custom tokens (from SP scale) produce py-giant=64px, py-huge=48px
+   which are too spacious for a professional B2B industrial platform.
+   Override inside .lp-root only so ERP pages are unaffected.               */
+.lp-root .py-giant { padding-top: 40px !important; padding-bottom: 40px !important; }
+.lp-root .py-huge  { padding-top: 28px !important; padding-bottom: 28px !important; }
+.lp-root .py-xl    { padding-top: 20px !important; padding-bottom: 20px !important; }
+.lp-root .mb-huge  { margin-bottom: 24px !important; }
+.lp-root .mb-xl    { margin-bottom: 16px !important; }
+.lp-root .gap-huge { gap: 24px !important; }
+.lp-root .gap-giant{ gap: 32px !important; }

@@ -318,18 +318,18 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
                 <span className="material-symbols-outlined" style={{ fontSize: 13 }}>verified</span>
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Enterprise Grade Infrastructure</span>
               </div>
-              <h2 style={{ fontFamily: 'Poppins,sans-serif', fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginBottom: 10, letterSpacing: '-0.02em' }}>
+              <h2 style={{ fontFamily: 'Poppins,sans-serif', fontSize: 20, fontWeight: 700, lineHeight: 1.25, marginBottom: 10, letterSpacing: '-0.01em' }}>
                 Precision Built for <span style={{ color: '#ffb3ad' }}>Industrial Excellence.</span>
               </h2>
               <p style={{ fontSize: 13, opacity: 0.72, lineHeight: 1.5, maxWidth: 260, marginBottom: 22 }}>Streamlining global procurement and logistics.</p>
               <div style={{ display: 'flex', gap: 20 }}>
-                <div><div style={{ fontFamily: 'Poppins,sans-serif', fontSize: 22, fontWeight: 700 }}>1.2M+</div><div style={{ fontSize: 11, opacity: 0.55 }}>SKUs Managed</div></div>
+                <div><div style={{ fontFamily: 'Poppins,sans-serif', fontSize: 16, fontWeight: 700 }}>1.2M+</div><div style={{ fontSize: 11, opacity: 0.55 }}>SKUs Managed</div></div>
                 <div style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-                <div><div style={{ fontFamily: 'Poppins,sans-serif', fontSize: 22, fontWeight: 700 }}>99.9%</div><div style={{ fontSize: 11, opacity: 0.55 }}>Uptime Reliability</div></div>
+                <div><div style={{ fontFamily: 'Poppins,sans-serif', fontSize: 16, fontWeight: 700 }}>99.9%</div><div style={{ fontSize: 11, opacity: 0.55 }}>Uptime Reliability</div></div>
               </div>
             </>) : (<>
               <img src={LOGO} alt="RedPiston" style={{ height: 42, width: 'auto', objectFit: 'contain', marginBottom: 18, display: 'block' }} />
-              <h2 style={{ fontFamily: 'Poppins,sans-serif', fontSize: 28, fontWeight: 700, lineHeight: 1.2, marginBottom: 10 }}>Fueling the future of industrial fleet management.</h2>
+              <h2 style={{ fontFamily: 'Poppins,sans-serif', fontSize: 20, fontWeight: 700, lineHeight: 1.25, marginBottom: 10 }}>Fueling the future of industrial fleet management.</h2>
               <p style={{ fontSize: 13, color: '#b7b8b8', lineHeight: 1.5, maxWidth: 260 }}>Join the global network of procurement leaders.</p>
             </>)}
             <div style={{ display: 'flex', gap: 6, marginTop: 20 }}>
@@ -351,7 +351,7 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
 
           {/* STEP 1 — Role selection */}
           {step === 'role' && (<>
-            <h2 style={{ fontFamily: 'Poppins,sans-serif', fontSize: 22, fontWeight: 700, color: '#1c1b1b', marginBottom: 4 }}>
+            <h2 style={{ fontFamily: 'Poppins,sans-serif', fontSize: 18, fontWeight: 700, color: '#1c1b1b', marginBottom: 4 }}>
               {authMode === 'signin' ? 'Welcome back' : 'Create your account'}
             </h2>
             <p style={{ fontSize: 13, color: '#58413f', marginBottom: 18 }}>How do you use RedPiston?</p>
@@ -359,7 +359,7 @@ function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; 
               {([['customer','🛒','Customer','Browse & buy auto parts'],['shop','🔧','Shop Owner','Manage your parts business']] as const).map(([v,icon,title,desc]) => (
                 <div key={v} onClick={() => setRole(v as 'customer'|'shop')}
                   style={{ border: `2px solid ${role === v ? '#8b1e1e' : '#dfbfbc'}`, borderRadius: 14, padding: '16px 14px', cursor: 'pointer', backgroundColor: role === v ? 'rgba(139,30,30,0.05)' : '#fff', transition: 'all 0.15s' }}>
-                  <div style={{ fontSize: 26, marginBottom: 8 }}>{icon}</div>
+                  <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: role === v ? '#8b1e1e' : '#1c1b1b' }}>{title}</div>
                   <div style={{ fontSize: 12, color: '#8b716e', marginTop: 3, lineHeight: 1.4 }}>{desc}</div>
                   {role === v && <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}><div style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: '#8b1e1e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><span style={{ color: '#fff', fontSize: 9, fontWeight: 900 }}>✓</span></div><span style={{ fontSize: 11, color: '#8b1e1e', fontWeight: 600 }}>Selected</span></div>}
@@ -689,12 +689,12 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
           <div className="z-10">
             <h1
               className="font-display-lg text-on-surface mb-md"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#1c1b1b' }}
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(20px, 2.8vw, 30px)', fontWeight: 700, lineHeight: 1.2, letterSpacing: '-0.02em', color: '#1c1b1b' }}
             >
               Precision Parts for{' '}
               <span style={{ color: '#8b1e1e' }}>Industrial Reliability.</span>
             </h1>
-            <p className="text-on-surface-variant text-title-lg mb-xl max-w-lg" style={{ color: '#58413f', fontSize: 'clamp(15px, 4vw, 20px)' }}>
+            <p className="text-on-surface-variant text-title-lg mb-xl max-w-lg" style={{ color: '#58413f', fontSize: 'clamp(13px, 1.4vw, 15px)' }}>
               Direct access to authentic OEM and OES components. Engineered for performance, delivered for speed.
             </p>
 
@@ -869,7 +869,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       ═══════════════════════════════════════════════════════════ */}
       <section className="py-huge bg-surface-container-low" style={{ backgroundColor: '#f6f3f2' }}>
         <div className="max-w-7xl mx-auto px-lg">
-          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
+          <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 16 }}>
             Popular Categories
           </h2>
           {/* Exact layout from design: 6-column grid, white card, icon circle + label */}
@@ -887,24 +887,24 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                 style={{
                   backgroundColor: '#ffffff',
                   border: '1px solid #e5e2e1',
-                  borderRadius: 16,
-                  padding: '20px 12px 16px',
+                  borderRadius: 10,
+                  padding: '12px 8px 10px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 12,
+                  gap: 8,
                   cursor: 'pointer',
                   transition: 'box-shadow 0.2s',
-                  boxShadow: '0 1px 3px rgba(26,18,5,0.05)',
+                  boxShadow: '0 1px 2px rgba(26,18,5,0.04)',
                   textAlign: 'center',
                 }}
-                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(139,30,30,0.12)'}
-                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(26,18,5,0.05)'}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 3px 12px rgba(139,30,30,0.10)'}
+                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 2px rgba(26,18,5,0.04)'}
               >
-                {/* Icon circle — matches design exactly */}
+                {/* Icon circle */}
                 <div style={{
-                  width: 52,
-                  height: 52,
+                  width: 36,
+                  height: 36,
                   borderRadius: '50%',
                   backgroundColor: 'rgba(139,30,30,0.09)',
                   display: 'flex',
@@ -914,14 +914,14 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                 }}>
                   <span
                     className="material-symbols-outlined"
-                    style={{ fontSize: 26, color: '#8b1e1e', lineHeight: 1 }}
+                    style={{ fontSize: 18, color: '#8b1e1e', lineHeight: 1 }}
                   >
                     {cat.icon}
                   </span>
                 </div>
-                {/* Label — short text, no overflow */}
+                {/* Label */}
                 <span style={{
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: 700,
                   color: '#1c1b1b',
                   letterSpacing: '0.01em',
@@ -943,7 +943,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
           <div className="flex flex-wrap justify-between items-end mb-xl gap-2">
             <div>
               <h2 className="font-headline-md text-headline-md"
-                  style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b' }}>
+                  style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b' }}>
                 Global Top Selling Parts
               </h2>
               <p style={{ color: '#58413f' }}>Authenticated OEM components sourced from tier-1 global suppliers.</p>
@@ -957,32 +957,27 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAXTm3hamhmwZRRFB--0oHuFTu0HgD8EVTRCeX048yM6eoD5STRTQdt18i9oVWgd3T0tS_E9ug0pOhMlLM938X4A2uQrYoi9DZ2_LIJVyvRdefdswg7BHDbWIcHWJ7bnxEOHmi7SfOi1litnm2QP8emzE4mO7waXRBmUtrWi6GIP-3WQBqfQZRmQMGjtfEiC3XXdIIw2xTmRM0IkJRi4sQ2e012iVqmpM1QBkgTSim3hT484e95caHoSYXkjOLcqndN0GFimb893Ks', alt: 'Air Filter', badge: null, name: 'Bosch PureLight Air Filter', price: '₹2,199', desc: 'Multilayer filtration technology capturing 99% of contaminants.', meta: 'Berlin Warehouse • 6,500km away' },
               { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC-5uk-GIYbtK6b5b-svhCZvUWI7ZQ0TEEw_2rB7_ogIfWXDRASPps40KkOjUTh9Ko1M6_HmQqeNz_3E6V2PlfKw818YWIrMxaw6l_rkPHpMYtksRNf3cWDB3QexA1teMcUrVS0hEma-lbDKFMP5bm1AhNxkpcamNBISLCl-TKxIOttxCK-Hm1fpscxNnLNeo2sMVLJloXgKi5NB9bNjkpng9ZUwyIEx8RAqdcTPD11Aqs2DL54EpOe_3qUMw7yhvobh-AuYC2TG1c', alt: 'Engine Oil', badge: null, name: 'Castrol EDGE 5W-30', price: '₹3,699', desc: 'Advanced full synthetic oil for extreme engine performance under pressure.', meta: 'Local Distributor • 45km away' },
             ].map(p => (
-              <div key={p.name} className="bg-surface border border-outline-variant rounded-xxl overflow-hidden hover:shadow-md transition-all"
-                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', borderRadius: 16 }}>
-                <div className="h-48 relative" style={{ height: 192, position: 'relative' }}>
-                  <img alt={p.alt} className="w-full h-full object-cover" src={p.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div key={p.name} style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ height: 140, position: 'relative' }}>
+                  <img alt={p.alt} src={p.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   {p.badge && (
-                    <span className="absolute top-md right-md bg-green-100 text-green-800 px-sm py-1 rounded text-xs font-bold uppercase tracking-wider"
-                          style={{ position: 'absolute', top: 12, right: 12, backgroundColor: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
+                    <span style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#dcfce7', color: '#166534', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
                       {p.badge}
                     </span>
                   )}
                 </div>
-                <div className="p-lg" style={{ padding: 16 }}>
-                  <div className="flex justify-between items-start mb-sm" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <h3 className="font-title-lg text-label-md line-clamp-1" style={{ fontSize: 14, fontWeight: 600, color: '#1c1b1b' }}>{p.name}</h3>
-                    <span className="font-black text-maroon" style={{ fontWeight: 900, color: '#8b1e1e', marginLeft: 8, whiteSpace: 'nowrap' }}>{p.price}</span>
+                <div style={{ padding: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>{p.name}</h3>
+                    <span style={{ fontWeight: 800, color: '#8b1e1e', marginLeft: 8, whiteSpace: 'nowrap', fontSize: 13 }}>{p.price}</span>
                   </div>
-                  <p className="text-on-surface-variant text-label-md line-clamp-2 mb-md" style={{ color: '#58413f', fontSize: 14, marginBottom: 12 }}>{p.desc}</p>
-                  <div className="flex items-center gap-xs text-xs text-on-surface-variant border-t border-outline-variant pt-md mt-md"
-                       style={{ display: 'flex', alignItems: 'center', gap: 4, borderTop: '1px solid #dfbfbc', paddingTop: 12, marginTop: 12, fontSize: 12, color: '#58413f' }}>
-                    <Icon n="store" className="" style={{ fontSize: 16 } as React.CSSProperties} />
+                  <p style={{ color: '#58413f', fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>{p.desc}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderTop: '1px solid #f0eded', paddingTop: 8, marginTop: 8, fontSize: 11, color: '#58413f' }}>
+                    <Icon n="store" style={{ fontSize: 13 } as React.CSSProperties} />
                     <span>{p.meta}</span>
                   </div>
-                  {/* Outline button — matches design exactly */}
                   <button
-                    className="w-full mt-lg h-[40px] border border-maroon text-maroon font-bold rounded-lg hover:bg-maroon hover:text-white transition-all"
-                    style={{ width: '100%', marginTop: 16, height: 40, border: '1px solid #8b1e1e', color: '#8b1e1e', backgroundColor: 'transparent', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: 14, transition: 'all 0.2s' }}
+                    style={{ width: '100%', marginTop: 10, height: 32, border: '1px solid #8b1e1e', color: '#8b1e1e', backgroundColor: 'transparent', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#8b1e1e'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#8b1e1e'; }}
                   >
@@ -1003,7 +998,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
           {/* Header row */}
           <div className="lp-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
             <div>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', margin: '0 0 4px' }}>
+              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', margin: '0 0 4px' }}>
                 Trending Near You
               </h2>
               <p style={{ color: '#58413f', fontSize: 14, margin: 0 }}>
@@ -1071,7 +1066,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                   <img
                     src={t.img}
                     alt={t.name}
-                    style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }}
+                    style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
                   />
                   <span style={{
                     position: 'absolute', top: 10, right: 10,
@@ -1085,30 +1080,30 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                 </div>
 
                 {/* Card body */}
-                <div style={{ padding: '14px 16px', flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {/* Name + Price row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: '#1c1b1b', lineHeight: 1.3 }}>{t.name}</span>
-                    <span style={{ fontWeight: 900, fontSize: 15, color: '#8b1e1e', whiteSpace: 'nowrap' }}>{t.price}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: '#1c1b1b', lineHeight: 1.3 }}>{t.name}</span>
+                    <span style={{ fontWeight: 800, fontSize: 13, color: '#8b1e1e', whiteSpace: 'nowrap' }}>{t.price}</span>
                   </div>
 
                   {/* Description */}
-                  <p style={{ fontSize: 13, color: '#58413f', lineHeight: 1.5, margin: 0 }}>{t.desc}</p>
+                  <p style={{ fontSize: 12, color: '#58413f', lineHeight: 1.4, margin: 0 }}>{t.desc}</p>
 
                   {/* Pickup info */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                    <Icon n="local_shipping" style={{ fontSize: 15, color: '#58413f' } as React.CSSProperties} />
-                    <span style={{ fontSize: 12, color: '#58413f' }}>{t.pickup}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <Icon n="local_shipping" style={{ fontSize: 13, color: '#58413f' } as React.CSSProperties} />
+                    <span style={{ fontSize: 11, color: '#58413f' }}>{t.pickup}</span>
                   </div>
 
-                  {/* Add to Cart button — full-width maroon */}
+                  {/* Add to Cart button */}
                   <button
                     style={{
-                      marginTop: 8,
-                      width: '100%', height: 40,
+                      marginTop: 6,
+                      width: '100%', height: 32,
                       backgroundColor: '#8b1e1e', color: '#fff',
-                      border: 'none', borderRadius: 8,
-                      fontWeight: 700, fontSize: 14,
+                      border: 'none', borderRadius: 6,
+                      fontWeight: 700, fontSize: 12,
                       cursor: 'pointer',
                       transition: 'opacity 0.2s',
                     }}
@@ -1128,13 +1123,13 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
           COMING SOON SERVICES — dark maroon band, 3×2 grid
           Matches Stitch design: "Coming Soon Services" section
       ═══════════════════════════════════════════════════════════ */}
-      <section style={{ backgroundColor: '#8b1e1e', padding: '64px 0' }}>
+      <section style={{ backgroundColor: '#8b1e1e', padding: '40px 0' }}>
         <div className="max-w-7xl mx-auto px-lg">
           {/* Heading */}
-          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
             <h2 style={{
               fontFamily: 'Poppins, sans-serif',
-              fontSize: 'clamp(24px, 4vw, 36px)',
+              fontSize: 'clamp(18px, 2.2vw, 26px)',
               fontWeight: 700,
               color: '#fff',
               marginBottom: 12,
@@ -1155,7 +1150,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
           </div>
 
           {/* 3-column grid → 2-col tablet → 1-col mobile */}
-          <div className="coming-soon-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div className="coming-soon-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
               {
                 icon: 'local_car_wash',
@@ -1200,13 +1195,13 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                 style={{
                   backgroundColor: s.isPlaceholder ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.09)',
                   border: `1px solid ${s.isPlaceholder ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.16)'}`,
-                  borderRadius: 14,
-                  padding: '22px 20px',
+                  borderRadius: 10,
+                  padding: '14px 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   textAlign: 'center',
-                  gap: 10,
+                  gap: 8,
                   cursor: s.isPlaceholder ? 'default' : 'pointer',
                   transition: 'background 0.2s, transform 0.15s',
                 }}
@@ -1223,15 +1218,15 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               >
                 {/* Icon */}
                 <div style={{
-                  width: 48, height: 48,
+                  width: 32, height: 32,
                   backgroundColor: 'rgba(255,255,255,0.12)',
-                  borderRadius: 12,
+                  borderRadius: 8,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                 }}>
                   {s.isPlaceholder
-                    ? <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>···</span>
-                    : <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#fff' }}>{s.icon}</span>
+                    ? <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>···</span>
+                    : <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#fff' }}>{s.icon}</span>
                   }
                 </div>
 
@@ -1268,7 +1263,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       <section className="py-giant industrial-grid">
         <div className="max-w-7xl mx-auto px-lg">
           <h2 className="font-headline-md text-headline-md mb-xl text-center"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24, textAlign: 'center' }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 16, textAlign: 'center' }}>
             Services Near You
           </h2>
           <div className="flex flex-wrap justify-center gap-lg">
@@ -1281,10 +1276,10 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             ].map(s => (
               <div key={s.title}
                    className="bg-surface border border-outline-variant p-xl rounded-xxl shadow-sm text-center hover:border-maroon transition-all cursor-pointer"
-                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', padding: 24, borderRadius: 16, width: 'clamp(160px, 40vw, 224px)', textAlign: 'center' }}>
-                <span className="material-symbols-outlined text-maroon mb-md" style={{ fontSize: 48, color: '#8b1e1e', display: 'block', marginBottom: 12 }}>{s.icon}</span>
-                <h4 className="font-bold" style={{ fontWeight: 700 }}>{s.title}</h4>
-                <p className="text-sm text-on-surface-variant mt-sm" style={{ fontSize: 14, color: '#58413f', marginTop: 8 }}>{s.desc}</p>
+                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', padding: 16, borderRadius: 10, width: 'clamp(120px, 28vw, 180px)', textAlign: 'center' }}>
+                <span className="material-symbols-outlined text-maroon mb-md" style={{ fontSize: 26, color: '#8b1e1e', display: 'block', marginBottom: 8 }}>{s.icon}</span>
+                <h4 className="font-bold" style={{ fontWeight: 700, fontSize: 13 }}>{s.title}</h4>
+                <p className="text-sm text-on-surface-variant mt-sm" style={{ fontSize: 12, color: '#58413f', marginTop: 6 }}>{s.desc}</p>
               </div>
             ))}
           </div>
@@ -1297,7 +1292,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       <section className="py-huge bg-surface-container-low" style={{ backgroundColor: '#f6f3f2' }}>
         <div className="max-w-7xl mx-auto px-lg">
           <h2 className="font-headline-md text-headline-md mb-xl"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 16 }}>
             Trusted Shops Near You
           </h2>
           <div className="grid lg:grid-cols-2 gap-xl">
@@ -1307,28 +1302,27 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             ].map(shop => (
               <div key={shop.name}
                    className="flex flex-col sm:flex-row bg-surface border border-outline-variant rounded-xxl overflow-hidden hover:shadow-lg transition-all"
-                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', borderRadius: 16 }}>
-                <img className="w-full sm:w-64 object-cover" src={shop.img}
-                     style={{ objectFit: 'cover', flexShrink: 0 }} />
-                <div className="p-xl flex flex-col justify-between" style={{ padding: 24, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', borderRadius: 10 }}>
+                <img className="w-full sm:w-56 object-cover" src={shop.img}
+                     style={{ objectFit: 'cover', flexShrink: 0, maxHeight: 200 }} />
+                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <h3 className="font-bold text-xl" style={{ fontSize: 20, fontWeight: 700, color: '#1c1b1b' }}>{shop.name}</h3>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1c1b1b' }}>{shop.name}</h3>
                       <div style={{ display: 'flex', alignItems: 'center', color: '#ca8a04', gap: 4 }}>
-                        <span className="material-symbols-outlined fill" style={{ fontSize: 18, fontVariationSettings: "'FILL' 1" }}>star</span>
-                        <span className="font-bold text-on-surface" style={{ fontWeight: 700, color: '#1c1b1b' }}>{shop.rating}</span>
+                        <span className="material-symbols-outlined fill" style={{ fontSize: 15, fontVariationSettings: "'FILL' 1" }}>star</span>
+                        <span style={{ fontWeight: 700, color: '#1c1b1b', fontSize: 13 }}>{shop.rating}</span>
                       </div>
                     </div>
-                    <p className="text-on-surface-variant text-sm mt-sm" style={{ color: '#58413f', fontSize: 14, marginTop: 8 }}>Authorized RedPiston Partner · {shop.dist}</p>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <p style={{ color: '#58413f', fontSize: 12, marginTop: 6 }}>Authorized RedPiston Partner · {shop.dist}</p>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                       {shop.tags.map(t => (
-                        <span key={t} style={{ backgroundColor: '#f0eded', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>{t}</span>
+                        <span key={t} style={{ backgroundColor: '#f0eded', padding: '2px 7px', borderRadius: 4, fontSize: 11 }}>{t}</span>
                       ))}
                     </div>
                   </div>
                   <button
-                    className="mt-xl text-maroon font-bold flex items-center gap-sm group"
-                    style={{ marginTop: 24, color: '#8b1e1e', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: 0 }}
+                    style={{ marginTop: 14, color: '#8b1e1e', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0, fontSize: 13 }}
                   >
                     {shop.cta}
                     <Icon n="arrow_forward" />
@@ -1347,7 +1341,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
         <div className="max-w-7xl mx-auto px-lg">
           {/* OEM */}
           <h2 className="font-headline-md text-headline-md mb-xl"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24 }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 16 }}>
             Popular OEM Brands
           </h2>
           <div className="flex gap-xl overflow-x-auto pb-lg hide-scrollbar">
@@ -1360,25 +1354,31 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               { alt: 'BMW',     logo: 'https://logo.clearbit.com/bmw.com',           label: 'BMW',           color: '#1C69D4', initial: 'BM' },
               { alt: 'Audi',    logo: 'https://logo.clearbit.com/audi.com',          label: 'Audi',          color: '#BB0A30', initial: 'AU' },
             ].map(b => (
-              <div key={b.label} className="min-w-[140px] flex flex-col items-center gap-md" style={{ minWidth: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-                <div style={{ width: 96, height: 96, backgroundColor: '#fff', border: '1.5px solid #dfbfbc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxShadow: '0 2px 8px rgba(26,18,5,0.07)', transition: 'box-shadow 0.2s, transform 0.2s' }}
-                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(139,30,30,0.14)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
-                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(26,18,5,0.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
-                  <img alt={b.alt} src={b.logo} style={{ width: 64, height: 64, objectFit: 'contain', display: 'block' }}
-                       onError={e => {
-                         const img = e.currentTarget;
-                         img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="${b.color}18"/><text x="32" y="40" text-anchor="middle" font-size="18" font-weight="800" font-family="Poppins,sans-serif" fill="${b.color}">${b.initial}</text></svg>`)}`;
-                       }}
-                  />
+              <div key={b.label} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
+                {/* Solid brand-color circle — no external image needed */}
+                <div
+                  style={{
+                    width: 56, height: 56,
+                    backgroundColor: b.color,
+                    borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: `0 3px 10px ${b.color}55`,
+                    transition: 'transform 0.18s, box-shadow 0.18s',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 6px 18px ${b.color}70`; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 3px 10px ${b.color}55`; }}
+                >
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, fontFamily: 'Poppins, sans-serif', letterSpacing: '0.04em', lineHeight: 1 }}>{b.initial}</span>
                 </div>
-                <span className="font-bold" style={{ fontWeight: 700, fontSize: 14, color: '#1c1b1b' }}>{b.label}</span>
+                <span style={{ fontWeight: 700, fontSize: 12, color: '#1c1b1b', textAlign: 'center' }}>{b.label}</span>
               </div>
             ))}
           </div>
 
           {/* OES */}
           <h2 className="font-headline-md text-headline-md mb-xl mt-giant"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 24, marginTop: 64 }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 20, marginTop: 40 }}>
             Popular OES Brands
           </h2>
           <div className="flex gap-xl overflow-x-auto pb-lg hide-scrollbar">
@@ -1389,18 +1389,24 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               { alt: 'Valeo',   logo: 'https://logo.clearbit.com/valeo.com',    label: 'Valeo',    color: '#005CA9', initial: 'VA' },
               { alt: 'ZF',      logo: 'https://logo.clearbit.com/zf.com',       label: 'ZF Group', color: '#1C3764', initial: 'ZF' },
             ].map(b => (
-              <div key={b.label} className="min-w-[140px] flex flex-col items-center gap-md" style={{ minWidth: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-                <div style={{ width: 96, height: 96, backgroundColor: '#fff', border: '1.5px solid #dfbfbc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxShadow: '0 2px 8px rgba(26,18,5,0.07)', transition: 'box-shadow 0.2s, transform 0.2s' }}
-                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(139,30,30,0.14)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
-                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(26,18,5,0.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
-                  <img alt={b.alt} src={b.logo} style={{ width: 64, height: 64, objectFit: 'contain', display: 'block' }}
-                       onError={e => {
-                         const img = e.currentTarget;
-                         img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="${b.color}18"/><text x="32" y="40" text-anchor="middle" font-size="18" font-weight="800" font-family="Poppins,sans-serif" fill="${b.color}">${b.initial}</text></svg>`)}`;
-                       }}
-                  />
+              <div key={b.label} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
+                {/* Solid brand-color circle — no external image needed */}
+                <div
+                  style={{
+                    width: 56, height: 56,
+                    backgroundColor: b.color,
+                    borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: `0 3px 10px ${b.color}55`,
+                    transition: 'transform 0.18s, box-shadow 0.18s',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 6px 18px ${b.color}70`; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 3px 10px ${b.color}55`; }}
+                >
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 14, fontFamily: 'Poppins, sans-serif', letterSpacing: '0.04em', lineHeight: 1 }}>{b.initial}</span>
                 </div>
-                <span style={{ fontWeight: 700, fontSize: 14, color: '#1c1b1b' }}>{b.label}</span>
+                <span style={{ fontWeight: 700, fontSize: 12, color: '#1c1b1b', textAlign: 'center' }}>{b.label}</span>
               </div>
             ))}
           </div>
@@ -1414,7 +1420,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                style={{ backgroundColor: '#f6f3f2' }}>
         <div className="max-w-7xl mx-auto px-lg">
           <h2 className="text-center mb-huge"
-              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 48, textAlign: 'center' }}>
+              style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', marginBottom: 28, textAlign: 'center' }}>
             Why Choose Us
           </h2>
           <div className="grid md:grid-cols-3 gap-xl">
@@ -1443,12 +1449,12 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                 style={{
                   backgroundColor: '#ffffff',
                   border: '1px solid #dfbfbc',
-                  borderRadius: 16,
-                  padding: 32,
+                  borderRadius: 10,
+                  padding: 18,
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 16,
-                  boxShadow: '0 1px 4px rgba(26,18,5,0.06)',
+                  gap: 10,
+                  boxShadow: '0 1px 3px rgba(26,18,5,0.05)',
                   transition: 'box-shadow 0.2s, transform 0.2s',
                   cursor: 'default',
                 }}
@@ -1463,12 +1469,12 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               >
                 {/* Icon circle */}
                 <div style={{
-                  width: 56, height: 56,
+                  width: 36, height: 36,
                   backgroundColor: 'rgba(139,30,30,0.08)',
                   borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 28, color: '#8b1e1e' }}>{w.icon}</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#8b1e1e' }}>{w.icon}</span>
                 </div>
 
                 {/* Badge */}
@@ -1488,15 +1494,15 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                 </span>
 
                 {/* Title */}
-                <h3 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 22, fontWeight: 700, color: '#1c1b1b', margin: 0 }}>
+                <h3 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 16, fontWeight: 700, color: '#1c1b1b', margin: 0 }}>
                   {w.title}
                 </h3>
 
                 {/* Description */}
-                <p style={{ color: '#58413f', fontSize: 15, lineHeight: 1.6, margin: 0 }}>{w.desc}</p>
+                <p style={{ color: '#58413f', fontSize: 13, lineHeight: 1.5, margin: 0 }}>{w.desc}</p>
 
                 {/* Bottom accent line */}
-                <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #f0eded', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid #f0eded', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#8b1e1e' }}>arrow_forward</span>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#8b1e1e' }}>Learn more</span>
                 </div>
@@ -1512,7 +1518,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       <footer className="border-t border-outline-variant text-white" style={{ backgroundColor: '#1c1b1b', borderTop: '1px solid #dfbfbc', color: '#fff' }}>
         <div className="max-w-7xl mx-auto px-lg py-xl flex flex-col md:flex-row justify-between items-start gap-lg">
           <div className="max-w-sm">
-            <span className="font-headline-md text-headline-md font-bold" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 28, fontWeight: 700 }}>
+            <span className="font-headline-md text-headline-md font-bold" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 20, fontWeight: 700 }}>
               <span style={{ color: '#8b1e1e' }}>RED</span>
               <span style={{ color: '#fff' }}>PISTON</span>
             </span>
