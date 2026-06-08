@@ -30,29 +30,50 @@ function MarketplaceNav({
   cartCount: number;
   currentUser: any;
 }) {
+  const navigate = useNavigate();
   return (
     <PublicHeader
       searchPlaceholder="Search by Part Name, OEM Number, or Brand..."
-      rightSlot={<>
-        {/* Wishlist */}
-        <button style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
-          <Icon n="favorite_border" style={{ color: '#58413f', fontSize: 22 }} />
-        </button>
-        {/* Cart */}
-        <button onClick={onCartClick}
-          style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', position: 'relative' }}>
-          <Icon n="shopping_cart" style={{ color: '#58413f', fontSize: 22 }} />
-          {cartCount > 0 && (
-            <span style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{cartCount}</span>
-          )}
-        </button>
-        {/* Auth */}
-        <button onClick={onAuthClick}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '1px solid #dfbfbc', borderRadius: 8, backgroundColor: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>
-          <Icon n="account_circle" style={{ fontSize: 20, color: '#58413f' }} />
-          {currentUser ? (currentUser.name || currentUser.email?.split('@')[0] || 'Account') : 'Log In'}
-        </button>
-      </>}
+      rightSlot={currentUser ? (
+        /* ── Logged in: wishlist + cart + account ── */
+        <>
+          <button style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
+            <Icon n="favorite_border" style={{ color: '#58413f', fontSize: 22 }} />
+          </button>
+          <button onClick={onCartClick}
+            style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', position: 'relative' }}>
+            <Icon n="shopping_cart" style={{ color: '#58413f', fontSize: 22 }} />
+            {cartCount > 0 && (
+              <span style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{cartCount}</span>
+            )}
+          </button>
+          <button onClick={onAuthClick}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '1px solid #dfbfbc', borderRadius: 8, backgroundColor: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>
+            <Icon n="account_circle" style={{ fontSize: 20, color: '#58413f' }} />
+            {currentUser.name || currentUser.email?.split('@')[0] || 'Account'}
+          </button>
+        </>
+      ) : (
+        /* ── Not logged in: Sign In + Get Started (matches landing page) ── */
+        <>
+          <button
+            onClick={() => navigate('/login')}
+            style={{ color: '#8b1e1e', padding: '0 16px', height: 44, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, transition: 'background 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#eae7e7')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            style={{ backgroundColor: '#8b1e1e', color: '#fff', padding: '0 16px', height: 44, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 14, transition: 'opacity 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
+            Get Started
+          </button>
+        </>
+      )}
     />
   );
 }

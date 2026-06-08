@@ -1,35 +1,18 @@
 /**
  * SuppliersPage — verified automotive parts suppliers directory.
  * Fully responsive: 320px → 1440px+
+ *
+ * Supplier cards are loaded from the DB via fetchShops().
+ * When a shop has no cover photo, initials are shown on a dark background
+ * (same pattern as the OEM brand circles on the landing page).
  */
 import '../styles/landing.css';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMarketplaceFonts } from '../hooks/useMarketplaceFonts';
 import { PublicHeader } from '../components/PublicHeader';
-
-const SUPPLIERS = [
-  {
-    name: 'Elite Automotive Solutions', city: 'Hyderabad', rating: 4.9, parts: 2840,
-    type: 'OEM Distributor', verified: true,
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBjMF9hu5XyoPROfLCSDYKJ7WVw5l1cZoOTB5_ZFK_c4W-fv4ta5e4XqCf-nfiuiGup936q9P1TkzYPBXNMnvwQYfSSBbBxrzk_4os0oapj8jWPZmEzpAD1Tu5F_5tqF_n3k22FRhv4PpF9iO0b5FQRlRFrnb9KkffIhX8hOghV1AjNq0zwBvtqv28qdVcw8U5jIsIXFHd6G-dx1z0p613uKfBHBYmR1AAkKnScvgXpVQsTNXaOWZFDnWLrYMjCMKgOLBbYbgMY5dg',
-    brands: ['Bosch', 'Brembo', 'Denso'],
-    desc: 'Authorized OEM distributor specializing in premium braking systems, engine components, and electrical parts.',
-  },
-  {
-    name: 'Speedy Gear Spares', city: 'Mumbai', rating: 4.7, parts: 1520,
-    type: 'Multi-Brand Supplier', verified: true,
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBxvyBJDw8Rbgq_si3vplJBpgVpeNHLwgS1X6lX4FjpmF6_6_9PRaGT_pDkpLDSQK1RnOmGq4u0ipcu8FYFidpoOk7D_365uxjESF2J70wSHfxNCyIGtyb6ZHDnNIQmLbtcAoQE2Be0qf_XpTKMXJmbgRNBOGiEX5NNQf0xSQa77IVMJ_lPY43KPkoZzd3w1hFXpizvouvsYzgcL0qAIjufTEw2hFw-MEqN6diQXVAUJg_p1TFD5i_07sltrUODfV0a6umd2hHHn4Q',
-    brands: ['NGK', 'Valeo', 'Gates'],
-    desc: 'Trusted multi-brand supplier with 15+ years in the auto parts industry. Fast delivery across Maharashtra.',
-  },
-  {
-    name: 'Pro-Tech Parts Hub', city: 'Delhi', rating: 4.8, parts: 3100,
-    type: 'OES Specialist', verified: true,
-    img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBNzvgZbtt0-WMxiMPt9NVAb1j32_dfm2tXCU08wa3XFS7KCYd4MqR9tVczihi5eS0ZLbBe8gqtro81Nhpekw3aZXASamj9jg85y4Xt7CprJUPMm4rP9nnUYvIFBFws-qqeASe8PRBVJ-FwRTKeqd5VS1NLpPQJhcs9xvRtUSFlVIruKJWXXZOngbrT0rxJAQmBtClV92bPXfG2LO39yEQg2cwUbl-HYo9bwMhKC_TxsdzvUK8YPimXj7g5xeJ6n_p56wOS3O2oN0Q',
-    brands: ['Bilstein', 'KYB', 'Sachs'],
-    desc: 'Leading OES specialist for suspension, shock absorbers, and chassis parts across North India.',
-  },
-];
+import { AppCtx } from '../context/AppCtx';
+import { fetchShops } from '../api/marketplace';
 
 const BENEFITS = [
   { emoji: '🔒', title: 'Background Verified',  desc: 'All suppliers undergo thorough KYC and stock verification before listing' },
@@ -38,9 +21,59 @@ const BENEFITS = [
   { emoji: '🎧', title: 'Dedicated Support',     desc: '24/7 supplier coordination and dispute resolution team' },
 ];
 
+/** Initials placeholder shown when a shop has no cover photo */
+function ShopImagePlaceholder({ name }: { name: string }) {
+  const words = (name || '').trim().split(/\s+/);
+  const initials =
+    words.length >= 2
+      ? (words[0][0] + words[1][0]).toUpperCase()
+      : (name || 'S').substring(0, 2).toUpperCase();
+  return (
+    <div
+      className="sp-supplier-img"
+      style={{
+        width: 200, minHeight: 160, backgroundColor: '#2c2929',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      }}
+    >
+      <span style={{ fontSize: 32, fontWeight: 800, color: 'rgba(255,255,255,0.65)', fontFamily: 'Poppins, sans-serif', letterSpacing: '0.04em' }}>
+        {initials}
+      </span>
+    </div>
+  );
+}
+
+/** Single skeleton card while shops are loading */
+function SupplierCardSkeleton() {
+  return (
+    <div className="sp-supplier-card" style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 16, overflow: 'hidden', display: 'flex' }}>
+      <div className="lp-skeleton sp-supplier-img" style={{ width: 200, minHeight: 160, backgroundColor: '#f0eded', flexShrink: 0 }} />
+      <div style={{ padding: '24px 28px', flex: 1 }}>
+        <div className="lp-skeleton" style={{ height: 18, width: '50%', backgroundColor: '#f0eded', borderRadius: 4, marginBottom: 10 }} />
+        <div className="lp-skeleton" style={{ height: 13, width: '30%', backgroundColor: '#f0eded', borderRadius: 4, marginBottom: 14 }} />
+        <div className="lp-skeleton" style={{ height: 12, width: '80%', backgroundColor: '#f0eded', borderRadius: 4, marginBottom: 8 }} />
+        <div className="lp-skeleton" style={{ height: 12, width: '65%', backgroundColor: '#f0eded', borderRadius: 4 }} />
+      </div>
+    </div>
+  );
+}
+
 export function SuppliersPage() {
   useMarketplaceFonts();
   const navigate = useNavigate();
+  const ctx = useContext(AppCtx);
+  const currentUser = ctx?.currentUser ?? null;
+
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [suppLoading, setSuppLoading] = useState(true);
+
+  useEffect(() => {
+    setSuppLoading(true);
+    fetchShops()
+      .then((shops: any[]) => setSuppliers(shops || []))
+      .catch(() => setSuppliers([]))
+      .finally(() => setSuppLoading(false));
+  }, []);
 
   return (
     <div className="lp-root" style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#fcf9f8', minHeight: '100vh' }}>
@@ -49,10 +82,35 @@ export function SuppliersPage() {
       <PublicHeader
         searchPlaceholder="Search parts by brand, OEM number…"
         rightSlot={
-          <button onClick={() => navigate('/marketplace')}
-            style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}>
-            Browse Parts
-          </button>
+          currentUser ? (
+            /* Logged in — keep "Browse Parts" action */
+            <button
+              onClick={() => navigate('/marketplace')}
+              style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}
+            >
+              Browse Parts
+            </button>
+          ) : (
+            /* Not logged in — match landing page header */
+            <>
+              <button
+                onClick={() => navigate('/login')}
+                style={{ color: '#8b1e1e', padding: '0 16px', height: 44, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, transition: 'background 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#eae7e7')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                style={{ backgroundColor: '#8b1e1e', color: '#fff', padding: '0 16px', height: 44, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 14, transition: 'opacity 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              >
+                Get Started
+              </button>
+            </>
+          )
         }
       />
 
@@ -109,55 +167,89 @@ export function SuppliersPage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {SUPPLIERS.map(s => (
-              // sp-supplier-card: row on desktop, column on mobile
-              <div key={s.name} className="sp-supplier-card"
-                style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 16, overflow: 'hidden', display: 'flex', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            {suppLoading ? (
+              /* Loading skeletons */
+              [0, 1, 2].map(i => <SupplierCardSkeleton key={i} />)
+            ) : suppliers.length === 0 ? (
+              /* Empty state */
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: '#58413f', fontSize: 15 }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>🏪</div>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>No suppliers found</div>
+                <div style={{ opacity: 0.7 }}>Check back soon — more suppliers are being verified.</div>
+              </div>
+            ) : suppliers.map((s: any, idx: number) => {
+              const name    = s.name       || s.shopName    || 'Unnamed Shop';
+              const city    = s.city       || s.shopCity    || '';
+              const address = s.address    || s.shopAddress || '';
+              const verified= s.isVerified ?? s.verified    ?? false;
+              const rating  = s.rating     != null ? Number(s.rating).toFixed(1) : null;
+              const coverImg= s.imageUrl   || s.coverImage  || '';
+              const desc    = s.description|| '';
 
-                {/* sp-supplier-img: fixed-width on desktop, full-width on mobile */}
-                <img src={s.img} alt={s.name} className="sp-supplier-img"
-                  style={{ width: 200, objectFit: 'cover', flexShrink: 0 }} />
+              return (
+                /* sp-supplier-card: row on desktop, column on mobile */
+                <div key={s.id ?? idx} className="sp-supplier-card"
+                  style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 16, overflow: 'hidden', display: 'flex', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
 
-                {/* Card body: row on desktop (info left, buttons right), column on mobile */}
-                <div className="sp-supplier-body"
-                  style={{ padding: '24px 28px', flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
-                      <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1c1b1b', margin: 0 }}>{s.name}</h3>
-                      {s.verified && (
-                        <span style={{ backgroundColor: 'rgba(22,163,74,0.1)', color: '#166534', fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 12, whiteSpace: 'nowrap' }}>
-                          ✓ Verified
-                        </span>
+                  {/* Cover photo or initials placeholder */}
+                  {coverImg ? (
+                    <img src={coverImg} alt={name} className="sp-supplier-img"
+                      style={{ width: 200, objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <ShopImagePlaceholder name={name} />
+                  )}
+
+                  {/* Card body */}
+                  <div className="sp-supplier-body"
+                    style={{ padding: '24px 28px', flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {/* Name + verified badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1c1b1b', margin: 0 }}>{name}</h3>
+                        {verified && (
+                          <span style={{ backgroundColor: 'rgba(22,163,74,0.1)', color: '#166534', fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 12, whiteSpace: 'nowrap' }}>
+                            ✓ Verified
+                          </span>
+                        )}
+                      </div>
+
+                      {/* City / address */}
+                      {(city || address) && (
+                        <p style={{ fontSize: 13, color: '#58413f', margin: '0 0 8px' }}>
+                          {[city, address].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+
+                      {/* Description */}
+                      {desc && (
+                        <p style={{ fontSize: 14, color: '#58413f', lineHeight: 1.5, margin: '0 0 14px' }}>{desc}</p>
+                      )}
+
+                      {/* Rating */}
+                      {rating && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ color: '#eab308', fontSize: 16 }}>★</span>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#1c1b1b' }}>{rating}</span>
+                        </div>
                       )}
                     </div>
-                    <p style={{ fontSize: 13, color: '#58413f', margin: '0 0 8px' }}>{s.type} · {s.city}</p>
-                    <p style={{ fontSize: 14, color: '#58413f', lineHeight: 1.5, margin: '0 0 14px' }}>{s.desc}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ color: '#eab308', fontSize: 16 }}>★</span>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1c1b1b' }}>{s.rating}</span>
-                        <span style={{ fontSize: 13, color: '#58413f' }}> · {s.parts.toLocaleString()} parts</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {s.brands.map(b => <span key={b} style={{ backgroundColor: '#f0eded', color: '#58413f', fontSize: 12, padding: '3px 10px', borderRadius: 6 }}>{b}</span>)}
-                      </div>
+
+                    {/* Action buttons */}
+                    <div className="sp-supplier-btns"
+                      style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
+                      <button onClick={() => navigate('/marketplace')}
+                        style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}>
+                        View Inventory
+                      </button>
+                      <button
+                        style={{ backgroundColor: 'transparent', color: '#8b1e1e', border: '1.5px solid #dfbfbc', borderRadius: 10, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}>
+                        Contact Supplier
+                      </button>
                     </div>
                   </div>
-
-                  {/* Buttons: column on desktop, row on mobile (via sp-supplier-btns) */}
-                  <div className="sp-supplier-btns"
-                    style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
-                    <button onClick={() => navigate('/marketplace')}
-                      style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}>
-                      View Inventory
-                    </button>
-                    <button style={{ backgroundColor: 'transparent', color: '#8b1e1e', border: '1.5px solid #dfbfbc', borderRadius: 10, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}>
-                      Contact Supplier
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
