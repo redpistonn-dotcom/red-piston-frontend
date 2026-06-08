@@ -62,9 +62,9 @@ export function PublicHeader({
           margin: '0 auto',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 16px',
+          padding: '0 28px',
           minHeight: 64,
-          gap: 16,
+          gap: 0,   // controlled individually below
         }}
       >
         {/* Logo */}
@@ -72,11 +72,11 @@ export function PublicHeader({
           src={LOGO}
           alt="RedPiston"
           onClick={() => { navigate('/'); setMobileOpen(false); }}
-          style={{ height: 36, width: 'auto', objectFit: 'contain', cursor: 'pointer', flexShrink: 0 }}
+          style={{ height: 36, width: 'auto', objectFit: 'contain', cursor: 'pointer', flexShrink: 0, marginRight: 28 }}
         />
 
         {/* Desktop Nav — hidden on mobile via .ph-nav class */}
-        <nav className="ph-nav" style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
+        <nav className="ph-nav" style={{ display: 'flex', gap: 28, flexShrink: 0, marginRight: 32 }}>
           {NAV_LINKS.map(({ label, href }) => {
             const active = pathname === href;
             return (
@@ -111,7 +111,7 @@ export function PublicHeader({
 
         {/* Right slot — hidden on mobile via .ph-right class */}
         {rightSlot && (
-          <div className="ph-right" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div className="ph-right" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 20 }}>
             {rightSlot}
           </div>
         )}

@@ -588,10 +588,11 @@ function AppContent() {
     return (
       <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT.ui }}>
         <style>{GLOBAL_CSS}</style>
-        <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.72;transform:scale(0.93)} }`}</style>
+        <style>{`@keyframes rp-spin { to { transform: rotate(360deg); } }`}</style>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
-          <div style={{ width: 56, height: 56, borderRadius: 16, background: `linear-gradient(145deg, ${T.amber}, ${T.amberDim})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, boxShadow: `0 4px 24px ${T.amber}55`, animation: "pulse 1.4s ease-in-out infinite" }}>⚙</div>
-          <div style={{ fontSize: 14, color: T.t2, fontWeight: 600 }}>AutoSpace</div>
+          {/* CSS ring spinner — avoids the pulsing gear icon that looks like a "joystick" */}
+          <div style={{ width: 44, height: 44, borderRadius: "50%", border: `3px solid rgba(139,30,30,0.15)`, borderTopColor: "#8b1e1e", animation: "rp-spin 0.8s linear infinite" }} />
+          <div style={{ fontSize: 14, color: T.t2, fontWeight: 600 }}>RedPiston</div>
           <div style={{ fontSize: 12, color: T.t4 }}>Restoring session…</div>
           <button
             onClick={() => { clearTokens(); try { localStorage.removeItem("as_user"); localStorage.removeItem("as_refresh_token"); } catch {} window.location.replace("/login"); }}

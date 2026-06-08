@@ -211,6 +211,13 @@ body:has(.lp-root) {
 
   /* Number plate input font size */
   .lp-root .lp-plate-input { font-size: clamp(14px, 4vw, 20px) !important; letter-spacing: clamp(0.08em, 1vw, 0.18em) !important; }
+
+  /* Coming Soon Services: 2-col on tablet / 1-col on mobile */
+  .lp-root .coming-soon-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 480px) {
+  .lp-root .coming-soon-grid { grid-template-columns: 1fr !important; }
 }
 
 /* ── Safe-area insets for iPhone notch / home bar ─────────────────────── */

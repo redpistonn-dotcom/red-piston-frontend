@@ -5,12 +5,15 @@
   min-height: 100vh;
 }
 
-/* Smooth focus outlines for accessibility */
-:focus-visible {
+/* Smooth focus outlines — scoped to interactive elements only.
+   Excluding body/html/#root prevents a spurious amber/page-border glow
+   that can appear when the root container is focused on route change. */
+:focus-visible:not(body):not(html):not(#root) {
   outline: 2px solid #F59E0B;
   outline-offset: 2px;
   border-radius: 4px;
 }
+body:focus, html:focus, #root:focus { outline: none; }
 
 /* Text selection styling — brand amber */
 ::selection {

@@ -1125,6 +1125,144 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════
+          COMING SOON SERVICES — dark maroon band, 3×2 grid
+          Matches Stitch design: "Coming Soon Services" section
+      ═══════════════════════════════════════════════════════════ */}
+      <section style={{ backgroundColor: '#8b1e1e', padding: '64px 0' }}>
+        <div className="max-w-7xl mx-auto px-lg">
+          {/* Heading */}
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <h2 style={{
+              fontFamily: 'Poppins, sans-serif',
+              fontSize: 'clamp(24px, 4vw, 36px)',
+              fontWeight: 700,
+              color: '#fff',
+              marginBottom: 12,
+              letterSpacing: '-0.01em',
+            }}>
+              Coming Soon Services
+            </h2>
+            <p style={{
+              color: 'rgba(255,255,255,0.72)',
+              fontSize: 'clamp(13px, 2vw, 15px)',
+              maxWidth: 480,
+              margin: '0 auto',
+              lineHeight: 1.6,
+            }}>
+              Expert automotive services and maintenance hubs located in your immediate vicinity.
+              Verified technical standards.
+            </p>
+          </div>
+
+          {/* 3-column grid → 2-col tablet → 1-col mobile */}
+          <div className="coming-soon-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            {[
+              {
+                icon: 'local_car_wash',
+                emoji: '🚗',
+                title: 'Car Washing',
+                desc: 'Professional exterior and interior steam cleaning',
+              },
+              {
+                icon: 'auto_fix_high',
+                emoji: '✨',
+                title: 'Detailing Studios',
+                desc: 'Ceramic coating and paint protection specialists',
+              },
+              {
+                icon: 'shopping_bag',
+                emoji: '🛍',
+                title: 'Car & Bike Accessories',
+                desc: 'Premium styling and comfort modifications',
+              },
+              {
+                icon: 'two_wheeler',
+                emoji: '🏍',
+                title: 'Bike Spare Parts',
+                desc: 'OEM components for two-wheeler performance',
+              },
+              {
+                icon: 'build',
+                emoji: '⚙️',
+                title: 'Customisation & Upgrade Parts',
+                desc: 'Bespoke performance tuning and body kits',
+              },
+              {
+                icon: 'more_horiz',
+                emoji: '···',
+                title: 'More Automotive Services Coming Soon...',
+                desc: '',
+                isPlaceholder: true,
+              },
+            ].map(s => (
+              <div
+                key={s.title}
+                style={{
+                  backgroundColor: s.isPlaceholder ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.09)',
+                  border: `1px solid ${s.isPlaceholder ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.16)'}`,
+                  borderRadius: 14,
+                  padding: '22px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  gap: 10,
+                  cursor: s.isPlaceholder ? 'default' : 'pointer',
+                  transition: 'background 0.2s, transform 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (!s.isPlaceholder) {
+                    (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(255,255,255,0.15)';
+                    (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLDivElement).style.backgroundColor = s.isPlaceholder ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.09)';
+                  (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)';
+                }}
+              >
+                {/* Icon */}
+                <div style={{
+                  width: 48, height: 48,
+                  backgroundColor: 'rgba(255,255,255,0.12)',
+                  borderRadius: 12,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  {s.isPlaceholder
+                    ? <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>···</span>
+                    : <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#fff' }}>{s.icon}</span>
+                  }
+                </div>
+
+                {/* Title */}
+                <span style={{
+                  fontFamily: 'Poppins, sans-serif',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: s.isPlaceholder ? 'rgba(255,255,255,0.45)' : '#fff',
+                  lineHeight: 1.3,
+                }}>
+                  {s.title}
+                </span>
+
+                {/* Description */}
+                {s.desc && (
+                  <span style={{
+                    fontSize: 12,
+                    color: 'rgba(255,255,255,0.60)',
+                    lineHeight: 1.5,
+                  }}>
+                    {s.desc}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════
           SERVICES NEAR YOU — industrial grid background
       ═══════════════════════════════════════════════════════════ */}
       <section className="py-giant industrial-grid">
@@ -1214,20 +1352,26 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
           </h2>
           <div className="flex gap-xl overflow-x-auto pb-lg hide-scrollbar">
             {[
-              { alt: 'Maruti',   src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDAB-u93DFaDfPnmYYkqhxHM6Vm4hgfacLYbbBpv9zUFmBY_RlQKGx0Nzfu62mL6NhWpH0nLhET4STsMgAeR2xrzUV8TXDZ78lmAg479Bytcdr6UJjJ8oa3T0o0CRN7z8Pz-wlReuTCGTztgLkvYbD4AvQ7V60dfx410fRXxBn3Wzwxka04lgKmxR5nIoV7i_As1julS0ytjXx_Pv_zai2oA8ZbFsWfqgbYY4OeOSBJb3Z_ck1YOGYM23NouH9Gij30IOc_PVAN5Qc', label: 'Maruti Suzuki', size: 64 },
-              { alt: 'Hyundai',  src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAnnyxgUSGFuCKnmUzH6B2SSXtf1ixoff8hRKvff7QcaB31Hsy8rcZMOT4pNEcsUP2Twfs1HyEhqzpkvYXDJdqOL1fWwjkAXSyJbELZijMnVMdTq8v5ioVW8x5yaAEJwsaoG2slNrA7vrntQoJSmznq9oDtHYjSSn2wl3wAN_MLicvN_rWklJQ5TkePDEUpqwD4_8EKLlhacwCPez2Ki_DhYOGFwJDVhopxBkXOf4SZxzm2cunjQdFl0CbhAMaowBTdkB_eYlxUNdY', label: 'Hyundai', size: 64 },
-              { alt: 'Toyota',   src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAeHLZmwFSopNJGENIQC6KSxCjfbkzdZyNNYPMXffS43plTaMnUB43d4Yz09eKkpT3nbYguC8hnHOJIEBgn-L3OI8hOkYFVbtS3EhHlY7Pd3_0cPcdFKmUFhA7spW-Yr6ZZWz2mT-Sks5OBMWMh2PpujzqCFO4Er_Vp0ZT1ItEY4L7ogPpxNVqjbyhVnfW4IdNt5UQ6Pmi1l6MZ5KPB5DIFcQ8pLvMebXLPI02tCEfy4xA1ompOxNQrn1PGDAeobgnbs_SSvL6Ii2M', label: 'Toyota', size: 64 },
-              { alt: 'Skoda',    src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBDRR-sYSYMzqczNFiXGOBf_zgLrpW9ql8zgI46jFKU37n4vo8KLCMTUfOL0sKZxCynY64lRGSMD3uP7Ti3gVjZvVnKFGjCDagVc_6LoI02QG9nVJH5rbtPjwL4MWjcxVfotWCN5MXEzIEf18Dv60M0hlDCR9npd2jMEo05xzM-FN0u--n8sMmuaJT0ivCIcQffTmeTgF7CKylMMX6AgQ3gHOU2DV73TN3XI03PCUgKVGcH6XtOrBVoZTLVCnrQ1pmCJQx3vGvMUZ0', label: 'Skoda', size: 56 },
-              { alt: 'Honda',    src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCAp3DQAj5ElccSEIaEfd9TidmRQyUWQ1_cYRNUcwxWoLZpzjxAy3Ij9b8r2vj3A-KulcjwYkeU-6qWEAq05DouJW_69P_-oG1W2JpdSZ9R5bouZodBYB-Hf5oYua5DYw3p9qS4NS5KbJgqTz0eHouR3N0Jt6nmUUcJTwN2UWG_VhcIrki_9UWze0m8I1TNEsep7cIoDNhDeHbSeD1bpE3Op_9txYmFXrH7Qa6m0Z3F5w72wTfc2sh2TSeBLU7I98dnhz_v_vMVcOA', label: 'Honda', size: 56 },
-              { alt: 'BMW',      src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB1qreorP_O0bIq6skZ5SWhfzRXx5iTnrH7hANaUOzdQIQlVAI3GFh59WfgQv9nel2OO53UYf-riHgIJEn32Q-fgg5iSaRQuuIiVoCbwwlcE_IovwODEP8FgNQtS64XTDQI1LhHe0JnbLw1JJ6G9ClqzQC4IRtifBT4VqpcL8qrl6ucn_YRtxlMgiUtUrIopWl5wcCmDZeO0kpHQq2NW317d2KiBdSGndPI9TaRAek8tbyTNhD5BmgQ6ZGEYbcZNWTxQGG6VzWv1XY', label: 'BMW', size: 64 },
-              { alt: 'Audi',     src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBFp8utUUsWKsRvjNe_q1bV7hwYS-4SEvS8Mc3zZ-TltcleElw7jP-uSevaA--ljbblZB6o5oLxLzuWuIV931rRuVoPLK1TjcX0azBep5G69j7Iopj9E1PGTIvBGBATya889jgLCEgz6mfHImpO_qBA4Mvrs_WKp-5MCamC9RfzZ4qhpvysZhr0q3u2z8iaPvg5a9D7Glxk5EbLu7rlR5SLJOzMtUkOVfcDADmm1UCHc7Sy7G4UOIhuidL2JpawxB1lNGh1TY4PT8U', label: 'Audi', size: 64 },
+              { alt: 'Maruti',  logo: 'https://logo.clearbit.com/marutisuzuki.com', label: 'Maruti Suzuki', color: '#003082', initial: 'MS' },
+              { alt: 'Hyundai', logo: 'https://logo.clearbit.com/hyundai.com',       label: 'Hyundai',       color: '#002C5F', initial: 'HY' },
+              { alt: 'Toyota',  logo: 'https://logo.clearbit.com/toyota.com',        label: 'Toyota',        color: '#EB0A1E', initial: 'TY' },
+              { alt: 'Skoda',   logo: 'https://logo.clearbit.com/skoda-auto.com',    label: 'Škoda',         color: '#4BA82E', initial: 'SK' },
+              { alt: 'Honda',   logo: 'https://logo.clearbit.com/honda.com',         label: 'Honda',         color: '#CC0000', initial: 'HN' },
+              { alt: 'BMW',     logo: 'https://logo.clearbit.com/bmw.com',           label: 'BMW',           color: '#1C69D4', initial: 'BM' },
+              { alt: 'Audi',    logo: 'https://logo.clearbit.com/audi.com',          label: 'Audi',          color: '#BB0A30', initial: 'AU' },
             ].map(b => (
-              <div key={b.label} className="min-w-[140px] flex flex-col items-center gap-md" style={{ minWidth: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                <div className="w-24 h-24 bg-surface border border-outline-variant rounded-full flex items-center justify-center p-md"
-                     style={{ width: 96, height: 96, backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-                  <img alt={b.alt} style={{ width: b.size, height: 'auto' }} src={b.src} />
+              <div key={b.label} className="min-w-[140px] flex flex-col items-center gap-md" style={{ minWidth: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                <div style={{ width: 96, height: 96, backgroundColor: '#fff', border: '1.5px solid #dfbfbc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxShadow: '0 2px 8px rgba(26,18,5,0.07)', transition: 'box-shadow 0.2s, transform 0.2s' }}
+                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(139,30,30,0.14)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
+                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(26,18,5,0.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
+                  <img alt={b.alt} src={b.logo} style={{ width: 64, height: 64, objectFit: 'contain', display: 'block' }}
+                       onError={e => {
+                         const img = e.currentTarget;
+                         img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="${b.color}18"/><text x="32" y="40" text-anchor="middle" font-size="18" font-weight="800" font-family="Poppins,sans-serif" fill="${b.color}">${b.initial}</text></svg>`)}`;
+                       }}
+                  />
                 </div>
-                <span className="font-bold" style={{ fontWeight: 700, fontSize: 14 }}>{b.label}</span>
+                <span className="font-bold" style={{ fontWeight: 700, fontSize: 14, color: '#1c1b1b' }}>{b.label}</span>
               </div>
             ))}
           </div>
@@ -1239,17 +1383,24 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
           </h2>
           <div className="flex gap-xl overflow-x-auto pb-lg hide-scrollbar">
             {[
-              { alt: 'Bosch',   src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAuUPNXzjER-6vP59L3HN1lvBkqF6-6UjQu0e537Vjks8ZpUj_3ys_zFrrKpZodg3WqmLfjwE3IPBjeS7tZpe212--BfT19Y-N7QgwwikaB5y3_4o-2eLhCLIBsJVZwnwaboZtgORU7WlpfmZTkr6GM2ZSjvS8iqEitp3s8w3yaWyPLku9SvvTSaxt7JPwu_TlXwuAQ84uTsMzMNIJJYtttk4B84WU6wWA2JzyBeFuD_XaL1bS-a_y2a2tW6Kr4uglgZTdgKHAfibw', label: 'Bosch', size: 64 },
-              { alt: 'Castrol', src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuATXpeEPGxnuWKFSPRjVWBTjvGJhuPmCau9WBtBh6yBN_anfo5TOYcwmh1cZ_dRVpIdgqaK9INd4ooJG-faHHPcuFq8LxaMujnAg03Ujk1N_xaNBxAbUieJRkC-LZGQX-fS5usL71N1JqZ83V15raM3_9COeJjIV84zRW46tejmAabBaqtjbxQTPe3jLOSfloUNmI1KKR_m-2NcmCRjL4uGcsgyXBzWzHSg-Fi3LBmHd2Tfvo5zFpodH4rEIgwwb1NB0jsIHp4Z8uw', label: 'Castrol', size: 56 },
-              { alt: 'Brembo',  src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuATeZvD3Ga_MEAAc_KT7mXXx3-r4nmn26Jcsrxxy1sOSHGUMb4bbLWo4bdku846nfN1E9eHjYgC1PtWhIuUNg6hXfrN2vsCgJ31BnB9I2vzxAtS8UgP3-7hGncqiSykJILE7bmYWIMD9baTeaHeuPpq_d2F09fbOYeABalr_jX_INe_41sz6LtwwC2r-uOxuOU7loibdV0uz2rUTCLFTo38Lty0gqO463n4SZQyakV3ZKwn0vc65P_5OOZQR4CO4-BjEO9naaytVhs', label: 'Brembo', size: 64 },
-              { alt: 'Valeo',   src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCGw_8gODiDRhhfg8YvfkojJNIItxaDQCa47A_vnjOJQKQDm8QnEi_dPLnZgZRze3WqzK4A3PqtBOLIgcwIY3Snf5w3gU_JB9syLuNqEGoWyhNOpBEW5EA4UpHgadnuuFy-d6iYcJKHgVJEw33Bmy-ojsqXNUsa_43fqde7RXxrMSW2yYpti_ZbohZK_7nf3YWXMuqRHtkO4cO8QapTfBfYpZ7gY3hGGb3f8yuUWC9B5LxaJHlDFg4CfuQW8ycMZppzHvq1QvjA5Gc', label: 'Valeo', size: 64 },
-              { alt: 'ZF',      src: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDnQrMgKv1k1gT5eXKWMzU8bWN7OCrPz1pWAhajmrU_wotF0tT3BCiJaCyKkVK2d8UBVBGRRI8m7PQIG_Op0J1oh4CVOVJT8qaaGaZrpYzb_JpX4Jtzr_lPqRazscn1_QS4yQumg1k4jodVMZeJni3uHGU57WUqxtiQPekgCe1g2GE5ilkJF4aiq2JCZLj3u5yXfu55fAZ60y8t1C1bQyUbtSnIPKpePH4TkWFVaX3XZ2gypsdIOXcTdJzeKhgGlF5pcaJG5aHxZJw', label: 'ZF Group', size: 56 },
+              { alt: 'Bosch',   logo: 'https://logo.clearbit.com/bosch.com',    label: 'Bosch',    color: '#EA0016', initial: 'BS' },
+              { alt: 'Castrol', logo: 'https://logo.clearbit.com/castrol.com',  label: 'Castrol',  color: '#00693C', initial: 'CS' },
+              { alt: 'Brembo',  logo: 'https://logo.clearbit.com/brembo.com',   label: 'Brembo',   color: '#C8102E', initial: 'BR' },
+              { alt: 'Valeo',   logo: 'https://logo.clearbit.com/valeo.com',    label: 'Valeo',    color: '#005CA9', initial: 'VA' },
+              { alt: 'ZF',      logo: 'https://logo.clearbit.com/zf.com',       label: 'ZF Group', color: '#1C3764', initial: 'ZF' },
             ].map(b => (
-              <div key={b.label} className="min-w-[140px] flex flex-col items-center gap-md" style={{ minWidth: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 96, height: 96, backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-                  <img alt={b.alt} style={{ width: b.size, height: 'auto' }} src={b.src} />
+              <div key={b.label} className="min-w-[140px] flex flex-col items-center gap-md" style={{ minWidth: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                <div style={{ width: 96, height: 96, backgroundColor: '#fff', border: '1.5px solid #dfbfbc', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxShadow: '0 2px 8px rgba(26,18,5,0.07)', transition: 'box-shadow 0.2s, transform 0.2s' }}
+                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(139,30,30,0.14)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; }}
+                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(26,18,5,0.07)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}>
+                  <img alt={b.alt} src={b.logo} style={{ width: 64, height: 64, objectFit: 'contain', display: 'block' }}
+                       onError={e => {
+                         const img = e.currentTarget;
+                         img.src = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="${b.color}18"/><text x="32" y="40" text-anchor="middle" font-size="18" font-weight="800" font-family="Poppins,sans-serif" fill="${b.color}">${b.initial}</text></svg>`)}`;
+                       }}
+                  />
                 </div>
-                <span style={{ fontWeight: 700, fontSize: 14 }}>{b.label}</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#1c1b1b' }}>{b.label}</span>
               </div>
             ))}
           </div>
@@ -1370,15 +1521,32 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-huge">
+            {/* Solutions column — links are real routes; Company/Support are placeholders */}
+            <div className="flex flex-col gap-sm">
+              <h5 style={{ color: '#fff', fontWeight: 700 }}>Solutions</h5>
+              {([
+                { label: 'Marketplace',  href: '/marketplace' },
+                { label: 'OEM Parts',    href: '/marketplace?type=oem' },
+                { label: 'Suppliers',    href: '/suppliers' },
+              ] as { label: string; href: string }[]).map(link => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={e => { e.preventDefault(); navigate(link.href); }}
+                  style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textDecoration: 'none', cursor: 'pointer', transition: 'color 0.15s' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
+                >{link.label}</a>
+              ))}
+            </div>
             {[
-              { h: 'Solutions', links: ['Marketplace','OEM Parts','Suppliers'] },
-              { h: 'Company',   links: ['Contact Us','Legal Details','Privacy Policy'] },
-              { h: 'Support',   links: ['Help Center','Shipping','Returns'] },
+              { h: 'Company', links: ['Contact Us','Legal Details','Privacy Policy'] },
+              { h: 'Support', links: ['Help Center','Shipping','Returns'] },
             ].map(col => (
               <div key={col.h} className="flex flex-col gap-sm">
                 <h5 className="font-bold text-white" style={{ color: '#fff', fontWeight: 700 }}>{col.h}</h5>
                 {col.links.map(l => (
-                  <a key={l} href="#" className="hover:underline hover:text-primary transition-all text-white" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textDecoration: 'none' }}>{l}</a>
+                  <a key={l} href="#" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, textDecoration: 'none' }}>{l}</a>
                 ))}
               </div>
             ))}

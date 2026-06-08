@@ -39,27 +39,20 @@ export function LoadingBar() {
   if (!visible && progress === 0) return null;
 
   return (
+    /* No visible background track — the bar itself slides across a transparent base,
+       so there is no persistent red line/"border animation" at the top of every page. */
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999999,
-      height: 3, backgroundColor: 'rgba(139,30,30,0.12)', pointerEvents: 'none',
+      height: 2, backgroundColor: 'transparent', pointerEvents: 'none',
     }}>
       <div style={{
         height: '100%',
         width: `${Math.min(progress, 100)}%`,
-        backgroundColor: '#8b1e1e',
+        background: 'linear-gradient(to right, #c0392b, #e8a09a)',
         transition: progress === 100 ? 'width 0.25s ease' : 'width 0.12s ease',
-        borderRadius: '0 3px 3px 0',
-        position: 'relative',
-        boxShadow: '2px 0 8px rgba(139,30,30,0.4)',
-      }}>
-        {/* Glowing tip */}
-        <div style={{
-          position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
-          width: 60, height: 3,
-          background: 'linear-gradient(to right, transparent, rgba(255,180,170,0.9))',
-          borderRadius: 3,
-        }} />
-      </div>
+        borderRadius: '0 2px 2px 0',
+        opacity: 0.7,
+      }} />
     </div>
   );
 }
