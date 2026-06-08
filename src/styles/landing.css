@@ -60,10 +60,17 @@ body:has(.lp-root) {
   background-color: #ffffff;
 }
 
-/* Focus ring for selects */
+/* Focus ring for selects — subtle, not aggressive */
 .lp-root select:focus {
-  border-color: #8b1e1e !important;
-  box-shadow: 0 0 0 2px rgba(139, 30, 30, 0.15);
+  border-color: #c9a8a5 !important;
+  box-shadow: 0 0 0 3px rgba(139, 30, 30, 0.08);
+  outline: none;
+}
+
+/* Disabled select — visually muted */
+.lp-root select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Focus ring for inputs */

@@ -865,83 +865,79 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               {/* ── Vehicle Selector — data fetched from DB ─────────────── */}
               {tab === 'vehicle' && (
                 <div className="lp-vehicle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  {/* Shared select style helper */}
                   {/* Make */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1c1b1b', marginBottom: 5 }}>Make</label>
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        value={selectedMake}
-                        onChange={e => {
-                          const opt = e.target.options[e.target.selectedIndex];
-                          setSelectedMake(e.target.value);
-                          setSelectedMakeId(opt.dataset.id ? Number(opt.dataset.id) : null);
-                        }}
-                        disabled={makesLoading}
-                        style={{ width: '100%', height: 48, backgroundColor: '#fcf9f8', color: selectedMake ? '#1c1b1b' : '#8b716e', border: '1px solid #dfbfbc', borderRadius: 12, padding: '0 36px 0 12px', fontSize: 14, cursor: 'pointer', appearance: 'none', outline: 'none' }}
-                      >
-                        <option value="">{makesLoading ? 'Loading…' : 'Select Make'}</option>
-                        {makes.map(m => <option key={m.id} value={m.name} data-id={String(m.id)}>{m.name}</option>)}
-                      </select>
-                      <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#8b716e', fontSize: 16 }}>▾</span>
-                    </div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#58413f', marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Make</label>
+                    <select
+                      value={selectedMake}
+                      onChange={e => {
+                        const opt = e.target.options[e.target.selectedIndex];
+                        setSelectedMake(e.target.value);
+                        setSelectedMakeId(opt.dataset.id ? Number(opt.dataset.id) : null);
+                        // reset model when make changes
+                        setSelectedModel('');
+                      }}
+                      disabled={makesLoading}
+                      style={{ width: '100%', height: 48, backgroundColor: '#fff', color: selectedMake ? '#1c1b1b' : '#8b716e', border: '1.5px solid #dfbfbc', borderRadius: 10, padding: '0 36px 0 14px', fontSize: 14, fontFamily: 'Inter, sans-serif', cursor: 'pointer', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                    >
+                      <option value="">{makesLoading ? 'Loading…' : 'Select Make'}</option>
+                      {makes.map(m => <option key={m.id} value={m.name} data-id={String(m.id)}>{m.name}</option>)}
+                    </select>
                   </div>
 
                   {/* Model */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1c1b1b', marginBottom: 5 }}>Model</label>
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        value={selectedModel}
-                        onChange={e => setSelectedModel(e.target.value)}
-                        disabled={!selectedMakeId || modelsLoading}
-                        style={{ width: '100%', height: 48, backgroundColor: !selectedMakeId ? '#f0eded' : '#fcf9f8', color: selectedModel ? '#1c1b1b' : '#8b716e', border: '1px solid #dfbfbc', borderRadius: 12, padding: '0 36px 0 12px', fontSize: 14, cursor: selectedMakeId ? 'pointer' : 'not-allowed', appearance: 'none', outline: 'none' }}
-                      >
-                        <option value="">{modelsLoading ? 'Loading…' : !selectedMakeId ? 'Select Make first' : 'Select Model'}</option>
-                        {models.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                      </select>
-                      <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#8b716e', fontSize: 16 }}>▾</span>
-                    </div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#58413f', marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Model</label>
+                    <select
+                      value={selectedModel}
+                      onChange={e => setSelectedModel(e.target.value)}
+                      disabled={!selectedMakeId || modelsLoading}
+                      style={{ width: '100%', height: 48, backgroundColor: '#fff', color: selectedModel ? '#1c1b1b' : '#8b716e', border: '1.5px solid #dfbfbc', borderRadius: 10, padding: '0 36px 0 14px', fontSize: 14, fontFamily: 'Inter, sans-serif', cursor: selectedMakeId ? 'pointer' : 'not-allowed', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                    >
+                      <option value="">{modelsLoading ? 'Loading…' : !selectedMakeId ? 'Select Make first' : 'Select Model'}</option>
+                      {models.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                    </select>
                   </div>
 
                   {/* Year */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1c1b1b', marginBottom: 5 }}>Year</label>
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        value={selectedYear}
-                        onChange={e => setSelectedYear(e.target.value)}
-                        style={{ width: '100%', height: 48, backgroundColor: '#fcf9f8', color: selectedYear ? '#1c1b1b' : '#8b716e', border: '1px solid #dfbfbc', borderRadius: 12, padding: '0 36px 0 12px', fontSize: 14, cursor: 'pointer', appearance: 'none', outline: 'none' }}
-                      >
-                        <option value="">Select Year</option>
-                        {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-                      </select>
-                      <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#8b716e', fontSize: 16 }}>▾</span>
-                    </div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#58413f', marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Year</label>
+                    <select
+                      value={selectedYear}
+                      onChange={e => setSelectedYear(e.target.value)}
+                      style={{ width: '100%', height: 48, backgroundColor: '#fff', color: selectedYear ? '#1c1b1b' : '#8b716e', border: '1.5px solid #dfbfbc', borderRadius: 10, padding: '0 36px 0 14px', fontSize: 14, fontFamily: 'Inter, sans-serif', cursor: 'pointer', boxSizing: 'border-box', transition: 'border-color 0.15s' }}
+                    >
+                      <option value="">Select Year</option>
+                      {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
                   </div>
 
-                  {/* Variant — free text since DB doesn't store variants separately */}
+                  {/* Variant — free text */}
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#1c1b1b', marginBottom: 5 }}>Variant <span style={{ fontWeight: 400, color: '#8b716e' }}>(optional)</span></label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#58413f', marginBottom: 6, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                      Variant <span style={{ fontWeight: 400, color: '#8b716e', textTransform: 'none' }}>(optional)</span>
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. VXI, ZXI, Petrol"
-                      style={{ width: '100%', height: 48, backgroundColor: '#fcf9f8', color: '#1c1b1b', border: '1px solid #dfbfbc', borderRadius: 12, padding: '0 12px', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                      style={{ width: '100%', height: 48, backgroundColor: '#fff', color: '#1c1b1b', border: '1.5px solid #dfbfbc', borderRadius: 10, padding: '0 14px', fontSize: 14, fontFamily: 'Inter, sans-serif', boxSizing: 'border-box', outline: 'none', transition: 'border-color 0.15s' }}
                     />
                   </div>
 
-                  {/* CTA — redirects to /marketplace with vehicle filters as query params */}
+                  {/* CTA — full maroon always, opacity dims when disabled */}
                   <button
                     disabled={!selectedMake}
                     onClick={() => {
-                      const params = new URLSearchParams();
-                      if (selectedMake)  params.set('make',  selectedMake);
-                      if (selectedModel) params.set('model', selectedModel);
-                      if (selectedYear)  params.set('year',  selectedYear);
-                      navigate(`/marketplace?${params.toString()}`);
+                      const qp = new URLSearchParams();
+                      if (selectedMake)  qp.set('make',  selectedMake);
+                      if (selectedModel) qp.set('model', selectedModel);
+                      if (selectedYear)  qp.set('year',  selectedYear);
+                      navigate(`/marketplace?${qp.toString()}`);
                     }}
-                    style={{ gridColumn: 'span 2', height: 50, backgroundColor: selectedMake ? '#8b1e1e' : '#c9bab8', color: '#fff', borderRadius: 12, marginTop: 6, fontWeight: 700, fontSize: 14, border: 'none', cursor: selectedMake ? 'pointer' : 'not-allowed', transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                    style={{ gridColumn: 'span 2', height: 52, backgroundColor: '#8b1e1e', color: '#fff', borderRadius: 12, marginTop: 4, fontWeight: 700, fontSize: 15, border: 'none', cursor: selectedMake ? 'pointer' : 'not-allowed', opacity: selectedMake ? 1 : 0.45, transition: 'opacity 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontFamily: 'Inter, sans-serif' }}
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>search</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>search</span>
                     Find Compatible Parts
                   </button>
                 </div>
