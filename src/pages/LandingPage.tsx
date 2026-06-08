@@ -7,7 +7,7 @@
  */
 import '../styles/landing.css';
 import { useState, useEffect, useContext } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, isFirebaseConfigured } from '../config/firebase';
 import { api, setTokens } from '../api/client';
 import { getDefaultRoute } from '../components/routes';
@@ -169,10 +169,10 @@ function RoleTag({ role }: { role: 'customer' | 'shop' }) {
   );
 }
 
-function AuthModal({ mode: initialMode, onClose }: { mode: 'signin' | 'signup'; onClose: () => void }) {
+function AuthModal({ mode: initialMode, onClose, initialRole }: { mode: 'signin' | 'signup'; onClose: () => void; initialRole?: 'customer' | 'shop' }) {
   const [step,     setStep]    = useState<AuthStep>('role');
   const [authMode, setAuthMode] = useState<'signin'|'signup'>(initialMode);
-  const [role,     setRole]    = useState<'customer'|'shop'>('customer');
+  const [role,     setRole]    = useState<'customer'|'shop'>(initialRole || 'customer');
   const [loading,  setLoading] = useState(false);
   const [error,    setError]   = useState('');
   const [showPw,        setShowPw]        = useState(false);
@@ -670,6 +670,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
   useDesignFonts();
   const navigate  = useNavigate();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<'vehicle' | 'plate'>('vehicle');
 
   /* ── Hero vehicle selector — fetched from DB ────────────────────── */
@@ -770,9 +771,12 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
   }, []);
 
 
-  const [authModal, setAuthModal] = useState<{ open: boolean; mode: 'signin' | 'signup' }>({
+  // ?role=shop in the URL (from "Apply as Supplier" CTA) pre-selects Shop Owner + signup
+  const urlRole = searchParams.get('role') === 'shop' ? 'shop' : undefined;
+  const [authModal, setAuthModal] = useState<{ open: boolean; mode: 'signin' | 'signup'; initialRole?: 'customer' | 'shop' }>({
     open: openAuth,
-    mode: 'signin',
+    mode: urlRole ? 'signup' : 'signin',
+    initialRole: urlRole,
   });
 
   return (
@@ -784,6 +788,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       {authModal.open && (
         <AuthModal
           mode={authModal.mode}
+          initialRole={authModal.initialRole}
           onClose={() => setAuthModal({ open: false, mode: 'signin' })}
         />
       )}

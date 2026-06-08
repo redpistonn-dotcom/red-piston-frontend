@@ -133,10 +133,14 @@ export function SuppliersPage() {
             </p>
             {/* lp-cta-row: wraps on narrow screens */}
             <div className="lp-cta-row" style={{ display: 'flex', gap: 12 }}>
-              <button style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
+              <button
+                onClick={() => document.getElementById('featured-suppliers')?.scrollIntoView({ behavior: 'smooth' })}
+                style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
                 Browse Suppliers
               </button>
-              <button style={{ backgroundColor: 'transparent', color: '#fff', border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 12, padding: '13px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
+              <button
+                onClick={() => navigate('/login?role=shop')}
+                style={{ backgroundColor: 'transparent', color: '#fff', border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 12, padding: '13px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
                 Become a Supplier →
               </button>
             </div>
@@ -155,7 +159,7 @@ export function SuppliersPage() {
       </section>
 
       {/* ── SUPPLIER CARDS ──────────────────────────────────────── */}
-      <section style={{ padding: '48px 20px' }}>
+      <section id="featured-suppliers" style={{ padding: '48px 20px' }}>
         <div style={{ maxWidth: 1440, margin: '0 auto' }}>
           {/* lp-section-header: wraps on mobile */}
           <div className="lp-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
@@ -163,7 +167,9 @@ export function SuppliersPage() {
               <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(22px, 5vw, 32px)', fontWeight: 700, color: '#1c1b1b', margin: '0 0 6px' }}>Featured Suppliers</h2>
               <p style={{ color: '#58413f', margin: 0, fontSize: 14 }}>Top-rated verified automotive parts suppliers</p>
             </div>
-            <a href="#" style={{ color: '#8b1e1e', fontWeight: 700, textDecoration: 'none', fontSize: 14, whiteSpace: 'nowrap' }}>View all 500+ →</a>
+            {suppliers.length > 0 && (
+              <span style={{ color: '#58413f', fontSize: 13 }}>{suppliers.length} supplier{suppliers.length !== 1 ? 's' : ''} found</span>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -178,13 +184,16 @@ export function SuppliersPage() {
                 <div style={{ opacity: 0.7 }}>Check back soon — more suppliers are being verified.</div>
               </div>
             ) : suppliers.map((s: any, idx: number) => {
-              const name    = s.name       || s.shopName    || 'Unnamed Shop';
-              const city    = s.city       || s.shopCity    || '';
-              const address = s.address    || s.shopAddress || '';
-              const verified= s.isVerified ?? s.verified    ?? false;
-              const rating  = s.rating     != null ? Number(s.rating).toFixed(1) : null;
-              const coverImg= s.imageUrl   || s.coverImage  || '';
-              const desc    = s.description|| '';
+              // Backend /api/marketplace/shops returns: id, name, address, city,
+              // logo, is_verified, rating, parts_count, distance
+              const name      = s.name         || s.shopName    || 'Unnamed Shop';
+              const city      = s.city         || s.shopCity    || '';
+              const address   = s.address      || s.shopAddress || '';
+              const verified  = s.is_verified  ?? s.isVerified  ?? s.verified ?? false;
+              const rating    = s.rating       != null ? Number(s.rating).toFixed(1) : null;
+              const coverImg  = s.logo         || s.logoUrl     || s.imageUrl  || s.coverImage || '';
+              const partsCount= s.parts_count  ?? s.partsCount  ?? null;
+              const desc      = s.description  || '';
 
               return (
                 /* sp-supplier-card: row on desktop, column on mobile */
@@ -225,13 +234,18 @@ export function SuppliersPage() {
                         <p style={{ fontSize: 14, color: '#58413f', lineHeight: 1.5, margin: '0 0 14px' }}>{desc}</p>
                       )}
 
-                      {/* Rating */}
-                      {rating && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ color: '#eab308', fontSize: 16 }}>★</span>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: '#1c1b1b' }}>{rating}</span>
-                        </div>
-                      )}
+                      {/* Rating + parts count */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                        {rating && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ color: '#eab308', fontSize: 16 }}>★</span>
+                            <span style={{ fontSize: 14, fontWeight: 700, color: '#1c1b1b' }}>{rating}</span>
+                          </div>
+                        )}
+                        {partsCount != null && partsCount > 0 && (
+                          <span style={{ fontSize: 13, color: '#58413f' }}>{partsCount.toLocaleString()} parts listed</span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Action buttons */}
@@ -282,7 +296,9 @@ export function SuppliersPage() {
         </h2>
         <p style={{ opacity: 0.7, fontSize: 15, marginBottom: 28 }}>Join 500+ verified suppliers and reach 50,000+ buyers</p>
         <div className="lp-cta-row" style={{ display: 'flex', gap: 14, justifyContent: 'center' }}>
-          <button style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 28px', fontWeight: 800, fontSize: 15, cursor: 'pointer', minHeight: 44 }}>
+          <button
+            onClick={() => navigate('/login?role=shop')}
+            style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 28px', fontWeight: 800, fontSize: 15, cursor: 'pointer', minHeight: 44 }}>
             Apply as Supplier →
           </button>
           <button onClick={() => navigate('/marketplace')}

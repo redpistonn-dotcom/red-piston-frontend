@@ -12,13 +12,33 @@ import { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { AppCtx } from '../context/AppCtx';
-import { api } from '../api/client';
 import { CatalogSearchBar } from '../components/CatalogSearchBar';
 import { PublicHeader } from '../components/PublicHeader';
+import { browseMarketplace } from '../api/marketplace';
 
 /* ── Shared icon shorthand ─────────────────────────────────────────── */
 function Icon({ n, style }: { n: string; style?: React.CSSProperties }) {
   return <span className="material-symbols-outlined" style={style}>{n}</span>;
+}
+
+/* ── Part image placeholder (shown when no imageUrl in DB) ─────────── */
+const CATEGORY_ICON_MAP: Record<string, string> = {
+  Brakes: 'settings_input_component', Engine: 'settings',
+  Electrical: 'bolt', Filters: 'filter_alt',
+  Suspension: 'architecture', Cooling: 'ac_unit',
+  Ignition: 'flash_on', 'Engine Oils': 'oil_barrel',
+  Fluids: 'water_drop', Exhaust: 'air', Steering: 'trip_origin',
+  'Body & Exterior': 'directions_car',
+  'Clutch & Transmission': 'settings_input_composite',
+};
+function PartImagePlaceholder({ category }: { category?: string }) {
+  const icon = (category && CATEGORY_ICON_MAP[category]) || 'inventory_2';
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: 'rgba(139,30,30,0.04)' }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 38, color: 'rgba(139,30,30,0.25)' }}>{icon}</span>
+      {category && <span style={{ fontSize: 10, color: 'rgba(139,30,30,0.30)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>{category}</span>}
+    </div>
+  );
 }
 
 /* ── Nav bar — uses shared PublicHeader ─────────────────────────── */
@@ -86,6 +106,9 @@ function ProductCard({
   onAddToCart: (p: Product) => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const hasImage = product.image && !imgError;
+
   return (
     <div
       onMouseEnter={() => setHovered(true)}
@@ -96,10 +119,17 @@ function ProductCard({
         boxShadow: hovered ? '0 8px 32px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.04)',
         transition: 'box-shadow 0.3s',
       }}>
-      {/* Image */}
-      <div style={{ aspectRatio: '1', backgroundColor: '#fff', padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-        <img src={product.image} alt={product.name}
-          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: hovered ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.5s' }} />
+      {/* Image or placeholder */}
+      <div style={{ aspectRatio: '1', backgroundColor: '#fff', padding: hasImage ? 20 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+        {hasImage ? (
+          <img
+            src={product.image} alt={product.name}
+            onError={() => setImgError(true)}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: hovered ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.5s' }}
+          />
+        ) : (
+          <PartImagePlaceholder category={product.category} />
+        )}
         {/* OEM/OES badge */}
         <span style={{
           position: 'absolute', top: 12, right: 12,
@@ -108,10 +138,10 @@ function ProductCard({
           fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 4,
           textTransform: 'uppercase', letterSpacing: '0.06em',
         }}>
-          {product.type || 'OEM'}
+          {product.type || 'OES'}
         </span>
-        {/* Save 20% badge */}
-        {product.discount && (
+        {/* Discount badge — only show if >0 */}
+        {product.discount > 0 && (
           <span style={{ position: 'absolute', top: 12, left: 12, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 4 }}>
             Save {product.discount}%
           </span>
@@ -126,26 +156,41 @@ function ProductCard({
         </h3>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#58413f' }}>
-            <span>Part No:</span>
-            <span style={{ fontWeight: 700, color: '#1c1b1b' }}>{product.partNo}</span>
-          </div>
+          {product.partNo && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#58413f' }}>
+              <span>Part No:</span>
+              <span style={{ fontWeight: 700, color: '#1c1b1b', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{product.partNo}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#58413f' }}>
             <span>Availability:</span>
-            <span style={{ fontWeight: 700, color: '#8b1e1e' }}>{product.availability || 'In Stock'}</span>
+            <span style={{ fontWeight: 700, color: product.availability === 'In Stock' ? '#166534' : '#8b1e1e' }}>{product.availability || 'Available'}</span>
           </div>
-          {product.sellers && (
-            <div style={{ fontSize: 12, color: '#8b716e' }}>{product.sellers} Seller{product.sellers > 1 ? 's' : ''}</div>
+          {/* Shop name + distance from API */}
+          {product.shopName && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#8b716e' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>storefront</span>
+              <span>{product.shopName}</span>
+              {product.distance != null && <span>· {product.distance}km away</span>}
+            </div>
+          )}
+          {(product.sellers ?? 0) > 1 && (
+            <div style={{ fontSize: 12, color: '#8b716e' }}>{product.sellers} sellers available</div>
           )}
         </div>
 
         {/* Price + Add to cart */}
         <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid #dfbfbc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <span style={{ fontSize: 22, fontWeight: 800, color: '#8b1e1e', fontFamily: 'Poppins, sans-serif' }}>
-              ₹{product.price.toLocaleString('en-IN')}
-            </span>
-            {product.originalPrice && (
+            {product.price > 0 ? (
+              <span style={{ fontSize: 22, fontWeight: 800, color: '#8b1e1e', fontFamily: 'Poppins, sans-serif' }}>
+                ₹{product.price.toLocaleString('en-IN')}
+              </span>
+            ) : (
+              <span style={{ fontSize: 14, fontWeight: 600, color: '#8b716e' }}>Contact for price</span>
+            )}
+            {/* Only show strikethrough if there's a real discount */}
+            {product.discount > 0 && product.originalPrice && product.originalPrice !== product.price && (
               <span style={{ fontSize: 13, color: '#8b716e', textDecoration: 'line-through', marginLeft: 6 }}>
                 ₹{product.originalPrice.toLocaleString('en-IN')}
               </span>
@@ -179,26 +224,17 @@ interface Product {
   partNo: string;
   price: number;
   originalPrice?: number;
-  discount?: number;
+  discount: number;      // 0 = no discount
   image: string;
   type: 'OEM' | 'OES';
   availability?: string;
-  category?: string;
+  category?: string;     // used by PartImagePlaceholder
   sellers?: number;
+  shopName?: string;     // best shop name from API
+  distance?: number | null;
 }
 
-/* ── Static demo products (design data) ───────────────────────────── */
-const DEMO_PRODUCTS: Product[] = [
-  { id: '1', brand: 'BREMBO INDUSTRIAL', name: 'Ventilated Heavy-Duty Brake Disc Rotor with Coating', partNo: '09.C422.11', price: 8499, originalPrice: 10625, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBKYvHm0DrXaMNN_XxUcXtGNpo1YzlQhfudU9sHnfqyaH9BWKF-ZehDzu90iflFI7aKOk_BgIzAwzyGR0v2uX0cVq6VJ_AGc1Ur_kCw8YkWjMUMaUNFBY0eHMA4faeNYnv_Rx88UANJoBU4tIqVlkvDzGGycP9d_fDG6WFGYdK5Dgo5mdzji_vqaH_yvonyjt6DreCRXg1iKVOG8n8BLhrqkVn8YY0Nw91IByAFE7hRFW2pIpWozU-azv_zyhr_RP7AM0ETKW0ArlY', type: 'OEM', availability: '1.2 km away', sellers: 1 },
-  { id: '2', brand: 'GARRETT MOTION', name: 'GTX3076R Gen II Dual Ball Bearing Turbocharger', partNo: '849849-5002S', price: 27500, originalPrice: 34375, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDP2XS17jS9sTzR__xuzEdhaYtJ6zPkDgNfYg7Jc3-KGzok8JN-R54efiR2BlJ_NWoIByf3tLRGATCLugO6e-_HbhwrXyftzzTQpJtnzbVYLlVI41oEGUJm0w2SYF7TxK-ZwFL92zrJO6bycxzWctuDWSj_qqvsHOqYp4nOezDRuoqjgCVCTp-vu3rh9rq-vMXL-Ss8bm6L0eZzOkidyeB6RXOB0bL8AIo3hUkY5zlZIwAD9lxaBzqahpic0XY7Omh8x8F3nxfy9l0', type: 'OES', availability: '3.5 km away', sellers: 1 },
-  { id: '3', brand: 'DENSO CORP', name: 'High Output 150A Alternator - Series 4', partNo: 'DAN1328', price: 5599, originalPrice: 6999, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA22ksS8tjxAPUwMyP-t6RuYT4ZCVK0RhtkjtcKIicUMQ2ty0t8q85baYw--4uCVFDGZJjLrQJXJ1Z7Yym9EPd65aiRGxMPEjX2FXJT86VmLu9QnSL_KvRCocZ0zXRJtiAEjSBBfLX8qtPbxAmISpTSpbMyMvSuHlozVVpScFVYBm40visp55qj3VAVCPgKKrTzfYHUn6nlOxpGQwe3pIy2TRQymTAfgTx1L7YhSdRSXhG9GofNnOzLiVfoAy8WaTQf8aEOO3VTJHk', type: 'OEM', availability: '0.8 km away', sellers: 1 },
-  { id: '4', brand: 'BILSTEIN', name: 'B6 Performance Front Gas Pressure Shock Absorber', partNo: '24-184976', price: 3199, originalPrice: 3999, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCoFopVMfKmhrpufzMMP0htqnHMzYmG8Gw2UFJ0hb56G23PFuT_AguTZmVvrSeJeJNCrsTcNXWoTanUCceht6AufYTYxReRxFpwLzXsLHTmZaqvrAg9ZbB-GfyTBuLk_lMU2kU2XrIltH29-c01bYLqk8hUvELKIZw7s_MPenuxnVT5RkSmCddyeATO9qicf0XUkmYbqe7YhHRHIoIDdX3rsYjee0j6hkzaIoSmpb1BSK1kT-jtBgMhgFR-5Bvzhmsuey7I0kyAi2M', type: 'OEM', availability: '12 km away', sellers: 1 },
-  { id: '5', brand: 'NGK SPARK PLUG', name: 'Laser Iridium Premium Spark Plug Set (x4)', partNo: 'SILZKR7B11', price: 1099, originalPrice: 1374, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCP6gtVYOZ0A8GlMfDslqHyI0zvWxZhWCTFq4RY5Sk6_HLiSTNafQ4ybwLaVrz3GdCbIQGVJ9wUcLBL1q287YNLsJSIfZAQSlX2qcKPv9KiAaNk_hgB0sUX5OW4GRC5BnVN4pkojBQ-ehbBe21fcySgow_10mczGVTlxL-cTFHPRRhyYEORhvwV9f0FPW-ko7njPvZ_P0WTpjZujypnuRNJrm3kR80ECG6gfemx4cGjB46Ggt3uKsz5QR1GyFSAqf9FsuXidEvOqdE', type: 'OEM', availability: '2.1 km away', sellers: 1 },
-  { id: '6', brand: 'GATES UNITA', name: 'Reinforced EPDM Timing Belt - Precision Fit', partNo: 'T328RB', price: 1920, originalPrice: 2400, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD4P_Dqy6mh5eaLa1iOFGxfTh8FAGVJ1Z1V4fCuQwes4nuTkMKTecPTKAXhd3cGOBVVmu3GI_ttusjfLg_CVoN-IiW0kPYXg2wuB5xIye01LC3VAlrPgB4WHNQwWWaB7052mTekcIADV3BnM2egKq2vZtsw4a0lQtesFjR2vuhlp1nbo3vTOukh4J4JVf95jy9mRaijqwwtcSNezcbiMQvfJS9bLn0Mb85uYKQGupP8Uu1L8EJqdWl2KuxmWF1Bf0uXeCNNNBJUnzM', type: 'OES', availability: '5.5 km away', sellers: 1 },
-  { id: '7', brand: 'BOSCH', name: 'Premium Ignition Coil Set — Direct Fit', partNo: 'F000ZS0206', price: 2499, originalPrice: 3124, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBOlwJou4Lm9VYehyDxPD6GSrcXp1SQsbDzfUUnW0U3cn8Wl7zZPHlclUzHORFL4ZIDCTpichc5D2-Wv0aGDeqMfcWEq_2M9fPjnDTwcECwoL7cfNlxRiiaWffJuWbkQa0_oduZ2eA2EejoMURv-b4oqBZk0jc5nVQpR5qsrvcgxlLb9ttHCyApdiw95089dKsrk0fry-rrxmJn6O7sSa1Y94p8yPfDWde-8wzVc4Y_-XfyRyaK6c2vyf2U5zeN6yxFuYB3FfLTIJU', type: 'OEM', availability: '4.0 km away', sellers: 1 },
-  { id: '8', brand: 'MANN-FILTER', name: 'Heavy Duty Engine Oil Filter — Multi-Layer', partNo: 'W940/66', price: 849, originalPrice: 1062, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDJKjKKnIwHK2hAhy56vQWebehIR8DoulZi67ReTWX1Cukr2z4I75DNfCpsroAxDDIfO9AVpKZ56LJ__L43v6EGALPKa4v1B9B-i_ve3T8dxHLMtLIkpxng5NcvRumlrTjJzkrQxHFObjx1FG8g98nB4OF8qFvNA5nWK6JnQKSBUBgqW_BzHE0aEPBU82m46U8I7vLJo-lAxaDag5_m6GvUoopH_hQKYPuKN47Kw7xJJKQfsPbnbMtnl2ny9ZEO8u5pzD675p-pZw', type: 'OES', availability: '1.8 km away', sellers: 1 },
-  { id: '9', brand: 'CASTROL', name: 'EDGE 5W-30 Titanium Full Synthetic Engine Oil 5L', partNo: 'CAS5W30-5L', price: 2199, originalPrice: 2749, discount: 20, image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC-5uk-GIYbtK6b5b-svhCZvUWI7ZQ0TEEw_2rB7_ogIfWXDRASPps40KkOjUTh9Ko1M6_HmQqeNz_3E6V2PlfKw818YWIrMxaw6l_rkPHpMYtksRNf3cWDB3QexA1teMcUrVS0hEma-lbDKFMP5bm1AhNxkpcamNBISLCl-TKxIOttxCK-Hm1fpscxNnLNeo2sMVLJloXgKi5NB9bNjkpng9ZUwyIEx8RAqdcTPD11Aqs2DL54EpOe_3qUMw7yhvobh-AuYC2TG1c', type: 'OES', availability: 'In Stock', sellers: 3 },
-];
+/* No static demo products — all parts come from the live DB via browseMarketplace() */
 
 const CATEGORIES = [
   { name: 'Engine Components', count: 124 },
@@ -254,9 +290,11 @@ export function MarketplacePage() {
   const [search, setSearch] = useState(urlQuery);
 
   // Real catalog data from backend
+  const PAGE_SIZE = 24;
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [catalogLoading,  setCatalogLoading]  = useState(false);
   const [totalResults,    setTotalResults]    = useState(0);
+  const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE));
 
   // Vehicle filter (from logged-in user's saved vehicle)
   const [vehicleFilter, setVehicleFilter] = useState<string | null>(null);
@@ -283,48 +321,56 @@ export function MarketplacePage() {
     }
   }, [currentUser, urlMake]);
 
-  // Fetch from /api/catalog/search when URL query or filters change
+  // Fetch from browseMarketplace (returns real total for pagination)
+  useEffect(() => {
+    setPage(1); // reset to page 1 when search/filter changes
+  }, [urlQuery, urlMake, urlModel, urlYear, activeCateg]);
+
   useEffect(() => {
     const fetchCatalog = async () => {
       setCatalogLoading(true);
       try {
-        const queryParams = new URLSearchParams();
-        // Vehicle filter from home page takes priority as the search term
-        if (urlMake) queryParams.set('q', [urlMake, urlModel].filter(Boolean).join(' '));
-        else if (urlQuery) queryParams.set('q', urlQuery);
-        else queryParams.set('q', 'brake'); // default browse
-        if (urlMake)  queryParams.set('make',  urlMake);
-        if (urlModel) queryParams.set('model', urlModel);
-        if (urlYear)  queryParams.set('year',  urlYear);
-        if (activeCateg) queryParams.set('category', activeCateg);
-        queryParams.set('limit', '24');
-        queryParams.set('offset', String((page - 1) * 24));
+        const res = await browseMarketplace({
+          q:        urlQuery  || undefined,
+          make:     urlMake   || undefined,
+          model:    urlModel  || undefined,
+          year:     urlYear   || undefined,
+          category: activeCateg || undefined,
+          limit:    PAGE_SIZE,
+          offset:   (page - 1) * PAGE_SIZE,
+        });
 
-        const data = await api.get<{ parts: any[] }>(`/api/catalog/search?${queryParams}`);
-        const parts = (data.parts || []).map((p: any, i: number): Product => ({
-          id: String(p.masterPartId || i),
-          name: p.partName || 'Unknown Part',
-          brand: p.brand || '',
-          partNo: p.primaryOemNumber || p.masterPartId || '',
-          price: Math.floor(Math.random() * 8000) + 500, // price from ShopInventory in real impl
-          image: p.imageUrl || DEMO_PRODUCTS[i % DEMO_PRODUCTS.length]?.image || '',
-          type: (p.categoryL1?.includes('OEM') ? 'OEM' : 'OES') as 'OEM' | 'OES',
-          availability: 'In Stock',
-          discount: 20,
-          originalPrice: Math.floor(Math.random() * 10000) + 700,
-        }));
-        setCatalogProducts(parts.length > 0 ? parts : DEMO_PRODUCTS);
-        setTotalResults(parts.length > 0 ? parts.length : DEMO_PRODUCTS.length);
+        // browseMarketplace returns RankedPart[]; map to Product shape
+        const parts: Product[] = (res.parts || []).map((rp: any) => {
+          const prod = rp.product || rp;
+          return {
+            id:           String(prod.id || prod.masterPartId),
+            name:         prod.name || prod.partName || 'Unknown Part',
+            brand:        prod.brand || '',
+            partNo:       prod.sku  || prod.oemNumber || String(prod.id || ''),
+            price:        rp.bestPrice || prod.price || 0,
+            image:        prod.imageUrl || '',
+            category:     prod.category || prod.categoryL1 || '',
+            type:         'OES' as 'OEM' | 'OES',  // API doesn't distinguish OEM/OES at part level
+            availability: (rp.availability || 0) > 0 ? 'In Stock' : 'Available',
+            discount:     0,
+            shopName:     rp.bestListing?.shop?.name || rp.bestShop?.name || '',
+            distance:     rp.bestListing?.distance ?? null,
+            sellers:      rp.shopCount || 1,
+          };
+        });
+
+        setCatalogProducts(parts);
+        setTotalResults(res.total || parts.length);
       } catch {
-        // Fallback to demo data when backend unavailable
-        setCatalogProducts(DEMO_PRODUCTS);
-        setTotalResults(DEMO_PRODUCTS.length);
+        setCatalogProducts([]);
+        setTotalResults(0);
       } finally {
         setCatalogLoading(false);
       }
     };
     fetchCatalog();
-  }, [urlQuery, activeCateg, page]);
+  }, [urlQuery, urlMake, urlModel, urlYear, activeCateg, page]);
 
   // Client-side filter on fetched catalog data
   const filtered = catalogProducts.filter(p => {
@@ -491,7 +537,7 @@ export function MarketplacePage() {
               <h1 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(18px, 5vw, 28px)', fontWeight: 700, color: '#1c1b1b', margin: 0 }}>
                 {urlQuery ? `Results for "${urlQuery}"` : 'Industrial Parts'}{' '}
                 <span style={{ fontWeight: 400, color: '#8b716e', fontSize: 'clamp(14px, 3.5vw, 24px)' }}>
-                  {catalogLoading ? '(loading…)' : `(${filtered.length} results)`}
+                  {catalogLoading ? '(loading…)' : `(${totalResults.toLocaleString()} results)`}
                 </span>
               </h1>
             </div>
@@ -528,21 +574,46 @@ export function MarketplacePage() {
             </div>
           )}
 
-          {/* Pagination */}
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 40 }}>
-            {[1,2,3,'…',42].map((p, i) => (
-              <button key={i} onClick={() => typeof p === 'number' && setPage(p)}
-                style={{
-                  width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: 8, border: p === page ? 'none' : '1px solid #dfbfbc',
-                  backgroundColor: p === page ? '#8b1e1e' : '#fff',
-                  color: p === page ? '#fff' : '#1c1b1b',
-                  fontWeight: p === page ? 700 : 400, cursor: 'pointer', fontSize: 14,
-                }}>
-                {p}
-              </button>
-            ))}
-          </div>
+          {/* Pagination — calculated from real totalResults */}
+          {totalPages > 1 && (() => {
+            // Build smart page list: always show first, last, current ±1, with '…' gaps
+            const pageSet = new Set([1, totalPages, page, page - 1, page + 1].filter(n => n >= 1 && n <= totalPages));
+            const sorted = Array.from(pageSet).sort((a, b) => a - b);
+            const withEllipsis: (number | '…')[] = [];
+            sorted.forEach((n, i) => {
+              if (i > 0 && n - sorted[i - 1] > 1) withEllipsis.push('…');
+              withEllipsis.push(n);
+            });
+
+            const btnStyle = (active: boolean): React.CSSProperties => ({
+              minWidth: 40, height: 40, padding: '0 6px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 8, border: active ? 'none' : '1px solid #dfbfbc',
+              backgroundColor: active ? '#8b1e1e' : '#fff',
+              color: active ? '#fff' : '#1c1b1b',
+              fontWeight: active ? 700 : 400, cursor: 'pointer', fontSize: 14,
+            });
+
+            return (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 40, flexWrap: 'wrap' }}>
+                {/* Prev */}
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  style={{ ...btnStyle(false), opacity: page === 1 ? 0.4 : 1 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
+                </button>
+                {withEllipsis.map((p, i) =>
+                  p === '…'
+                    ? <span key={`e${i}`} style={{ padding: '0 4px', color: '#8b716e' }}>…</span>
+                    : <button key={p} onClick={() => setPage(p as number)} style={btnStyle(p === page)}>{p}</button>
+                )}
+                {/* Next */}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  style={{ ...btnStyle(false), opacity: page === totalPages ? 0.4 : 1 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
+                </button>
+              </div>
+            );
+          })()}
         </section>
       </main>
 
