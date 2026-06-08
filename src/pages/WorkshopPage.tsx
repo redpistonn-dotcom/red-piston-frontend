@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, useContext, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, uid, JOB_STATUS, generateCSV, downloadCSV } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
+import { api } from "../api/client";
 
 // ─── Status config for table ──────────────────────────────────────────────────
 const STATUS_DISPLAY: Record<string, { label: string; dot: string; color: string }> = {
@@ -91,6 +93,20 @@ export function WorkshopPage() {
     const [goLiveProd, setGoLiveProd]     = useState<any>(null);   // product being listed
     const [glQty, setGlQty]               = useState(0);
     const [glPrice, setGlPrice]           = useState(0);
+    const [glSaving, setGlSaving]         = useState(false);
+
+    // Real inventory from DB
+    const [inventory,   setInventory]     = useState<any[]>([]);
+    const [invLoading,  setInvLoading]    = useState(false);
+
+    // Add Qty modal
+    const [addQtyItem,   setAddQtyItem]   = useState<any>(null);
+    const [addQtyAmount, setAddQtyAmount] = useState(1);
+    const [addQtySaving, setAddQtySaving] = useState(false);
+
+    // Edit mode: track whether Go Live modal is opened on an already-live item
+    const [editMode,    setEditMode]    = useState(false);
+    const [glTargetQty, setGlTargetQty] = useState(0); // target qty for edit mode
 
     useEffect(() => {
         const t = setInterval(() => setNow(Date.now()), 30000);
@@ -193,37 +209,136 @@ export function WorkshopPage() {
         { key: "invoiced",    label: "Invoiced" },
     ];
 
-    // Parts marketplace helpers
-    const shopProducts = useMemo(() => (products || []).filter((p: any) => p.shopId === activeShopId && p.isActive !== false), [products, activeShopId]);
+    // ── Map a real ShopInventory DB row to the shape the table expects ───────────
+    const mapInv = (item: any) => ({
+        id:              item.inventoryId,
+        inventoryId:     item.inventoryId,
+        name:            item.customPartName || item.masterPart?.partName || "—",
+        sku:             String(item.masterPartId || item.inventoryId),
+        category:        item.masterPart?.categoryL1 || "General",
+        brand:           item.masterPart?.brand || "",
+        image:           item.masterPart?.imageUrl || null,
+        stock:           item.computedStock ?? item.stockQty,
+        sellPrice:       Number(item.sellingPrice || 0),
+        buyPrice:        Number(item.buyingPrice  || 0),
+        marketplaceLive: !!item.isMarketplaceListed,
+        marketplaceQty:  item.computedStock ?? item.stockQty,
+        marketplacePrice:Number(item.sellingPrice || 0),
+    });
 
-    // Open the "Go Live" modal to collect qty + price before publishing
+    // Real inventory from DB (replaces local useStore products for marketplace tab)
+    const shopProducts = useMemo(() => inventory.map(mapInv), [inventory]);
+
+    // Fetch real inventory
+    const loadInventory = useCallback(async () => {
+        setInvLoading(true);
+        try {
+            const res = await api.get("/api/shop/inventory");
+            setInventory((res as any)?.inventory || []);
+        } catch { setInventory([]); }
+        finally { setInvLoading(false); }
+    }, []);
+
+    // Load when marketplace tab first opens
+    useEffect(() => {
+        if (workshopTab === "marketplace") loadInventory();
+    }, [workshopTab]);
+
+    // Open the Go Live / Edit modal.
+    // editMode = true  → already-live item: show target qty + take-offline option
+    // editMode = false → unlisted item: show optional extra stock to add
     const openGoLive = (prod: any) => {
         setGoLiveProd(prod);
-        setGlQty(prod.marketplaceQty || prod.stock || 0);
+        setEditMode(!!prod.marketplaceLive);
+        setGlQty(0);                       // extra stock to add (Go Live mode only)
+        setGlTargetQty(prod.stock || 0);   // target qty (Edit mode)
         setGlPrice(prod.marketplacePrice || prod.sellPrice || 0);
     };
 
-    // Confirm go-live from the modal
-    const confirmGoLive = () => {
+    // Confirm go-live (new listing) or save edits (existing listing).
+    // Edit mode:    adjust stock to the target qty (delta can be negative), update price.
+    // Go Live mode: optionally add extra stock, update price, enable listing.
+    const confirmGoLive = async () => {
         if (!goLiveProd) return;
-        if (glQty <= 0) { toast?.("Please enter a valid quantity", "warning"); return; }
-        if (glPrice <= 0) { toast?.("Please enter a valid price", "warning"); return; }
-        const updated = { ...goLiveProd, marketplaceLive: true, marketplaceQty: glQty, marketplacePrice: glPrice };
-        saveProducts?.((products || []).map((p: any) => p.id === goLiveProd.id ? updated : p));
-        toast?.(`🚀 ${goLiveProd.name} is now LIVE on marketplace!`, "success");
-        setGoLiveProd(null);
+        if (glPrice <= 0) { toast?.("Please enter a selling price", "warning"); return; }
+        setGlSaving(true);
+        try {
+            // 1. Update the selling price
+            await api.put(`/api/shop/inventory/${goLiveProd.inventoryId}`, { sellingPrice: glPrice });
+
+            if (editMode) {
+                // Edit mode: apply stock delta (signed — ADJUSTMENT supports negative qty)
+                const delta = glTargetQty - (goLiveProd.stock || 0);
+                if (delta !== 0) {
+                    await api.post("/api/shop/inventory/adjust", {
+                        inventoryId: goLiveProd.inventoryId,
+                        type: "ADJUSTMENT",
+                        qty: delta,
+                        notes: `Stock ${delta > 0 ? "increased" : "decreased"} via marketplace manager (${delta > 0 ? "+" : ""}${delta})`,
+                    });
+                }
+                await loadInventory();
+                toast?.(`✅ ${goLiveProd.name} listing updated!`, "success");
+            } else {
+                // Go Live mode
+                if (glQty > 0) {
+                    await api.post("/api/shop/inventory/adjust", {
+                        inventoryId: goLiveProd.inventoryId,
+                        type: "ADJUSTMENT",
+                        qty: glQty,
+                        notes: "Stock added when listing on marketplace",
+                    });
+                }
+                await api.patch(`/api/shop/inventory/${goLiveProd.inventoryId}/marketplace`, { listed: true });
+                await loadInventory();
+                toast?.(`🚀 ${goLiveProd.name} is now LIVE on marketplace!`, "success");
+            }
+            setGoLiveProd(null);
+        } catch (err) {
+            console.error("[confirmGoLive]", err);
+            toast?.("Failed — please try again.", "error");
+        }
+        finally { setGlSaving(false); }
     };
 
-    // Take a live item offline directly (no confirmation needed)
-    const takeOffline = (prod: any) => {
-        const updated = { ...prod, marketplaceLive: false, marketplaceQty: 0 };
-        saveProducts?.((products || []).map((p: any) => p.id === prod.id ? updated : p));
-        toast?.(`⏸ ${prod.name} removed from marketplace.`, "info");
+    // Take a live item offline (from the table action column)
+    const takeOffline = async (prod: any) => {
+        try {
+            await api.patch(`/api/shop/inventory/${prod.inventoryId}/marketplace`, { listed: false });
+            // Optimistic update so UI responds instantly
+            setInventory(inv => inv.map(i => i.inventoryId === prod.inventoryId ? { ...i, isMarketplaceListed: false } : i));
+            toast?.(`⏸ ${prod.name} removed from marketplace.`, "info");
+        } catch { toast?.("Failed — please try again.", "error"); }
     };
 
-    const updateMpField = (prod: any, field: string, val: number) => {
-        const updated = { ...prod, [field]: Math.max(0, val) };
-        saveProducts?.((products || []).map((p: any) => p.id === prod.id ? updated : p));
+    // Take offline from within the Edit modal (with loading state so button disables)
+    const takeOfflineFromModal = async () => {
+        if (!goLiveProd) return;
+        setGlSaving(true);
+        try {
+            await api.patch(`/api/shop/inventory/${goLiveProd.inventoryId}/marketplace`, { listed: false });
+            setInventory(inv => inv.map(i => i.inventoryId === goLiveProd.inventoryId ? { ...i, isMarketplaceListed: false } : i));
+            toast?.(`⏸ ${goLiveProd.name} removed from marketplace.`, "info");
+            setGoLiveProd(null);
+        } catch (err) {
+            console.error("[takeOfflineFromModal]", err);
+            toast?.("Failed — please try again.", "error");
+        }
+        finally { setGlSaving(false); }
+    };
+
+    // Add stock to an existing inventory item
+    const confirmAddQty = async () => {
+        if (!addQtyItem || addQtyAmount <= 0) return;
+        setAddQtySaving(true);
+        try {
+            await api.post("/api/shop/inventory/adjust", { inventoryId: addQtyItem.inventoryId, type: "ADJUSTMENT", qty: addQtyAmount, notes: "Stock added from marketplace manager" });
+            await loadInventory();
+            toast?.(`Added ${addQtyAmount} units to ${addQtyItem.name}`, "success");
+            setAddQtyItem(null);
+            setAddQtyAmount(1);
+        } catch { toast?.("Failed to add stock — please try again.", "error"); }
+        finally { setAddQtySaving(false); }
     };
 
     const mpFiltered = useMemo(() => {
@@ -334,7 +449,17 @@ export function WorkshopPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {mpFiltered.length === 0 ? (
+                                    {invLoading ? (
+                                        [1,2,3].map(i => (
+                                            <tr key={i} style={{ borderBottom: `1px solid ${T.border}` }}>
+                                                {[...Array(7)].map((_, j) => (
+                                                    <td key={j} style={{ padding: "14px 16px" }}>
+                                                        <div style={{ height: 14, borderRadius: 6, background: T.border, opacity: 0.5, animation: "pulse 1.4s ease-in-out infinite", animationDelay: `${i * 0.1}s` }} />
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))
+                                    ) : mpFiltered.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} style={{ padding: "56px 24px", textAlign: "center" }}>
                                                 <div style={{ fontSize: 44, opacity: 0.2, marginBottom: 14 }}>📦</div>
@@ -412,10 +537,14 @@ export function WorkshopPage() {
                                                 {/* ACTION */}
                                                 <td style={{ padding: "12px 16px" }}>
                                                     {isLive ? (
-                                                        <div style={{ display: "flex", gap: 6 }}>
+                                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                                             <button onClick={() => openGoLive(prod)}
                                                                 style={{ height: 32, padding: "0 12px", borderRadius: 7, border: `1.5px solid ${T.amber}`, background: T.amberGlow, color: T.amber, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>
                                                                 ✏ Edit
+                                                            </button>
+                                                            <button onClick={() => { setAddQtyItem(prod); setAddQtyAmount(1); }}
+                                                                style={{ height: 32, padding: "0 12px", borderRadius: 7, border: `1.5px solid ${T.sky}`, background: `${T.sky}12`, color: T.sky, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>
+                                                                + Qty
                                                             </button>
                                                             <button onClick={() => takeOffline(prod)}
                                                                 style={{ height: 32, padding: "0 12px", borderRadius: 7, border: `1.5px solid ${T.crimson}44`, background: `${T.crimson}0D`, color: T.crimson, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>
@@ -759,25 +888,27 @@ export function WorkshopPage() {
 
             </>)} {/* end workshopTab === "jobs" */}
 
-            {/* ── Go Live Confirmation Modal ── */}
-            {goLiveProd && (
-                <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {/* ── Go Live / Edit Listing Modal ── rendered via portal to escape stacking context */}
+            {goLiveProd && createPortal(
+                <div style={{ position: "fixed", inset: 0, zIndex: 2147483647, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
                     {/* Backdrop */}
-                    <div onClick={() => setGoLiveProd(null)} style={{ position: "absolute", inset: 0, background: "rgba(28,27,27,0.55)", backdropFilter: "blur(3px)" }} />
+                    <div onClick={() => !glSaving && setGoLiveProd(null)} style={{ position: "absolute", inset: 0, background: "rgba(28,27,27,0.6)", backdropFilter: "blur(4px)" }} />
 
                     {/* Modal card */}
-                    <div style={{ position: "relative", background: "#FFFFFF", borderRadius: 18, width: "100%", maxWidth: 480, boxShadow: "0 24px 60px rgba(0,0,0,0.22)", overflow: "hidden", animation: "fadeUp 0.2s ease" }}>
+                    <div style={{ position: "relative", background: "#FFFFFF", borderRadius: 18, width: "100%", maxWidth: 500, boxShadow: "0 32px 80px rgba(0,0,0,0.28)", overflow: "hidden", animation: "fadeUp 0.2s ease" }}>
 
-                        {/* Header */}
-                        <div style={{ background: `linear-gradient(135deg, ${T.amber}, #6A020A)`, padding: "22px 24px 18px" }}>
+                        {/* Header — blue for Edit, red-amber for Go Live */}
+                        <div style={{ background: editMode ? `linear-gradient(135deg, #1e3a5f, #374151)` : `linear-gradient(135deg, ${T.amber}, #6A020A)`, padding: "22px 24px 18px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                                <span style={{ fontSize: 22 }}>🚀</span>
+                                <span style={{ fontSize: 22 }}>{editMode ? "✏️" : "🚀"}</span>
                                 <div>
-                                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>List on Marketplace</div>
+                                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>
+                                        {editMode ? "Edit Listing" : "List on Marketplace"}
+                                    </div>
                                     <div style={{ fontSize: 17, fontWeight: 900, color: "#FFFFFF", fontFamily: FONT.display, letterSpacing: "-0.01em" }}>{goLiveProd.name}</div>
                                 </div>
                             </div>
-                            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                                 {goLiveProd.sku && <span style={{ background: "rgba(255,255,255,0.18)", color: "#FFFFFF", fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, fontFamily: FONT.mono }}>{goLiveProd.sku}</span>}
                                 {goLiveProd.category && <span style={{ background: "rgba(255,255,255,0.18)", color: "#FFFFFF", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, fontFamily: FONT.ui }}>{goLiveProd.category}</span>}
                                 <span style={{ background: "rgba(255,255,255,0.18)", color: "#FFFFFF", fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, fontFamily: FONT.ui }}>📦 {goLiveProd.stock} in stock</span>
@@ -786,27 +917,58 @@ export function WorkshopPage() {
 
                         {/* Body */}
                         <div style={{ padding: "24px 24px 20px" }}>
-                            {/* Quantity */}
-                            <div style={{ marginBottom: 20 }}>
-                                <label style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8, fontFamily: FONT.ui }}>
-                                    How many units to list?
-                                </label>
-                                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <button onClick={() => setGlQty(q => Math.max(0, q - 1))}
-                                        style={{ width: 38, height: 38, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.t2 }}>−</button>
-                                    <input type="number" value={glQty} min={0} max={goLiveProd.stock}
-                                        onChange={e => setGlQty(Math.min(goLiveProd.stock, Math.max(0, +e.target.value)))}
-                                        style={{ flex: 1, height: 48, background: T.bg, border: `2px solid ${T.amber}`, borderRadius: 10, textAlign: "center", fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, outline: "none" }} />
-                                    <button onClick={() => setGlQty(q => Math.min(goLiveProd.stock, q + 1))}
-                                        style={{ width: 38, height: 38, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.t2 }}>+</button>
-                                    <button onClick={() => setGlQty(goLiveProd.stock)}
-                                        style={{ height: 38, padding: "0 12px", borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 11, fontWeight: 700, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>All ({goLiveProd.stock})</button>
-                                </div>
-                                <div style={{ fontSize: 11, color: T.t3, marginTop: 6, fontFamily: FONT.ui }}>Max {goLiveProd.stock} units available in stock</div>
-                            </div>
 
-                            {/* Price */}
-                            <div style={{ marginBottom: 24 }}>
+                            {editMode ? (
+                                /* ── EDIT MODE: set a new target quantity ── */
+                                <div style={{ marginBottom: 20 }}>
+                                    <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
+                                        <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginBottom: 4 }}>Current live stock</div>
+                                        <div style={{ fontSize: 26, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>{goLiveProd.stock} <span style={{ fontSize: 13, fontWeight: 600, color: T.t3 }}>units</span></div>
+                                    </div>
+                                    <label style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8, fontFamily: FONT.ui }}>
+                                        Set new target quantity
+                                    </label>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                                        <button onClick={() => setGlTargetQty(q => Math.max(0, q - 1))}
+                                            style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.t1 }}>−</button>
+                                        <input type="number" value={glTargetQty} min={0}
+                                            onChange={e => setGlTargetQty(Math.max(0, +e.target.value))}
+                                            style={{ flex: 1, height: 48, background: T.bg, border: `2px solid ${T.sky}`, borderRadius: 10, textAlign: "center", fontSize: 24, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, outline: "none" }} />
+                                        <button onClick={() => setGlTargetQty(q => q + 1)}
+                                            style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: T.t1 }}>+</button>
+                                    </div>
+                                    {/* Delta indicator */}
+                                    {(() => {
+                                        const delta = glTargetQty - (goLiveProd.stock || 0);
+                                        if (delta === 0) return <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>No stock change</div>;
+                                        if (delta > 0) return <div style={{ fontSize: 12, color: T.emerald, fontWeight: 700, fontFamily: FONT.ui }}>↑ +{delta} units will be added to stock</div>;
+                                        return <div style={{ fontSize: 12, color: T.crimson, fontWeight: 700, fontFamily: FONT.ui }}>↓ {Math.abs(delta)} units will be removed from stock</div>;
+                                    })()}
+                                </div>
+                            ) : (
+                                /* ── GO LIVE MODE: current stock + optional extra qty ── */
+                                <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div>
+                                        <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginBottom: 2 }}>Current stock</div>
+                                        <div style={{ fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>{goLiveProd.stock} units</div>
+                                    </div>
+                                    <div style={{ textAlign: "right" }}>
+                                        <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginBottom: 4 }}>Add more stock? (optional)</div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                            <button onClick={() => setGlQty(q => Math.max(0, q - 1))}
+                                                style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                                            <input type="number" value={glQty} min={0}
+                                                onChange={e => setGlQty(Math.max(0, +e.target.value))}
+                                                style={{ width: 60, height: 30, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 7, textAlign: "center", fontSize: 15, fontWeight: 700, color: T.t1, fontFamily: FONT.mono, outline: "none" }} />
+                                            <button onClick={() => setGlQty(q => q + 1)}
+                                                style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Price — shared between both modes */}
+                            <div style={{ marginBottom: 20 }}>
                                 <label style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8, fontFamily: FONT.ui }}>
                                     Marketplace price per unit
                                 </label>
@@ -814,7 +976,7 @@ export function WorkshopPage() {
                                     <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 18, color: T.t3, fontWeight: 700, pointerEvents: "none" }}>₹</span>
                                     <input type="number" value={glPrice} min={0}
                                         onChange={e => setGlPrice(Math.max(0, +e.target.value))}
-                                        style={{ width: "100%", height: 52, background: T.bg, border: `2px solid ${T.amber}`, borderRadius: 10, padding: "0 16px 0 34px", fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" }} />
+                                        style={{ width: "100%", height: 52, background: T.bg, border: `2px solid ${editMode ? T.sky : T.amber}`, borderRadius: 10, padding: "0 16px 0 34px", fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" as const }} />
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
                                     <span style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>Your sell price: ₹{(goLiveProd.sellPrice || 0).toLocaleString("en-IN")}</span>
@@ -826,30 +988,86 @@ export function WorkshopPage() {
                                 </div>
                             </div>
 
-                            {/* Preview strip */}
-                            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>Marketplace listing preview</div>
-                                <div style={{ textAlign: "right" }}>
-                                    <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 900, color: T.amber }}>₹{glPrice.toLocaleString("en-IN")}</div>
-                                    <div style={{ fontSize: 11, color: T.t3 }}>{glQty} units · {goLiveProd.name?.slice(0, 24)}</div>
+                            {/* Listing preview strip — only for Go Live mode */}
+                            {!editMode && (
+                                <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>Marketplace listing preview</div>
+                                    <div style={{ textAlign: "right" }}>
+                                        <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 900, color: T.amber }}>₹{glPrice.toLocaleString("en-IN")}</div>
+                                        <div style={{ fontSize: 11, color: T.t3 }}>{(goLiveProd.stock || 0) + glQty} units · {goLiveProd.name?.slice(0, 24)}</div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             {/* Action buttons */}
+                            {editMode ? (
+                                /* Edit mode: Cancel | Take Offline | Save Changes */
+                                <div style={{ display: "flex", gap: 8 }}>
+                                    <button onClick={() => !glSaving && setGoLiveProd(null)}
+                                        style={{ flex: 1, height: 44, background: "#FFFFFF", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: glSaving ? "not-allowed" : "pointer", fontFamily: FONT.ui }}>
+                                        Cancel
+                                    </button>
+                                    <button onClick={takeOfflineFromModal} disabled={glSaving}
+                                        style={{ flex: 1, height: 44, background: `${T.crimson}0D`, border: `1.5px solid ${T.crimson}66`, borderRadius: 10, fontSize: 12, fontWeight: 700, color: T.crimson, cursor: glSaving ? "not-allowed" : "pointer", fontFamily: FONT.ui, opacity: glSaving ? 0.6 : 1 }}>
+                                        ⏸ Take Offline
+                                    </button>
+                                    <button onClick={confirmGoLive} disabled={glPrice <= 0 || glSaving}
+                                        style={{ flex: 2, height: 44, background: glPrice > 0 ? `linear-gradient(135deg, #1e3a5f, #374151)` : T.surfaceContainerHigh, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, color: glPrice > 0 ? "#FFFFFF" : T.t3, cursor: glPrice > 0 && !glSaving ? "pointer" : "not-allowed", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: glSaving ? 0.7 : 1 }}>
+                                        {glSaving ? "Saving…" : "✏ Save Changes"}
+                                    </button>
+                                </div>
+                            ) : (
+                                /* Go Live mode: Cancel | Confirm & Go Live */
+                                <div style={{ display: "flex", gap: 10 }}>
+                                    <button onClick={() => !glSaving && setGoLiveProd(null)}
+                                        style={{ flex: 1, height: 44, background: "#FFFFFF", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: glSaving ? "not-allowed" : "pointer", fontFamily: FONT.ui }}>
+                                        Cancel
+                                    </button>
+                                    <button onClick={confirmGoLive} disabled={glPrice <= 0 || glSaving}
+                                        style={{ flex: 2, height: 44, background: glPrice > 0 ? `linear-gradient(135deg, ${T.amber}, #6A020A)` : T.surfaceContainerHigh, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, color: glPrice > 0 ? "#FFFFFF" : T.t3, cursor: glPrice > 0 && !glSaving ? "pointer" : "not-allowed", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: glPrice > 0 ? "0 3px 12px rgba(139,30,30,0.35)" : "none", opacity: glSaving ? 0.7 : 1 }}>
+                                        {glSaving ? "Saving…" : "🚀 Confirm & Go Live"}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* ── Add Quantity Modal ── rendered via portal to escape stacking context */}
+            {addQtyItem && createPortal(
+                <div style={{ position: "fixed", inset: 0, zIndex: 2147483647, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+                    <div onClick={() => !addQtySaving && setAddQtyItem(null)} style={{ position: "absolute", inset: 0, background: "rgba(28,27,27,0.6)", backdropFilter: "blur(4px)" }} />
+                    <div style={{ position: "relative", background: "#FFFFFF", borderRadius: 18, width: "100%", maxWidth: 400, boxShadow: "0 32px 80px rgba(0,0,0,0.28)", overflow: "hidden", animation: "fadeUp 0.2s ease" }}>
+                        <div style={{ background: `linear-gradient(135deg, ${T.sky}, #1e3a5f)`, padding: "20px 24px 16px" }}>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>Add Stock</div>
+                            <div style={{ fontSize: 17, fontWeight: 900, color: "#FFFFFF", fontFamily: FONT.display }}>{addQtyItem.name}</div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginTop: 4 }}>Current stock: {addQtyItem.stock} units</div>
+                        </div>
+                        <div style={{ padding: "24px" }}>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 10, fontFamily: FONT.ui }}>Units to Add</label>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                                <button onClick={() => setAddQtyAmount(q => Math.max(1, q - 1))}
+                                    style={{ width: 38, height: 38, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                                <input type="number" value={addQtyAmount} min={1}
+                                    onChange={e => setAddQtyAmount(Math.max(1, +e.target.value))}
+                                    style={{ flex: 1, height: 48, background: T.bg, border: `2px solid ${T.sky}`, borderRadius: 10, textAlign: "center", fontSize: 24, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, outline: "none" }} />
+                                <button onClick={() => setAddQtyAmount(q => q + 1)}
+                                    style={{ width: 38, height: 38, borderRadius: 9, border: `1px solid ${T.border}`, background: T.bg, fontSize: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                            </div>
                             <div style={{ display: "flex", gap: 10 }}>
-                                <button onClick={() => setGoLiveProd(null)}
-                                    style={{ flex: 1, height: 44, background: "#FFFFFF", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
-                                    Cancel
-                                </button>
-                                <button onClick={confirmGoLive}
-                                    disabled={glQty <= 0 || glPrice <= 0}
-                                    style={{ flex: 2, height: 44, background: glQty > 0 && glPrice > 0 ? `linear-gradient(135deg, ${T.amber}, #6A020A)` : T.surfaceContainerHigh, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, color: glQty > 0 && glPrice > 0 ? "#FFFFFF" : T.t3, cursor: glQty > 0 && glPrice > 0 ? "pointer" : "not-allowed", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: glQty > 0 && glPrice > 0 ? "0 3px 12px rgba(139,30,30,0.35)" : "none" }}>
-                                    🚀 Confirm & Go Live
+                                <button onClick={() => !addQtySaving && setAddQtyItem(null)}
+                                    style={{ flex: 1, height: 44, background: "#FFFFFF", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: addQtySaving ? "not-allowed" : "pointer", fontFamily: FONT.ui }}>Cancel</button>
+                                <button onClick={confirmAddQty} disabled={addQtySaving}
+                                    style={{ flex: 2, height: 44, background: `linear-gradient(135deg, ${T.sky}, #1e3a5f)`, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 800, color: "#FFFFFF", cursor: addQtySaving ? "not-allowed" : "pointer", fontFamily: FONT.ui, opacity: addQtySaving ? 0.7 : 1 }}>
+                                    {addQtySaving ? "Saving…" : `+ Add ${addQtyAmount} Unit${addQtyAmount !== 1 ? "s" : ""}`}
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Create Job Card Modal */}

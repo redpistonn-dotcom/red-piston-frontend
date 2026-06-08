@@ -17,7 +17,7 @@
  * single-purpose and independently navigable.
  */
 import { useState, useCallback, useEffect, Component, useMemo, lazy, Suspense } from "react";
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { LoadingBar } from "./components/LoadingBar";
 import { T, FONT, GLOBAL_CSS } from "./theme";
 import { fmt, uid } from "./utils";
@@ -127,6 +127,7 @@ function requireRole(user, role, element) {
 // ========== MAIN APP COMPONENT ==========
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ── Auth state ───────────────────────────────────────────────────────────────
   const [currentUser, setCurrentUser] = useState(() => {
@@ -222,6 +223,38 @@ function AppContent() {
     try { const s = localStorage.getItem('as_impersonating'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const { items: toasts, add: toast, remove: removeToast } = useToast();
+
+  // ── Route persistence — save & restore current path across page refreshes ────
+  // WHY: On refresh, auth loading guards (authReady=false / loaded=false) temporarily
+  // prevent routes from rendering. If requireRole fires a redirect during that window,
+  // the user ends up on their default route instead of where they were.
+  // Saving path to sessionStorage and restoring after auth+store are ready fixes this.
+  // NOTE: must live AFTER useStore() so `loaded` is already declared (avoids TDZ error).
+
+  // Save path on every navigation when user is logged in
+  useEffect(() => {
+    if (!currentUser) return;
+    const SKIP = ['/', '/login', '/reset-password'];
+    if (!SKIP.includes(location.pathname)) {
+      try { sessionStorage.setItem('rp_last_path', location.pathname + location.search); } catch {}
+    }
+  }, [location.pathname, location.search, currentUser]);
+
+  // After both auth + store are ready, navigate to the saved path (once per page load)
+  const [routeRestored, setRouteRestored] = useState(false);
+  useEffect(() => {
+    if (!authReady || !loaded || routeRestored) return;
+    setRouteRestored(true);
+    if (!currentUser) return;
+    try {
+      const saved = sessionStorage.getItem('rp_last_path');
+      const SKIP = ['/', '/login', '/reset-password'];
+      if (saved && !SKIP.includes(saved) && saved !== location.pathname) {
+        navigate(saved, { replace: true });
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authReady, loaded]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
