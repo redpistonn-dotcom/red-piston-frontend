@@ -5,6 +5,7 @@ import { fmt, uid } from "../../utils";
 import { DELIVERY_SLOTS } from "../api/mockDatabase";
 import { assignDeliveryPartner } from "../api/engine";
 import { PartImage } from "../components/PartImage";
+import "../../styles/landing.css";
 
 const STEPS = ["address", "delivery", "payment", "confirm", "processing", "success"];
 const STEP_LABELS = { address: "Address", delivery: "Delivery Slot", payment: "Payment", confirm: "Confirm", processing: "Processing", success: "Order Placed" };
@@ -157,7 +158,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
     // Stepper
     const currentIdx = STEPS.indexOf(step);
     const renderStepper = () => (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 40 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 40, overflowX: "auto", paddingBottom: 4 }}>
             {["address", "delivery", "payment", "confirm"].map((s, i) => {
                 const sIdx = STEPS.indexOf(s);
                 const isActive = sIdx === currentIdx;

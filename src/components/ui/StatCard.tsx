@@ -26,6 +26,20 @@ interface StatCardProps {
   onClick?: () => void;
 }
 
+/** Pick a font-size that won't overflow a ~160px card cell.
+ *  ≤6 chars (e.g. "₹0", "123"): full 24px
+ *  7–9 chars (e.g. "₹1,234"):   20px
+ *  10–11 chars (e.g. "₹20,73,500"): 16px
+ *  12+ chars:                   14px
+ */
+function valueFontSize(val: string | number): string {
+  const len = String(val).length;
+  if (len <= 6)  return "clamp(18px, 2.2vw, 24px)";
+  if (len <= 9)  return "clamp(15px, 1.8vw, 20px)";
+  if (len <= 11) return "clamp(13px, 1.4vw, 16px)";
+  return "clamp(11px, 1.2vw, 14px)";
+}
+
 export function StatCard({ label, value, sub, color, icon, trend, onClick }: StatCardProps) {
   const accent = color || T.amber;
 
@@ -78,7 +92,7 @@ export function StatCard({ label, value, sub, color, icon, trend, onClick }: Sta
       <div>
         {/* Value — title-lg / extrabold (Stitch: text-title-lg font-extrabold) */}
         <div style={{
-          fontSize: "clamp(20px, 2.5vw, 28px)",
+          fontSize: valueFontSize(value),
           fontWeight: 800,
           color: T.t1,                            // on-surface (#1C1B1B)
           fontFamily: FONT.mono,

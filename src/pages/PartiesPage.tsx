@@ -12,7 +12,7 @@ function KpiCard({ label, value, sub, subColor = T.emerald, icon }: { label: str
         <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, padding: "18px 20px", position: "relative", overflow: "hidden", boxShadow: SHADOWS.xs }}>
             <div style={{ position: "absolute", top: 14, right: 16, width: 36, height: 36, background: T.bg, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{icon}</div>
             <div style={{ fontSize: 9, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: FONT.ui, marginBottom: 6 }}>{label}</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, letterSpacing: "-0.03em", lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: "clamp(18px, 2.2vw, 26px)", fontWeight: 900, color: T.t1, fontFamily: FONT.mono, letterSpacing: "-0.03em", lineHeight: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</div>
             <div style={{ fontSize: 11, color: subColor, fontWeight: 600, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>{sub}</div>
         </div>
     );

@@ -109,7 +109,7 @@ function CreateOrderModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
     return (
         <div style={{ position: "fixed", inset: 0, background: "rgba(28,27,27,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
-            <div onClick={e => e.stopPropagation()} style={{ background: "#FFFFFF", borderRadius: 20, padding: "28px 28px 24px", width: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: "#FFFFFF", borderRadius: 20, padding: "28px 28px 24px", width: "min(440px, calc(100vw - 32px))", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: T.t1, fontFamily: FONT.display, marginBottom: 4 }}>Create New Order</div>
                 <div style={{ fontSize: 12, color: T.t3, marginBottom: 22, fontFamily: FONT.ui }}>Add a new sale or procurement order to the pipeline</div>
 

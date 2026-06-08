@@ -279,7 +279,7 @@ export function POSBillingPage() {
             )}
 
             {/* ── SCAN BARCODE + SEARCH ── */}
-            <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, display: "flex", gap: 12, alignItems: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+            <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                 {/* Scan barcode button */}
                 <button onClick={() => setScanOpen(true)}
                     style={{ flexShrink: 0, height: 46, padding: "0 20px", background: `linear-gradient(135deg, ${T.amber}, #6A020A)`, border: "none", borderRadius: 10, color: "#FFFFFF", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(139,30,30,0.3)" }}>
