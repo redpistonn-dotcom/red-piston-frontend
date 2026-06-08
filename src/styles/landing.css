@@ -239,3 +239,10 @@ body:has(.lp-root) {
 .lp-root .mb-xl    { margin-bottom: 16px !important; }
 .lp-root .gap-huge { gap: 24px !important; }
 .lp-root .gap-giant{ gap: 32px !important; }
+
+/* Skeleton shimmer for loading product/shop cards */
+@keyframes lp-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+.lp-skeleton { animation: lp-pulse 1.6s ease-in-out infinite; }

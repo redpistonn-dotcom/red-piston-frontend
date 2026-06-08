@@ -12,7 +12,7 @@ import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, isFirebaseConfigured } 
 import { api, setTokens } from '../api/client';
 import { getDefaultRoute } from '../components/routes';
 import { AppCtx } from '../context/AppCtx';
-import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from '../api/marketplace';
+import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer, browseMarketplace, fetchShops } from '../api/marketplace';
 import { CatalogSearchBar } from '../components/CatalogSearchBar';
 import { PublicHeader } from '../components/PublicHeader';
 
@@ -36,6 +36,86 @@ function useDesignFonts() {
 function Icon({ n, className = '' }: { n: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{n}</span>;
 }
+/* ── Image placeholder — shown when a part has no photo in the DB ───────────
+   Uses a maroon-tinted background + category-matched Material Symbol icon.   */
+function PartImagePlaceholder({ category, height = 140 }: { category?: string; height?: number }) {
+  const ICON_MAP: Record<string, string> = {
+    Brakes: 'settings_input_component', Engine: 'settings',
+    Electrical: 'bolt', Filters: 'filter_alt',
+    Suspension: 'architecture', Cooling: 'ac_unit',
+    Ignition: 'flash_on', 'Engine Oils': 'oil_barrel',
+    Fluids: 'water_drop', Exhaust: 'air', Steering: 'trip_origin',
+    'Body & Exterior': 'directions_car',
+    'Clutch & Transmission': 'settings_input_composite',
+  };
+  const icon = (category && ICON_MAP[category]) || 'inventory_2';
+  return (
+    <div style={{
+      width: '100%', height,
+      backgroundColor: 'rgba(139,30,30,0.05)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', gap: 6,
+    }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 34, color: 'rgba(139,30,30,0.28)' }}>{icon}</span>
+      {category && (
+        <span style={{ fontSize: 10, color: 'rgba(139,30,30,0.33)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
+          {category}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ── Shop placeholder — shown when a shop has no cover photo in DB ─────────── */
+function ShopImagePlaceholder({ name }: { name: string }) {
+  const words = (name || '').trim().split(/\s+/);
+  const initials = words.length >= 2
+    ? (words[0][0] + words[1][0]).toUpperCase()
+    : (name || 'S').substring(0, 2).toUpperCase();
+  return (
+    <div className="w-full sm:w-56" style={{
+      minHeight: 140, backgroundColor: '#2c2929',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      <span style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.65)', fontFamily: 'Poppins, sans-serif', letterSpacing: '0.04em' }}>
+        {initials}
+      </span>
+    </div>
+  );
+}
+
+/* ── Skeleton card — shown while API fetches part / shop data ─────────────── */
+function PartCardSkeleton() {
+  return (
+    <div style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 10, overflow: 'hidden' }}>
+      <div className="lp-skeleton" style={{ height: 140, backgroundColor: '#f0eded' }} />
+      <div style={{ padding: 12 }}>
+        <div className="lp-skeleton" style={{ height: 12, backgroundColor: '#f0eded', borderRadius: 4, marginBottom: 8, width: '80%' }} />
+        <div className="lp-skeleton" style={{ height: 10, backgroundColor: '#f0eded', borderRadius: 4, width: '58%' }} />
+      </div>
+    </div>
+  );
+}
+
+/* ── Fallback OEM brand list used when the manufacturers API is down ─────── */
+const OEM_BRANDS_STATIC = [
+  { label: 'Maruti Suzuki', color: '#003082', initial: 'MS' },
+  { label: 'Hyundai',       color: '#002C5F', initial: 'HY' },
+  { label: 'Toyota',        color: '#EB0A1E', initial: 'TY' },
+  { label: 'Škoda',         color: '#4BA82E', initial: 'SK' },
+  { label: 'Honda',         color: '#CC0000', initial: 'HN' },
+  { label: 'BMW',           color: '#1C69D4', initial: 'BM' },
+  { label: 'Audi',          color: '#BB0A30', initial: 'AU' },
+];
+
+/* ── Color palette cycled for dynamically fetched brands ─────────────────── */
+const BRAND_PALETTE = [
+  '#003082','#002C5F','#EB0A1E','#4BA82E','#CC0000',
+  '#1C69D4','#BB0A30','#005CA9','#1C3764','#6C3483',
+  '#117A65','#884EA0',
+];
+
 
 /* ── Auth Modal — fully revised ─────────────────────────────────────────────
    Fixes applied:
@@ -639,6 +719,56 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
   }, [selectedMakeId]);
 
   const YEARS = Array.from({ length: 25 }, (_, i) => String(new Date().getFullYear() - i));
+  /* ── Live data from DB ─────────────────────────────────────────────────── */
+  const [topParts,      setTopParts]      = useState<any[]>([]);
+  const [trendingParts, setTrendingParts] = useState<any[]>([]);
+  const [shopsList,     setShopsList]     = useState<any[]>([]);
+  const [oemBrands,     setOemBrands]     = useState<{ label: string; color: string; initial: string }[]>(OEM_BRANDS_STATIC);
+  const [partsLoading,  setPartsLoading]  = useState(true);
+  const [shopsLoading,  setShopsLoading]  = useState(true);
+
+  /* Fetch top-selling + trending parts in one browse call */
+  useEffect(() => {
+    setPartsLoading(true);
+    browseMarketplace({ limit: 10 })
+      .then((res: any) => {
+        const parts: any[] = res.parts || [];
+        setTopParts(parts.slice(0, 4));
+        const byDist = [...parts].sort(
+          (a, b) => (a.bestListing?.distance ?? 9999) - (b.bestListing?.distance ?? 9999)
+        );
+        setTrendingParts(byDist.slice(0, 3));
+      })
+      .catch(() => { setTopParts([]); setTrendingParts([]); })
+      .finally(() => setPartsLoading(false));
+  }, []);
+
+  /* Fetch nearest shops */
+  useEffect(() => {
+    setShopsLoading(true);
+    fetchShops()
+      .then((shops: any[]) => setShopsList((shops || []).slice(0, 2)))
+      .catch(() => setShopsList([]))
+      .finally(() => setShopsLoading(false));
+  }, []);
+
+  /* Fetch OEM brands from vehicle manufacturers table; fall back to static list */
+  useEffect(() => {
+    fetchVehicleManufacturers('car')
+      .then((data: any[]) => {
+        const brands = (data || []).slice(0, 12).map((m: any, i: number) => {
+          const name: string = m.name || m.manufacturer || '';
+          const words = name.trim().split(/\s+/);
+          const initial = words.length >= 2
+            ? (words[0][0] + words[1][0]).toUpperCase()
+            : name.substring(0, 2).toUpperCase();
+          return { label: name, color: BRAND_PALETTE[i % BRAND_PALETTE.length], initial };
+        });
+        if (brands.length > 0) setOemBrands(brands);
+      })
+      .catch(() => { /* keep OEM_BRANDS_STATIC */ });
+  }, []);
+
 
   const [authModal, setAuthModal] = useState<{ open: boolean; mode: 'signin' | 'signup' }>({
     open: openAuth,
@@ -884,6 +1014,7 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             ].map(cat => (
               <div
                 key={cat.label}
+                onClick={() => navigate(`/marketplace?category=${encodeURIComponent(cat.label)}`)}
                 style={{
                   backgroundColor: '#ffffff',
                   border: '1px solid #e5e2e1',
@@ -948,49 +1079,74 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
               </h2>
               <p style={{ color: '#58413f' }}>Authenticated OEM components sourced from tier-1 global suppliers.</p>
             </div>
-            <a className="text-maroon font-bold hover:underline" href="#" style={{ color: '#8b1e1e', fontWeight: 700 }}>View All Marketplace</a>
+            <button onClick={() => navigate('/marketplace')} style={{ color: '#8b1e1e', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 0 }}>View All Marketplace →</button>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-xl">
-            {[
-              { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBOlwJou4Lm9VYehyDxPD6GSrcXp1SQsbDzfUUnW0U3cn8Wl7zZPHlclUzHORFL4ZIDCTpichc5D2-Wv0aGDeqMfcWEq_2M9fPjnDTwcECwoL7cfNlxRiiaWffJuWbkQa0_oduZ2eA2EejoMURv-b4oqBZk0jc5nVQpR5qsrvcgxlLb9ttHCyApdiw95089dKsrk0fry-rrxmJn6O7sSa1Y94p8yPfDWde-8wzVc4Y_-XfyRyaK6c2vyf2U5zeN6yxFuYB3FfLTIJU', alt: 'Brake Pad', badge: 'In Stock', name: 'Brembo Front Brake Pads', price: '₹8,499', desc: 'High-performance ceramic compound for superior stopping power and low dust.', meta: 'Global Logistics Hub • 2,400km away' },
-              { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBPSbtVcZf8MtQulEvKqd6_g1QL2kD0p8dOvN0YxCpsNLm1OiQ0EKYKihuDvvc-qzMFB5Xiyy854c0ObHSTgjFGgmp6K50aT7H1yCTO7aSOHLMosYyNv8KmCGYaglhVXqnM-k8bLC3boidchfAgzq9GwTdyaEQIPYGlqSFYWsQvY11Wa4VmCdWTtmv-25v-6sx3QZk85e07euDjkw839QtJ1kmmk3GYz3W955v9wkkQcKFyzgV3z4MfcsKfi4dPRryvRDg4kUDzhgM', alt: 'Spark Plugs', badge: null, name: 'NGK Laser Iridium Plugs', price: '₹4,650', desc: 'Advanced iridium construction for maximized fuel efficiency and durability.', meta: 'OEM Direct • 12,000km away' },
-              { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAXTm3hamhmwZRRFB--0oHuFTu0HgD8EVTRCeX048yM6eoD5STRTQdt18i9oVWgd3T0tS_E9ug0pOhMlLM938X4A2uQrYoi9DZ2_LIJVyvRdefdswg7BHDbWIcHWJ7bnxEOHmi7SfOi1litnm2QP8emzE4mO7waXRBmUtrWi6GIP-3WQBqfQZRmQMGjtfEiC3XXdIIw2xTmRM0IkJRi4sQ2e012iVqmpM1QBkgTSim3hT484e95caHoSYXkjOLcqndN0GFimb893Ks', alt: 'Air Filter', badge: null, name: 'Bosch PureLight Air Filter', price: '₹2,199', desc: 'Multilayer filtration technology capturing 99% of contaminants.', meta: 'Berlin Warehouse • 6,500km away' },
-              { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC-5uk-GIYbtK6b5b-svhCZvUWI7ZQ0TEEw_2rB7_ogIfWXDRASPps40KkOjUTh9Ko1M6_HmQqeNz_3E6V2PlfKw818YWIrMxaw6l_rkPHpMYtksRNf3cWDB3QexA1teMcUrVS0hEma-lbDKFMP5bm1AhNxkpcamNBISLCl-TKxIOttxCK-Hm1fpscxNnLNeo2sMVLJloXgKi5NB9bNjkpng9ZUwyIEx8RAqdcTPD11Aqs2DL54EpOe_3qUMw7yhvobh-AuYC2TG1c', alt: 'Engine Oil', badge: null, name: 'Castrol EDGE 5W-30', price: '₹3,699', desc: 'Advanced full synthetic oil for extreme engine performance under pressure.', meta: 'Local Distributor • 45km away' },
-            ].map(p => (
-              <div key={p.name} style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 10, overflow: 'hidden' }}>
-                <div style={{ height: 140, position: 'relative' }}>
-                  <img alt={p.alt} src={p.img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  {p.badge && (
-                    <span style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#dcfce7', color: '#166534', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
-                      {p.badge}
-                    </span>
-                  )}
-                </div>
-                <div style={{ padding: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>{p.name}</h3>
-                    <span style={{ fontWeight: 800, color: '#8b1e1e', marginLeft: 8, whiteSpace: 'nowrap', fontSize: 13 }}>{p.price}</span>
+            {partsLoading
+              ? Array.from({ length: 4 }).map((_, i) => <PartCardSkeleton key={i} />)
+              : topParts.length > 0
+                ? topParts.map((p: any) => {
+                    const product = p.product || {};
+                    const price = p.bestPrice != null
+                      ? `₹${Math.round(p.bestPrice).toLocaleString('en-IN')}`
+                      : '—';
+                    const shopName = p.bestListing?.shop?.name || '';
+                    const distKm   = p.bestListing?.distance != null
+                      ? `${Math.round(p.bestListing.distance)}km away`
+                      : '';
+                    const meta    = [shopName, distKm].filter(Boolean).join(' · ');
+                    const inStock = (p.availability ?? 0) > 0;
+                    return (
+                      <div key={product.id ?? product.name} style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 10, overflow: 'hidden' }}>
+                        <div style={{ height: 140, position: 'relative' }}>
+                          {product.imageUrl
+                            ? <img alt={product.name} src={product.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            : <PartImagePlaceholder category={product.category} height={140} />
+                          }
+                          {inStock && (
+                            <span style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#dcfce7', color: '#166534', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
+                              In Stock
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ padding: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>{product.name}</h3>
+                            <span style={{ fontWeight: 800, color: '#8b1e1e', marginLeft: 8, whiteSpace: 'nowrap', fontSize: 13 }}>{price}</span>
+                          </div>
+                          <p style={{ color: '#58413f', fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>
+                            {product.description || product.category || '—'}
+                          </p>
+                          {meta && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderTop: '1px solid #f0eded', paddingTop: 8, marginTop: 8, fontSize: 11, color: '#58413f' }}>
+                              <Icon n="store" style={{ fontSize: 13 } as React.CSSProperties} />
+                              <span>{meta}</span>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => navigate(`/marketplace?q=${encodeURIComponent(product.name || '')}`)}
+                            style={{ width: '100%', marginTop: 10, height: 32, border: '1px solid #8b1e1e', color: '#8b1e1e', backgroundColor: 'transparent', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#8b1e1e'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#8b1e1e'; }}
+                          >
+                            View Part
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                : (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '36px 0', color: '#58413f' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(139,30,30,0.22)', display: 'block', marginBottom: 10 }}>inventory_2</span>
+                    <p style={{ fontSize: 14 }}>No parts listed yet — check back soon.</p>
                   </div>
-                  <p style={{ color: '#58413f', fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>{p.desc}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderTop: '1px solid #f0eded', paddingTop: 8, marginTop: 8, fontSize: 11, color: '#58413f' }}>
-                    <Icon n="store" style={{ fontSize: 13 } as React.CSSProperties} />
-                    <span>{p.meta}</span>
-                  </div>
-                  <button
-                    style={{ width: '100%', marginTop: 10, height: 32, border: '1px solid #8b1e1e', color: '#8b1e1e', backgroundColor: 'transparent', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#8b1e1e'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#8b1e1e'; }}
-                  >
-                    Add to Cart
-                  </button>
-                </div>
-              </div>
-            ))}
+                )
+            }
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════
+            {/* ═══════════════════════════════════════════════════════════
           TRENDING NEAR YOU — white cards, matches screenshot
       ═══════════════════════════════════════════════════════════ */}
       <section className="py-giant" style={{ backgroundColor: '#fcf9f8' }}>
@@ -1018,108 +1174,68 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             </div>
           </div>
 
-          {/* 3-column product cards — exact match to screenshot */}
+          {/* 3-column product cards — loaded from DB */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-xl">
-            {[
-              {
-                img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBNzvgZbtt0-WMxiMPt9NVAb1j32_dfm2tXCU08wa3XFS7KCYd4MqR9tVczihi5eS0ZLbBe8gqtro81Nhpekw3aZXASamj9jg85y4Xt7CprJUPMm4rP9nnUYvIFBFws-qqeASe8PRBVJ-FwRTKeqd5VS1NLpPQJhcs9xvRtUSFlVIruKJWXXZOngbrT0rxJAQmBtClV92bPXfG2LO39yEQg2cwUbl-HYo9bwMhKC_TxsdzvUK8YPimXj7g5xeJ6n_p56wOS3O2oN0Q',
-                badge: '8 IN STOCK',
-                name: 'Michelin Pilot Sport 4',
-                price: '₹14,299',
-                desc: 'Superior grip and steering response on both wet and dry pavement.',
-                pickup: 'Local Pickup • 4.2 miles away',
-              },
-              {
-                img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBeha2cuXVLgQtqAYKu1vWQCNdhdI4ERIb0wSewhORpZ3yRKBPwEOvAzjnkwKI2H9GI2K-hjPDgkO4NxuZ6mBubVHGQkSWVL5IjGyMe8KAh6QFpYA5mhQvFM1NtmPgU4M3gRbiWVTGQPxSBxExXi0TcSs8sScFR7OljwCo4LUjmBrrD6j9LQiR153omncNBpgrFQ4Hom6HZVy_bgVt2U0XOHUrN0a2220aNwKD_ipiFubNRn0d0eOq3NipfPZONQfAGRqqrpK8UYRU',
-                badge: '14 IN STOCK',
-                name: 'Philips LED H4 Bulbs',
-                price: '₹5,799',
-                desc: 'Ultinon Essential LED provides a modern high-end look and high brightness.',
-                pickup: 'Local Pickup • 2.8 miles away',
-              },
-              {
-                img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD4fPF_rKOpa9xTAZMOjck5SI12nnY5U-bmgUi2qawldmYfqGs9wuQu98X55LkpvhtTf4W_kgLTa2Vs60TBfBm0wsFIjXCmcD89Dap_KVRme6EYSwnfXjiFOsFAuTL5T7nUcwBfXu_ZNcQ0n98we6S5OuhxnBLSmezYQPFcWKjZO_4l637iEPcYLHqTXYq52vILsTjsSEuMGVGj4-RfKq8_KnFgTR8e7m5MYOU1DJG75kFVRiMw7xLJOPvVds80PQUKCYC5ZFUMd8M',
-                badge: '3 IN STOCK',
-                name: 'Exide Matrix Battery',
-                price: '₹9,849',
-                desc: 'Zero maintenance battery with high performance and long life.',
-                pickup: 'Local Pickup • 1.5 miles away',
-              },
-            ].map(t => (
-              <div
-                key={t.name}
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e5e2e1',
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  boxShadow: '0 1px 4px rgba(26,18,5,0.06)',
-                  transition: 'box-shadow 0.2s',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(26,18,5,0.1)'}
-                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(26,18,5,0.06)'}
-              >
-                {/* Image + IN STOCK badge */}
-                <div style={{ position: 'relative' }}>
-                  <img
-                    src={t.img}
-                    alt={t.name}
-                    style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
-                  />
-                  <span style={{
-                    position: 'absolute', top: 10, right: 10,
-                    backgroundColor: '#16a34a', color: '#fff',
-                    fontSize: 10, fontWeight: 700,
-                    padding: '3px 8px', borderRadius: 4,
-                    letterSpacing: '0.05em',
-                  }}>
-                    {t.badge}
-                  </span>
-                </div>
-
-                {/* Card body */}
-                <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {/* Name + Price row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: '#1c1b1b', lineHeight: 1.3 }}>{t.name}</span>
-                    <span style={{ fontWeight: 800, fontSize: 13, color: '#8b1e1e', whiteSpace: 'nowrap' }}>{t.price}</span>
+            {partsLoading
+              ? Array.from({ length: 3 }).map((_, i) => <PartCardSkeleton key={i} />)
+              : trendingParts.length > 0
+                ? trendingParts.map((p: any) => {
+                    const product = p.product || {};
+                    const price   = p.bestPrice != null ? `₹${Math.round(p.bestPrice).toLocaleString('en-IN')}` : '—';
+                    const stock   = p.availability ?? 0;
+                    const distKm  = p.bestListing?.distance != null ? `${p.bestListing.distance.toFixed(1)}km away` : '';
+                    return (
+                      <div
+                        key={product.id ?? product.name}
+                        style={{ backgroundColor: '#ffffff', border: '1px solid #e5e2e1', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(26,18,5,0.06)', transition: 'box-shadow 0.2s' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(26,18,5,0.1)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(26,18,5,0.06)'}
+                      >
+                        <div style={{ position: 'relative' }}>
+                          {product.imageUrl
+                            ? <img src={product.imageUrl} alt={product.name} style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }} />
+                            : <PartImagePlaceholder category={product.category} height={140} />
+                          }
+                          {stock > 0 && (
+                            <span style={{ position: 'absolute', top: 10, right: 10, backgroundColor: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.05em' }}>
+                              {stock} IN STOCK
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                            <span style={{ fontWeight: 700, fontSize: 13, color: '#1c1b1b', lineHeight: 1.3 }}>{product.name}</span>
+                            <span style={{ fontWeight: 800, fontSize: 13, color: '#8b1e1e', whiteSpace: 'nowrap' }}>{price}</span>
+                          </div>
+                          <p style={{ fontSize: 12, color: '#58413f', lineHeight: 1.4, margin: 0 }}>{product.description || product.category || '—'}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                            <Icon n="local_shipping" style={{ fontSize: 13, color: '#58413f' } as React.CSSProperties} />
+                            <span style={{ fontSize: 11, color: '#58413f' }}>Local Pickup{distKm ? ` · ${distKm}` : ''}</span>
+                          </div>
+                          <button
+                            onClick={() => navigate(`/marketplace?q=${encodeURIComponent(product.name || '')}`)}
+                            style={{ marginTop: 6, width: '100%', height: 32, backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'opacity 0.2s' }}
+                            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.88'}
+                            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
+                          >
+                            View Part
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                : (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '36px 0', color: '#58413f' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(139,30,30,0.22)', display: 'block', marginBottom: 10 }}>location_off</span>
+                    <p style={{ fontSize: 14 }}>No parts available in your area yet.</p>
                   </div>
-
-                  {/* Description */}
-                  <p style={{ fontSize: 12, color: '#58413f', lineHeight: 1.4, margin: 0 }}>{t.desc}</p>
-
-                  {/* Pickup info */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                    <Icon n="local_shipping" style={{ fontSize: 13, color: '#58413f' } as React.CSSProperties} />
-                    <span style={{ fontSize: 11, color: '#58413f' }}>{t.pickup}</span>
-                  </div>
-
-                  {/* Add to Cart button */}
-                  <button
-                    style={{
-                      marginTop: 6,
-                      width: '100%', height: 32,
-                      backgroundColor: '#8b1e1e', color: '#fff',
-                      border: 'none', borderRadius: 6,
-                      fontWeight: 700, fontSize: 12,
-                      cursor: 'pointer',
-                      transition: 'opacity 0.2s',
-                    }}
-                    onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.88'}
-                    onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
-                  >
-                    Add to Cart
-                  </button>
-                </div>
-              </div>
-            ))}
+                )
+            }
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════
+            {/* ═══════════════════════════════════════════════════════════
           COMING SOON SERVICES — dark maroon band, 3×2 grid
           Matches Stitch design: "Coming Soon Services" section
       ═══════════════════════════════════════════════════════════ */}
@@ -1296,45 +1412,69 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             Trusted Shops Near You
           </h2>
           <div className="grid lg:grid-cols-2 gap-xl">
-            {[
-              { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBjMF9hu5XyoPROfLCSDYKJ7WVw5l1cZoOTB5_ZFK_c4W-fv4ta5e4XqCf-nfiuiGup936q9P1TkzYPBXNMnvwQYfSSBbBxrzk_4os0oapj8jWPZmEzpAD1Tu5F_5tqF_n3k22FRhv4PpF9iO0b5FQRlRFrnb9KkffIhX8hOghV1AjNq0zwBvtqv28qdVcw8U5jIsIXFHd6G-dx1z0p613uKfBHBYmR1AAkKnScvgXpVQsTNXaOWZFDnWLrYMjCMKgOLBbYbgMY5dg', name: 'Elite Automotive Solutions', rating: '4.9', dist: '1.2 miles away', tags: ['Engine Repair','Diagnostics','OEM Spares'], cta: 'Book an Appointment' },
-              { img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBxvyBJDw8Rbgq_si3vplJBpgVpeNHLwgS1X6lX4FjpmF6_6_9PRaGT_pDkpLDSQK1RnOmGq4u0ipcu8FYFidpoOk7D_365uxjESF2J70wSHfxNCyIGtyb6ZHDnNIQmLbtcAoQE2Be0qf_XpTKMXJmbgRNBOGiEX5NNQf0xSQa77IVMJ_lPY43KPkoZzd3w1hFXpizvouvsYzgcL0qAIjufTEw2hFw-MEqN6diQXVAUJg_p1TFD5i_07sltrUODfV0a6umd2hHHn4Q', name: 'Speedy Gear Spares', rating: '4.7', dist: '3.5 miles away', tags: ['Transmission','Electrical'], cta: 'Contact Vendor' },
-            ].map(shop => (
-              <div key={shop.name}
-                   className="flex flex-col sm:flex-row bg-surface border border-outline-variant rounded-xxl overflow-hidden hover:shadow-lg transition-all"
-                   style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', borderRadius: 10 }}>
-                <img className="w-full sm:w-56 object-cover" src={shop.img}
-                     style={{ objectFit: 'cover', flexShrink: 0, maxHeight: 200 }} />
-                <div style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1c1b1b' }}>{shop.name}</h3>
-                      <div style={{ display: 'flex', alignItems: 'center', color: '#ca8a04', gap: 4 }}>
-                        <span className="material-symbols-outlined fill" style={{ fontSize: 15, fontVariationSettings: "'FILL' 1" }}>star</span>
-                        <span style={{ fontWeight: 700, color: '#1c1b1b', fontSize: 13 }}>{shop.rating}</span>
-                      </div>
-                    </div>
-                    <p style={{ color: '#58413f', fontSize: 12, marginTop: 6 }}>Authorized RedPiston Partner · {shop.dist}</p>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                      {shop.tags.map(t => (
-                        <span key={t} style={{ backgroundColor: '#f0eded', padding: '2px 7px', borderRadius: 4, fontSize: 11 }}>{t}</span>
-                      ))}
+            {shopsLoading
+              ? Array.from({ length: 2 }).map((_, i) => (
+                  <div key={i} className="flex flex-col sm:flex-row bg-surface border border-outline-variant rounded-xxl overflow-hidden" style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', borderRadius: 10 }}>
+                    <div className="lp-skeleton w-full sm:w-56" style={{ minHeight: 140, backgroundColor: '#f0eded', flexShrink: 0 }} />
+                    <div style={{ padding: 16, flex: 1 }}>
+                      <div className="lp-skeleton" style={{ height: 14, backgroundColor: '#f0eded', borderRadius: 4, marginBottom: 10, width: '60%' }} />
+                      <div className="lp-skeleton" style={{ height: 10, backgroundColor: '#f0eded', borderRadius: 4, width: '40%' }} />
                     </div>
                   </div>
-                  <button
-                    style={{ marginTop: 14, color: '#8b1e1e', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0, fontSize: 13 }}
-                  >
-                    {shop.cta}
-                    <Icon n="arrow_forward" />
-                  </button>
-                </div>
-              </div>
-            ))}
+                ))
+              : shopsList.length > 0
+                ? shopsList.map((shop: any, idx: number) => {
+                    const name     = shop.name || shop.shopName || 'Shop';
+                    const city     = shop.city || shop.shopCity || '';
+                    const address  = shop.address || shop.shopAddress || '';
+                    const rating   = shop.rating != null ? Number(shop.rating).toFixed(1) : null;
+                    const imageUrl = shop.imageUrl || shop.coverImage || null;
+                    return (
+                      <div key={shop.id || shop.shopId || idx}
+                           className="flex flex-col sm:flex-row bg-surface border border-outline-variant rounded-xxl overflow-hidden hover:shadow-lg transition-all"
+                           style={{ backgroundColor: '#fff', borderColor: '#dfbfbc', borderRadius: 10 }}>
+                        {imageUrl
+                          ? <img className="w-full sm:w-56 object-cover" src={imageUrl} alt={name} style={{ objectFit: 'cover', flexShrink: 0, maxHeight: 200 }} />
+                          : <ShopImagePlaceholder name={name} />
+                        }
+                        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1c1b1b' }}>{name}</h3>
+                              {rating && (
+                                <div style={{ display: 'flex', alignItems: 'center', color: '#ca8a04', gap: 4 }}>
+                                  <span className="material-symbols-outlined fill" style={{ fontSize: 15, fontVariationSettings: "'FILL' 1" }}>star</span>
+                                  <span style={{ fontWeight: 700, color: '#1c1b1b', fontSize: 13 }}>{rating}</span>
+                                </div>
+                              )}
+                            </div>
+                            <p style={{ color: '#58413f', fontSize: 12, marginTop: 6 }}>
+                              Authorized RedPiston Partner{city ? ` · ${city}` : ''}{address ? ` · ${address}` : ''}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => navigate('/marketplace?shops=1')}
+                            style={{ marginTop: 14, color: '#8b1e1e', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: 0, fontSize: 13 }}
+                          >
+                            Browse Parts
+                            <Icon n="arrow_forward" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                : (
+                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '32px 0', color: '#58413f' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(139,30,30,0.22)', display: 'block', marginBottom: 10 }}>store_off</span>
+                    <p style={{ fontSize: 14 }}>No shops registered yet.</p>
+                  </div>
+                )
+            }
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════
+            {/* ═══════════════════════════════════════════════════════════
           BRAND CAROUSELS
       ═══════════════════════════════════════════════════════════ */}
       <section className="py-huge overflow-hidden">
@@ -1345,27 +1485,11 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             Popular OEM Brands
           </h2>
           <div className="flex gap-xl overflow-x-auto pb-lg hide-scrollbar">
-            {[
-              { alt: 'Maruti',  logo: 'https://logo.clearbit.com/marutisuzuki.com', label: 'Maruti Suzuki', color: '#003082', initial: 'MS' },
-              { alt: 'Hyundai', logo: 'https://logo.clearbit.com/hyundai.com',       label: 'Hyundai',       color: '#002C5F', initial: 'HY' },
-              { alt: 'Toyota',  logo: 'https://logo.clearbit.com/toyota.com',        label: 'Toyota',        color: '#EB0A1E', initial: 'TY' },
-              { alt: 'Skoda',   logo: 'https://logo.clearbit.com/skoda-auto.com',    label: 'Škoda',         color: '#4BA82E', initial: 'SK' },
-              { alt: 'Honda',   logo: 'https://logo.clearbit.com/honda.com',         label: 'Honda',         color: '#CC0000', initial: 'HN' },
-              { alt: 'BMW',     logo: 'https://logo.clearbit.com/bmw.com',           label: 'BMW',           color: '#1C69D4', initial: 'BM' },
-              { alt: 'Audi',    logo: 'https://logo.clearbit.com/audi.com',          label: 'Audi',          color: '#BB0A30', initial: 'AU' },
-            ].map(b => (
-              <div key={b.label} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
-                {/* Solid brand-color circle — no external image needed */}
+            {oemBrands.map(b => (
+              <div key={b.label} style={{ minWidth: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7, cursor: 'pointer' }}
+                   onClick={() => navigate(`/marketplace?make=${encodeURIComponent(b.label)}`)}>
                 <div
-                  style={{
-                    width: 56, height: 56,
-                    backgroundColor: b.color,
-                    borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: `0 3px 10px ${b.color}55`,
-                    transition: 'transform 0.18s, box-shadow 0.18s',
-                    flexShrink: 0,
-                  }}
+                  style={{ width: 56, height: 56, backgroundColor: b.color, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 3px 10px ${b.color}55`, transition: 'transform 0.18s, box-shadow 0.18s', flexShrink: 0 }}
                   onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 6px 18px ${b.color}70`; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 3px 10px ${b.color}55`; }}
                 >
