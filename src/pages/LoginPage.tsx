@@ -183,6 +183,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [profile, setProfile]     = useState({ name: "", profileType: "INDIVIDUAL" });
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingUser, setPendingUser]     = useState(null); // for profile step
+  const [resumeNotice, setResumeNotice]   = useState("");   // "welcome back, finish setup" banner
   const [rejectionMsg, setRejectionMsg]   = useState("");
   const [forgotEmail, setForgotEmail]     = useState("");
   const [forgotMode, setForgotMode]       = useState(false);
@@ -290,10 +291,20 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
   // ── Handle backend response (shared across all auth methods) ──────────────
   const handleAuthResponse = (data) => {
-    // New shop owner — collect shop details first
+    // Shop owner needing shop details (new registration OR resumed after abandoning).
+    // The backend now issues tokens here — /shop-setup requires a Bearer token.
     if (data?.needsShopDetails) {
+      if (data.accessToken) setTokens(data.accessToken, data.refreshToken);
       setPendingUserId(data.userId);
-      setShopDetails(d => ({ ...d, ownerName: data.userName || "", contactPhone: data.phone || phone || "" }));
+      setShopDetails(d => ({
+        ...d,
+        ownerName:    data.userName || d.ownerName,
+        contactPhone: data.phone || phone || d.contactPhone,
+        email:        data.email || email || d.email,
+      }));
+      setResumeNotice(data.resume
+        ? "Welcome back! Your account is verified — just finish your shop details below to complete registration."
+        : "");
       go(STEPS.SHOP_DETAILS);
       return;
     }
@@ -309,10 +320,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
     setTokens(accessToken, refreshToken);
 
-    if (isNewUser && userData.role !== "SHOP_OWNER") {
-      // New customer — collect name
+    if ((isNewUser || !userData.name) && userData.role === "CUSTOMER") {
+      // New customer — or returning customer who never finished the name step
       setPendingUser(userData);
-      if (userData.name) setProfile({ name: userData.name });
+      if (userData.name) setProfile(p => ({ ...p, name: userData.name }));
+      setResumeNotice(isNewUser ? "" : "Welcome back! Just tell us your name to finish setting up your account.");
       go(STEPS.PROFILE);
     } else {
       // Existing user (or new shop owner already handled above)
@@ -327,9 +339,27 @@ export default function LoginPage({ onLogin, isModal = false }) {
     setError(""); setLoading(true);
     try {
       const data = await api.post("/api/auth/login", { email, password });
+
+      // Shop owner who abandoned signup — resume the shop-details step
+      if (data?.needsShopDetails) {
+        handleAuthResponse(data);
+        setLoading(false);
+        return;
+      }
+
       const userData = data?.user;
       if (!userData) throw new Error("Server returned an unexpected response.");
       setTokens(data.accessToken, data.refreshToken);
+
+      // Customer who never finished the name step — resume it
+      if (!userData.name && userData.role === "CUSTOMER") {
+        setPendingUser(userData);
+        setResumeNotice("Welcome back! Just tell us your name to finish setting up your account.");
+        go(STEPS.PROFILE);
+        setLoading(false);
+        return;
+      }
+
       // If user has no phone number, collect and link it before entering the app
       if (!userData.phone) {
         setPendingUser(userData);
@@ -343,6 +373,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
       onLogin(userData);
     } catch (e) {
       const code = e.data?.error?.code;
+      if (code === "NO_ACCOUNT") { setError("No account found with this email. Please create an account first."); setLoading(false); return; }
       if (code === "SHOP_OWNER_PENDING")  { go(STEPS.PENDING);  return; }
       if (code === "SHOP_OWNER_REJECTED") { setRejectionMsg(e.data?.error?.message || ""); go(STEPS.REJECTED); return; }
       setError(getErr(e, "Login failed. Check your credentials."));
@@ -361,8 +392,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
       const vehiclePayload = vehicle.make && vehicle.model && vehicle.year ? vehicle : undefined;
       const data = await api.post("/api/auth/register", { email, password, role, name: profile.name || undefined, vehicle: vehiclePayload });
       if (data?.needsShopDetails) {
-        setPendingUserId(data.userId);
-        go(STEPS.SHOP_DETAILS);
+        handleAuthResponse(data); // stores tokens + prefills + goes to SHOP_DETAILS
         return;
       }
       const userData = data?.user;
@@ -370,7 +400,14 @@ export default function LoginPage({ onLogin, isModal = false }) {
       setTokens(data.accessToken, data.refreshToken);
       setPendingUser(userData);
       go(STEPS.PROFILE);
-    } catch (e) { setError(getErr(e, "Registration failed. Try again.")); }
+    } catch (e) {
+      const code = e.data?.error?.code;
+      if (code === "EMAIL_EXISTS") {
+        setError("An account with this email already exists. Please sign in instead — if your registration was incomplete, you'll resume right where you left off.");
+        return setLoading(false);
+      }
+      setError(getErr(e, "Registration failed. Try again."));
+    }
     setLoading(false);
   };
 
@@ -888,6 +925,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={S.heading}>Tell us about your shop</div>
             <div style={S.sub}>These details let our team verify you're a legitimate retailer.</div>
 
+            {resumeNotice && (
+              <div style={{ background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, padding: "11px 14px", color: "#15803D", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+                ✅ {resumeNotice}
+              </div>
+            )}
             {error && <div style={S.error}>{error}</div>}
 
             <label style={S.label}>Your Full Name <span style={{ color: "#DC2626" }}>*</span></label>
@@ -968,6 +1010,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={S.chip}>Almost done!</div>
             <div style={S.heading}>Quick setup</div>
             <div style={S.sub}>Tell us a bit about yourself so we can personalise your experience.</div>
+            {resumeNotice && (
+              <div style={{ background: "#F0FDF4", border: "1px solid #86EFAC", borderRadius: 8, padding: "11px 14px", color: "#15803D", fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>
+                ✅ {resumeNotice}
+              </div>
+            )}
             {error && <div style={S.error}>{error}</div>}
             <label style={S.label}>Full Name <span style={{ color: "#DC2626" }}>*</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 18 }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} autoFocus />
