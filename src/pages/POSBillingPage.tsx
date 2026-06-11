@@ -3,8 +3,11 @@ import { T, FONT } from "../theme";
 import { fmt, fmtDateTime, margin } from "../utils";
 import { Modal } from "../components/ui";
 import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
+import { PurchaseBills } from "../components/PurchaseBills";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
+import { getAccessToken } from "../api/client";
+import { getInvoicePdfUrl } from "../api/billing";
 
 // ─── Payment mode button ───────────────────────────────────────────────────────
 function PayBtn({ label, icon, active, onClick }: { label: string; icon: string; active: boolean; onClick: () => void }) {
@@ -49,6 +52,9 @@ export function POSBillingPage() {
     const [invoiceAt, setInvoiceAt] = useState<number | null>(null);
     const [scanOpen, setScanOpen]   = useState(false);
     const [search, setSearch]       = useState("");
+    const [posTab, setPosTab]       = useState<"pos" | "bills">("pos");
+    // Backend invoice id once the sale syncs — enables PDF download + WhatsApp share
+    const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
     const [suspendedBill, setSuspendedBill] = useState(() => {
         try { return JSON.parse(localStorage.getItem("vl_suspended_bill") || "null"); } catch { return null; }
     });
@@ -56,6 +62,17 @@ export function POSBillingPage() {
     const searchRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => { searchRef.current?.focus(); }, []);
+
+    // The sale syncs to the backend asynchronously — capture the created
+    // invoice id so the preview can offer Download PDF / WhatsApp share.
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const d = (e as CustomEvent).detail;
+            if (d?.invoiceId) setSyncedInvoiceId(d.invoiceId);
+        };
+        window.addEventListener("invoice:synced", handler);
+        return () => window.removeEventListener("invoice:synced", handler);
+    }, []);
 
     // Ctrl+Enter shortcut
     useEffect(() => {
@@ -138,6 +155,7 @@ export function POSBillingPage() {
     const handleSubmit = async () => {
         if (!validate()) return;
         setSaving(true);
+        setSyncedInvoiceId(null); // new sale — previous backend invoice no longer applies
         await new Promise(r => setTimeout(r, 50));
         const ts = Date.now();
         const inv = `${billType === "Sale" ? "INV" : "EST"}-${ts.toString(36).toUpperCase()}`;
@@ -256,9 +274,36 @@ export function POSBillingPage() {
                     <br />Powered by RED PISTON · Thank you for your business.
                 </div>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                <button onClick={() => window.print()} style={{ flex: 1, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
-                <button onClick={newBill} style={{ flex: 2, height: 42, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui }}>🆕 New Bill</button>
+            <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+                <button onClick={() => window.print()} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
+                <button
+                    onClick={async () => {
+                        if (!syncedInvoiceId) { toast?.("PDF is being prepared — try again in a few seconds", "info"); return; }
+                        try {
+                            const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
+                                headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                            });
+                            if (!res.ok) throw new Error("pdf fetch failed");
+                            const url = URL.createObjectURL(await res.blob());
+                            window.open(url, "_blank");
+                        } catch { toast?.("Could not fetch the PDF — check your connection", "warning"); }
+                    }}
+                    style={{ flex: 1, minWidth: 140, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: syncedInvoiceId ? T.t1 : T.t3, cursor: "pointer", fontFamily: FONT.ui }}>
+                    📄 Download PDF
+                </button>
+                <button
+                    onClick={() => {
+                        const msg = encodeURIComponent(
+                            `*${shopName}*\n${billType === "Sale" ? "Tax Invoice" : "Quotation"} ${invoiceNo}\nItems: ${items.length}\nTotal: ₹${finalTotal.toFixed(2)}\n\nThank you for your business! 🙏`
+                        );
+                        const ph = customerPhone.replace(/\D/g, "");
+                        const url = ph.length === 10 ? `https://wa.me/91${ph}?text=${msg}` : `https://wa.me/?text=${msg}`;
+                        window.open(url, "_blank");
+                    }}
+                    style={{ flex: 1, minWidth: 140, height: 42, background: "#25D366", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui }}>
+                    💬 Share WhatsApp
+                </button>
+                <button onClick={newBill} style={{ flex: 1.5, minWidth: 130, height: 42, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui }}>🆕 New Bill</button>
             </div>
         </div>
     );
@@ -267,6 +312,20 @@ export function POSBillingPage() {
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
+            {/* POS / Purchase Bills tab switcher */}
+            <div style={{ display: "flex", gap: 6 }}>
+                {([["pos", "🧾", "Point of Sale"], ["bills", "📂", "Purchase Bills"]] as const).map(([id, icon, label]) => (
+                    <button key={id} onClick={() => setPosTab(id)}
+                        style={{ height: 38, padding: "0 16px", borderRadius: 9, border: `1.5px solid ${posTab === id ? T.amber : T.border}`, background: posTab === id ? T.amber : "#FFFFFF", color: posTab === id ? "#FFFFFF" : T.t2, fontSize: 13, fontWeight: posTab === id ? 700 : 500, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s", flexShrink: 0 }}>
+                        <span>{icon}</span> {label}
+                    </button>
+                ))}
+            </div>
+
+            {posTab === "bills" ? (
+                <PurchaseBills toast={toast} />
+            ) : (
+            <>
             {/* Barcode Scanner */}
             <BarcodeScanner open={scanOpen} onScan={handlePosScan} onClose={() => setScanOpen(false)} hint="Scan product barcode to add to bill" />
 
@@ -440,6 +499,7 @@ export function POSBillingPage() {
                     <div style={{ padding: "12px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, borderBottom: `1px solid ${T.border}` }}>
                         {[
                             { label: "Customer Name", val: customerName, set: setCustomerName, placeholder: "Name or garage" },
+                            { label: "WhatsApp No.", val: customerPhone, set: (v: string) => setCustomerPhone(v.replace(/[^\d]/g, "").slice(0, 10)), placeholder: "For invoice sharing" },
                             { label: "Vehicle Reg.", val: vehicleReg, set: setVehicleReg, placeholder: "MH 02 AB 1234" },
                         ].map(f => (
                             <div key={f.label}>
@@ -548,6 +608,8 @@ export function POSBillingPage() {
                     </div>
                 </div>
             </div>
+            </>
+            )}
         </div>
     );
 }

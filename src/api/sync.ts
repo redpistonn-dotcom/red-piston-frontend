@@ -231,7 +231,7 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<void> {
   const hasRealIds = params.items?.every(item => isDbId(item.inventoryId));
   if (!hasRealIds) return;
   try {
-    await api.post('/api/billing/invoice', {
+    const res = await api.post<{ success: boolean; invoice?: { invoiceId: number; invoiceNumber: string } }>('/api/billing/invoice', {
       items: params.items.map(item => ({
         inventoryId: item.inventoryId,
         qty: item.qty,
@@ -247,6 +247,13 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<void> {
       creditAmount: params.creditAmount || undefined,
       notes: params.notes || undefined,
     });
+    // Tell the POS page which backend invoice this sale became so it can offer
+    // "Download PDF" / "Share on WhatsApp" on the invoice preview.
+    if (res?.invoice?.invoiceId) {
+      window.dispatchEvent(new CustomEvent('invoice:synced', {
+        detail: { invoiceId: res.invoice.invoiceId, invoiceNumber: res.invoice.invoiceNumber },
+      }));
+    }
   } catch (err: unknown) {
     console.error('[Sync] Invoice sync failed — saved locally, backend out of sync:', (err as Error).message);
   }
