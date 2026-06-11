@@ -3,6 +3,7 @@ import { T, FONT } from "../theme";
 import { uid, CATEGORIES, POSITIONS, ENGINE_TYPES, TRANSMISSIONS, EMOJIS, fmt } from "../utils";
 import { searchCatalog } from "../api/inventory";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
+import { ImageUploader } from "./ImageUploader";
 
 export function ProductModal({ open, onClose, product, products, onSave, toast, activeShopId }) {
     const isEdit = !!product;
@@ -97,12 +98,24 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
     return (
         <Modal open={open} onClose={onClose} title={isEdit ? "Edit Product" : "Add New Product"} subtitle={isEdit ? `SKU: ${product.sku}` : "Register a new product in your inventory"} width={680}>
             <div style={{ marginBottom: 16 }}>
-                <Field label="Product Icon / Image">
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                        {EMOJIS.map(e => (
-                            <button key={e} onClick={() => set("image")(e)} style={{ width: 34, height: 34, borderRadius: 7, border: `1.5px solid ${f.image === e ? T.amber : T.border}`, background: f.image === e ? T.amberGlow : "transparent", cursor: "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}>{e}</button>
-                        ))}
-                    </div>
+                <Field label="Product Photo">
+                    <ImageUploader
+                        folder="products"
+                        currentUrl={f.image?.startsWith('http') ? f.image : null}
+                        onUploaded={(url) => set("image")(url)}
+                        label="Upload Part Photo"
+                    />
+                    {/* Emoji fallback if no real photo uploaded */}
+                    {!f.image?.startsWith('http') && (
+                        <div style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 11, color: T.t3, marginBottom: 5 }}>Or pick an icon:</div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                                {EMOJIS.map(e => (
+                                    <button key={e} onClick={() => set("image")(e)} style={{ width: 34, height: 34, borderRadius: 7, border: `1.5px solid ${f.image === e ? T.amber : T.border}`, background: f.image === e ? T.amberGlow : "transparent", cursor: "pointer", fontSize: 17, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}>{e}</button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </Field>
             </div>
 

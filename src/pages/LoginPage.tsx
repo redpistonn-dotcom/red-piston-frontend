@@ -2,6 +2,45 @@ import { useState, useRef } from "react";
 import { sendPhoneOtp, verifyPhoneOtp, signInWithGoogle } from "../firebase.js";
 import { api, setTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
+import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
+
+/** Minimal photo uploader used only inside the shop registration step */
+function ShopPhotoUploader({ photoUrl, onUploaded }: { photoUrl: string; onUploaded: (url: string) => void }) {
+  const { upload, uploading, progress } = useCloudinaryUpload();
+  const ref = useRef<HTMLInputElement>(null);
+  const [err, setErr] = useState("");
+  const handle = async (file: File) => {
+    if (!file.type.startsWith("image/")) { setErr("Please select an image file"); return; }
+    if (file.size > 10 * 1024 * 1024) { setErr("File too large — max 10 MB"); return; }
+    setErr("");
+    try { const r = await upload(file, "shops"); onUploaded(r.secureUrl); }
+    catch { setErr("Upload failed — please try again"); }
+  };
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div onClick={() => !uploading && ref.current?.click()}
+        style={{ height: 100, border: `2px dashed ${photoUrl ? "#22c55e" : "#3F3F46"}`, borderRadius: 10, background: "#16171e", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" }}>
+        {photoUrl
+          ? <img src={photoUrl} alt="Shop" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : <div style={{ textAlign: "center", color: "#6b6b75" }}>
+              <div style={{ fontSize: 28 }}>📷</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>Upload shop photo</div>
+            </div>}
+        {uploading && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            <div style={{ width: 100, height: 4, background: "#2e2f3a", borderRadius: 4 }}>
+              <div style={{ width: `${progress}%`, height: "100%", background: "#BE2B1A", borderRadius: 4, transition: "width 0.1s" }} />
+            </div>
+            <span style={{ fontSize: 11, color: "#fff" }}>Uploading {progress}%</span>
+          </div>
+        )}
+      </div>
+      {err && <div style={{ fontSize: 12, color: "#DC2626", marginTop: 4 }}>{err}</div>}
+      {photoUrl && <div style={{ fontSize: 11, color: "#22c55e", marginTop: 4 }}>✓ Photo uploaded</div>}
+      <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={e => { const f = e.target.files?.[0]; if (f) handle(f); e.target.value = ""; }} />
+    </div>
+  );
+}
 
 /**
  * AUTH FLOW — two clearly separated paths:
@@ -139,7 +178,8 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [resendTimer, setResendTimer]     = useState(0);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
-  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "" });
+  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "", shopCategory: "", whatsappNumber: "", photoUrl: "" });
+  const [vehicle, setVehicle] = useState({ make: "", model: "", year: "", fuelType: "", registrationNo: "" });
   const [profile, setProfile]     = useState({ name: "", profileType: "INDIVIDUAL" });
   const [pendingUserId, setPendingUserId] = useState(null);
   const [pendingUser, setPendingUser]     = useState(null); // for profile step
@@ -228,10 +268,13 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const callBackendFirebase = async (firebaseToken, mode) => {
     let data;
     try {
+      const vehiclePayload = vehicle.make && vehicle.model && vehicle.year ? vehicle : undefined;
       data = await api.post("/api/auth/firebase", {
         firebaseToken,
         mode: mode === "signin" ? "signin" : undefined,
         role: mode === "register" ? role : undefined,
+        name: mode === "register" ? (profile.name || undefined) : undefined,
+        vehicle: mode === "register" ? vehiclePayload : undefined,
       });
     } catch (e) {
       const code = e.data?.error?.code;
@@ -315,7 +358,8 @@ export default function LoginPage({ onLogin, isModal = false }) {
     if (password !== confirmPwd) { setError("Passwords do not match"); return; }
     setError(""); setLoading(true);
     try {
-      const data = await api.post("/api/auth/register", { email, password, role });
+      const vehiclePayload = vehicle.make && vehicle.model && vehicle.year ? vehicle : undefined;
+      const data = await api.post("/api/auth/register", { email, password, role, name: profile.name || undefined, vehicle: vehiclePayload });
       if (data?.needsShopDetails) {
         setPendingUserId(data.userId);
         go(STEPS.SHOP_DETAILS);
@@ -344,16 +388,19 @@ export default function LoginPage({ onLogin, isModal = false }) {
     setError(""); setLoading(true);
     try {
       await api.post("/api/auth/shop-setup", {
-        userId:       pendingUserId,
-        ownerName:    shopDetails.ownerName.trim(),
-        shopName:     shopDetails.shopName.trim(),
-        address:      shopDetails.address.trim(),
-        city:         shopDetails.city.trim(),
-        state:        shopDetails.state,
-        pincode:      pin,
-        contactPhone: ph,
-        email:        shopDetails.email.trim() || undefined,
-        gstin:        shopDetails.gstin.trim() || undefined,
+        userId:          pendingUserId,
+        ownerName:       shopDetails.ownerName.trim(),
+        shopName:        shopDetails.shopName.trim(),
+        address:         shopDetails.address.trim(),
+        city:            shopDetails.city.trim(),
+        state:           shopDetails.state,
+        pincode:         pin,
+        contactPhone:    ph,
+        email:           shopDetails.email.trim() || undefined,
+        gstin:           shopDetails.gstin.trim() || undefined,
+        shopCategory:    shopDetails.shopCategory || undefined,
+        whatsappNumber:  shopDetails.whatsappNumber.replace(/\D/g,"") || undefined,
+        photoUrl:        shopDetails.photoUrl || undefined,
       });
       go(STEPS.PENDING);
     } catch (e) { setError(getErr(e, "Could not submit shop details. Try again.")); }
@@ -864,10 +911,21 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 </select>
               </div>
               <div style={{ flex: 1 }}>
-                <label style={S.label}>Pincode</label>
+                <label style={S.label}>Pincode <span style={{ color: "#DC2626" }}>*</span></label>
                 <input className="auth-input" style={S.input} placeholder="500001" value={shopDetails.pincode} maxLength={6} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, pincode: e.target.value.replace(/\D/g, "") }))} />
               </div>
             </div>
+
+            <label style={S.label}>Shop Category <span style={{ color: "#DC2626" }}>*</span></label>
+            <select className="auth-input" style={{ ...S.input, marginBottom: 14, cursor: "pointer" }} value={shopDetails.shopCategory} onChange={e => setShopDetails(d => ({ ...d, shopCategory: e.target.value }))}>
+              <option value="">Select category…</option>
+              <option value="AUTO_PARTS">Auto Parts Retailer</option>
+              <option value="WORKSHOP">Workshop / Service Centre</option>
+              <option value="BOTH">Auto Parts + Workshop</option>
+              <option value="TYRES">Tyre Shop</option>
+              <option value="ELECTRICAL">Auto Electrical</option>
+              <option value="GENERAL">General Automotive</option>
+            </select>
 
             <label style={S.label}>Shop Contact Number <span style={{ color: "#DC2626" }}>*</span></label>
             <div style={{ ...S.phoneRow, marginBottom: 14 }}>
@@ -875,15 +933,23 @@ export default function LoginPage({ onLogin, isModal = false }) {
               <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" value={shopDetails.contactPhone} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, contactPhone: e.target.value.replace(/\D/g, "") }))} />
             </div>
 
-            <label style={S.label}>Shop Email <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — for order & billing notifications)</span></label>
+            <label style={S.label}>WhatsApp Number <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — for order alerts)</span></label>
+            <div style={{ ...S.phoneRow, marginBottom: 14 }}>
+              <div style={S.phoneFlag}>IN +91</div>
+              <input className="auth-input" style={S.phoneInput} placeholder="Same as above or different" value={shopDetails.whatsappNumber} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, whatsappNumber: e.target.value.replace(/\D/g, "") }))} />
+            </div>
+
+            <label style={S.label}>Shop Email <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — for billing notifications)</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} type="email" placeholder="shop@example.com" value={shopDetails.email} onChange={e => setShopDetails(d => ({ ...d, email: e.target.value }))} />
 
             <label style={S.label}>GSTIN <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — for GST billing)</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 28, fontFamily: FONT.mono, letterSpacing: "1px" }} placeholder="22AAAAA0000A1Z5" value={shopDetails.gstin} maxLength={15} onChange={e => setShopDetails(d => ({ ...d, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: 14, fontFamily: FONT.mono, letterSpacing: "1px" }} placeholder="22AAAAA0000A1Z5" value={shopDetails.gstin} maxLength={15} onChange={e => setShopDetails(d => ({ ...d, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") }))} />
 
-            <button className="btn-primary"
-              style={S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10)}
-              disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10}
+            <label style={{ ...S.label, marginBottom: 6 }}>Shop Photo <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — helps customers recognise your shop)</span></label>
+            <ShopPhotoUploader photoUrl={shopDetails.photoUrl} onUploaded={url => setShopDetails(d => ({ ...d, photoUrl: url }))} />
+
+            <button className="btn-primary" style={{ ...S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory), marginTop: 24 }}
+              disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory}
               onClick={submitShopDetails}>
               {loading ? "Submitting…" : "Submit for Verification →"}
             </button>
@@ -904,9 +970,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={S.sub}>Tell us a bit about yourself so we can personalise your experience.</div>
             {error && <div style={S.error}>{error}</div>}
             <label style={S.label}>Full Name <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 18 }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} onKeyDown={e => e.key === "Enter" && saveProfile()} autoFocus />
+            <input className="auth-input" style={{ ...S.input, marginBottom: 18 }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} autoFocus />
             <label style={S.label}>I am a…</label>
-            <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
               {[
                 { value: "INDIVIDUAL", label: "Car Owner", icon: "🚗" },
                 { value: "MECHANIC",   label: "Mechanic",  icon: "🔧" },
@@ -920,8 +986,31 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 </button>
               ))}
             </div>
+
+            {/* Vehicle — core to the marketplace experience */}
+            <div style={{ background: "#16171e", border: "1px solid #2e2f3a", borderRadius: 10, padding: "14px 14px 10px", marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#c9c6c5", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                🚗 Add Your Vehicle <span style={{ fontWeight: 400, color: "#6b6b75", fontSize: 11 }}>(optional — get personalised part suggestions)</span>
+              </div>
+              <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                <input className="auth-input" style={{ ...S.input, flex: 1, marginBottom: 0 }} placeholder="Make (e.g. Maruti)" value={vehicle.make} onChange={e => setVehicle(v => ({ ...v, make: e.target.value }))} />
+                <input className="auth-input" style={{ ...S.input, flex: 1, marginBottom: 0 }} placeholder="Model (e.g. Swift)" value={vehicle.model} onChange={e => setVehicle(v => ({ ...v, model: e.target.value }))} />
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <input className="auth-input" style={{ ...S.input, flex: 1, marginBottom: 0 }} placeholder="Year (e.g. 2019)" maxLength={4} inputMode="numeric" value={vehicle.year} onChange={e => setVehicle(v => ({ ...v, year: e.target.value.replace(/\D/g,"") }))} />
+                <select className="auth-input" style={{ ...S.input, flex: 1, marginBottom: 0, cursor: "pointer" }} value={vehicle.fuelType} onChange={e => setVehicle(v => ({ ...v, fuelType: e.target.value }))}>
+                  <option value="">Fuel type</option>
+                  <option value="Petrol">Petrol</option>
+                  <option value="Diesel">Diesel</option>
+                  <option value="CNG">CNG</option>
+                  <option value="Electric">Electric</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
+            </div>
+
             <button className="btn-primary" style={S.btnPrimary(loading || !profile.name.trim())} disabled={loading || !profile.name.trim()} onClick={saveProfile}>
-              {loading ? "Saving…" : "Enter AutoSpace →"}
+              {loading ? "Saving…" : "Enter RedPiston →"}
             </button>
           </div>
         );
