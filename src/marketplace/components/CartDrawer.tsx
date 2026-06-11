@@ -43,15 +43,23 @@ export function CartDrawer({ onCheckout }) {
 
     const safeCart = cart || [];
 
+    interface ShopGroup {
+        shopId: string | number;
+        shop: any;
+        items: typeof safeCart;
+        subtotal: number;
+        deliveryOption: string;
+    }
+
     const cartByShop = useMemo(() => {
-        return safeCart.reduce((acc, item) => {
+        return safeCart.reduce<Record<string, ShopGroup>>((acc, item) => {
             const shopId = item.listing?.shop_id;
             if (!shopId) return acc;
             if (!acc[shopId]) {
                 acc[shopId] = { shopId, shop: item.listing.shop, items: [], subtotal: 0, deliveryOption: item.deliveryOption || "standard" };
             }
             acc[shopId].items.push(item);
-            acc[shopId].subtotal += (item.listing?.selling_price || 0) * item.qty;
+            acc[shopId].subtotal += (Number(item.listing?.selling_price) || 0) * item.qty;
             return acc;
         }, {});
     }, [safeCart]);

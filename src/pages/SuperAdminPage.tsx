@@ -644,7 +644,7 @@ function CatalogTab() {
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px', marginBottom: 12 }}>
                 {/* Vehicle + Category defaults */}
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'Inter', sans-serif", marginBottom: 10 }}>Step 1 — Set Batch Defaults</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 10 }}>
                   <div>
                     <div style={{ fontSize: 10, color: C.t3, marginBottom: 4, fontFamily: "'Inter', sans-serif" }}>Vehicle Type</div>
                     <select value={defaultVehicleType} onChange={e => { setDefaultVehicleType(e.target.value); setDefaultMake(''); setDefaultMakeId(''); setDefaultModel(''); }}
@@ -717,7 +717,7 @@ function CatalogTab() {
                 <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: "'Inter', sans-serif", marginBottom: 10 }}>
                   Step 2 — Column Match &nbsp;·&nbsp; <span style={{ color: C.green }}>{Object.keys(fileData.colMap).length} matched</span> / {fileData.headers.length} total
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 4, marginBottom: 10 }}>
                   {DB_FIELDS.filter(f => f.section === 'required').map(f => {
                     const col = dbToExcel[f.key];
                     return (
@@ -731,7 +731,7 @@ function CatalogTab() {
                     );
                   })}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 3, marginBottom: 8 }}>
                   {DB_FIELDS.filter(f => f.section === 'core').map(f => {
                     const col = dbToExcel[f.key];
                     return (
@@ -815,7 +815,7 @@ function CatalogTab() {
                 })()}
               </div>
               {/* Live counters */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))', gap: 6 }}>
                 {[
                   { label: 'Processed', val: `${importProg.done.toLocaleString('en-IN')}/${importProg.total.toLocaleString('en-IN')}`, color: C.t3 },
                   { label: 'Added',     val: importProg.created.toLocaleString('en-IN'),   color: C.green },
@@ -839,7 +839,7 @@ function CatalogTab() {
 
       {/* ════════════ LIVE DATABASE ════════════ */}
       {dbStats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 18 }}>
           {[
             { label: 'Total Parts',    val: dbStats.total,    color: C.red   },
             { label: 'Verified',       val: dbStats.verified, color: C.green },
@@ -854,8 +854,8 @@ function CatalogTab() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
-        <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 200, position: 'relative' }}>
           <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: C.t4, fontSize: 13, pointerEvents: 'none' }}>🔍</span>
           <input value={dbSearch} onChange={e => setDbSearch(e.target.value)} placeholder="Search by part name, OEM or brand…"
             style={{ width: '100%', background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: '10px 14px 10px 36px', color: C.t1, fontSize: 13, outline: 'none', fontFamily: "'Inter', sans-serif", boxSizing: 'border-box' }} />

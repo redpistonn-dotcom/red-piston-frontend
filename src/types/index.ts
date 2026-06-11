@@ -453,6 +453,23 @@ export interface CartItem {
   qty: number;
   shopId: string | number;
   image?: string;
+  /** Marketplace cart entries carry the full product + shop listing context */
+  product?: {
+    id?: string | number;
+    name?: string;
+    brand?: string;
+    image?: string;
+    [key: string]: unknown;
+  };
+  listing?: {
+    shop_id?: string | number;
+    product_id?: string | number;
+    price?: number;
+    shop?: { id?: string | number; name?: string; city?: string; distance_km?: number; [key: string]: unknown };
+    [key: string]: unknown;
+  };
+  /** Per-shop delivery choice: "standard" | "express" | "pickup" */
+  deliveryOption?: string;
 }
 
 // ─── Billing utilities ────────────────────────────────────────────────────────

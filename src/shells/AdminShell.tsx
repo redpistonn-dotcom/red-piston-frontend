@@ -43,16 +43,44 @@ export function AdminShell({ children }: AdminShellProps) {
         .admin-header-tab:hover { color: ${AC.t1}; }
         .admin-header-tab.active { color: ${AC.red}; border-bottom-color: ${AC.red}; }
         .admin-signout-btn:hover { background: #FEF2F2 !important; color: ${AC.red} !important; border-color: #FECACA !important; }
+
+        .admin-shell-content { padding-top: 60px; }
+
+        /* ── Mobile: header collapses to 2 rows — brand+user on top, scrollable tabs below ── */
+        @media (max-width: 820px) {
+          .admin-topbar {
+            flex-wrap: wrap !important;
+            height: 100px !important;
+            padding: 0 14px !important;
+            align-items: flex-start !important;
+          }
+          .admin-brand-row { height: 56px; margin-right: auto !important; }
+          .admin-brand-divider { display: none !important; }
+          .admin-tabs {
+            order: 3;
+            flex: 0 0 100% !important;
+            height: 44px !important;
+            gap: 20px !important;
+            overflow-x: auto;
+            scrollbar-width: none;
+          }
+          .admin-tabs::-webkit-scrollbar { display: none; }
+          .admin-user-block { height: 56px; }
+          .admin-user-meta { display: none !important; }
+          .admin-signout-text { display: none !important; }
+          .admin-signout-btn { padding: 7px 10px !important; min-height: 36px; }
+          .admin-shell-content { padding-top: 100px !important; }
+        }
       `}</style>
 
       {/* Top header */}
-      <div style={{
+      <div className="admin-topbar" style={{
         position: "fixed", top: 0, left: 0, right: 0, height: 60, zIndex: 400,
         background: AC.surface, borderBottom: `1px solid ${AC.border}`,
         display: "flex", alignItems: "center", padding: "0 24px", gap: 0,
         fontFamily: "'Inter', sans-serif", boxShadow: "0 1px 4px rgba(26,18,5,0.06)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 32, flexShrink: 0 }}>
+        <div className="admin-brand-row" style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 32, flexShrink: 0 }}>
           <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", border: `1.5px solid ${AC.border}`, flexShrink: 0 }}>
             <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
@@ -62,9 +90,9 @@ export function AdminShell({ children }: AdminShellProps) {
           </div>
         </div>
 
-        <div style={{ width: 1, height: 28, background: AC.border, marginRight: 28, flexShrink: 0 }} />
+        <div className="admin-brand-divider" style={{ width: 1, height: 28, background: AC.border, marginRight: 28, flexShrink: 0 }} />
 
-        <nav style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 24, flex: 1 }}>
+        <nav className="admin-tabs" style={{ display: "flex", alignItems: "stretch", height: "100%", gap: 24, flex: 1 }}>
           {ADMIN_TABS.map(t => (
             <button
               key={t.key}
@@ -76,10 +104,10 @@ export function AdminShell({ children }: AdminShellProps) {
           ))}
         </nav>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <div className="admin-user-block" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Avatar user={currentUser} size={30} />
-            <div style={{ lineHeight: 1.2 }}>
+            <div className="admin-user-meta" style={{ lineHeight: 1.2 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: AC.t1, whiteSpace: "nowrap" }}>
                 {currentUser?.name || currentUser?.email?.split("@")[0] || "Admin"}
               </div>
@@ -97,12 +125,12 @@ export function AdminShell({ children }: AdminShellProps) {
               transition: "all 0.15s", display: "flex", alignItems: "center", gap: 6,
             }}
           >
-            <span>⏏</span> Sign Out
+            <span>⏏</span> <span className="admin-signout-text">Sign Out</span>
           </button>
         </div>
       </div>
 
-      <div style={{ paddingTop: 60, minHeight: "100vh", background: AC.bg }}>
+      <div className="admin-shell-content" style={{ minHeight: "100vh", background: AC.bg }}>
         {Children.map(children, child => cloneElement(child, { activeTab, setActiveTab }))}
       </div>
 
