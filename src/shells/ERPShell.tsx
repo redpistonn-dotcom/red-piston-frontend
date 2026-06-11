@@ -20,6 +20,7 @@ import { ProfileDropdown } from "../components/ProfileDropdown";
 import { ProductModal } from "../components/ProductModal";
 import { BulkStockInModal } from "../components/BulkStockInModal";
 import { CatalogStockInModal } from "../components/CatalogStockInModal";
+import { ProfileNudge } from "../components/ProfileNudge";
 
 // ── Sidebar width constant ──────────────────────────────────────────────────
 const SIDEBAR_W = 210;   // compact sidebar matching design
@@ -684,6 +685,7 @@ export function ERPShell({ children }: ERPShellProps) {
           minHeight: "100vh",
         }}
       >
+        <ProfileNudge />
         {children}
       </main>
 

@@ -43,6 +43,11 @@ export interface Shop {
   gstin?: string | null;
   pincode?: string | null;
   email?: string | null;
+  photoUrl?: string | null;
+  logoUrl?: string | null;
+  shopCategory?: string | null;
+  whatsappNumber?: string | null;
+  shopDescription?: string | null;
 }
 
 // ─── Product / Inventory ─────────────────────────────────────────────────────
