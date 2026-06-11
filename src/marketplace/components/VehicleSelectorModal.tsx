@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { T, FONT } from "../../theme";
 import { useStore } from "../../store";
 import { useVehicleManufacturers, useVehicleModels, useVehicleVariants } from "../../hooks/queries";
@@ -158,7 +159,7 @@ export function VehicleSelectorModal({ open, onClose }) {
 
   const STEPS = ["Brand", "Model", "Year", "Variant"];
 
-  return (
+  return createPortal(
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.2s" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(10,15,29,0.8)", backdropFilter: "blur(8px)" }} onClick={resetAndClose} />
 
@@ -366,6 +367,7 @@ export function VehicleSelectorModal({ open, onClose }) {
         )}
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

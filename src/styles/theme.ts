@@ -286,6 +286,16 @@ export const GLOBAL_CSS = `
   .table-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    /* Scroll affordance: edge shadows appear only when more content exists in
+       that direction (background-attachment: local trick — pure CSS) */
+    background:
+      linear-gradient(to right, #FFFFFF 30%, rgba(255,255,255,0)) left,
+      linear-gradient(to left,  #FFFFFF 30%, rgba(255,255,255,0)) right,
+      linear-gradient(to right, rgba(28,27,27,0.10), rgba(28,27,27,0)) left,
+      linear-gradient(to left,  rgba(28,27,27,0.10), rgba(28,27,27,0)) right;
+    background-repeat: no-repeat;
+    background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
   }
   .table-scroll::-webkit-scrollbar { height: 4px; }
   .table-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -296,6 +306,11 @@ export const GLOBAL_CSS = `
     outline: 2px solid #8B1E1E;
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  /* ── Touch targets — topbar icon buttons grow to 44px on touch devices ── */
+  @media (pointer: coarse) {
+    .topbar-icon-btn { width: 44px !important; height: 44px !important; }
   }
 
   /* ── Text selection ── */

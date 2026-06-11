@@ -7,6 +7,7 @@
  */
 import '../styles/landing.css';
 import { useState, useEffect, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, isFirebaseConfigured } from '../config/firebase';
 import { api, setTokens } from '../api/client';
@@ -153,7 +154,7 @@ function AuthModal({ onClose }: { mode: 'signin' | 'signup'; onClose: () => void
     navigate(getDefaultRoute(user), { replace: true });
   };
 
-  return (
+  return createPortal(
     <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,18,5,0.6)', backdropFilter: 'blur(6px)' }} onClick={onClose} />
       <div style={{ position: 'relative', width: 'min(92vw, 960px)', height: 'min(640px, 88vh)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 32px 80px rgba(26,18,5,0.3)', border: '1px solid #E0D5C8', display: 'flex', flexDirection: 'column' }}>
@@ -165,7 +166,8 @@ function AuthModal({ onClose }: { mode: 'signin' | 'signup'; onClose: () => void
           <LoginPage onLogin={handleLogin} isModal={true} />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

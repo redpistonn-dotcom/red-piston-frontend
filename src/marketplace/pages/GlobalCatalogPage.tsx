@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { T, FONT } from "../../theme";
 import { MASTER_PRODUCTS, BRAND_CATALOG, CATEGORIES, VEHICLES } from "../api/mockDatabase";
 import { useStore } from "../../store";
@@ -485,7 +486,7 @@ export function GlobalCatalogPage({ onBack }) {
             )}
 
             {/* Add Modal (Simplified) */}
-            {showAddModal && (
+            {showAddModal && createPortal(
                 <div style={{
                     position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000,
                     display: "flex", alignItems: "center", justifyContent: "center"
@@ -560,7 +561,8 @@ export function GlobalCatalogPage({ onBack }) {
                             }}>Publish</button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
@@ -806,7 +808,7 @@ function ImportModal({ onClose, existingProducts, activeShopId, onImport }) {
         border: `1px solid ${T.border}`, boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
     };
 
-    return (
+    return createPortal(
         <div style={MODAL_STYLE} onClick={onClose}>
             <div style={BOX_STYLE} onClick={e => e.stopPropagation()}>
                 {/* Modal Header */}
@@ -1142,6 +1144,7 @@ function ImportModal({ onClose, existingProducts, activeShopId, onImport }) {
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

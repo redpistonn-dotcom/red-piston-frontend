@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { FONT } from "../../theme";
 import { useStore } from "../../store";
 import { fmt } from "../../utils";
@@ -85,7 +86,7 @@ export function CartDrawer({ onCheckout }) {
 
     if (!isCartOpen) return null;
 
-    return (
+    return createPortal(
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
             <style>{`
                 @media (max-width: 768px) {
@@ -245,7 +246,8 @@ export function CartDrawer({ onCheckout }) {
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../../store";
 import { getHomeData } from "../api/engine";
@@ -27,7 +28,7 @@ const YEARS = Array.from({ length: 20 }, (_, i) => String(2024 - i));
 
 function SideBySideModal({ open, items, onClose }) {
   if (!open || !items?.length) return null;
-  return (
+  return createPortal(
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(26,18,5,0.5)", backdropFilter: "blur(4px)" }} onClick={onClose} />
       <div style={{ position: "relative", background: "#fff", borderRadius: 16, border: "1px solid #E0D5C8", boxShadow: "0 24px 80px rgba(0,0,0,0.2)", overflow: "hidden", display: "flex", flexDirection: "column", maxHeight: "90vh", width: Math.min(340 * items.length + 48, 1100) }}>
@@ -67,7 +68,8 @@ function SideBySideModal({ open, items, onClose }) {
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -923,7 +925,7 @@ export function MarketplaceHome() {
                     </div>
                   </div>
 
-                  {filterDrawerOpen && (
+                  {filterDrawerOpen && createPortal(
                     <>
                       <div onClick={() => setFilterDrawerOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 500, background: "rgba(26,18,5,0.3)", backdropFilter: "blur(2px)" }} />
                       <div className="mp-filter-panel">
@@ -968,7 +970,8 @@ export function MarketplaceHome() {
                           </button>
                         </div>
                       </div>
-                    </>
+                    </>,
+                    document.body
                   )}
 
                   {data.compatibleParts.length === 0 ? (

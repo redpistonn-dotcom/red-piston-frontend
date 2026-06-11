@@ -38,9 +38,11 @@ export function useCloudinaryUpload() {
     setProgress(0);
 
     try {
-      // Step 1: get signed params from our backend
+      // Step 1: get signed params from our backend.
+      // Path MUST include /api — the client prepends the bare host
+      // (https://red-piston-backend.onrender.com), so "/upload/..." 404s in prod.
       const sig = await api.get<SignatureResponse>(
-        `/upload/signature`,
+        `/api/upload/signature`,
         { folder }
       );
 

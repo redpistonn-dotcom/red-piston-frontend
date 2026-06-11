@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { T, FONT } from "../theme";
 
 const SHORTCUTS = [
@@ -25,7 +26,7 @@ export function ShortcutOverlay({ open, onClose }) {
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 9990,
@@ -82,6 +83,7 @@ export function ShortcutOverlay({ open, onClose }) {
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

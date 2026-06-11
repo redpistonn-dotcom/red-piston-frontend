@@ -1,4 +1,5 @@
 import { useState, useContext, Children, cloneElement } from "react";
+import { createPortal } from "react-dom";
 import { GLOBAL_CSS } from "../theme";
 import { AppCtx } from "../AppCtx";
 import { Toast } from "../components/ui";
@@ -106,7 +107,7 @@ export function AdminShell({ children }: AdminShellProps) {
       </div>
 
       {/* Logout confirmation modal */}
-      {showLogoutConfirm && (
+      {showLogoutConfirm && createPortal(
         <div style={{
           position: "fixed", inset: 0, zIndex: 9000,
           background: "rgba(26,18,5,0.5)", backdropFilter: "blur(6px)",
@@ -138,7 +139,8 @@ export function AdminShell({ children }: AdminShellProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <Toast items={toasts} onRemove={removeToast} />

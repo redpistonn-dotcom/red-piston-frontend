@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { T, FONT } from "../../theme";
 import { fmt } from "../../utils";
 import { useStore } from "../../store";
@@ -27,7 +28,7 @@ export function ProductComparisonModal({ open, onClose, productData }) {
     onClose();
   };
 
-  return (
+  return createPortal(
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", animation: "fadeIn 0.2s" }}>
       <div style={{ position: "absolute", inset: 0, background: "rgba(10,15,29,0.8)", backdropFilter: "blur(6px)" }} onClick={onClose} />
 
@@ -174,6 +175,7 @@ export function ProductComparisonModal({ open, onClose, productData }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

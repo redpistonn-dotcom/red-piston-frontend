@@ -574,6 +574,7 @@ export function ERPShell({ children }: ERPShellProps) {
             onClick={() => setCatalogModal(true)}
             title="Add stock"
             aria-label="Add stock"
+            className="topbar-icon-btn"
             style={{
               width: 38, height: 38, borderRadius: 10,
               background: "#8B1E1E", border: "none",
@@ -592,6 +593,7 @@ export function ERPShell({ children }: ERPShellProps) {
             onClick={() => navigate("/billing")}
             title="POS Billing"
             aria-label="POS Billing"
+            className="topbar-icon-btn"
             style={{
               width: 38, height: 38, borderRadius: 10,
               background: "transparent",
@@ -611,6 +613,7 @@ export function ERPShell({ children }: ERPShellProps) {
             onClick={() => navigate("/settings")}
             title="Settings"
             aria-label="Settings"
+            className="topbar-icon-btn"
             style={{
               width: 38, height: 38, borderRadius: 10,
               background: "transparent",

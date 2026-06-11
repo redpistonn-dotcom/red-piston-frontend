@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import LoginPage from "../../pages/LoginPage";
 
 export function LoginModal({ onClose, onLogin }) {
@@ -30,7 +31,7 @@ export function LoginModal({ onClose, onLogin }) {
     onClose();
   };
 
-  return (
+  return createPortal(
     <div style={{
       position: "fixed", inset: 0, zIndex: 99999,
       display: "flex", alignItems: "center", justifyContent: "center",
@@ -79,6 +80,7 @@ export function LoginModal({ onClose, onLogin }) {
           <LoginPage onLogin={handleLogin} isModal={true} />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

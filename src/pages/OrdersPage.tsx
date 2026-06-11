@@ -1,4 +1,5 @@
 import { useState, useMemo, useContext } from "react";
+import { createPortal } from "react-dom";
 import { T, FONT, SHADOWS } from "../theme";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
@@ -107,7 +108,7 @@ function CreateOrderModal({ onClose, onCreated }: { onClose: () => void; onCreat
         onClose();
     };
 
-    return (
+    return createPortal(
         <div style={{ position: "fixed", inset: 0, background: "rgba(28,27,27,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
             <div onClick={e => e.stopPropagation()} style={{ background: "#FFFFFF", borderRadius: 20, padding: "28px 28px 24px", width: "min(440px, calc(100vw - 32px))", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: T.t1, fontFamily: FONT.display, marginBottom: 4 }}>Create New Order</div>
@@ -145,7 +146,8 @@ function CreateOrderModal({ onClose, onCreated }: { onClose: () => void; onCreat
                     <button onClick={handleSubmit} style={{ flex: 2, height: 40, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui }}>⊕ Create Order</button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { T, FONT } from "../../theme";
 
@@ -66,7 +67,10 @@ export function Modal({ open, onClose, title, subtitle, width = 560, children }:
 
     if (!open) return null;
 
-    return (
+    // Portal to <body>: pages animate in with a transform (.page-in), and a
+    // transformed ancestor turns position:fixed into position:absolute-within-it,
+    // gluing the modal to page content instead of the viewport.
+    return createPortal(
         <div
             style={{
                 position: "fixed",
@@ -145,6 +149,7 @@ export function Modal({ open, onClose, title, subtitle, width = 560, children }:
                 </div>
                 {children}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

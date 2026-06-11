@@ -7,7 +7,8 @@
  * - Dismissed nudges reappear on the next login (intentional — soft reminder)
  * - Renders nothing if all tasks are complete or all dismissed
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useAppCtx } from "../AppCtx";
 import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
 import { api } from "../api/client";
@@ -31,6 +32,19 @@ export function ProfileNudge() {
 
   const shop = currentUser?.shop;
   const isShopOwner = currentUser?.role === "SHOP_OWNER";
+
+  // Modal behaviour: lock body scroll + close on Escape while open
+  useEffect(() => {
+    if (!uploaderOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setUploaderOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [uploaderOpen]);
 
   // Build list of pending nudge tasks
   const tasks: { key: string; icon: string; title: string; action: string; onAction: () => void }[] = [];
@@ -61,15 +75,16 @@ export function ProfileNudge() {
     try {
       const result = await upload(file, "shops");
       // Persist to backend
-      await api.patch("/auth/me/shop", { photoUrl: result.secureUrl });
+      await api.patch("/api/auth/me/shop", { photoUrl: result.secureUrl });
       // Update local context so nudge disappears immediately
       if (handleLogin && currentUser) {
         handleLogin({ ...currentUser, shop: { ...currentUser.shop!, photoUrl: result.secureUrl } });
       }
       setUploaderOpen(false);
       handleDismiss("shop_photo");
-    } catch {
-      setUploadErr("Upload failed — please try again");
+    } catch (e: any) {
+      // Surface the real failure (e.g. session expired, server error) — no silent generic
+      setUploadErr(e?.data?.error?.message || e?.message || "Upload failed — please try again");
     }
   };
 
@@ -114,18 +129,33 @@ export function ProfileNudge() {
         ))}
       </div>
 
-      {/* Upload modal */}
-      {uploaderOpen && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 9999,
-          background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          padding: 16,
-        }} onClick={e => e.target === e.currentTarget && setUploaderOpen(false)}>
-          <div style={{
-            background: "#fff", borderRadius: 16, padding: 24, width: "100%", maxWidth: 400,
-            boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-          }}>
+      {/* Upload modal — portaled to <body>: the ERP page wrapper animates in
+          with a transform (.page-in), and a transformed ancestor turns
+          position:fixed into "absolute inside the page", which glued this
+          dialog to the content instead of centering it in the viewport. */}
+      {uploaderOpen && createPortal(
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 100000,
+            background: "rgba(26,18,5,0.55)",
+            backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16,
+            animation: "fadeIn 0.18s ease both",
+          }}
+          onClick={e => e.target === e.currentTarget && setUploaderOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Upload Shop Photo"
+            style={{
+              background: "#fff", borderRadius: 18, padding: 24, width: "100%", maxWidth: 400,
+              maxHeight: "90vh", overflowY: "auto",
+              boxShadow: "0 32px 80px rgba(26,18,5,0.35), 0 4px 16px rgba(26,18,5,0.12)",
+              animation: "scaleIn 0.22s cubic-bezier(0.16,1,0.3,1) both",
+            }}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: "#1c1b1b" }}>Upload Shop Photo</div>
               <button onClick={() => setUploaderOpen(false)} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#8b716e" }}>✕</button>
@@ -165,7 +195,8 @@ export function ProfileNudge() {
               Remind me later
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

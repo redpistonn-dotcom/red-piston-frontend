@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from "react-dom";
 import { T, FONT } from '../theme';
 import { fmt } from '../utils';
 import { lookupCatalog, lookupByBarcode, bulkStockIn, contributePart, addInventory } from '../api/inventory';
@@ -747,7 +748,7 @@ export function BulkStockInModal({ open, onClose, onSave, toast, activeShopId })
     }
   };
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9000,
       background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
@@ -818,6 +819,7 @@ export function BulkStockInModal({ open, onClose, onSave, toast, activeShopId })
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

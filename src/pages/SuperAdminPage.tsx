@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { flushSync } from "react-dom";
+import { flushSync, createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { api } from "../api/client.js";
 import { T, FONT } from "../theme.js"; // T kept for any remaining tokens
@@ -93,7 +93,7 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
     setLoading(false);
   };
 
-  return (
+  return createPortal(
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
       background: "rgba(26,18,5,0.5)", backdropFilter: "blur(4px)",
@@ -179,7 +179,8 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1690,7 +1691,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
       )}
 
       {/* ─── Import Completion Popup (appears even when on other sections) ─── */}
-      {bgImport?.popup && (
+      {bgImport?.popup && createPortal(
         <div style={{
           position: 'fixed', inset: 0, zIndex: 10000,
           background: 'rgba(26,18,5,0.5)', backdropFilter: 'blur(6px)',
@@ -1776,7 +1777,8 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ─── Floating Background Import Widget ─── */}
