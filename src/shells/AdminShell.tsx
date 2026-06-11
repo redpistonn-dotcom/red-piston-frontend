@@ -4,6 +4,7 @@ import { GLOBAL_CSS } from "../theme";
 import { AppCtx } from "../AppCtx";
 import { Toast } from "../components/ui";
 import { Avatar } from "../components/Avatar";
+import { BrandHeader } from "../components/BrandHeader";
 
 const ADMIN_TABS = [
   { key: "users",         label: "All Users",    icon: "👥" },
@@ -80,14 +81,8 @@ export function AdminShell({ children }: AdminShellProps) {
         display: "flex", alignItems: "center", padding: "0 24px", gap: 0,
         fontFamily: "'Inter', sans-serif", boxShadow: "0 1px 4px rgba(26,18,5,0.06)",
       }}>
-        <div className="admin-brand-row" style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 32, flexShrink: 0 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", border: `1.5px solid ${AC.border}`, flexShrink: 0 }}>
-            <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: AC.t1, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", lineHeight: 1 }}>RedPiston</div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: AC.t3, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Inter',sans-serif", marginTop: 2 }}>Admin Console</div>
-          </div>
+        <div className="admin-brand-row" style={{ display: "flex", alignItems: "center", marginRight: 32, flexShrink: 0 }}>
+          <BrandHeader subtitle="Admin Console" logoSize={36} />
         </div>
 
         <div className="admin-brand-divider" style={{ width: 1, height: 28, background: AC.border, marginRight: 28, flexShrink: 0 }} />

@@ -33,8 +33,11 @@ async function _doRefresh(): Promise<string> {
     throw Object.assign(new Error('Session expired. Please login again.'), { code: 'SESSION_EXPIRED' });
   }
 
+  // 65s timeout: the Render free-tier backend spins down after ~15min idle and
+  // takes 30-60s to cold-start. The previous 8s abort made every cold start
+  // look like a dead session and force-logged users out.
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 65000);
 
   let res: Response;
   try {
@@ -106,10 +109,18 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
         const newToken = await refreshAccessToken();
         headers['Authorization'] = `Bearer ${newToken}`;
         res = await fetch(url, { ...options, headers, credentials: 'include', _isRetry: true } as RequestOptions);
-      } catch {
-        window.dispatchEvent(new CustomEvent('auth:session-expired'));
-        throw Object.assign(new Error('Session expired. Please login again.'), {
-          status: 401, code: 'SESSION_EXPIRED',
+      } catch (refreshErr: any) {
+        // Only end the session when the refresh token was actually REJECTED.
+        // A network error / cold-start timeout is transient — the user is still
+        // authenticated; let the request fail and be retried by the caller.
+        if (refreshErr?.code === 'SESSION_EXPIRED') {
+          window.dispatchEvent(new CustomEvent('auth:session-expired'));
+          throw Object.assign(new Error('Session expired. Please login again.'), {
+            status: 401, code: 'SESSION_EXPIRED',
+          });
+        }
+        throw Object.assign(new Error('Server is waking up — please try again in a moment.'), {
+          status: 0, code: 'NETWORK_ERROR',
         });
       }
     }

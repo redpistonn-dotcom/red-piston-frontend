@@ -188,11 +188,15 @@ function AppContent() {
   }, []);
 
   // ── Proactive token refresh every 7.5 hours ───────────────────────────────────
+  // Only end the session if the refresh token was actually rejected — a transient
+  // network failure (e.g. backend cold start) must never log the user out; the
+  // request-level interceptor will retry the refresh on the next API call anyway.
   useEffect(() => {
     if (!currentUser) return;
     const id = setInterval(async () => {
-      const token = await silentRefresh();
-      if (!token) window.dispatchEvent(new CustomEvent("auth:session-expired"));
+      try {
+        await silentRefresh();
+      } catch {}
     }, 7.5 * 60 * 60 * 1000);
     return () => clearInterval(id);
   }, [currentUser]);

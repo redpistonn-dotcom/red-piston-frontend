@@ -21,9 +21,12 @@ import { ProductModal } from "../components/ProductModal";
 import { BulkStockInModal } from "../components/BulkStockInModal";
 import { CatalogStockInModal } from "../components/CatalogStockInModal";
 import { ProfileNudge } from "../components/ProfileNudge";
+import { BrandHeader } from "../components/BrandHeader";
 
-// ── Sidebar width constant ──────────────────────────────────────────────────
-const SIDEBAR_W = 210;   // compact sidebar matching design
+// ── Sidebar width constants ─────────────────────────────────────────────────
+// Desktop default is a collapsed 68px icon rail; hovering expands it to 236px
+// OVER the content (no layout shift) — see the .erp-sidebar rules in GLOBAL_CSS.
+const SIDEBAR_W = 68;    // collapsed rail width — content/topbar offset
 const TOPBAR_H  = 64;    // topbar height
 
 // ── Nav definition — Material Symbols Outlined icon names ──────────────────
@@ -163,6 +166,7 @@ export function ERPShell({ children }: ERPShellProps) {
         boxShadow: "2px 0 16px rgba(28,27,27,0.06)",
         display: "flex", flexDirection: "column",
         padding: `${SP.xl}px 0`,   // py-xl = 24px top+bottom
+        overflow: "hidden",        // clip labels while collapsed
       }}>
 
         {/* ── BRAND (logo + wordmark) ───────────────────────────────────
@@ -172,39 +176,12 @@ export function ERPShell({ children }: ERPShellProps) {
             "Industrial Ops" = 12px, on-surface-variant, opacity-70
         ─────────────────────────────────────────────────────────── */}
         <div className="sidebar-brand" style={{
-          display: "flex", alignItems: "center",
-          gap: 10,
           marginBottom: 28,
           paddingLeft: 14,
           paddingRight: 14,
           flexShrink: 0,
         }}>
-          {/* Logo: 40px wide, auto height */}
-          <img
-            src="/logo.png"
-            alt="RED PISTON Logo"
-            style={{ width: 40, height: 40, objectFit: "contain", flexShrink: 0, display: "block" }}
-            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-          />
-          {/* Wordmark */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <div style={{
-              display: "flex",
-              fontSize: 16, fontWeight: 700,
-              letterSpacing: "0.02em",
-              textTransform: "uppercase",
-              fontFamily: FONT.display,
-              lineHeight: 1.1,
-            }}>
-              <span style={{ color: "#8B1E1E" }}>RED</span>
-              <span style={{ color: "#000000", marginLeft: 3 }}>PISTON</span>
-            </div>
-            <p style={{
-              fontSize: 10, color: T.t3,
-              fontFamily: FONT.ui, fontWeight: 500,
-              margin: 0, letterSpacing: "0.04em",
-            }}>Industrial Ops</p>
-          </div>
+          <BrandHeader subtitle="Industrial Ops" logoSize={40} textClassName="sb-fade" />
         </div>
 
         {/* ── NAVIGATION ────────────────────────────────────────────────
@@ -227,8 +204,8 @@ export function ERPShell({ children }: ERPShellProps) {
                 style={{
                   width: "100%",
                   display: "flex", alignItems: "center",
-                  gap: 10,
-                  padding: "9px 10px",
+                  gap: 12,
+                  padding: "9px 14px",
                   borderRadius: 8,
                   border: "none",
                   background: isActive ? "#8B1E1E" : "transparent",
@@ -244,16 +221,16 @@ export function ERPShell({ children }: ERPShellProps) {
                 {/* Material Symbol icon — FILL 1 when active */}
                 <MSIcon name={n.icon} filled={isActive} size={20} />
 
-                {/* Label */}
-                <span style={{
+                {/* Label — fades in when the rail expands */}
+                <span className="sb-fade" style={{
                   fontSize: 13, fontWeight: isActive ? 600 : 400,
                   fontFamily: FONT.ui, flex: 1,
-                  letterSpacing: "0.01em",
+                  letterSpacing: "0.01em", whiteSpace: "nowrap",
                 }}>{n.label}</span>
 
                 {/* Badge — orders pending */}
                 {n.key === "orders" && pendingOrders > 0 && (
-                  <span style={{
+                  <span className="sb-fade" style={{
                     background: isActive ? "rgba(255,255,255,0.25)" : T.crimson,
                     color: "#fff",
                     fontSize: 10, borderRadius: 10, padding: "1px 6px",
@@ -262,12 +239,20 @@ export function ERPShell({ children }: ERPShellProps) {
                 )}
                 {/* Badge — low stock */}
                 {n.key === "inventory" && lowCount > 0 && (
-                  <span style={{
+                  <span className="sb-fade" style={{
                     background: isActive ? "rgba(255,255,255,0.25)" : "#8B1E1E",
                     color: "#fff",
                     fontSize: 10, borderRadius: 10, padding: "1px 6px",
                     fontWeight: 700, flexShrink: 0,
                   }}>{lowCount}</span>
+                )}
+                {/* Collapsed-state alert dot — visible only while the rail is closed */}
+                {((n.key === "orders" && pendingOrders > 0) || (n.key === "inventory" && lowCount > 0)) && (
+                  <span className="sb-dot" style={{
+                    position: "absolute", top: 7, left: 26,
+                    width: 7, height: 7, borderRadius: "50%",
+                    background: T.crimson, border: "1.5px solid #fff",
+                  }} />
                 )}
               </button>
             );
@@ -276,7 +261,7 @@ export function ERPShell({ children }: ERPShellProps) {
 
         {/* ── Today's Revenue mini card ────────────────────────────────── */}
         {todayRev > 0 && (
-          <div style={{
+          <div className="sb-fade" style={{
             margin: `0 ${SP.sm}px ${SP.sm}px`,
             padding: `${SP.sm}px ${SP.md}px`,
             background: "rgba(22,163,74,0.06)",
@@ -317,17 +302,18 @@ export function ERPShell({ children }: ERPShellProps) {
           </div>
 
           {/* Name + role */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="sb-fade" style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: 13, fontWeight: 600, color: T.t1,
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               fontFamily: FONT.ui,
             }}>{userName}</div>
-            <div style={{ fontSize: 11, color: T.t3, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em" }}>SHOP OWNER</div>
+            <div style={{ fontSize: 11, color: T.t3, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>SHOP OWNER</div>
           </div>
 
           {/* Logout button — maroon border (Stitch style) */}
           <button
+            className="sb-fade"
             onClick={handleLogout}
             title="Logout"
             style={{
@@ -366,17 +352,7 @@ export function ERPShell({ children }: ERPShellProps) {
           borderBottom: `1px solid ${T.border}`,
           flexShrink: 0,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src="/logo.png" alt="RedPiston" style={{ width: 34, height: 34, objectFit: "contain" }}
-              onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.02em" }}>
-                <span style={{ color: "#8B1E1E" }}>RED</span>
-                <span style={{ color: "#000", marginLeft: 3 }}>PISTON</span>
-              </div>
-              <div style={{ fontSize: 10, color: T.t3, fontFamily: FONT.ui }}>Industrial Ops</div>
-            </div>
-          </div>
+          <BrandHeader subtitle="Industrial Ops" logoSize={34} />
           <button onClick={() => setDrawerOpen(false)} style={{
             width: 36, height: 36, borderRadius: 8,
             background: T.bg, border: `1px solid ${T.border}`,

@@ -155,11 +155,36 @@ export const GLOBAL_CSS = `
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* ── Design tokens — one motion/elevation language for the whole app ── */
+  :root {
+    /* Animation durations */
+    --dur-fast:   150ms;
+    --dur-normal: 220ms;
+    --dur-slow:   320ms;
+    /* Easings */
+    --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    /* Elevation scale */
+    --shadow-sm: 0 1px 4px rgba(28,27,27,0.06);
+    --shadow-md: 0 4px 16px rgba(28,27,27,0.10);
+    --shadow-lg: 0 12px 40px rgba(28,27,27,0.14);
+    --shadow-elevated: 0 32px 80px rgba(28,27,27,0.20);
+  }
+
   html, body {
     background: #F5F5F0;
     color: #1C1B1B;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   /* ── Scrollbars ── */
@@ -505,12 +530,53 @@ export const GLOBAL_CSS = `
 
   /* ── Tablet adjustments (768-1023px) ── */
   @media (min-width: 768px) and (max-width: 1023px) {
-    .erp-topbar { left: 210px !important; }
+    .erp-topbar { left: 68px !important; }
     .erp-content {
-      margin-left: 210px !important;
+      margin-left: 68px !important;
       padding-left: 18px !important;
       padding-right: 18px !important;
     }
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     COLLAPSIBLE SIDEBAR (desktop ≥768px)
+     Default: 68px icon rail. Hover/keyboard focus: expands to 236px OVER
+     the page content (content margin stays 68px — zero layout shift).
+     Inner sections keep a fixed 220px min-width so text never reflows
+     during the animation; the rail simply clips it (overflow hidden).
+  ══════════════════════════════════════════════════════════════════════ */
+  @media (min-width: 768px) {
+    .erp-sidebar {
+      transition: width var(--dur-normal) var(--ease-out), box-shadow var(--dur-normal) ease;
+      will-change: width;
+    }
+    .erp-sidebar:hover,
+    .erp-sidebar:focus-within {
+      width: 236px !important;
+      box-shadow: 12px 0 40px rgba(28,27,27,0.16), 2px 0 16px rgba(28,27,27,0.06);
+    }
+    .erp-sidebar nav,
+    .erp-sidebar .sidebar-brand,
+    .erp-sidebar .sidebar-user-section { min-width: 220px; }
+
+    /* Labels / badges / footer fade+slide in as the rail opens */
+    .erp-sidebar .sb-fade {
+      opacity: 0;
+      transform: translateX(-6px);
+      pointer-events: none;
+      transition: opacity var(--dur-fast) ease 60ms, transform var(--dur-fast) var(--ease-out) 60ms;
+    }
+    .erp-sidebar:hover .sb-fade,
+    .erp-sidebar:focus-within .sb-fade {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+
+    /* Collapsed-state notification dot — hides once badges are visible */
+    .erp-sidebar .sb-dot { transition: opacity var(--dur-fast) ease; }
+    .erp-sidebar:hover .sb-dot,
+    .erp-sidebar:focus-within .sb-dot { opacity: 0; }
   }
 
   /* ── Large desktop enhancements ── */
@@ -544,6 +610,12 @@ export const GLOBAL_CSS = `
   }
 
   /* ── Responsive chart container ── */
+  /* min-width:0 + overflow:hidden break the grow-feedback loop where a mounted
+     Recharts SVG keeps its parent wide on window shrink (rotation/resize), so
+     ResponsiveContainer's ResizeObserver can actually re-measure smaller. */
+  .chart-container { min-width: 0; max-width: 100%; overflow: hidden; }
+  .dash-card { min-width: 0; }
+  .recharts-responsive-container { min-width: 0 !important; }
   .rp-chart-sm { height: 160px; }
   .rp-chart-md { height: 200px; }
   .rp-chart-lg { height: 240px; }
