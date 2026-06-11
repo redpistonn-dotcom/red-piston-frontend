@@ -57,6 +57,7 @@ const MarketplaceHome    = lazy(() => import("./marketplace/pages/MarketplaceHom
 // New marketplace + cart pages (Stitch design)
 const MarketplacePage    = lazy(() => import("./pages/MarketplacePage").then(m => ({ default: m.MarketplacePage })));
 const CartPage           = lazy(() => import("./pages/CartPage").then(m => ({ default: m.CartPage })));
+const SavedItemsPage     = lazy(() => import("./pages/SavedItemsPage").then(m => ({ default: m.SavedItemsPage })));
 const SuppliersPage      = lazy(() => import("./pages/SuppliersPage").then(m => ({ default: m.SuppliersPage })));
 const ProductDetailsPage = lazy(() => import("./marketplace/pages/ProductDetailsPage").then(m => ({ default: m.ProductDetailsPage })));
 const CheckoutPage       = lazy(() => import("./marketplace/pages/CheckoutPage").then(m => ({ default: m.CheckoutPage })));
@@ -731,6 +732,7 @@ function AppContent() {
           {/* New marketplace — Stitch design (browse without login, cart requires login) */}
           <Route path="/marketplace"          element={<MarketplacePage />} />
           <Route path="/cart"                 element={<CartPage />} />
+          <Route path="/saved"                element={<SavedItemsPage />} />
           <Route path="/suppliers"            element={<SuppliersPage />} />
           {/* /oem-parts removed — redirect to marketplace */}
           <Route path="/oem-parts"            element={<Navigate to="/marketplace" replace />} />

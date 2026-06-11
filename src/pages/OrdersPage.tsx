@@ -3,7 +3,7 @@ import { T, FONT, SHADOWS } from "../theme";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { fmt, fmtDate, downloadCSV, generateCSV, uid } from "../utils";
-import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
+import { MobileCard, MobileCardList, useIsMobile } from "../components/ui";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 type OrderStatus = "Shipped" | "Pending" | "Delivered" | "Cancelled" | "Processing";
@@ -242,38 +242,65 @@ export function OrdersPage() {
     };
 
     // ─── Render ───────────────────────────────────────────────────────────────
+    // Toolbar buttons + search are shared between desktop header layout and the
+    // mobile stacked layout (search → KPIs → CTA → Filter/Export → Recent Orders).
+    const filterBtn = (
+        <button
+            onClick={() => setStatusFilter(statusFilter === "All" ? "Pending" : "All")}
+            style={{ height: isMobile ? 46 : 40, padding: "0 16px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
+        >≡ Filter</button>
+    );
+    const exportBtn = (
+        <button
+            onClick={handleExportCSV}
+            style={{ height: isMobile ? 46 : 40, padding: "0 16px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
+        ><span style={{ fontSize: 14 }}>↑</span> Export CSV</button>
+    );
+    const createBtn = (
+        <button
+            onClick={() => setShowCreate(true)}
+            style={{ height: isMobile ? 48 : 40, width: isMobile ? "100%" : undefined, padding: "0 18px", background: T.amber, border: "none", borderRadius: 10, fontSize: isMobile ? 14 : 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
+        ><span style={{ fontSize: 16, lineHeight: 1 }}>⊕</span> Create New Order</button>
+    );
+    const searchBox = (
+        <div style={{ flex: 1, minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : undefined, position: "relative" }}>
+            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.t3, fontSize: 14, pointerEvents: "none" }}>🔍</span>
+            <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by Order ID or Party Name..."
+                style={{ width: "100%", height: isMobile ? 46 : 38, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: isMobile ? 12 : 9, padding: "0 32px 0 36px", fontSize: isMobile ? 16 : 13, color: T.t1, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box", transition: "border-color 0.15s" }}
+                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }}
+            />
+        </div>
+    );
+
     return (
-        <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: isMobile ? 14 : 18 }}>
 
             {/* ── HEADER ── */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
                 <div>
-                    <h1 style={{ fontSize: 26, fontWeight: 800, color: T.t1, fontFamily: FONT.display, margin: 0, letterSpacing: "-0.03em" }}>Orders Pipeline</h1>
+                    <h1 className="rp-h1" style={{ fontSize: 26, fontWeight: 800, color: T.t1, fontFamily: FONT.display, margin: 0, letterSpacing: "-0.03em" }}>Orders Pipeline</h1>
                     <p style={{ fontSize: 13, color: T.t3, margin: "5px 0 0", fontFamily: FONT.ui }}>
                         Managing <span style={{ color: T.t1, fontWeight: 700 }}>{allOrders.length.toLocaleString()}</span> total active transactions across regions.
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
-                    {/* Filter */}
-                    <button
-                        onClick={() => setStatusFilter(statusFilter === "All" ? "Pending" : "All")}
-                        style={{ height: 40, padding: "0 16px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7 }}
-                    >≡ Filter</button>
-                    {/* Export CSV */}
-                    <button
-                        onClick={handleExportCSV}
-                        style={{ height: 40, padding: "0 16px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7 }}
-                    ><span style={{ fontSize: 14 }}>↑</span> Export CSV</button>
-                    {/* Create New Order */}
-                    <button
-                        onClick={() => setShowCreate(true)}
-                        style={{ height: 40, padding: "0 18px", background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7 }}
-                    ><span style={{ fontSize: 16, lineHeight: 1 }}>⊕</span> Create New Order</button>
-                </div>
+                {!isMobile && (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+                        {filterBtn}
+                        {exportBtn}
+                        {createBtn}
+                    </div>
+                )}
             </div>
 
+            {/* Mobile: search sits at the top, per design */}
+            {isMobile && searchBox}
+
             {/* ── 4 KPI CARDS ── */}
-            <div className="kpi-grid-4" style={{ display: "grid", gap: 14 }}>
+            <div className="kpi-grid-4 orders-kpi" style={{ display: "grid", gap: 14 }}>
                 {[
                     { label: "ACTIVE SALES", value: fmt(kpi.activeSales), badge: "~12%", badgeColor: T.emerald, badgeBg: T.emeraldBg },
                     { label: "PROCUREMENT", value: fmt(kpi.procurement), badge: "~4.2%", badgeColor: T.emerald, badgeBg: T.emeraldBg },
@@ -295,19 +322,20 @@ export function OrdersPage() {
                 ))}
             </div>
 
+            {/* Mobile: full-width CTA + 2-up Filter/Export, per design */}
+            {isMobile && (
+                <>
+                    {createBtn}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        {filterBtn}
+                        {exportBtn}
+                    </div>
+                </>
+            )}
+
             {/* ── SEARCH + TYPE FILTER ROW ── */}
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 220, position: "relative" }}>
-                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.t3, fontSize: 14, pointerEvents: "none" }}>🔍</span>
-                    <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Search by Order ID or Party Name..."
-                        style={{ width: "100%", height: 38, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 9, padding: "0 32px 0 36px", fontSize: 13, color: T.t1, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box", transition: "border-color 0.15s" }}
-                        onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
-                        onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }}
-                    />
-                </div>
+                {!isMobile && searchBox}
                 {/* Type filter pills */}
                 {(["All", "Sale", "Purchase"] as const).map(t => (
                     <button key={t} onClick={() => setTypeFilter(t)} style={{
@@ -327,8 +355,15 @@ export function OrdersPage() {
                 <span style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginLeft: 4 }}>{filtered.length} orders</span>
             </div>
 
+            {/* Mobile: section heading, per design */}
+            {isMobile && (
+                <h2 style={{ fontSize: 17, fontWeight: 800, color: T.t1, fontFamily: FONT.display, margin: "2px 0 -8px", letterSpacing: "-0.02em" }}>Recent Orders</h2>
+            )}
+
             {/* ── TABLE ── */}
-            <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.xs }}>
+            <div style={isMobile && filtered.length > 0
+                ? undefined
+                : { background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.xs }}>
                 {filtered.length === 0 ? (
                     <div style={{ textAlign: "center", padding: "60px 24px", color: T.t3 }}>
                         <div style={{ fontSize: 48, opacity: 0.25, marginBottom: 16 }}>🛒</div>
@@ -347,24 +382,35 @@ export function OrdersPage() {
                         {filtered.slice(0, visibleCount).map((order) => {
                             const isSale = order.type === "Sale";
                             const isCancelled = order.status === "Cancelled";
-                            const statusCfg = STATUS_CFG[order.status as OrderStatus] || STATUS_CFG.Pending;
+                            const iconBtnStyle = { width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: T.t2 } as const;
                             return (
                                 <MobileCard key={order.orderId} accent={isSale ? T.amber : T.sky}>
-                                    <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <span style={{ fontFamily: FONT.mono, fontWeight: 800, fontSize: 13, color: T.amber }}>{order.orderId}</span>
-                                        <StatusBadge status={order.status as OrderStatus} />
+                                    {/* Top: id / party / date on the left, amount + status on the right */}
+                                    <div style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 12 }}>
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontFamily: FONT.mono, fontWeight: 800, fontSize: 13, color: T.amber }}>{order.orderId}</div>
+                                            <div style={{ fontSize: 14, fontWeight: 700, color: T.t1, fontFamily: FONT.ui, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{order.partyName}</div>
+                                            <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginTop: 3 }}>
+                                                {new Date(order.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                            </div>
+                                        </div>
+                                        <div style={{ flexShrink: 0, textAlign: "right" }}>
+                                            <div style={{ fontFamily: FONT.mono, fontWeight: 800, fontSize: 15, color: isCancelled ? T.t3 : T.t1, textDecoration: isCancelled ? "line-through" : "none" }}>{fmt(order.amount)}</div>
+                                            <div style={{ marginTop: 6 }}><StatusBadge status={order.status as OrderStatus} /></div>
+                                        </div>
                                     </div>
-                                    <CardField label="Party" value={order.partyName} bold width="full" />
-                                    {order.product && <CardField label="Product" value={order.product} width="full" />}
-                                    <CardField label="Type" value={order.type} color={isSale ? T.amber : T.sky} />
-                                    <CardField label="Date" value={new Date(order.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} />
-                                    <CardField label="Amount" value={fmt(order.amount)} mono color={isCancelled ? T.t3 : T.t1} />
-                                    <CardActions>
-                                        <button style={{ flex: 1, height: 38, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFF", cursor: "pointer", fontSize: 13, color: T.t2, fontFamily: FONT.ui }}>👁 View</button>
-                                        {!isCancelled && (
-                                            <button onClick={() => window.print()} style={{ flex: 1, height: 38, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFF", cursor: "pointer", fontSize: 13, color: T.t2, fontFamily: FONT.ui }}>🖨 Print</button>
-                                        )}
-                                    </CardActions>
+                                    {order.product && (
+                                        <div style={{ width: "100%", fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginTop: -6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{order.product}</div>
+                                    )}
+                                    {/* Bottom: type chip + icon actions */}
+                                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                                        <TypeBadge type={order.type} />
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                            <button title="View" style={iconBtnStyle}>👁</button>
+                                            <button title={isCancelled ? "Restore" : "Print"} onClick={() => { if (!isCancelled) window.print(); }} style={iconBtnStyle}>{isCancelled ? "↺" : "🖨"}</button>
+                                            <button title="More options" style={iconBtnStyle}>⋯</button>
+                                        </div>
+                                    </div>
                                 </MobileCard>
                             );
                         })}

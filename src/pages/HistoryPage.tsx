@@ -327,9 +327,9 @@ export function HistoryPage() {
             </div>
 
             {/* ── PERIOD PILLS + SEARCH + DATE RANGE + EXPORT ── */}
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div className="hist-filters" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 {/* Period pills */}
-                <div style={{ display: "flex", background: T.surfaceContainerLow, border: `1px solid ${T.border}`, borderRadius: 9, padding: 3, gap: 2, flexShrink: 0 }}>
+                <div className="hist-periods" style={{ display: "flex", background: T.surfaceContainerLow, border: `1px solid ${T.border}`, borderRadius: 9, padding: 3, gap: 2, flexShrink: 0 }}>
                     {PERIODS.map(p => {
                         const active = period === p.key && !dateFrom && !dateTo;
                         return (
@@ -345,7 +345,7 @@ export function HistoryPage() {
                 </div>
 
                 {/* Search */}
-                <div style={{ flex: 1, minWidth: 200, position: "relative" }}>
+                <div className="hist-search" style={{ flex: 1, minWidth: 200, position: "relative" }}>
                     <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: T.t3, pointerEvents: "none" }}>🔍</span>
                     <input
                         value={search} onChange={e => setSearch(e.target.value)}
@@ -357,16 +357,16 @@ export function HistoryPage() {
                 </div>
 
                 {/* Date range */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <div className="hist-dates" style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                        style={{ height: 36, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontFamily: FONT.ui, fontSize: 12, outline: "none", background: "#FFFFFF" }} />
-                    <span style={{ fontSize: 11, color: T.t3 }}>to</span>
+                        style={{ height: 36, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontFamily: FONT.ui, fontSize: 12, outline: "none", background: "#FFFFFF", boxSizing: "border-box" }} />
+                    <span className="hist-dates-sep" style={{ fontSize: 11, color: T.t3 }}>to</span>
                     <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                        style={{ height: 36, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontFamily: FONT.ui, fontSize: 12, outline: "none", background: "#FFFFFF" }} />
+                        style={{ height: 36, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontFamily: FONT.ui, fontSize: 12, outline: "none", background: "#FFFFFF", boxSizing: "border-box" }} />
                 </div>
 
                 {/* Export CSV */}
-                <button onClick={() => exportMovementsCSV(filtered)}
+                <button className="hist-export" onClick={() => exportMovementsCSV(filtered)}
                     style={{ height: 36, padding: "0 16px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 6, flexShrink: 0, transition: "all 0.12s" }}
                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
@@ -378,7 +378,7 @@ export function HistoryPage() {
             <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.xs, flex: 1 }}>
 
                 {/* Tab row */}
-                <div style={{ display: "flex", borderBottom: `1px solid ${T.border}`, paddingLeft: 4 }}>
+                <div className="hist-tabs" style={{ display: "flex", borderBottom: `1px solid ${T.border}`, paddingLeft: 4 }}>
                     {TABS.map(t => {
                         const active = tab === t.key;
                         return (
@@ -398,10 +398,16 @@ export function HistoryPage() {
 
                 {/* ── MOBILE CARD VIEW ── */}
                 {isMobile && groups.length === 0 && (
-                    <div style={{ padding: "60px 24px", textAlign: "center" }}>
-                        <div style={{ fontSize: 48, opacity: 0.25, marginBottom: 14 }}>⊞</div>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: T.t2, marginBottom: 6 }}>No records found</div>
-                        <div style={{ fontSize: 12, color: T.t3 }}>Try adjusting your filters or date range.</div>
+                    <div style={{ padding: "48px 24px 56px", textAlign: "center" }}>
+                        <div style={{ width: 88, height: 88, borderRadius: "50%", background: T.surfaceContainerLow, border: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto 16px", opacity: 0.7 }}>⊞</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: T.t1, marginBottom: 6 }}>No records found</div>
+                        <div style={{ fontSize: 12, color: T.t3, lineHeight: 1.6, maxWidth: 260, margin: "0 auto 18px" }}>
+                            Try adjusting your filters or date range to find specific transaction logs.
+                        </div>
+                        <button onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setTab("ALL"); }}
+                            style={{ background: T.surfaceContainerLow, border: `1px solid ${T.border}`, borderRadius: 99, padding: "9px 22px", fontSize: 12, fontWeight: 700, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
+                            Clear all filters
+                        </button>
                     </div>
                 )}
                 {isMobile && groups.length > 0 && (
@@ -511,7 +517,7 @@ export function HistoryPage() {
             </div>
 
             {/* ── FOOTER STATUS BAR ── */}
-            <div style={{
+            <div className="hist-footer" style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "8px 4px", flexShrink: 0,
             }}>

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { T, FONT } from "../../theme";
 import { fmt, getStarRating, renderStars } from "../../utils";
 import { PartImage } from "./PartImage";
+import { isSaved, toggleSavedItem } from "../savedItems";
 
 const DARK = {
   cardBg: T.card, cardBorder: T.border, imageBg: T.surface,
@@ -28,7 +29,28 @@ const LIGHT = {
 export function ProductCard({ item, onClick, inCompare, onCompareToggle, variant = "dark" }) {
   const C = variant === "light" ? LIGHT : DARK;
   const { product, bestPrice, availability, shopCount, fastestEta, listings, isCompatible, fitmentType, bestShop } = item;
-  const [wishlisted, setWishlisted] = useState(false);
+  const [wishlisted, setWishlisted] = useState(() => isSaved(product.id));
+
+  // Stay in sync when the item is removed from the Saved Items page
+  useEffect(() => {
+    const sync = () => setWishlisted(isSaved(product.id));
+    window.addEventListener("mp-saved-changed", sync);
+    return () => window.removeEventListener("mp-saved-changed", sync);
+  }, [product.id]);
+
+  const handleWishlist = () => {
+    const best = listings?.[0];
+    toggleSavedItem({
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      sku: product.sku,
+      image: product.image,
+      price: bestPrice,
+      inStock: availability !== 0,
+      listing: best ? { shop_id: best.shop_id, product_id: best.product_id ?? product.id, selling_price: best.selling_price ?? best.price ?? bestPrice, shop: best.shop } : null,
+    });
+  };
 
   let stockColor = "#16A34A", stockLabel = "IN STOCK";
   if (availability === 0) { stockColor = "#DC2626"; stockLabel = "OUT OF STOCK"; }
@@ -45,6 +67,7 @@ export function ProductCard({ item, onClick, inCompare, onCompareToggle, variant
   return (
     <div
       onClick={onClick}
+      className="mp-prod-card"
       style={{
         background: C.cardBg, border: `1px solid ${C.cardBorder}`,
         borderRadius: 14, padding: 0, cursor: "pointer",
@@ -57,7 +80,7 @@ export function ProductCard({ item, onClick, inCompare, onCompareToggle, variant
     >
       {/* WISHLIST */}
       <button
-        onClick={e => { e.stopPropagation(); setWishlisted(!wishlisted); }}
+        onClick={e => { e.stopPropagation(); handleWishlist(); }}
         style={{
           position: "absolute", top: 10, right: 10, zIndex: 10,
           width: 30, height: 30, borderRadius: "50%",

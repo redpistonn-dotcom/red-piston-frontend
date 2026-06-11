@@ -5,9 +5,11 @@
  * Desktop: logo + nav + search bar + rightSlot (72px)
  * Mobile:  logo + hamburger → slide-down drawer with nav + search + rightSlot
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CatalogSearchBar } from './CatalogSearchBar';
+import { useCart } from '../context/CartContext';
+import { getSavedItems } from '../marketplace/savedItems';
 
 const LOGO =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuAHoRqueT7rYQ9UU0uaqdoukDlx38GMecl-iaxA_YPsKta4MkYIh1zNn8Cq0sPsr7M4RgQ_U9qftq7c7PW05n3PYedVKG1_Cpvw5_kyltJtcea9-H5bNgTqs1NRGHFnhX112m_HSJaZ_F722rFQmkTxVmCCp4R5IZWlInV5SCBfQPTQHPO3YJFw6En0MQgRNEFl44PmMZH8bZyTjh0btvYW3gM2r1JgFZvpQS67UpJr1SYz_N81ByrPkXv3k89WFF_7n0z5A0S4BE4';
@@ -32,6 +34,25 @@ export function PublicHeader({
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { count: cartCount } = useCart();
+  const [savedCount, setSavedCount] = useState(() => getSavedItems().length);
+
+  useEffect(() => {
+    const sync = () => setSavedCount(getSavedItems().length);
+    window.addEventListener('mp-saved-changed', sync);
+    return () => window.removeEventListener('mp-saved-changed', sync);
+  }, []);
+
+  const mIconStyle: React.CSSProperties = {
+    position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer',
+    color: '#8b1e1e', borderRadius: 8, flexShrink: 0,
+  };
+  const mBadgeStyle: React.CSSProperties = {
+    position: 'absolute', top: 3, right: 3, backgroundColor: '#8b1e1e', color: '#fff',
+    fontSize: 9, width: 15, height: 15, borderRadius: '50%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700,
+  };
 
   const linkStyle = (active: boolean): React.CSSProperties => ({
     color: active ? '#8b1e1e' : '#58413f',
@@ -67,6 +88,33 @@ export function PublicHeader({
           gap: 0,   // controlled individually below
         }}
       >
+        {/* Hamburger — shown only on mobile via .ph-hamburger class (left, per design) */}
+        <button
+          className="ph-hamburger"
+          onClick={() => setMobileOpen(o => !o)}
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          style={{
+            display: 'none', // overridden by CSS on mobile
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 44,
+            height: 44,
+            flexShrink: 0,
+            marginRight: 4,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            borderRadius: 8,
+            color: '#8b1e1e',
+          }}
+        >
+          {mobileOpen ? (
+            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>close</span>
+          ) : (
+            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>menu</span>
+          )}
+        </button>
+
         {/* Logo */}
         <img
           src={LOGO}
@@ -116,33 +164,25 @@ export function PublicHeader({
           </div>
         )}
 
-        {/* Hamburger — shown only on mobile via .ph-hamburger class */}
-        <button
-          className="ph-hamburger"
-          onClick={() => setMobileOpen(o => !o)}
-          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          style={{
-            display: 'none', // overridden by CSS on mobile
-            marginLeft: 'auto',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 44,
-            height: 44,
-            flexShrink: 0,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            borderRadius: 8,
-            color: '#58413f',
-          }}
-        >
-          {/* 3-line / X icon */}
-          {mobileOpen ? (
-            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>close</span>
-          ) : (
-            <span className="material-symbols-outlined" style={{ fontSize: 26 }}>menu</span>
-          )}
-        </button>
+        {/* Mobile icons — saved + cart (shown only on mobile via .ph-m-icons) */}
+        <div className="ph-m-icons" style={{ display: 'none', alignItems: 'center', marginLeft: 'auto', gap: 2 }}>
+          <button aria-label="Saved items" style={mIconStyle} onClick={() => { navigate('/saved'); setMobileOpen(false); }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 24 }}>{savedCount > 0 ? 'favorite' : 'favorite_border'}</span>
+            {savedCount > 0 && <span style={mBadgeStyle}>{savedCount}</span>}
+          </button>
+          <button aria-label="Cart" style={mIconStyle} onClick={() => { navigate('/cart'); setMobileOpen(false); }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 24 }}>shopping_cart</span>
+            {cartCount > 0 && <span style={mBadgeStyle}>{cartCount}</span>}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Mobile search row — always visible below the bar (.ph-m-search) ── */}
+      <div className="ph-m-search" style={{ display: 'none', padding: '0 12px 10px' }}>
+        <CatalogSearchBar
+          placeholder={searchPlaceholder}
+          onNavigate={q => { navigate(`/marketplace?q=${encodeURIComponent(q)}`); setMobileOpen(false); }}
+        />
       </div>
 
       {/* ── Mobile Drawer ───────────────────────────────────────────── */}
@@ -172,14 +212,6 @@ export function PublicHeader({
               </a>
             );
           })}
-        </div>
-
-        {/* Search bar in drawer */}
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0eded' }}>
-          <CatalogSearchBar
-            placeholder={searchPlaceholder}
-            onNavigate={q => { navigate(`/marketplace?q=${encodeURIComponent(q)}`); setMobileOpen(false); }}
-          />
         </div>
 
         {/* Right slot in drawer */}

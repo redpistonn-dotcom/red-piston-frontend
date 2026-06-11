@@ -8,13 +8,14 @@
  *   • Vehicle filter: shown as removable tag, can be changed
  */
 import '../styles/landing.css';
-import { useState, useEffect, useCallback, useContext } from 'react';
+import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { AppCtx } from '../context/AppCtx';
 import { CatalogSearchBar } from '../components/CatalogSearchBar';
 import { PublicHeader } from '../components/PublicHeader';
-import { browseMarketplace } from '../api/marketplace';
+import { browseMarketplace, fetchShops, fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from '../api/marketplace';
+import { isSaved, toggleSavedItem } from '../marketplace/savedItems';
 
 /* ── Shared icon shorthand ─────────────────────────────────────────── */
 function Icon({ n, style }: { n: string; style?: React.CSSProperties }) {
@@ -57,7 +58,8 @@ function MarketplaceNav({
       rightSlot={currentUser ? (
         /* ── Logged in: wishlist + cart + account ── */
         <>
-          <button style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
+          <button onClick={() => navigate('/saved')} title="Saved Items"
+            style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
             <Icon n="favorite_border" style={{ color: '#58413f', fontSize: 22 }} />
           </button>
           <button onClick={onCartClick}
@@ -107,7 +109,29 @@ function ProductCard({
 }) {
   const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [saved, setSaved] = useState(() => isSaved(product.id));
   const hasImage = product.image && !imgError;
+
+  useEffect(() => {
+    const sync = () => setSaved(isSaved(product.id));
+    window.addEventListener('mp-saved-changed', sync);
+    return () => window.removeEventListener('mp-saved-changed', sync);
+  }, [product.id]);
+
+  const handleSaveToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleSavedItem({
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      sku: product.partNo,
+      image: product.image || null,
+      price: product.price,
+      inStock: product.availability !== 'Out of Stock',
+      listing: null,
+      type: product.type,
+    });
+  };
 
   return (
     <div
@@ -116,99 +140,127 @@ function ProductCard({
       style={{
         backgroundColor: '#fff', border: '1px solid #dfbfbc',
         borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        height: '100%',   // fills grid cell so all cards in a row are equal height
         boxShadow: hovered ? '0 8px 32px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.04)',
         transition: 'box-shadow 0.3s',
       }}>
-      {/* Image or placeholder */}
-      <div style={{ aspectRatio: '1', backgroundColor: '#fff', padding: hasImage ? 20 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+      {/* Image / placeholder — fixed height, not full aspect-ratio square */}
+      <div style={{ height: 140, backgroundColor: '#fff', padding: hasImage ? 12 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
         {hasImage ? (
           <img
             src={product.image} alt={product.name}
             onError={() => setImgError(true)}
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: hovered ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.5s' }}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', transform: hovered ? 'scale(1.06)' : 'scale(1)', transition: 'transform 0.4s' }}
           />
         ) : (
           <PartImagePlaceholder category={product.category} />
         )}
         {/* OEM/OES badge */}
         <span style={{
-          position: 'absolute', top: 12, right: 12,
+          position: 'absolute', top: 8, right: 8,
           backgroundColor: product.type === 'OEM' ? '#8b1e1e' : '#e0e0db',
           color: product.type === 'OEM' ? '#fff' : '#62635f',
-          fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 4,
+          fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3,
           textTransform: 'uppercase', letterSpacing: '0.06em',
         }}>
-          {product.type || 'OES'}
+          {product.type || 'OEM'}
         </span>
-        {/* Discount badge — only show if >0 */}
         {product.discount > 0 && (
-          <span style={{ position: 'absolute', top: 12, left: 12, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 4 }}>
-            Save {product.discount}%
+          <span style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3 }}>
+            -{product.discount}%
           </span>
         )}
+        {/* Save to procurement list */}
+        <button
+          onClick={handleSaveToggle}
+          aria-label={saved ? 'Remove from saved' : 'Save item'}
+          style={{
+            position: 'absolute', bottom: 8, right: 8,
+            width: 30, height: 30, borderRadius: '50%',
+            backgroundColor: '#fff', border: '1px solid #dfbfbc',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 17, color: '#8b1e1e', fontVariationSettings: saved ? "'FILL' 1" : "'FILL' 0" }}>
+            {saved ? 'favorite' : 'favorite_border'}
+          </span>
+        </button>
       </div>
 
       {/* Info */}
-      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', flex: 1 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#8b716e', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{product.brand}</span>
-        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1c1b1b', lineHeight: 1.4, margin: '6px 0 12px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>
+      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {product.brand && (
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#8b716e', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{product.brand}</span>
+        )}
+        {/* Reserve exactly 2 lines so all cards align below the title */}
+        <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1c1b1b', lineHeight: 1.4, margin: '4px 0 8px', height: '2.8em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>
           {product.name}
         </h3>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
           {product.partNo && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#58413f' }}>
-              <span>Part No:</span>
-              <span style={{ fontWeight: 700, color: '#1c1b1b', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{product.partNo}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#58413f' }}>
+              <span>Item No:</span>
+              <span style={{ fontWeight: 700, color: '#1c1b1b' }}>#{product.partNo}</span>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#58413f' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#58413f' }}>
             <span>Availability:</span>
             <span style={{ fontWeight: 700, color: product.availability === 'In Stock' ? '#166534' : '#8b1e1e' }}>{product.availability || 'Available'}</span>
           </div>
-          {/* Shop name + distance from API */}
           {product.shopName && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#8b716e' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>storefront</span>
-              <span>{product.shopName}</span>
-              {product.distance != null && <span>· {product.distance}km away</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8b716e' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>storefront</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{product.shopName}</span>
+              {product.distance != null && <span style={{ flexShrink: 0 }}>· {product.distance}km</span>}
             </div>
           )}
           {(product.sellers ?? 0) > 1 && (
-            <div style={{ fontSize: 12, color: '#8b716e' }}>{product.sellers} sellers available</div>
+            <div style={{ fontSize: 11, color: '#8b716e' }}>{product.sellers} sellers</div>
           )}
         </div>
 
         {/* Price + Add to cart */}
-        <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid #dfbfbc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
+        <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px solid #f0eded', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ minWidth: 0 }}>
             {product.price > 0 ? (
-              <span style={{ fontSize: 22, fontWeight: 800, color: '#8b1e1e', fontFamily: 'Poppins, sans-serif' }}>
+              <span style={{ fontSize: 18, fontWeight: 800, color: '#8b1e1e', fontFamily: 'Poppins, sans-serif' }}>
                 ₹{product.price.toLocaleString('en-IN')}
               </span>
             ) : (
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#8b716e' }}>Contact for price</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#8b716e' }}>Contact for price</span>
             )}
-            {/* Only show strikethrough if there's a real discount */}
             {product.discount > 0 && product.originalPrice && product.originalPrice !== product.price && (
-              <span style={{ fontSize: 13, color: '#8b716e', textDecoration: 'line-through', marginLeft: 6 }}>
+              <span style={{ fontSize: 11, color: '#8b716e', textDecoration: 'line-through', marginLeft: 4 }}>
                 ₹{product.originalPrice.toLocaleString('en-IN')}
               </span>
             )}
           </div>
           <button
             onClick={() => onAddToCart(product)}
-            style={{
-              backgroundColor: '#8b1e1e', color: '#fff',
-              border: 'none', borderRadius: 8, padding: '10px 12px',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s',
-            }}
             title="Add to Cart"
-            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#6a020a')}
-            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#8b1e1e')}
+            style={{
+              flexShrink: 0, border: 'none', cursor: 'pointer',
+              backgroundColor: '#8b1e1e',
+              borderRadius: 9, width: 36, height: 36,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background-color 0.15s, transform 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = '#6a0000';
+              e.currentTarget.style.transform = 'scale(1.08)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = '#8b1e1e';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
           >
-            <Icon n="add_shopping_cart" style={{ fontSize: 20 }} />
+            {/* Clean Feather-style cart */}
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+              <path d="M1 1h4l2.68 13.39a2 2 0 001.95 1.61h9.72a2 2 0 001.95-1.61L23 6H6"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -274,23 +326,75 @@ export function MarketplacePage() {
   const ctx = useContext(AppCtx);
   const currentUser = ctx?.currentUser;
 
-  // Filters
+  // ── URL params — must be declared before any useState that uses them ──────────
+  const urlQuery = params.get('q')     || '';
+  const urlMake  = params.get('make')  || '';
+  const urlModel = params.get('model') || '';
+  const urlYear  = params.get('year')  || '';
+
+  const [page,          setPage]          = useState(1);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
+  const [search,        setSearch]        = useState(urlQuery);
+
+  // ── Applied (committed) filter values — these drive the actual render/query ──
   const [priceMax,      setPriceMax]      = useState(50000);
   const [sortBy,        setSortBy]        = useState('Relevance');
   const [partTypes,     setPartTypes]     = useState({ OEM: true, OES: true });
   const [activeCateg,   setActiveCateg]   = useState<string | null>(null);
-  const [viewMode,      setViewMode]      = useState<'grid' | 'list'>('grid');
-  const [page,          setPage]          = useState(1);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [sidebarOpen,   setSidebarOpen]   = useState(false);
-  const urlQuery = params.get('q') || '';
-  const urlMake  = params.get('make')  || '';
-  const urlModel = params.get('model') || '';
-  const urlYear  = params.get('year')  || '';
-  const [search, setSearch] = useState(urlQuery);
+
+  // ── Staged (draft) filter values — only committed on "Apply Filters" click ──
+  const [draftPriceMax,  setDraftPriceMax]  = useState(50000);
+  const [draftSortBy,    setDraftSortBy]    = useState('Relevance');
+  const [draftPartTypes, setDraftPartTypes] = useState({ OEM: true, OES: true });
+  const [draftCateg,     setDraftCateg]     = useState<string | null>(null);
+
+  // ── Vehicle filter (sidebar cascading selects) — urlMake/Model/Year are safe now ──
+  const [draftVehicleMake,    setDraftVehicleMake]    = useState(urlMake);
+  const [draftVehicleModel,   setDraftVehicleModel]   = useState(urlModel);
+  const [draftVehicleYear,    setDraftVehicleYear]    = useState(urlYear);
+  const [appliedVehicleMake,  setAppliedVehicleMake]  = useState(urlMake);
+  const [appliedVehicleModel, setAppliedVehicleModel] = useState(urlModel);
+  const [appliedVehicleYear,  setAppliedVehicleYear]  = useState(urlYear);
+  const [makesList,    setMakesList]    = useState<{ id: number; name: string }[]>([]);
+  const [modelsList,   setModelsList]   = useState<{ id: number; name: string }[]>([]);
+  const [makesLoading,  setMakesLoading]  = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
+
+  // ── Shop filter ──
+  const [draftShopId,   setDraftShopId]   = useState<number | null>(null);
+  const [appliedShopId, setAppliedShopId] = useState<number | null>(null);
+  const [shopsList,  setShopsList]  = useState<{ id: number; name: string; city?: string }[]>([]);
+  const [shopSearch, setShopSearch] = useState('');
+
+  const applyFilters = () => {
+    setPriceMax(draftPriceMax);
+    setSortBy(draftSortBy);
+    setPartTypes(draftPartTypes);
+    setActiveCateg(draftCateg);
+    setAppliedVehicleMake(draftVehicleMake);
+    setAppliedVehicleModel(draftVehicleModel);
+    setAppliedVehicleYear(draftVehicleYear);
+    setAppliedShopId(draftShopId);
+    setPage(1);
+  };
+
+  const resetFilters = () => {
+    setDraftPriceMax(50000);      setPriceMax(50000);
+    setDraftSortBy('Relevance');  setSortBy('Relevance');
+    setDraftPartTypes({ OEM: true, OES: true }); setPartTypes({ OEM: true, OES: true });
+    setDraftCateg(null);          setActiveCateg(null);
+    setDraftVehicleMake('');      setAppliedVehicleMake('');
+    setDraftVehicleModel('');     setAppliedVehicleModel('');
+    setDraftVehicleYear('');      setAppliedVehicleYear('');
+    setDraftShopId(null);         setAppliedShopId(null);
+    setVehicleFilter(null);
+    setModelsList([]);
+    setPage(1);
+  };
 
   // Real catalog data from backend
-  const PAGE_SIZE = 24;
+  const PAGE_SIZE = 20; // 20 = LCM of 4 and 5 columns → last row always full, no orphan card
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [catalogLoading,  setCatalogLoading]  = useState(false);
   const [totalResults,    setTotalResults]    = useState(0);
@@ -301,6 +405,34 @@ export function MarketplacePage() {
 
   // Login wall
   const [showLoginToast, setShowLoginToast] = useState(false);
+
+  // ── Load vehicle makes on mount ──────────────────────────────────────────────
+  useEffect(() => {
+    setMakesLoading(true);
+    fetchVehicleManufacturers(undefined)
+      .then((data: any[]) => setMakesList((data || []).map((m: any) => ({ id: m.id ?? m.manufacturerId, name: m.name ?? m.manufacturerName ?? m.make }))))
+      .catch(() => setMakesList([]))
+      .finally(() => setMakesLoading(false));
+  }, []);
+
+  // ── Load models whenever draft make changes ───────────────────────────────────
+  useEffect(() => {
+    if (!draftVehicleMake) { setModelsList([]); return; }
+    const mfr = makesList.find(m => m.name.toLowerCase() === draftVehicleMake.toLowerCase());
+    if (!mfr) { setModelsList([]); return; }
+    setModelsLoading(true);
+    fetchVehicleModelsByManufacturer(mfr.id, undefined)
+      .then((data: any[]) => setModelsList((data || []).map((m: any) => ({ id: m.id ?? m.modelId, name: m.name ?? m.modelName ?? m.model }))))
+      .catch(() => setModelsList([]))
+      .finally(() => setModelsLoading(false));
+  }, [draftVehicleMake, makesList]);
+
+  // ── Load shops once ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetchShops()
+      .then((shops: any[]) => setShopsList((shops || []).map((s: any) => ({ id: s.id ?? s.shopId, name: s.name, city: s.city }))))
+      .catch(() => setShopsList([]));
+  }, []);
 
   // Pre-populate vehicle filter from URL params (set by LandingPage "Find Compatible Parts")
   useEffect(() => {
@@ -321,24 +453,36 @@ export function MarketplacePage() {
     }
   }, [currentUser, urlMake]);
 
-  // Fetch from browseMarketplace (returns real total for pagination)
-  useEffect(() => {
-    setPage(1); // reset to page 1 when search/filter changes
-  }, [urlQuery, urlMake, urlModel, urlYear, activeCateg]);
+  // Derive a single part_type param from the partTypes checkboxes
+  // → 'OEM' | 'OES' | 'ALL'  (ALL means no filter — show both)
+  const activePartType =
+    partTypes.OEM && partTypes.OES ? 'ALL'
+    : partTypes.OEM ? 'OEM'
+    : partTypes.OES ? 'OES'
+    : 'ALL'; // neither checked → show all (edge case)
 
+  // Reset to page 1 whenever any filter/search param changes
+  useEffect(() => {
+    setPage(1);
+  }, [urlQuery, appliedVehicleMake, appliedVehicleModel, appliedVehicleYear, activeCateg, priceMax, activePartType, appliedShopId]);
+
+  // Fetch from browseMarketplace — filters are now server-side so total/pagination are accurate
   useEffect(() => {
     const fetchCatalog = async () => {
       setCatalogLoading(true);
       try {
         const res = await browseMarketplace({
-          q:        urlQuery  || undefined,
-          make:     urlMake   || undefined,
-          model:    urlModel  || undefined,
-          year:     urlYear   || undefined,
-          category: activeCateg || undefined,
+          q:        urlQuery              || undefined,
+          make:     appliedVehicleMake    || undefined,
+          model:    appliedVehicleModel   || undefined,
+          year:     appliedVehicleYear    || undefined,
+          category: activeCateg           || undefined,
+          priceMax: priceMax < 50000      ? priceMax : undefined,
+          partType: activePartType !== 'ALL' ? activePartType : undefined,
+          shopId:   appliedShopId         || undefined,
           limit:    PAGE_SIZE,
           offset:   (page - 1) * PAGE_SIZE,
-        });
+        } as any);
 
         // browseMarketplace returns RankedPart[]; map to Product shape
         const parts: Product[] = (res.parts || []).map((rp: any) => {
@@ -347,11 +491,11 @@ export function MarketplacePage() {
             id:           String(prod.id || prod.masterPartId),
             name:         prod.name || prod.partName || 'Unknown Part',
             brand:        prod.brand || '',
-            partNo:       prod.sku  || prod.oemNumber || String(prod.id || ''),
+            partNo:       String(prod.id || prod.masterPartId || ''), // item number (masterPartId) — OEM no. is confidential
             price:        rp.bestPrice || prod.price || 0,
             image:        prod.imageUrl || '',
             category:     prod.category || prod.categoryL1 || '',
-            type:         'OES' as 'OEM' | 'OES',  // API doesn't distinguish OEM/OES at part level
+            type:         ((rp.partType || prod.partType || 'OEM').toUpperCase() === 'OES' ? 'OES' : 'OEM') as 'OEM' | 'OES',
             availability: (rp.availability || 0) > 0 ? 'In Stock' : 'Available',
             discount:     0,
             shopName:     rp.bestListing?.shop?.name || rp.bestShop?.name || '',
@@ -361,7 +505,7 @@ export function MarketplacePage() {
         });
 
         setCatalogProducts(parts);
-        setTotalResults(res.total || parts.length);
+        setTotalResults(res.total || parts.length); // total is now the DB-filtered count
       } catch {
         setCatalogProducts([]);
         setTotalResults(0);
@@ -370,15 +514,10 @@ export function MarketplacePage() {
       }
     };
     fetchCatalog();
-  }, [urlQuery, urlMake, urlModel, urlYear, activeCateg, page]);
+  }, [urlQuery, appliedVehicleMake, appliedVehicleModel, appliedVehicleYear, activeCateg, priceMax, activePartType, appliedShopId, page]);
 
-  // Client-side filter on fetched catalog data
-  const filtered = catalogProducts.filter(p => {
-    if (!partTypes.OEM && p.type === 'OEM') return false;
-    if (!partTypes.OES && p.type === 'OES') return false;
-    if (p.price > priceMax) return false;
-    return true;
-  }).sort((a, b) => {
+  // Only client-side sorting remains (no need to re-fetch for order change)
+  const filtered = catalogProducts.slice().sort((a, b) => {
     if (sortBy === 'Price: Low to High') return a.price - b.price;
     if (sortBy === 'Price: High to Low') return b.price - a.price;
     return 0;
@@ -400,6 +539,14 @@ export function MarketplacePage() {
     ctx?.toast?.(`${product.name.slice(0, 30)}… added to cart`, 'success');
   }, [currentUser, addItem, ctx]);
 
+  // Scroll results into view when page changes (not the whole window — just the section top)
+  const resultsRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [page]);
+
   const sep: React.CSSProperties = { width: '100%', height: 1, backgroundColor: '#dfbfbc', margin: '0 0 20px' };
   const secTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: '#58413f', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 };
 
@@ -419,42 +566,151 @@ export function MarketplacePage() {
         <aside className={`mp-sidebar-hidden${sidebarOpen ? ' mp-sidebar-open' : ''}`}
           style={{ width: 260, flexShrink: 0 }}>
           <div style={{
-            backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 12, padding: 24,
-            position: 'sticky', top: 88,
+            backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 12,
           }}>
+            <div style={{ padding: 24 }}>
+
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1c1b1b' }}>Filters</h2>
-              <button onClick={() => { setPriceMax(50000); setSortBy('Relevance'); setPartTypes({ OEM: true, OES: true }); setActiveCateg(null); setVehicleFilter(null); }}
+              <button onClick={resetFilters}
                 style={{ background: 'none', border: 'none', color: '#8b1e1e', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
                 Reset All
               </button>
             </div>
 
-            {/* Vehicle filter tag */}
-            {vehicleFilter && (
-              <div style={{ marginBottom: 20 }}>
-                <p style={secTitle}>Filtered For</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: 'rgba(139,30,30,0.07)', border: '1px solid rgba(139,30,30,0.25)', borderRadius: 20, padding: '6px 12px' }}>
-                  <Icon n="directions_car" style={{ fontSize: 16, color: '#8b1e1e' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#8b1e1e', flex: 1 }}>{vehicleFilter}</span>
-                  <button onClick={() => setVehicleFilter(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b1e1e', fontSize: 16, lineHeight: 1 }}>×</button>
-                </div>
-                <button onClick={() => navigate('/')} style={{ fontSize: 12, color: '#8b716e', marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                  Change vehicle
-                </button>
+            {/* ── VEHICLE FILTER ─────────────────────────────────────── */}
+            <div style={{ marginBottom: 20 }}>
+              <p style={secTitle}>
+                <Icon n="directions_car" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 5 }} />
+                Filter by Vehicle
+              </p>
+
+              {/* Make */}
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 11, color: '#8b716e', display: 'block', marginBottom: 4 }}>Make</label>
+                <select
+                  value={draftVehicleMake}
+                  onChange={e => { setDraftVehicleMake(e.target.value); setDraftVehicleModel(''); }}
+                  style={{ width: '100%', height: 38, border: '1px solid #dfbfbc', borderRadius: 8, padding: '0 10px', fontSize: 13, color: '#1c1b1b', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}
+                >
+                  <option value="">All Makes</option>
+                  {makesLoading
+                    ? <option disabled>Loading…</option>
+                    : makesList.map(m => <option key={m.id} value={m.name}>{m.name}</option>)
+                  }
+                </select>
               </div>
-            )}
+
+              {/* Model — only shown once a make is picked */}
+              {draftVehicleMake && (
+                <div style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 11, color: '#8b716e', display: 'block', marginBottom: 4 }}>Model</label>
+                  <select
+                    value={draftVehicleModel}
+                    onChange={e => setDraftVehicleModel(e.target.value)}
+                    style={{ width: '100%', height: 38, border: '1px solid #dfbfbc', borderRadius: 8, padding: '0 10px', fontSize: 13, color: '#1c1b1b', backgroundColor: '#fff', cursor: 'pointer', outline: 'none' }}
+                  >
+                    <option value="">All Models</option>
+                    {modelsLoading
+                      ? <option disabled>Loading…</option>
+                      : modelsList.map(m => <option key={m.id} value={m.name}>{m.name}</option>)
+                    }
+                  </select>
+                </div>
+              )}
+
+              {/* Year */}
+              <div>
+                <label style={{ fontSize: 11, color: '#8b716e', display: 'block', marginBottom: 4 }}>Year</label>
+                <input
+                  type="number" min={1990} max={new Date().getFullYear()} placeholder="e.g. 2020"
+                  value={draftVehicleYear}
+                  onChange={e => setDraftVehicleYear(e.target.value)}
+                  style={{ width: '100%', height: 38, border: '1px solid #dfbfbc', borderRadius: 8, padding: '0 10px', fontSize: 13, color: '#1c1b1b', backgroundColor: '#fff', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* Active vehicle chip */}
+              {appliedVehicleMake && (
+                <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, backgroundColor: 'rgba(139,30,30,0.07)', border: '1px solid rgba(139,30,30,0.25)', borderRadius: 20, padding: '5px 10px' }}>
+                  <Icon n="directions_car" style={{ fontSize: 14, color: '#8b1e1e' }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#8b1e1e', flex: 1 }}>
+                    {[appliedVehicleMake, appliedVehicleModel, appliedVehicleYear].filter(Boolean).join(' · ')}
+                  </span>
+                  <button onClick={() => {
+                    setDraftVehicleMake(''); setDraftVehicleModel(''); setDraftVehicleYear('');
+                    setAppliedVehicleMake(''); setAppliedVehicleModel(''); setAppliedVehicleYear('');
+                  }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b1e1e', fontSize: 16, lineHeight: 1 }}>×</button>
+                </div>
+              )}
+            </div>
+            <div style={sep} />
+
+            {/* ── SHOP FILTER ────────────────────────────────────────── */}
+            <div style={{ marginBottom: 20 }}>
+              <p style={secTitle}>
+                <Icon n="storefront" style={{ fontSize: 13, verticalAlign: 'middle', marginRight: 5 }} />
+                Filter by Shop
+              </p>
+
+              {/* Search box */}
+              <div style={{ position: 'relative', marginBottom: 8 }}>
+                <Icon n="search" style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 15, color: '#8b716e' }} />
+                <input
+                  type="text" placeholder="Search shops…"
+                  value={shopSearch} onChange={e => setShopSearch(e.target.value)}
+                  style={{ width: '100%', height: 36, border: '1px solid #dfbfbc', borderRadius: 8, paddingLeft: 30, paddingRight: 10, fontSize: 13, color: '#1c1b1b', backgroundColor: '#fff', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* Shop list — radio style, max 6 visible then scroll */}
+              <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* "All shops" option */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '5px 6px', borderRadius: 6, backgroundColor: draftShopId === null ? 'rgba(139,30,30,0.06)' : 'transparent' }}>
+                  <input type="radio" name="shopFilter" checked={draftShopId === null} onChange={() => setDraftShopId(null)}
+                    style={{ accentColor: '#8b1e1e', cursor: 'pointer' }} />
+                  <span style={{ fontSize: 13, color: '#1c1b1b', fontWeight: draftShopId === null ? 600 : 400 }}>All Shops</span>
+                </label>
+
+                {shopsList
+                  .filter(s => !shopSearch || s.name.toLowerCase().includes(shopSearch.toLowerCase()) || (s.city || '').toLowerCase().includes(shopSearch.toLowerCase()))
+                  .map(s => (
+                    <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '5px 6px', borderRadius: 6, backgroundColor: draftShopId === s.id ? 'rgba(139,30,30,0.06)' : 'transparent' }}>
+                      <input type="radio" name="shopFilter" checked={draftShopId === s.id} onChange={() => setDraftShopId(s.id)}
+                        style={{ accentColor: '#8b1e1e', cursor: 'pointer' }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: '#1c1b1b', fontWeight: draftShopId === s.id ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
+                        {s.city && <div style={{ fontSize: 11, color: '#8b716e' }}>{s.city}</div>}
+                      </div>
+                    </label>
+                  ))
+                }
+              </div>
+
+              {/* Active shop chip */}
+              {appliedShopId !== null && (() => {
+                const shop = shopsList.find(s => s.id === appliedShopId);
+                return shop ? (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, backgroundColor: 'rgba(139,30,30,0.07)', border: '1px solid rgba(139,30,30,0.25)', borderRadius: 20, padding: '5px 10px' }}>
+                    <Icon n="storefront" style={{ fontSize: 14, color: '#8b1e1e' }} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#8b1e1e', flex: 1 }}>{shop.name}</span>
+                    <button onClick={() => { setDraftShopId(null); setAppliedShopId(null); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b1e1e', fontSize: 16, lineHeight: 1 }}>×</button>
+                  </div>
+                ) : null;
+              })()}
+            </div>
             <div style={sep} />
 
             {/* Price Range */}
             <div style={{ marginBottom: 20 }}>
               <p style={secTitle}>Price Range</p>
-              <input type="range" min={0} max={50000} value={priceMax} onChange={e => setPriceMax(Number(e.target.value))}
+              <input type="range" min={0} max={50000} value={draftPriceMax} onChange={e => setDraftPriceMax(Number(e.target.value))}
                 style={{ width: '100%', accentColor: '#8b1e1e' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#8b716e', marginTop: 6 }}>
                 <span>₹0</span>
-                <span style={{ fontWeight: 600, color: '#1c1b1b' }}>₹{priceMax.toLocaleString('en-IN')}</span>
+                <span style={{ fontWeight: 600, color: '#1c1b1b' }}>₹{draftPriceMax.toLocaleString('en-IN')}</span>
                 <span>₹50k+</span>
               </div>
             </div>
@@ -463,7 +719,7 @@ export function MarketplacePage() {
             {/* Sort By */}
             <div style={{ marginBottom: 20 }}>
               <p style={secTitle}>Sort By</p>
-              <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+              <select value={draftSortBy} onChange={e => setDraftSortBy(e.target.value)}
                 style={{ width: '100%', height: 44, border: '1px solid #dfbfbc', borderRadius: 8, padding: '0 36px 0 12px', fontSize: 14, color: '#1c1b1b', backgroundColor: '#fff', cursor: 'pointer', outline: 'none', appearance: 'none' }}>
                 {['Relevance','Price: Low to High','Price: High to Low','Newest Arrivals'].map(o => <option key={o}>{o}</option>)}
               </select>
@@ -475,7 +731,7 @@ export function MarketplacePage() {
               <p style={secTitle}>Part Type</p>
               {(['OEM','OES'] as const).map(t => (
                 <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 10 }}>
-                  <input type="checkbox" checked={partTypes[t]} onChange={e => setPartTypes(pt => ({ ...pt, [t]: e.target.checked }))}
+                  <input type="checkbox" checked={draftPartTypes[t]} onChange={e => setDraftPartTypes(pt => ({ ...pt, [t]: e.target.checked }))}
                     style={{ width: 18, height: 18, accentColor: '#8b1e1e', cursor: 'pointer' }} />
                   <span style={{ fontSize: 14, color: '#1c1b1b' }}>
                     {t === 'OEM' ? 'OEM (Original Equipment)' : 'OES (Original Spare)'}
@@ -488,28 +744,31 @@ export function MarketplacePage() {
             {/* Categories */}
             <div style={{ marginBottom: 20 }}>
               <p style={secTitle}>Categories</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {CATEGORIES.map(cat => (
-                  <div key={cat.name} onClick={() => setActiveCateg(activeCateg === cat.name ? null : cat.name)}
+                  <div key={cat.name} onClick={() => setDraftCateg(draftCateg === cat.name ? null : cat.name)}
                     style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer', padding: '4px 0' }}>
-                    <span style={{ fontSize: 14, color: activeCateg === cat.name ? '#8b1e1e' : '#1c1b1b', fontWeight: activeCateg === cat.name ? 700 : 400 }}>
+                    <span style={{ fontSize: 14, color: draftCateg === cat.name ? '#8b1e1e' : '#1c1b1b', fontWeight: draftCateg === cat.name ? 700 : 400 }}>
                       {cat.name}
                     </span>
-                    <span style={{ fontSize: 11, backgroundColor: '#e0e0db', color: '#62635f', padding: '2px 7px', borderRadius: 12 }}>{cat.count}</span>
+                    <span style={{ fontSize: 11, backgroundColor: draftCateg === cat.name ? 'rgba(139,30,30,0.1)' : '#e0e0db', color: draftCateg === cat.name ? '#8b1e1e' : '#62635f', padding: '2px 7px', borderRadius: 12, fontWeight: draftCateg === cat.name ? 700 : 400 }}>{cat.count}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <button
-              style={{ width: '100%', height: 48, backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}>
+              onClick={applyFilters}
+              style={{ width: '100%', height: 48, backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: 13, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', marginBottom: 2 }}>
               Apply Filters
             </button>
+
+            </div>{/* /padding wrapper */}
           </div>
         </aside>
 
         {/* ── RESULTS ──────────────────────────────────────────────── */}
-        <section style={{ flex: 1, minWidth: 0 }}>
+        <section ref={resultsRef} style={{ flex: 1, minWidth: 0 }}>
           {/* Mobile Filters button — hidden on desktop via .mp-filter-btn CSS class */}
           <button className="mp-filter-btn"
             onClick={() => setSidebarOpen(o => !o)}
@@ -520,7 +779,7 @@ export function MarketplacePage() {
               color: '#1c1b1b', fontWeight: 600, fontSize: 14, cursor: 'pointer', minHeight: 44,
             }}>
             <Icon n="tune" style={{ fontSize: 18, color: '#8b1e1e' }} />
-            {sidebarOpen ? 'Hide Filters' : 'Filters'}
+            {sidebarOpen ? 'Hide Filters' : 'Sort & Filter'}
           </button>
 
           {/* Header: wraps on mobile */}
@@ -541,36 +800,64 @@ export function MarketplacePage() {
                 </span>
               </h1>
             </div>
-            {/* View toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 13, color: '#58413f' }}>View:</span>
-              <div style={{ display: 'flex', backgroundColor: '#f0eded', borderRadius: 8, padding: 4 }}>
-                <button onClick={() => setViewMode('grid')} style={{ padding: '6px 8px', backgroundColor: viewMode === 'grid' ? '#fff' : 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                  <Icon n="grid_view" style={{ fontSize: 18, color: viewMode === 'grid' ? '#8b1e1e' : '#58413f' }} />
-                </button>
-                <button onClick={() => setViewMode('list')} style={{ padding: '6px 8px', backgroundColor: viewMode === 'list' ? '#fff' : 'transparent', border: 'none', borderRadius: 6, cursor: 'pointer', boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
-                  <Icon n="list" style={{ fontSize: 18, color: viewMode === 'list' ? '#8b1e1e' : '#58413f' }} />
-                </button>
-              </div>
-            </div>
           </div>
 
-          {/* Product grid */}
-          {filtered.length === 0 ? (
+          {/* Card animation keyframes */}
+          <style>{`
+            @keyframes mp-card-in {
+              from { opacity: 0; transform: translateY(14px); }
+              to   { opacity: 1; transform: translateY(0); }
+            }
+            @keyframes mp-skeleton-pulse {
+              0%, 100% { opacity: 1; }
+              50%       { opacity: 0.45; }
+            }
+            .mp-card-animated {
+              animation: mp-card-in 0.32s ease-out both;
+            }
+            .mp-skeleton-box {
+              background: #ede8e7;
+              border-radius: 6px;
+              animation: mp-skeleton-pulse 1.4s ease-in-out infinite;
+            }
+          `}</style>
+
+          {/* Product grid — skeletons while loading, then real cards with stagger */}
+          {catalogLoading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px, 100%), 1fr))', gap: 14 }}>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 12, overflow: 'hidden' }}>
+                  {/* image placeholder */}
+                  <div className="mp-skeleton-box" style={{ height: 140, borderRadius: 0, animationDelay: `${i * 0.05}s` }} />
+                  <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="mp-skeleton-box" style={{ height: 10, width: '45%', animationDelay: `${i * 0.05 + 0.1}s` }} />
+                    <div className="mp-skeleton-box" style={{ height: 13, width: '90%', animationDelay: `${i * 0.05 + 0.15}s` }} />
+                    <div className="mp-skeleton-box" style={{ height: 13, width: '70%', animationDelay: `${i * 0.05 + 0.2}s` }} />
+                    <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div className="mp-skeleton-box" style={{ height: 18, width: '40%', animationDelay: `${i * 0.05 + 0.25}s` }} />
+                      <div className="mp-skeleton-box" style={{ height: 34, width: 38, borderRadius: 7, animationDelay: `${i * 0.05 + 0.25}s` }} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '64px 0', color: '#8b716e' }}>
               <Icon n="search_off" style={{ fontSize: 48, display: 'block', margin: '0 auto 16px' }} />
               <p style={{ fontSize: 18, fontWeight: 600 }}>No parts found</p>
               <p style={{ fontSize: 14 }}>Try adjusting your filters or search term</p>
             </div>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: viewMode === 'grid'
-                ? 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))'
-                : '1fr',
-              gap: 20,
-            }}>
-              {filtered.map(p => <ProductCard key={p.id} product={p} onAddToCart={handleAddToCart} />)}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(150px, 100%), 1fr))', gap: 14 }}>
+              {filtered.map((p, i) => (
+                <div
+                  key={p.id}
+                  className="mp-card-animated"
+                  style={{ animationDelay: `${Math.min(i, 9) * 0.04}s`, display: 'flex', flexDirection: 'column' }}
+                >
+                  <ProductCard product={p} onAddToCart={handleAddToCart} />
+                </div>
+              ))}
             </div>
           )}
 

@@ -607,6 +607,118 @@ export const GLOBAL_CSS = `
     .recharts-tooltip-wrapper { max-width: calc(100vw - 32px) !important; }
   }
 
+  /* ── Dashboard mobile (DashboardPage.tsx) — ≤767px only, desktop untouched ── */
+  @media (max-width: 767px) {
+    /* big white/dark cards: lighter padding so content fits at 375px */
+    .dash-card { padding: 14px !important; }
+    /* card headers (title + pill group): allow wrap instead of colliding */
+    .dash-card-head { flex-wrap: wrap !important; row-gap: 10px; }
+    /* profit-view filter pills: full row, equal-width tap targets */
+    .dash-filter-pills { width: 100%; }
+    .dash-filter-pills button { flex: 1 1 auto; min-height: 32px; }
+    /* profit table: scroll horizontally instead of squashing 10 columns */
+    .dash-table { min-width: 760px; }
+  }
+
+  /* ── Reports mobile (ReportsPage.tsx) — ≤767px only, desktop untouched ── */
+  @media (max-width: 767px) {
+    /* header action buttons: full row, equal-width tap targets */
+    .rpt-header-actions { width: 100%; }
+    .rpt-header-actions button { flex: 1 1 auto; justify-content: center; }
+    /* big white cards: lighter padding so content fits at 375px */
+    .rpt-card { padding: 16px 14px !important; }
+    /* chart card header (title + Weekly/Monthly toggle): wrap instead of squashing */
+    .rpt-chart-head { flex-wrap: wrap !important; row-gap: 10px; }
+    /* chart: shorter on phones */
+    .rpt-chart { height: 220px !important; margin-top: 16px !important; }
+    /* date inputs: keep 2-up without intrinsic-width overflow */
+    .rpt-date-row input { min-width: 0; }
+    /* performance logs table: horizontal scroll instead of squashing 4 columns */
+    .rpt-logs-table { min-width: 540px; }
+  }
+
+  /* ── History mobile (HistoryPage.tsx) — ≤767px only, desktop untouched ── */
+  @media (max-width: 767px) {
+    /* filter row → vertical stack: chips / search / dates 2-up / export */
+    .hist-filters { flex-direction: column; align-items: stretch !important; gap: 10px !important; }
+    .hist-periods { width: 100%; }
+    .hist-periods button { flex: 1 1 0; min-width: 0; padding: 0 4px !important; }
+    .hist-search { width: 100%; min-width: 0 !important; }
+    .hist-dates { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; width: 100%; }
+    .hist-dates input { width: 100%; min-width: 0; }
+    .hist-dates-sep { display: none; }
+    .hist-export { width: 100%; justify-content: center; height: 42px !important; font-size: 13px !important; }
+    /* tab strip: single row, horizontal scroll, no wrap */
+    .hist-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .hist-tabs::-webkit-scrollbar { display: none; }
+    .hist-tabs button { flex-shrink: 0; padding: 0 14px !important; }
+    /* footer strip: allow wrap so the two labels never overflow at 375px */
+    .hist-footer { flex-wrap: wrap; gap: 6px; }
+  }
+
+  /* ── Workshop mobile (WorkshopPage.tsx) — ≤767px only, desktop untouched ── */
+  @media (max-width: 767px) {
+    /* tab switcher chips: horizontal scroll, never wrap or overflow */
+    .ws-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .ws-tabs::-webkit-scrollbar { display: none; }
+    .ws-tabs button { flex-shrink: 0; white-space: nowrap; }
+
+    /* jobs toolbar → 2-col grid: maroon CTA on top full-width, search full-width, filter + export 2-up */
+    .ws-jobs-tools { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; width: 100%; }
+    .ws-jobs-tools .ws-newjob { order: -1; grid-column: 1 / -1; height: 46px !important; font-size: 14px !important; border-radius: 10px !important; justify-content: center; }
+    .ws-jobs-tools .ws-search { grid-column: 1 / -1; }
+    .ws-jobs-tools .ws-search input { width: 100% !important; height: 44px !important; font-size: 14px !important; }
+    .ws-jobs-tools select { width: 100%; height: 40px !important; }
+    .ws-jobs-tools .ws-export { width: 100%; height: 40px !important; justify-content: center; }
+  }
+
+  /* Workshop KPI stack per design: Active Jobs full-width, Technicians + Pending 2-up */
+  @media (max-width: 639px) {
+    .ws-kpis { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+    .ws-kpis > :first-child { grid-column: 1 / -1; }
+  }
+
+  /* Workshop floating "+" FAB — sits above the bottom nav (mobile only via .rp-mobile-flex) */
+  .ws-fab {
+    position: fixed; right: 16px; bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+    width: 54px; height: 54px; border-radius: 50%; border: none;
+    background: #8B1E1E; color: #FFFFFF; font-size: 26px; line-height: 1;
+    align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: 0 6px 18px rgba(139,30,30,0.45); z-index: 590;
+  }
+
+  /* ── Orders mobile (OrdersPage.tsx) — ≤767px only, desktop untouched ── */
+  @media (max-width: 767px) {
+    /* KPI cards: tighter padding + gap so 2-up fits cleanly at 375px */
+    .orders-kpi { gap: 10px !important; }
+    .orders-kpi > div { padding: 14px 14px 12px !important; }
+  }
+
+  /* ── Inventory mobile (InventoryPage.tsx) — ≤767px only, desktop untouched ── */
+  .inv-table { min-width: 900px; }
+  @media (max-width: 767px) {
+    /* Row 1: search + ≡ filter button; Row 2: PO + Add as a 2-up */
+    .inv-search { min-width: 0 !important; flex: 1 1 auto !important; }
+    .inv-filter-btn { width: 46px !important; height: 46px !important; }
+    .inv-po-btn, .inv-add-btn { flex: 1 1 45%; height: 44px !important; }
+    /* Category chips + stock quick-filters: single scrollable row, hidden scrollbar */
+    .inv-chips {
+      flex-wrap: nowrap !important;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .inv-chips::-webkit-scrollbar { display: none; }
+    .inv-chips > * { flex-shrink: 0; }
+    .inv-chips button { white-space: nowrap; }
+    /* Table stays a table (per design) — scrolls inside .table-scroll, compact min-width */
+    .inv-table { min-width: 720px; }
+    .inv-table th, .inv-table td { padding-left: 10px !important; padding-right: 10px !important; }
+    /* Expanded detail panel: 4-col grid → 2-col */
+    .detail-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+
   /* ── Page-level responsive overrides ── */
   @media (max-width: 767px) {
     /* Dashboard chart on mobile */

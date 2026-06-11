@@ -55,9 +55,10 @@ export function mapPartToRanked(part) {
     masterPartId:    part.masterPartId,
     name:            part.partName,
     brand:           part.brand || '',
-    sku:             part.primaryOemNumber || part.oemNumber || String(part.masterPartId),
-    oemNumber:       part.primaryOemNumber || part.oemNumber || '',
-    oemNumbers:      part.oemNumbers || [],
+    // OEM numbers are confidential — use masterPartId as the public item reference
+    sku:             String(part.masterPartId),
+    oemNumber:       '',   // not exposed in marketplace
+    oemNumbers:      [],   // not exposed in marketplace
     category:        part.categoryL1 || 'General',
     categoryL2:      part.categoryL2 || '',
     image:           part.imageUrl || getCategoryEmoji(part.categoryL1),
@@ -139,6 +140,10 @@ export async function browseMarketplace(opts = {}) {
   if (opts.lng)       params.lng        = opts.lng;
   if (opts.limit)     params.limit      = opts.limit;
   if (opts.offset)    params.offset     = opts.offset;
+  // Server-side filters — keep total count and pagination accurate
+  if (opts.priceMax && opts.priceMax < 50000)   params.price_max  = opts.priceMax;
+  if (opts.partType  && opts.partType !== 'ALL') params.part_type  = opts.partType;
+  if (opts.shopId)                               params.shop_id    = opts.shopId;
 
   const res = await api.get('/api/marketplace/browse', params);
   const d = res.data || res;

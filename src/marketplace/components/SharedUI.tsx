@@ -51,7 +51,7 @@ export function ShopCard({ shop, variant = "dark" }) {
   );
 }
 
-export function SectionCarousel({ title, children, variant = "dark" }) {
+export function SectionCarousel({ title, children, variant = "dark", mobileGrid = false }) {
   const scrollRef = useRef(null);
   const isLight = variant === "light";
   const scroll = dir => {
@@ -62,7 +62,7 @@ export function SectionCarousel({ title, children, variant = "dark" }) {
       {title ? (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: isLight ? "#1A1205" : T.t1 }}>{title}</div>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div className="mp-carousel-arrows" style={{ display: "flex", gap: 6 }}>
             {[[-1, "←"], [1, "→"]].map(([dir, label]) => (
               <button key={label} onClick={() => scroll(dir)} style={{
                 width: 32, height: 32, borderRadius: 8,
@@ -78,7 +78,7 @@ export function SectionCarousel({ title, children, variant = "dark" }) {
           </div>
         </div>
       ) : (
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+        <div className="mp-carousel-arrows" style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
           {[[-1, "←"], [1, "→"]].map(([dir, label]) => (
             <button key={label} onClick={() => scroll(dir)} style={{
               width: 32, height: 32, borderRadius: 8,
@@ -93,7 +93,7 @@ export function SectionCarousel({ title, children, variant = "dark" }) {
           ))}
         </div>
       )}
-      <div ref={scrollRef} className="no-scrollbar" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollSnapType: "x mandatory", msOverflowStyle: "none", scrollbarWidth: "none" }}>
+      <div ref={scrollRef} className={`no-scrollbar${mobileGrid ? " mp-m-grid" : ""}`} style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, scrollSnapType: "x mandatory", msOverflowStyle: "none", scrollbarWidth: "none" }}>
         {children}
       </div>
     </div>

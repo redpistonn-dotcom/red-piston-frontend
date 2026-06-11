@@ -204,6 +204,8 @@ const DETECT_MAP = {
   'long description': 'description', 'remarks': 'description', 'product description': 'description',
   'alternate oem': 'alternateOem', 'alternate oem numbers': 'alternateOem', 'alt oem': 'alternateOem', 'cross reference': 'alternateOem',
   'weight': 'weightGrams', 'weight grams': 'weightGrams', 'weight (g)': 'weightGrams', 'weight (gm)': 'weightGrams', 'wt': 'weightGrams',
+  // Part type
+  'part type': 'partType', 'part_type': 'partType', 'oem/oes': 'partType', 'type': 'partType', 'catalog type': 'partType',
   // Vehicle fitment columns
   'vehicle make': 'vehicleMake', 'car make': 'vehicleMake', 'applicable make': 'vehicleMake',
   'vehicle model': 'vehicleModel', 'car model': 'vehicleModel', 'applicable model': 'vehicleModel', 'model name': 'vehicleModel',
@@ -217,6 +219,7 @@ const DETECT_MAP = {
 const TEMPLATE_COLS = [
   { key: 'oemNumber',    label: 'OEM Number',            required: true,  example: '265C0-00QAG',                   note: 'Primary OEM/part number — must be unique (required)' },
   { key: 'partName',     label: 'Part Name',             required: true,  example: 'Brake Pad Set Front',            note: 'Display name shown to customers (required)' },
+  { key: 'partType',     label: 'Part Type',             required: false, example: 'OEM',                            note: 'OEM = Original Equipment Manufacturer; OES = Original Equipment Supplier (aftermarket). Defaults to OEM if blank.' },
   { key: 'brand',        label: 'Brand',                 required: false, example: 'Bosch',                          note: 'Manufacturer brand name' },
   { key: 'categoryL1',   label: 'Category L1',           required: false, example: 'Brakes',                         note: 'Top category: Brakes / Engine / Filters / Suspension / Electrical / Body' },
   { key: 'categoryL2',   label: 'Category L2',           required: false, example: 'Brake Pads',                     note: 'Sub-category under Category L1' },
@@ -375,6 +378,7 @@ function CatalogTab() {
       setImportProg(null);
       setImporting(false);
       setAnalysisStep('idle');
+      setImportPartType('OEM');
       setDefaultCategory('');
       setDefaultVehicleType('');
       setDefaultMake('');
@@ -388,6 +392,7 @@ function CatalogTab() {
 
   // 'idle' → 'analyzing' (show column analysis + confirm) → 'confirmed' (show import button)
   const [analysisStep, setAnalysisStep] = useState('idle');
+  const [importPartType,     setImportPartType]     = useState('OEM'); // OEM | OES — applied to every row in the import
   const [defaultCategory,    setDefaultCategory]    = useState('');
   const [defaultVehicleType, setDefaultVehicleType] = useState('');
   const [defaultMake,        setDefaultMake]        = useState('');  // manufacturer name (for display + fitment)
@@ -460,7 +465,7 @@ function CatalogTab() {
     if (!file) return;
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { setParseErr('Upload an Excel (.xlsx, .xls) or CSV (.csv) file'); return; }
     setParsing(true); setParseErr(''); setFileData(null); setImportProg(null);
-    setAnalysisStep('idle'); setDefaultCategory(''); setDefaultVehicleType(''); setDefaultMake(''); setDefaultModel('');
+    setAnalysisStep('idle'); setImportPartType('OEM'); setDefaultCategory(''); setDefaultVehicleType(''); setDefaultMake(''); setDefaultModel('');
     try {
       const parsed = await parseExcel(file);
       setFileData({ name: file.name, ...parsed });
@@ -487,6 +492,8 @@ function CatalogTab() {
         partName:            p.partName || p.oemNumber,
         oemNumber:           p.oemNumber || null,
         brand:               p.brand || null,
+        // Per-row partType from Excel takes precedence; otherwise use the global selector
+        partType:            (['OEM','OES'].includes((p.partType||'').toUpperCase()) ? (p.partType||'').toUpperCase() : null) || importPartType,
         categoryL1:          p.categoryL1 || defaultCategory || null,
         categoryL2:          p.categoryL2 || null,
         categoryL3:          p.categoryL3 || null,
@@ -548,6 +555,7 @@ function CatalogTab() {
     // Clear the file upload UI — user sees popup; catalog view resets ready for next upload
     setFileData(null);
     setAnalysisStep('idle');
+    setImportPartType('OEM');
     setDefaultCategory('');
     setDefaultVehicleType('');
     setDefaultMake('');
@@ -673,6 +681,31 @@ function CatalogTab() {
                     🔗 Fitment: <strong>{defaultMake}</strong>{defaultModel ? ` → ${defaultModel}` : ' (all models)'}
                   </div>
                 )}
+                {/* OEM / OES selector — applies to every row unless per-row partType column is present */}
+                <div style={{ fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  Part Type <span style={{ color: C.amber, fontSize: 10 }}>(applied to every row — choose before import)</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  {(['OEM', 'OES'] as const).map(pt => (
+                    <button
+                      key={pt}
+                      onClick={() => setImportPartType(pt)}
+                      style={{
+                        flex: 1, padding: '9px 0', borderRadius: 8, border: `1.5px solid ${importPartType === pt ? (pt === 'OEM' ? '#2563eb' : '#16a34a') : C.border}`,
+                        background: importPartType === pt ? (pt === 'OEM' ? '#1d4ed820' : '#15803d20') : C.bg,
+                        color: importPartType === pt ? (pt === 'OEM' ? '#2563eb' : '#16a34a') : C.t2,
+                        fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: "'Inter', sans-serif",
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {pt === 'OEM' ? '🔵 OEM' : '🟢 OES'}
+                      <div style={{ fontSize: 10, fontWeight: 400, marginTop: 2, color: importPartType === pt ? 'inherit' : C.t4 }}>
+                        {pt === 'OEM' ? 'Original Equipment' : 'Aftermarket / Supplier'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
                 <div style={{ fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif", marginBottom: 5, textTransform: 'uppercase' }}>Parts Category (default)</div>
                 <select value={defaultCategory} onChange={e => setDefaultCategory(e.target.value)}
                   style={{ width: '100%', background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 7, padding: '7px 10px', color: C.t1, fontSize: 12, outline: 'none', fontFamily: "'Inter', sans-serif", marginBottom: 16 }}>
@@ -845,20 +878,26 @@ function CatalogTab() {
             <table style={{ minWidth: 900, width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['OEM Number', 'Part Name', 'Brand', 'Category', 'GST %', 'Status', 'Shops', 'Created', 'Updated'].map(h => (
+                  {['OEM Number', 'Part Name', 'Brand', 'Category', 'Part Type', 'GST %', 'Status', 'Shops', 'Created', 'Updated'].map(h => (
                     <th key={h} style={{ padding: '10px 14px', fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', borderBottom: `1px solid ${C.border}`, textAlign: 'left', background: C.bg, whiteSpace: 'nowrap', fontFamily: "'Inter', sans-serif" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {dbLoading ? (
-                  <tr><td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: C.t4, fontFamily: "'Inter', sans-serif" }}>Loading…</td></tr>
+                  <tr><td colSpan={10} style={{ padding: '32px', textAlign: 'center', color: C.t4, fontFamily: "'Inter', sans-serif" }}>Loading…</td></tr>
                 ) : dbParts.map(p => (
                   <tr key={p.masterPartId} className="admin-table-row" style={{ borderBottom: `1px solid ${C.borderLight}` }}>
                     <td style={{ padding: '10px 14px', fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.t1, whiteSpace: 'nowrap' }}>{p.primaryOemNumber || <span style={{ color: C.t4 }}>—</span>}</td>
                     <td style={{ padding: '10px 14px', fontSize: 12, color: C.t1, fontFamily: "'Inter', sans-serif", maxWidth: 240 }}><div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.partName}</div></td>
                     <td style={{ padding: '10px 14px', fontSize: 11, color: C.t2, fontFamily: "'Inter', sans-serif" }}>{p.brand || <span style={{ color: C.t4 }}>—</span>}</td>
                     <td style={{ padding: '10px 14px', fontSize: 10, color: C.t3, fontFamily: "'Inter', sans-serif" }}>{p.categoryL1 || <span style={{ color: C.t4 }}>—</span>}</td>
+                    <td style={{ padding: '10px 14px' }}>
+                      {p.partType === 'OES'
+                        ? <span style={{ background: '#15803d20', border: '1px solid #16a34a', color: '#16a34a', borderRadius: 5, padding: '2px 7px', fontSize: 9, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>OES</span>
+                        : <span style={{ background: '#1d4ed820', border: '1px solid #2563eb', color: '#2563eb', borderRadius: 5, padding: '2px 7px', fontSize: 9, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>OEM</span>
+                      }
+                    </td>
                     <td style={{ padding: '10px 14px', fontSize: 11, color: C.amber, fontFamily: "'Inter', sans-serif" }}>{p.gstRate}%</td>
                     <td style={{ padding: '10px 14px' }}><span style={{ background: p.status === 'VERIFIED' ? C.greenBg : C.amberBg, border: `1px solid ${p.status === 'VERIFIED' ? C.green : C.amber}`, color: p.status === 'VERIFIED' ? C.green : C.amber, borderRadius: 5, padding: '2px 7px', fontSize: 9, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>{p.status}</span></td>
                     <td style={{ padding: '10px 14px', fontSize: 10, color: C.sky, fontFamily: "'Inter', sans-serif" }}>{p._count?.inventory ?? 0}</td>

@@ -18,6 +18,8 @@ import { ProductCard } from "../components/ProductCard";
 import { ShopCard, SectionCarousel, SkeletonLoader, EmptyState } from "../components/SharedUI";
 import { CustomerProfile } from "./CustomerProfile";
 import { ProductDetailsPage } from "./ProductDetailsPage";
+import { SavedItemsPage } from "./SavedItemsPage";
+import { getSavedItems } from "../savedItems";
 import { fmt } from "../../utils";
 
 const MAKES = ["Maruti Suzuki", "Hyundai", "Tata Motors", "Mahindra", "Honda", "Toyota", "Kia", "Renault", "Skoda", "Volkswagen", "MG", "Ford"];
@@ -129,6 +131,14 @@ export function MarketplaceHome() {
   const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [suppliersSearch, setSuppliersSearch] = useState("");
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [savedCount, setSavedCount] = useState(() => getSavedItems().length);
+
+  useEffect(() => {
+    const sync = () => setSavedCount(getSavedItems().length);
+    window.addEventListener("mp-saved-changed", sync);
+    return () => window.removeEventListener("mp-saved-changed", sync);
+  }, []);
 
   const handleCompareToggle = (item) => {
     setCompareList(prev => {
@@ -491,18 +501,128 @@ export function MarketplaceHome() {
     /* ── LOADING SKELETON ── */
     .mp-loading-wrap { max-width: 1440px; margin: 0 auto; padding: 120px 28px 48px; }
 
+    /* ── MOBILE-ONLY ELEMENTS (hidden on desktop) ── */
+    .mp-hamburger, .mp-nav-search-m, .mp-mobile-only, .mp-m-drawer, .mp-m-overlay, .mp-login-icon { display: none; }
+
+    /* ── MOBILE DRAWER (shared styles, shown via media query) ── */
+    .mp-m-drawer {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 9000;
+      width: 290px; background: #FFFFFF; border-right: 1px solid #E0D5C8;
+      box-shadow: 8px 0 32px rgba(26,18,5,0.18);
+      flex-direction: column;
+      animation: slideInLeft 0.25s cubic-bezier(0.16,1,0.3,1);
+    }
+    .mp-m-drawer-link {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 20px; font-size: 15px; font-weight: 600;
+      color: #5C4F40; background: none; border: none; width: 100%;
+      text-align: left; cursor: pointer;
+    }
+    .mp-m-drawer-link.active { color: #BE2B1A; background: rgba(190,43,26,0.07); font-weight: 800; }
+    .mp-m-overlay {
+      position: fixed; inset: 0; z-index: 8999;
+      background: rgba(26,18,5,0.4); backdrop-filter: blur(2px);
+    }
+
+    /* ── FOOTER ── */
+    .mp-footer {
+      background: #1A1205; color: #F5EFE6;
+      padding: 36px 24px 28px; margin-top: 24px;
+    }
+    .mp-footer-brand {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 16px; font-weight: 900; letter-spacing: 0.04em; margin-bottom: 10px;
+    }
+    .mp-footer-brand span { color: #FF6B5A; }
+    .mp-footer-blurb { font-size: 12px; color: rgba(245,239,230,0.55); line-height: 1.7; max-width: 420px; margin-bottom: 24px; }
+    .mp-footer-cols { display: flex; gap: 48px; flex-wrap: wrap; margin-bottom: 24px; }
+    .mp-footer-col-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(245,239,230,0.45); margin-bottom: 12px; }
+    .mp-footer-link { display: block; font-size: 13px; color: rgba(245,239,230,0.75); margin-bottom: 9px; cursor: pointer; background: none; border: none; padding: 0; text-align: left; }
+    .mp-footer-link:hover { color: #FF6B5A; }
+    .mp-footer-copy { font-size: 11px; color: rgba(245,239,230,0.35); border-top: 1px solid rgba(245,239,230,0.1); padding-top: 16px; }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 1024px) {
       .mp-hero-h1 { font-size: 40px !important; }
       .mp-hero-left { padding: 48px 32px 48px 24px !important; }
     }
     @media (max-width: 768px) {
+      /* Header: row 1 = hamburger + logo + icons, row 2 = full-width search */
+      .mp-nav { height: auto; }
+      .mp-nav-inner { flex-wrap: wrap; padding: 0 12px; gap: 8px; min-height: 56px; }
+      .mp-page-body { padding-top: 112px; }
+      .mp-hamburger {
+        display: flex; align-items: center; justify-content: center;
+        width: 38px; height: 38px; background: none; border: none;
+        font-size: 22px; color: #BE2B1A; cursor: pointer; padding: 0; flex-shrink: 0;
+      }
+      .mp-logo-wrap { border-right: none; height: 56px; padding: 0; gap: 7px; }
+      .mp-logo-img { height: 40px; }
+      .mp-logo-text { font-size: 15px; }
+      .mp-nav-divider, .mp-nav-links, .mp-nav-search, .mp-btn-outline, .mp-btn-solid { display: none !important; }
+      .mp-nav-actions { gap: 4px; }
+      .mp-icon-btn { border: none; width: 38px; height: 38px; font-size: 18px; color: #BE2B1A; }
+      .mp-nav-search-m { display: block; width: 100%; position: relative; padding-bottom: 10px; }
+      .mp-login-icon { display: flex; }
+      .mp-m-drawer { display: flex; }
+      .mp-m-overlay { display: block; }
+      .mp-mobile-only { display: block; }
+
+      /* Hero: stacked, image strip below the selector card */
+      .mp-hero { min-height: 0; }
       .mp-hero-split { grid-template-columns: 1fr !important; }
-      .mp-hero-right { display: none !important; }
-      .mp-nav-links { display: none !important; }
-      .mp-hero-h1 { font-size: 32px !important; }
-      .mp-hero-left { padding: 40px 20px !important; }
-      .mp-btn-outline { display: none !important; }
+      .mp-hero-left { padding: 28px 16px 24px !important; }
+      .mp-hero-h1 { font-size: 30px !important; }
+      .mp-hero-sub { font-size: 14px; margin-bottom: 24px; }
+      .mp-vsel-row { grid-template-columns: 1fr; }
+      .mp-vsel-form { max-width: none; }
+      .mp-tabs-row { gap: 8px; border-bottom: none; }
+      .mp-tab-btn {
+        flex: 1; padding: 9px 6px; font-size: 13px;
+        border: 1.5px solid #E0D5C8; border-radius: 8px; margin-bottom: 0;
+      }
+      .mp-tab-btn.active { background: #BE2B1A; color: #fff; border-color: #BE2B1A; }
+      .mp-hero-right {
+        display: block; height: 200px; margin: 0 16px 24px;
+        border-radius: 14px;
+      }
+      .mp-hero-right-badge { top: 14px; left: 14px; padding: 8px 12px; }
+      .mp-hero-right-badge-val { font-size: 20px; }
+      .mp-hero-stats { bottom: 10px; padding: 0 10px; }
+      .mp-hero-stat { padding: 8px 4px; }
+      .mp-hero-stat-num { font-size: 15px; }
+
+      /* Sections: tighter padding, grids instead of carousels */
+      .mp-sections { padding: 28px 16px 40px; }
+      .mp-section-block { margin-bottom: 36px; }
+      .mp-section-title { font-size: 18px; }
+      .mp-carousel-arrows { display: none !important; }
+      .mp-m-grid {
+        display: grid !important; grid-template-columns: 1fr 1fr;
+        gap: 12px; overflow-x: visible !important;
+      }
+      .mp-m-grid .mp-prod-card { width: 100% !important; }
+      .mp-m-grid .mp-cat-card { min-width: 0 !important; padding: 18px 8px; }
+
+      /* Results view (design 6): 2-col grid, stacked header */
+      .mp-results-wrap { padding: 24px 16px 40px; }
+      .mp-results-header { flex-direction: column; align-items: stretch; gap: 12px; }
+      .mp-results-title { font-size: 20px; }
+      .mp-results-grid { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+      .mp-results-grid .mp-prod-card { width: 100% !important; }
+
+      /* Filter panel becomes a bottom sheet */
+      .mp-filter-panel {
+        top: auto; bottom: 0; left: 0; right: 0; width: 100%;
+        max-height: 78vh; border-right: none; border-top: 1px solid #E0D5C8;
+        border-radius: 16px 16px 0 0;
+        animation: slideUp 0.25s cubic-bezier(0.16,1,0.3,1);
+      }
+
+      /* Compare bar: scrollable chips */
+      .mp-compare-bar { padding: 10px 14px; overflow-x: auto; }
+
+      .mp-footer-cols { gap: 32px; }
     }
 
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -519,6 +639,9 @@ export function MarketplaceHome() {
       {/* ── Navigation ── */}
       <nav className="mp-nav">
         <div className="mp-nav-inner">
+          {/* Hamburger (mobile only) */}
+          <button className="mp-hamburger" onClick={() => setMobileMenuOpen(true)} aria-label="Menu">☰</button>
+
           {/* Logo */}
           <div className="mp-logo-wrap" onClick={() => setPage("home")}>
             <img src="/logo.png" alt="Red Piston" className="mp-logo-img" />
@@ -563,6 +686,10 @@ export function MarketplaceHome() {
 
           {/* Actions */}
           <div className="mp-nav-actions">
+            <button className="mp-icon-btn" title="Saved Items" onClick={() => setPage("saved")} style={{ position: "relative" }}>
+              {savedCount > 0 ? "❤️" : "🤍"}
+              {savedCount > 0 && <span className="mp-cart-badge">{savedCount}</span>}
+            </button>
             <button className="mp-icon-btn" title="Cart" onClick={toggleCart} style={{ position: "relative" }}>
               🛒
               {cart.length > 0 && <span className="mp-cart-badge">{cart.length}</span>}
@@ -574,19 +701,83 @@ export function MarketplaceHome() {
               />
             ) : (
               <>
+                <button className="mp-icon-btn mp-login-icon" title="Sign In" onClick={() => setLoginModalOpen(true)}>👤</button>
                 <button className="mp-btn-outline" onClick={() => setLoginModalOpen(true)}>Sign In</button>
                 <button className="mp-btn-solid" onClick={() => setLoginModalOpen(true)}>Get Started</button>
               </>
             )}
           </div>
+
+          {/* Mobile full-width search (row 2) */}
+          <div className="mp-nav-search-m">
+            <span className="mp-nav-search-icon">🔍</span>
+            <input
+              className="mp-nav-search-input"
+              placeholder="Search by Part Number, VIN, or Category..."
+              value={navSearch}
+              onChange={e => setNavSearch(e.target.value)}
+            />
+          </div>
         </div>
       </nav>
+
+      {/* ── Mobile nav drawer ── */}
+      {mobileMenuOpen && (
+        <>
+          <div className="mp-m-overlay" onClick={() => setMobileMenuOpen(false)} />
+          <div className="mp-m-drawer">
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #E0D5C8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 16, fontWeight: 900, color: "#1A1205" }}>
+                <span style={{ color: "#BE2B1A" }}>RED</span> PISTON
+              </span>
+              <button onClick={() => setMobileMenuOpen(false)} style={{ background: "none", border: "none", fontSize: 20, color: "#9C8C7C", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ flex: 1, paddingTop: 8 }}>
+              {[
+                ["🏪", "Marketplace", "home"],
+                ["🤝", "Suppliers", "suppliers"],
+                ["🤍", "Saved Items", "saved"],
+              ].map(([icon, lbl, target]) => (
+                <button
+                  key={target}
+                  className={`mp-m-drawer-link${page === target ? " active" : ""}`}
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    if (target === "suppliers" && suppliersData.length === 0) {
+                      setSuppliersLoading(true);
+                      fetchShops({ lat: userGeoRef.current?.lat, lng: userGeoRef.current?.lng })
+                        .then(shops => { setSuppliersData(shops); setSuppliersLoading(false); })
+                        .catch(() => setSuppliersLoading(false));
+                    }
+                    setPage(target);
+                  }}
+                >
+                  <span>{icon}</span> {lbl}
+                </button>
+              ))}
+            </div>
+            {!currentUser && (
+              <div style={{ padding: "16px 20px", borderTop: "1px solid #E0D5C8", display: "flex", flexDirection: "column", gap: 10 }}>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); setLoginModalOpen(true); }}
+                  style={{ width: "100%", padding: "12px", background: "transparent", border: "1.5px solid #1A1205", borderRadius: 8, fontSize: 14, fontWeight: 700, color: "#1A1205", cursor: "pointer" }}
+                >Sign In</button>
+                <button
+                  onClick={() => { setMobileMenuOpen(false); setLoginModalOpen(true); }}
+                  style={{ width: "100%", padding: "12px", background: "#BE2B1A", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 800, color: "#fff", cursor: "pointer" }}
+                >Get Started</button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── Page body (offset for fixed nav) ── */}
       <div className="mp-page-body">
 
       {/* ── Sub-pages ── */}
       {page === "profile" && <CustomerProfile />}
+      {page === "saved" && <SavedItemsPage onBack={() => setPage("home")} />}
       {page === "pdp" && <ProductDetailsPage productId={pdpProductId} onBack={() => setPage("home")} onRequireLogin={() => setLoginModalOpen(true)} />}
 
       {/* ── Suppliers page ── */}
@@ -783,7 +974,7 @@ export function MarketplaceHome() {
                   {data.compatibleParts.length === 0 ? (
                     <EmptyState title="No parts found" desc="No parts listed for this vehicle in your area yet." variant="light" />
                   ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20 }}>
+                    <div className="mp-results-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 20 }}>
                       {data.compatibleParts.filter(p => {
                         if (activeFilters.length === 0) return true;
                         const bf = activeFilters.filter(f => f.label === "Brand").map(f => f.value);
@@ -845,7 +1036,7 @@ export function MarketplaceHome() {
                               </select>
                             </div>
                             <button className="mp-search-parts-btn" onClick={() => setVehModalOpen(true)}>
-                              Search Parts →
+                              Find Compatible Parts →
                             </button>
                             <div className="mp-or-divider">or</div>
                             <button className="mp-open-selector" onClick={() => setVehModalOpen(true)}>
@@ -968,7 +1159,7 @@ export function MarketplaceHome() {
                         <div className="mp-section-title">Popular Categories</div>
                         <button className="mp-view-all">View all →</button>
                       </div>
-                      <SectionCarousel title="" variant="light">
+                      <SectionCarousel title="" variant="light" mobileGrid>
                         {data.popularCategories.map(c => (
                           <div key={c} className="mp-cat-card">
                             <span className="mp-cat-icon">{catIcons[c] || catIcons.default}</span>
@@ -1034,7 +1225,7 @@ export function MarketplaceHome() {
                         <div className="mp-section-title">Top Selling Parts</div>
                         <button className="mp-view-all">View all →</button>
                       </div>
-                      <SectionCarousel title="" variant="light">
+                      <SectionCarousel title="" variant="light" mobileGrid>
                         {data.topSelling.map(p => (
                           <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} variant="light" />
                         ))}
@@ -1048,7 +1239,7 @@ export function MarketplaceHome() {
                           <div className="mp-section-title">Best Deals Today</div>
                           <button className="mp-view-all">View all →</button>
                         </div>
-                        <SectionCarousel title="" variant="light">
+                        <SectionCarousel title="" variant="light" mobileGrid>
                           {data.bestDeals.map(p => (
                             <ProductCard key={p.product.id} item={p} onClick={() => { setPdpProductId(p.product.id); setPage("pdp"); }} variant="light" />
                           ))}
@@ -1069,6 +1260,34 @@ export function MarketplaceHome() {
                       </SectionCarousel>
                     </div>
 
+                    {/* ── Coming Soon Services (mobile, design 5) ── */}
+                    <div className="mp-mobile-only mp-section-block">
+                      <div style={{ background: "#1A1205", borderRadius: 16, padding: "28px 18px", textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 22, fontWeight: 800, color: "#F5EFE6", marginBottom: 6 }}>
+                          Coming Soon <span style={{ color: "#FF6B5A" }}>Services</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "rgba(245,239,230,0.6)", lineHeight: 1.6, marginBottom: 20, maxWidth: 300, margin: "0 auto 20px" }}>
+                          Expert automotive services and maintenance hubs located in your immediate vicinity.
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                          {[
+                            ["🚿", "Car Washing", "Premium & interior steam cleaning"],
+                            ["✨", "Detailing Studios", "Ceramic & paint protection"],
+                            ["🪛", "Accessories", "Premium styling & modifications"],
+                            ["🏍️", "Bike Spare Parts", "OEM performance components"],
+                            ["⚡", "Upgrade Parts", "Bespoke performance tuning"],
+                            ["🔜", "More Services", "New hubs launching soon"],
+                          ].map(([icon, lbl, sub]) => (
+                            <div key={lbl} style={{ background: "rgba(245,239,230,0.06)", border: "1px solid rgba(245,239,230,0.12)", borderRadius: 12, padding: "16px 10px" }}>
+                              <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: "#F5EFE6", marginBottom: 3 }}>{lbl}</div>
+                              <div style={{ fontSize: 10, color: "rgba(245,239,230,0.5)", lineHeight: 1.5 }}>{sub}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Trusted Shops */}
                     <div className="mp-section-block">
                       <div className="mp-section-hdr">
@@ -1082,7 +1301,52 @@ export function MarketplaceHome() {
                       </SectionCarousel>
                     </div>
 
+                    {/* ── Why Choose Us (mobile, design 5) ── */}
+                    <div className="mp-mobile-only mp-section-block">
+                      <div style={{ textAlign: "center", fontFamily: "'Plus Jakarta Sans',sans-serif", fontSize: 20, fontWeight: 800, color: "#1A1205", marginBottom: 22 }}>
+                        Why Choose Us
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                        {[
+                          ["✓", "Verified Quality", "Vetted for authenticity and structural integrity. No compromises."],
+                          ["⚡", "Industrial Speed", "Advanced logistics ensures your vehicle never stays idle."],
+                          ["🛡️", "Deep Trust", "Used by thousands of mechanics worldwide for supply chains."],
+                        ].map(([icon, lbl, sub]) => (
+                          <div key={lbl} style={{ textAlign: "center" }}>
+                            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(190,43,26,0.08)", border: "1.5px solid rgba(190,43,26,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: "#BE2B1A", margin: "0 auto 10px" }}>{icon}</div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "#1A1205", marginBottom: 4 }}>{lbl}</div>
+                            <div style={{ fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, maxWidth: 280, margin: "0 auto" }}>{sub}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                   </div>
+
+                  {/* ── Footer (mobile, design 5) ── */}
+                  <footer className="mp-mobile-only mp-footer">
+                    <div className="mp-footer-brand"><span>RED</span> PISTON</div>
+                    <div className="mp-footer-blurb">
+                      The world's leading industrial commerce platform for automotive components, providing enterprise-grade reliability to the aftermarket.
+                    </div>
+                    <div className="mp-footer-cols">
+                      <div>
+                        <div className="mp-footer-col-title">Solutions</div>
+                        <button className="mp-footer-link" onClick={() => setPage("home")}>Marketplace</button>
+                        <button className="mp-footer-link" onClick={() => setVehModalOpen(true)}>OEM Parts</button>
+                        <button className="mp-footer-link" onClick={() => setPage("suppliers")}>Suppliers</button>
+                        <button className="mp-footer-link" onClick={() => setPage("suppliers")}>Logistics</button>
+                      </div>
+                      <div>
+                        <div className="mp-footer-col-title">Company</div>
+                        <button className="mp-footer-link">About Us</button>
+                        <button className="mp-footer-link">Contact Us</button>
+                        <button className="mp-footer-link">Careers</button>
+                        <button className="mp-footer-link">Privacy Policy</button>
+                      </div>
+                    </div>
+                    <div className="mp-footer-copy">© {new Date().getFullYear()} Red Piston Industrial. All rights reserved.</div>
+                  </footer>
                 </div>
               ) : null}
             </>

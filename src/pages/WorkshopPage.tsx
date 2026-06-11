@@ -361,7 +361,7 @@ export function WorkshopPage() {
         <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
 
             {/* ── PAGE TAB SWITCHER ── */}
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className="ws-tabs" style={{ display: "flex", gap: 6 }}>
                 {([["jobs", "🔧", "Job Cards"], ["marketplace", "🌐", "Parts Marketplace"]] as const).map(([id, icon, label]) => (
                     <button key={id} onClick={() => setWorkshopTab(id)}
                         style={{ height: 40, padding: "0 18px", borderRadius: 9, border: `1.5px solid ${workshopTab === id ? T.amber : T.border}`, background: workshopTab === id ? T.amber : "#FFFFFF", color: workshopTab === id ? "#FFFFFF" : T.t2, fontSize: 13, fontWeight: workshopTab === id ? 700 : 500, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s" }}>
@@ -584,7 +584,7 @@ export function WorkshopPage() {
             {workshopTab === "jobs" && (<>
 
             {/* ── 3 KPI CARDS ── */}
-            <div className="kpi-grid-3" style={{ display: "grid" }}>
+            <div className="kpi-grid-3 ws-kpis" style={{ display: "grid" }}>
                 <KpiCard
                     label="Active Jobs"
                     main={String(kpi.activeCount).padStart(2, "0")}
@@ -619,9 +619,9 @@ export function WorkshopPage() {
                             LIVE DATA
                         </span>
                     </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <div className="ws-jobs-tools" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         {/* Search */}
-                        <div style={{ position: "relative" }}>
+                        <div className="ws-search" style={{ position: "relative" }}>
                             <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: T.t3, pointerEvents: "none" }}>🔍</span>
                             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search jobs..."
                                 style={{ height: 34, width: 180, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px 0 30px", fontSize: 12, color: T.t1, fontFamily: FONT.ui, outline: "none", background: T.bg }}
@@ -635,14 +635,14 @@ export function WorkshopPage() {
                             {STATUS_TABS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
                         </select>
                         {/* Export CSV */}
-                        <button onClick={handleExportCSV}
+                        <button className="ws-export" onClick={handleExportCSV}
                             style={{ height: 34, padding: "0 14px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 6 }}
                             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
                             ⬆ Export CSV
                         </button>
                         {/* New Job */}
-                        <button onClick={() => setShowCreate(true)}
+                        <button className="ws-newjob" onClick={() => setShowCreate(true)}
                             style={{ height: 34, padding: "0 14px", background: T.amber, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 6 }}>
                             + New Job
                         </button>
@@ -885,6 +885,9 @@ export function WorkshopPage() {
                     </span>
                 </div>
             </div>
+
+            {/* Mobile-only floating "+" FAB (Stitch design) — hidden ≥768px via rp-mobile-flex */}
+            <button className="rp-mobile-flex ws-fab" aria-label="New job card" onClick={() => setShowCreate(true)}>+</button>
 
             </>)} {/* end workshopTab === "jobs" */}
 

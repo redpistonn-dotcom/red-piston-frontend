@@ -6,13 +6,13 @@ import '../styles/landing.css';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { PublicHeader } from '../components/PublicHeader';
 
 function Icon({ n, style }: { n: string; style?: React.CSSProperties }) {
   return <span className="material-symbols-outlined" style={style}>{n}</span>;
 }
 
 const TAX_RATE    = 0.12;
-const LOGO = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAHoRqueT7rYQ9UU0uaqdoukDlx38GMecl-iaxA_YPsKta4MkYIh1zNn8Cq0sPsr7M4RgQ_U9qftq7c7PW05n3PYedVKG1_Cpvw5_kyltJtcea9-H5bNgTqs1NRGHFnhX112m_HSJaZ_F722rFQmkTxVmCCp4R5IZWlInV5SCBfQPTQHPO3YJFw6En0MQgRNEFl44PmMZH8bZyTjh0btvYW3gM2r1JgFZvpQS67UpJr1SYz_N81ByrPkXv3k89WFF_7n0z5A0S4BE4';
 
 export function CartPage() {
   const navigate = useNavigate();
@@ -26,39 +26,32 @@ export function CartPage() {
   return (
     <div className="lp-root" style={{ fontFamily: 'Inter, sans-serif', backgroundColor: '#fcf9f8', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── NAV ─────────────────────────────────────────────────────── */}
-      <header style={{ backgroundColor: '#fcf9f8', borderBottom: '1px solid #dfbfbc', position: 'sticky', top: 0, zIndex: 50 }}>
-        <nav style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 32px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-            <img src={LOGO} alt="RedPiston" style={{ height: 40, width: 'auto', objectFit: 'contain', cursor: 'pointer' }} onClick={() => navigate('/')} />
-            <div style={{ display: 'flex', gap: 24 }}>
-              {['Marketplace','OEM Parts','Suppliers','Logistics'].map(l => (
-                <a key={l} href="#" style={{ color: '#58413f', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>{l}</a>
-              ))}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: '#f6f3f2', border: '1px solid #dfbfbc', borderRadius: 12, padding: '8px 14px', gap: 8 }}>
-              <Icon n="search" style={{ fontSize: 18, color: '#58413f' }} />
-              <input type="text" placeholder="Search industrial parts..." style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: 14, width: 220, color: '#1c1b1b' }} />
-            </div>
-            <button onClick={() => navigate('/marketplace')}
-              style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: '#8b1e1e', fontWeight: 700, borderBottom: '2px solid #8b1e1e', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Icon n="shopping_cart" style={{ fontSize: 22 }} />
-              {count > 0 && <span style={{ position: 'absolute', top: -4, right: -8, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{count}</span>}
+      {/* ── NAV — shared responsive header (hamburger + search + icons on mobile) ── */}
+      <PublicHeader
+        searchPlaceholder="Search industrial parts..."
+        rightSlot={
+          <>
+            <button onClick={() => navigate('/saved')} title="Saved Items"
+              style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
+              <Icon n="favorite_border" style={{ color: '#58413f', fontSize: 22 }} />
             </button>
-            <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#58413f' }}>
+            <button onClick={() => navigate('/cart')}
+              style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: '#8b1e1e', fontWeight: 700, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icon n="shopping_cart" style={{ fontSize: 22 }} />
+              {count > 0 && <span style={{ position: 'absolute', top: -4, right: -2, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{count}</span>}
+            </button>
+            <button onClick={() => navigate('/profile')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#58413f' }}>
               <Icon n="account_circle" style={{ fontSize: 24 }} />
             </button>
-          </div>
-        </nav>
-      </header>
+          </>
+        }
+      />
 
       {/* ── MAIN ─────────────────────────────────────────────────────── */}
-      <main style={{ flex: 1, maxWidth: 1440, margin: '0 auto', width: '100%', padding: '48px 32px', display: 'flex', gap: 32 }}>
+      <main className="cart-main" style={{ flex: 1, maxWidth: 1440, margin: '0 auto', width: '100%', padding: '48px 32px', display: 'flex', gap: 32 }}>
 
         {/* ── Cart items (75%) ─────────────────────────────────────── */}
-        <section style={{ flex: '0 0 72%' }}>
+        <section className="cart-items-sec" style={{ flex: '0 0 72%', minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid #dfbfbc', paddingBottom: 16, marginBottom: 24 }}>
             <h1 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 28, fontWeight: 700, color: '#1c1b1b', margin: 0 }}>Shopping Cart</h1>
             <span style={{ fontSize: 13, color: '#58413f' }}>{count} item{count !== 1 ? 's' : ''} in your list</span>
@@ -77,7 +70,7 @@ export function CartPage() {
           ) : (
             <div style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 12, overflow: 'hidden' }}>
               {items.map((item, idx) => (
-                <div key={item.id} style={{
+                <div key={item.id} className="cart-item-row" style={{
                   padding: '24px', display: 'flex', gap: 24,
                   borderBottom: idx < items.length - 1 ? '1px solid #dfbfbc' : 'none',
                   transition: 'background 0.15s',
@@ -86,7 +79,7 @@ export function CartPage() {
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#fff')}
                 >
                   {/* Image */}
-                  <div style={{ width: 160, height: 160, backgroundColor: '#f0eded', borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div className="cart-item-img" style={{ width: 160, height: 160, backgroundColor: '#f0eded', borderRadius: 10, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {item.image
                       ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} />
                       : <Icon n="build" style={{ fontSize: 48, color: '#dfbfbc' }} />
@@ -113,7 +106,7 @@ export function CartPage() {
                     </div>
 
                     {/* Controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 }}>
+                    <div className="cart-item-controls" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, flexWrap: 'wrap', gap: 10 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         {/* Qty */}
                         <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #dfbfbc', borderRadius: 8, overflow: 'hidden' }}>
@@ -143,7 +136,7 @@ export function CartPage() {
 
           {/* Subtotal */}
           {items.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, padding: '16px 0', borderTop: '1px solid #dfbfbc' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, padding: '16px 0', borderTop: '1px solid #dfbfbc', flexWrap: 'wrap', gap: 12 }}>
               <button onClick={() => navigate('/marketplace')}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#8b1e1e', fontWeight: 600, fontSize: 14 }}>
                 <Icon n="arrow_back" style={{ fontSize: 18 }} />
@@ -158,7 +151,7 @@ export function CartPage() {
 
         {/* ── Order Summary (25%) ──────────────────────────────────── */}
         {items.length > 0 && (
-          <aside style={{ flex: 1, minWidth: 300 }}>
+          <aside className="cart-aside" style={{ flex: 1, minWidth: 300 }}>
             <div style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 12, padding: 24, position: 'sticky', top: 88 }}>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1c1b1b', marginBottom: 20, fontFamily: 'Poppins, sans-serif' }}>Order Summary</h2>
 

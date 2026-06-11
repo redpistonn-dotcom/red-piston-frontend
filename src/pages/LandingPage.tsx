@@ -12,7 +12,7 @@ import { signInWithGoogle, sendPhoneOtp, verifyPhoneOtp, isFirebaseConfigured } 
 import { api, setTokens } from '../api/client';
 import { getDefaultRoute } from '../components/routes';
 import { AppCtx } from '../context/AppCtx';
-import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer, browseMarketplace, fetchShops } from '../api/marketplace';
+import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer, fetchShops } from '../api/marketplace';
 import { CatalogSearchBar } from '../components/CatalogSearchBar';
 import { PublicHeader } from '../components/PublicHeader';
 
@@ -36,35 +36,6 @@ function useDesignFonts() {
 function Icon({ n, className = '' }: { n: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{n}</span>;
 }
-/* ── Image placeholder — shown when a part has no photo in the DB ───────────
-   Uses a maroon-tinted background + category-matched Material Symbol icon.   */
-function PartImagePlaceholder({ category, height = 140 }: { category?: string; height?: number }) {
-  const ICON_MAP: Record<string, string> = {
-    Brakes: 'settings_input_component', Engine: 'settings',
-    Electrical: 'bolt', Filters: 'filter_alt',
-    Suspension: 'architecture', Cooling: 'ac_unit',
-    Ignition: 'flash_on', 'Engine Oils': 'oil_barrel',
-    Fluids: 'water_drop', Exhaust: 'air', Steering: 'trip_origin',
-    'Body & Exterior': 'directions_car',
-    'Clutch & Transmission': 'settings_input_composite',
-  };
-  const icon = (category && ICON_MAP[category]) || 'inventory_2';
-  return (
-    <div style={{
-      width: '100%', height,
-      backgroundColor: 'rgba(139,30,30,0.05)',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: 6,
-    }}>
-      <span className="material-symbols-outlined" style={{ fontSize: 34, color: 'rgba(139,30,30,0.28)' }}>{icon}</span>
-      {category && (
-        <span style={{ fontSize: 10, color: 'rgba(139,30,30,0.33)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
-          {category}
-        </span>
-      )}
-    </div>
-  );
-}
 
 /* ── Shop placeholder — shown when a shop has no cover photo in DB ─────────── */
 function ShopImagePlaceholder({ name }: { name: string }) {
@@ -85,18 +56,6 @@ function ShopImagePlaceholder({ name }: { name: string }) {
   );
 }
 
-/* ── Skeleton card — shown while API fetches part / shop data ─────────────── */
-function PartCardSkeleton() {
-  return (
-    <div style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 10, overflow: 'hidden' }}>
-      <div className="lp-skeleton" style={{ height: 140, backgroundColor: '#f0eded' }} />
-      <div style={{ padding: 12 }}>
-        <div className="lp-skeleton" style={{ height: 12, backgroundColor: '#f0eded', borderRadius: 4, marginBottom: 8, width: '80%' }} />
-        <div className="lp-skeleton" style={{ height: 10, backgroundColor: '#f0eded', borderRadius: 4, width: '58%' }} />
-      </div>
-    </div>
-  );
-}
 
 /* ── Fallback OEM brand list used when the manufacturers API is down ─────── */
 const OEM_BRANDS_STATIC = [
@@ -721,28 +680,9 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
 
   const YEARS = Array.from({ length: 25 }, (_, i) => String(new Date().getFullYear() - i));
   /* ── Live data from DB ─────────────────────────────────────────────────── */
-  const [topParts,      setTopParts]      = useState<any[]>([]);
-  const [trendingParts, setTrendingParts] = useState<any[]>([]);
   const [shopsList,     setShopsList]     = useState<any[]>([]);
   const [oemBrands,     setOemBrands]     = useState<{ label: string; color: string; initial: string }[]>(OEM_BRANDS_STATIC);
-  const [partsLoading,  setPartsLoading]  = useState(true);
   const [shopsLoading,  setShopsLoading]  = useState(true);
-
-  /* Fetch top-selling + trending parts in one browse call */
-  useEffect(() => {
-    setPartsLoading(true);
-    browseMarketplace({ limit: 10 })
-      .then((res: any) => {
-        const parts: any[] = res.parts || [];
-        setTopParts(parts.slice(0, 4));
-        const byDist = [...parts].sort(
-          (a, b) => (a.bestListing?.distance ?? 9999) - (b.bestListing?.distance ?? 9999)
-        );
-        setTrendingParts(byDist.slice(0, 3));
-      })
-      .catch(() => { setTopParts([]); setTrendingParts([]); })
-      .finally(() => setPartsLoading(false));
-  }, []);
 
   /* Fetch nearest shops */
   useEffect(() => {
@@ -982,8 +922,8 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
             </div>
           </div>
 
-          {/* Right — hero image */}
-          <div className="relative hidden lg:block">
+          {/* Right — hero image (visible on all sizes; stacks below the selector on mobile) */}
+          <div className="relative block">
             <div className="aspect-square bg-surface-container rounded-full absolute -top-xl -right-xl w-[120%] opacity-20 blur-3xl" />
             <img
               alt="Modern Industrial Parts"
@@ -1068,175 +1008,6 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
       </section>
 
       {/* ═══════════════════════════════════════════════════════════
-          GLOBAL TOP SELLING PARTS
-      ═══════════════════════════════════════════════════════════ */}
-      <section className="py-giant">
-        <div className="max-w-7xl mx-auto px-lg">
-          <div className="flex flex-wrap justify-between items-end mb-xl gap-2">
-            <div>
-              <h2 className="font-headline-md text-headline-md"
-                  style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b' }}>
-                Global Top Selling Parts
-              </h2>
-              <p style={{ color: '#58413f' }}>Authenticated OEM components sourced from tier-1 global suppliers.</p>
-            </div>
-            <button onClick={() => navigate('/marketplace')} style={{ color: '#8b1e1e', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 0 }}>View All Marketplace →</button>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-xl">
-            {partsLoading
-              ? Array.from({ length: 4 }).map((_, i) => <PartCardSkeleton key={i} />)
-              : topParts.length > 0
-                ? topParts.map((p: any) => {
-                    const product = p.product || {};
-                    const price = p.bestPrice != null
-                      ? `₹${Math.round(p.bestPrice).toLocaleString('en-IN')}`
-                      : '—';
-                    const shopName = p.bestListing?.shop?.name || '';
-                    const distKm   = p.bestListing?.distance != null
-                      ? `${Math.round(p.bestListing.distance)}km away`
-                      : '';
-                    const meta    = [shopName, distKm].filter(Boolean).join(' · ');
-                    const inStock = (p.availability ?? 0) > 0;
-                    return (
-                      <div key={product.id ?? product.name} style={{ backgroundColor: '#fff', border: '1px solid #dfbfbc', borderRadius: 10, overflow: 'hidden' }}>
-                        <div style={{ height: 140, position: 'relative' }}>
-                          {product.imageUrl
-                            ? <img alt={product.name} src={product.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <PartImagePlaceholder category={product.category} height={140} />
-                          }
-                          {inStock && (
-                            <span style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#dcfce7', color: '#166534', padding: '2px 7px', borderRadius: 4, fontSize: 10, fontWeight: 700 }}>
-                              In Stock
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ padding: 12 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <h3 style={{ fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>{product.name}</h3>
-                            <span style={{ fontWeight: 800, color: '#8b1e1e', marginLeft: 8, whiteSpace: 'nowrap', fontSize: 13 }}>{price}</span>
-                          </div>
-                          <p style={{ color: '#58413f', fontSize: 12, marginBottom: 8, lineHeight: 1.4 }}>
-                            {product.description || product.category || '—'}
-                          </p>
-                          {meta && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderTop: '1px solid #f0eded', paddingTop: 8, marginTop: 8, fontSize: 11, color: '#58413f' }}>
-                              <Icon n="store" style={{ fontSize: 13 } as React.CSSProperties} />
-                              <span>{meta}</span>
-                            </div>
-                          )}
-                          <button
-                            onClick={() => navigate(`/marketplace?q=${encodeURIComponent(product.name || '')}`)}
-                            style={{ width: '100%', marginTop: 10, height: 32, border: '1px solid #8b1e1e', color: '#8b1e1e', backgroundColor: 'transparent', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontSize: 12, transition: 'all 0.2s' }}
-                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#8b1e1e'; (e.currentTarget as HTMLButtonElement).style.color = '#fff'; }}
-                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = '#8b1e1e'; }}
-                          >
-                            View Part
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                : (
-                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '36px 0', color: '#58413f' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(139,30,30,0.22)', display: 'block', marginBottom: 10 }}>inventory_2</span>
-                    <p style={{ fontSize: 14 }}>No parts listed yet — check back soon.</p>
-                  </div>
-                )
-            }
-          </div>
-        </div>
-      </section>
-
-            {/* ═══════════════════════════════════════════════════════════
-          TRENDING NEAR YOU — white cards, matches screenshot
-      ═══════════════════════════════════════════════════════════ */}
-      <section className="py-giant" style={{ backgroundColor: '#fcf9f8' }}>
-        <div className="max-w-7xl mx-auto px-lg">
-          {/* Header row */}
-          <div className="lp-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-            <div>
-              <h2 style={{ fontFamily: 'Poppins, sans-serif', fontSize: 'clamp(16px, 2vw, 22px)', fontWeight: 700, color: '#1c1b1b', margin: '0 0 4px' }}>
-                Trending Near You
-              </h2>
-              <p style={{ color: '#58413f', fontSize: 14, margin: 0 }}>
-                High-demand items available for same-day pickup in your region.
-              </p>
-            </div>
-            {/* Location chip */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              backgroundColor: '#fff', border: '1px solid #dfbfbc',
-              borderRadius: 9999, padding: '7px 14px',
-              boxShadow: '0 1px 3px rgba(26,18,5,0.06)',
-              flexShrink: 0, marginLeft: 16,
-            }}>
-              <Icon n="location_on" style={{ fontSize: 16, color: '#8b1e1e' } as React.CSSProperties} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#1c1b1b', whiteSpace: 'nowrap' }}>Hyderabad, TS</span>
-            </div>
-          </div>
-
-          {/* 3-column product cards — loaded from DB */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-xl">
-            {partsLoading
-              ? Array.from({ length: 3 }).map((_, i) => <PartCardSkeleton key={i} />)
-              : trendingParts.length > 0
-                ? trendingParts.map((p: any) => {
-                    const product = p.product || {};
-                    const price   = p.bestPrice != null ? `₹${Math.round(p.bestPrice).toLocaleString('en-IN')}` : '—';
-                    const stock   = p.availability ?? 0;
-                    const distKm  = p.bestListing?.distance != null ? `${p.bestListing.distance.toFixed(1)}km away` : '';
-                    return (
-                      <div
-                        key={product.id ?? product.name}
-                        style={{ backgroundColor: '#ffffff', border: '1px solid #e5e2e1', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(26,18,5,0.06)', transition: 'box-shadow 0.2s' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(26,18,5,0.1)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 4px rgba(26,18,5,0.06)'}
-                      >
-                        <div style={{ position: 'relative' }}>
-                          {product.imageUrl
-                            ? <img src={product.imageUrl} alt={product.name} style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }} />
-                            : <PartImagePlaceholder category={product.category} height={140} />
-                          }
-                          {stock > 0 && (
-                            <span style={{ position: 'absolute', top: 10, right: 10, backgroundColor: '#16a34a', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 4, letterSpacing: '0.05em' }}>
-                              {stock} IN STOCK
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ padding: '10px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                            <span style={{ fontWeight: 700, fontSize: 13, color: '#1c1b1b', lineHeight: 1.3 }}>{product.name}</span>
-                            <span style={{ fontWeight: 800, fontSize: 13, color: '#8b1e1e', whiteSpace: 'nowrap' }}>{price}</span>
-                          </div>
-                          <p style={{ fontSize: 12, color: '#58413f', lineHeight: 1.4, margin: 0 }}>{product.description || product.category || '—'}</p>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                            <Icon n="local_shipping" style={{ fontSize: 13, color: '#58413f' } as React.CSSProperties} />
-                            <span style={{ fontSize: 11, color: '#58413f' }}>Local Pickup{distKm ? ` · ${distKm}` : ''}</span>
-                          </div>
-                          <button
-                            onClick={() => navigate(`/marketplace?q=${encodeURIComponent(product.name || '')}`)}
-                            style={{ marginTop: 6, width: '100%', height: 32, backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, fontSize: 12, cursor: 'pointer', transition: 'opacity 0.2s' }}
-                            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.opacity = '0.88'}
-                            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.opacity = '1'}
-                          >
-                            View Part
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                : (
-                  <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '36px 0', color: '#58413f' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(139,30,30,0.22)', display: 'block', marginBottom: 10 }}>location_off</span>
-                    <p style={{ fontSize: 14 }}>No parts available in your area yet.</p>
-                  </div>
-                )
-            }
-          </div>
-        </div>
-      </section>
-
-            {/* ═══════════════════════════════════════════════════════════
           COMING SOON SERVICES — dark maroon band, 3×2 grid
           Matches Stitch design: "Coming Soon Services" section
       ═══════════════════════════════════════════════════════════ */}
@@ -1626,11 +1397,8 @@ export function LandingPage({ openAuth = false }: { openAuth?: boolean }) {
                 {/* Description */}
                 <p style={{ color: '#58413f', fontSize: 13, lineHeight: 1.5, margin: 0 }}>{w.desc}</p>
 
-                {/* Bottom accent line */}
-                <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid #f0eded', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#8b1e1e' }}>arrow_forward</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#8b1e1e' }}>Learn more</span>
-                </div>
+                {/* Spacer so cards stay same height */}
+                <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid #f0eded' }} />
               </div>
             ))}
           </div>

@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment, useContext } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { CATEGORIES, stockStatus, margin, fmt, downloadCSV, generateCSV, useDebounce } from "../utils";
-import { Badge, Btn, Input, Select, MobileCard, MobileCardList, CardField, CardActions, useIsMobile, ResponsiveTable } from "../components/ui";
+import { Badge, Btn, Input, Select, useIsMobile, ResponsiveTable } from "../components/ui";
 import { PurchaseModal } from "../components/PurchaseModal";
 import { SaleModal } from "../components/SaleModal";
 import { StockAdjustmentModal } from "../components/StockAdjustmentModal";
@@ -201,9 +201,9 @@ export function InventoryPage() {
             )}
 
             {/* ── SEARCH + ACTIONS ROW ── */}
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {/* Search box */}
-              <div style={{ flex: 1, minWidth: isMobile ? "100%" : 220, position: "relative" }}>
+            <div className="inv-toolbar" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {/* Search box — on mobile it shares row 1 with the ≡ filter button */}
+              <div className="inv-search" style={{ flex: 1, minWidth: isMobile ? 0 : 220, position: "relative" }}>
                 <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: T.t3, fontSize: 15, pointerEvents: "none" }}>🔍</span>
                 <input
                   value={search}
@@ -229,6 +229,7 @@ export function InventoryPage() {
 
               {/* Filter / sort icon button (≡) — opens a sort popover in the future */}
               <button
+                className="inv-filter-btn"
                 title="Sort & Filter"
                 onClick={() => setSortBy(sortBy === "name" ? "stock" : sortBy === "stock" ? "margin" : "name")}
                 style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16 }}
@@ -236,19 +237,21 @@ export function InventoryPage() {
 
               {/* Generate Draft PO */}
               <button
+                className="inv-po-btn"
                 onClick={handleGeneratePO}
                 style={{ height: 40, padding: "0 16px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t1, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap", flexShrink: 0 }}
               >Generate Draft PO{selectedIds.length > 0 ? ` (${selectedIds.length})` : ""}</button>
 
               {/* + Add Product — solid maroon */}
               <button
+                className="inv-add-btn"
                 onClick={onAdd}
                 style={{ height: 40, padding: "0 18px", background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap", flexShrink: 0 }}
               >+ Add Product</button>
             </div>
 
-            {/* ── CATEGORY TABS (design: pill tabs) ── */}
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {/* ── CATEGORY TABS (design: pill tabs; mobile = one scrollable row) ── */}
+            <div className="inv-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {["All", ...CATEGORIES].map(c => {
                 const isAct = c === cat;
                 return (
@@ -332,57 +335,12 @@ export function InventoryPage() {
                 </div>
             )}
 
-            {/* ── MOBILE CARD VIEW ── */}
-            {filtered.length > 0 && isMobile && (
-              <MobileCardList>
-                {filtered.slice(0, visibleCount).map(p => {
-                  const mg = margin(p.buyPrice, p.sellPrice);
-                  const st = stockStatus(p);
-                  return (
-                    <MobileCard
-                      key={p.id}
-                      accent={st === "out" ? T.crimson : st === "low" ? "#F59E0B" : undefined}
-                      onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
-                    >
-                      {/* Product header */}
-                      <div style={{ width: "100%", display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 10, background: T.amberGlow, border: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
-                          {p.image?.startsWith("http")
-                            ? <img src={p.image} alt="" style={{ width: "100%", height: "100%", borderRadius: 10, objectFit: "cover" }} />
-                            : (p.imageEmoji || "📦")}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 700, fontSize: 14, color: T.t1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</div>
-                          <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono }}>{p.oemNumber || p.sku}</div>
-                        </div>
-                        <span style={{ background: `${T.amber}12`, color: T.amber, fontSize: 10, padding: "3px 8px", borderRadius: 6, fontWeight: 700, flexShrink: 0 }}>{p.category}</span>
-                      </div>
-                      {/* Fields row */}
-                      <CardField label="Buy" value={fmt(p.buyPrice)} mono bold={false} />
-                      <CardField label="Sell" value={fmt(p.sellPrice)} mono bold color={T.t1} />
-                      <CardField label="Margin" value={`${mg}%`} mono color={+mg > 30 ? T.emerald : +mg > 15 ? "#D97706" : T.crimson} bold />
-                      <CardField label="Stock" value={<span><strong style={{ color: st === "out" ? T.crimson : st === "low" ? "#D97706" : T.t1 }}>{p.stock}</strong><span style={{ color: T.t4, fontSize: 11 }}>/{p.minStock}</span></span>} />
-                      <CardField label="Location" value={p.location || "—"} mono />
-                      {/* Actions */}
-                      <CardActions>
-                        <button onClick={e => { e.stopPropagation(); onEdit(p); }} style={{ flex: 1, height: 38, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFF", cursor: "pointer", fontSize: 13, fontWeight: 600, color: T.t2, fontFamily: FONT.ui }}>✎ Edit</button>
-                        <button onClick={e => { e.stopPropagation(); setAdjP(p); }} style={{ flex: 1, height: 38, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFF", cursor: "pointer", fontSize: 13, fontWeight: 600, color: T.t2, fontFamily: FONT.ui }}>⚖ Adjust</button>
-                        <button onClick={e => { e.stopPropagation(); setSaleP(p); }} style={{ flex: 1, height: 38, borderRadius: 8, border: "none", background: T.emerald, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>Sell</button>
-                        {(st === "low" || st === "out") && (
-                          <button onClick={e => { e.stopPropagation(); setPurchP(p); }} style={{ flex: 1, height: 38, borderRadius: 8, border: "none", background: T.amber, color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>Reorder</button>
-                        )}
-                      </CardActions>
-                    </MobileCard>
-                  );
-                })}
-              </MobileCardList>
-            )}
-
-            {/* ── DESKTOP TABLE (design: ICON | PRODUCT | CAT. | BUY | SELL | MARGIN | STOCK | RACK | ACTIONS) ── */}
-            {filtered.length > 0 && !isMobile && (
+            {/* ── PRODUCT TABLE (design: ICON | PRODUCT | CAT. | BUY | SELL | MARGIN | STOCK | RACK | ACTIONS)
+                 Rendered at ALL widths — on mobile the design keeps the table, horizontally scrollable inside .table-scroll ── */}
+            {filtered.length > 0 && (
             <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.sm }}>
               <div className="table-scroll">
-                <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse" }}>
+                <table className="inv-table" style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                         <tr>
                             <th className="th-cell" style={{ width: 48, padding: "11px 14px" }} />

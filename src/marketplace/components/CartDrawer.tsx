@@ -87,6 +87,11 @@ export function CartDrawer({ onCheckout }) {
 
     return (
         <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", justifyContent: "flex-end" }}>
+            <style>{`
+                @media (max-width: 768px) {
+                    .mp-cart-panel { width: 100vw !important; max-width: 100vw !important; border-left: none !important; }
+                }
+            `}</style>
             {/* Backdrop */}
             <div
                 style={{ position: "absolute", inset: 0, background: "rgba(26,18,5,0.35)", backdropFilter: "blur(4px)", animation: "fadeIn 0.2s ease both" }}
@@ -94,7 +99,7 @@ export function CartDrawer({ onCheckout }) {
             />
 
             {/* Drawer panel */}
-            <div style={{
+            <div className="mp-cart-panel" style={{
                 position: "relative", width: 440, maxWidth: "92vw", height: "100%",
                 background: C.surface,
                 borderLeft: `1px solid ${C.border}`,
@@ -398,6 +403,9 @@ function CartItem({ item, isLast, updateQty, removeItem }) {
                 </div>
                 {item.product?.brand && (
                     <div style={{ fontSize: 11, color: "#9C8C7C", marginTop: 1, fontFamily: FONT.ui }}>{item.product.brand}</div>
+                )}
+                {item.product?.sku && (
+                    <div style={{ fontSize: 10, color: "#BFB0A0", marginTop: 1, fontFamily: FONT.mono }}>Part: {item.product.sku}</div>
                 )}
 
                 {/* Qty controls */}

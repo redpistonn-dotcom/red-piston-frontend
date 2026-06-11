@@ -209,7 +209,7 @@ export function ReportsPage() {
                         Comprehensive analytics and <span style={{ color: T.amber }}>industrial performance</span> tracking.
                     </p>
                 </div>
-                <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+                <div className="rpt-header-actions" style={{ display: "flex", gap: 10, flexShrink: 0 }}>
                     <button
                         onClick={handleExportCSV}
                         style={{ height: 40, padding: "0 18px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t1, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7 }}
@@ -262,9 +262,9 @@ export function ReportsPage() {
             <div className="rp-grid-2" style={{ alignItems: "start" }}>
 
                 {/* LEFT: Analytics Overview chart card */}
-                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div className="rpt-card" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                     {/* Card header */}
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                    <div className="rpt-chart-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
                         <div>
                             <div style={{ fontSize: 16, fontWeight: 700, color: T.t1, fontFamily: FONT.display }}>Analytics Overview</div>
                             <div style={{ fontSize: 11, color: T.t3, marginTop: 3, fontFamily: FONT.ui }}>
@@ -292,7 +292,7 @@ export function ReportsPage() {
                     </div>
 
                     {/* Chart */}
-                    <div style={{ marginTop: 24, height: 280 }}>
+                    <div className="rpt-chart" style={{ marginTop: 24, height: 280 }}>
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                                 <defs>
@@ -339,7 +339,7 @@ export function ReportsPage() {
                 </div>
 
                 {/* RIGHT: Generate Report panel */}
-                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: "20px 20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+                <div className="rpt-card" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: "20px 20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                     <div style={{ fontSize: 16, fontWeight: 700, color: T.t1, fontFamily: FONT.display, marginBottom: 4 }}>Generate Report</div>
                     <div style={{ fontSize: 11, color: T.t3, marginBottom: 20, fontFamily: FONT.ui }}>Configure and export custom industrial datasets.</div>
 
@@ -369,7 +369,7 @@ export function ReportsPage() {
                     {/* Date Range */}
                     <div style={{ marginBottom: 16 }}>
                         <label style={{ fontSize: 12, fontWeight: 600, color: T.t2, fontFamily: FONT.ui, display: "block", marginBottom: 6 }}>Date Range</label>
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div className="rpt-date-row" style={{ display: "flex", gap: 8 }}>
                             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} placeholder="dd-mm-yyyy"
                                 style={{ flex: 1, height: 38, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", fontSize: 12, color: T.t1, fontFamily: FONT.ui, outline: "none" }}
                                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
@@ -456,7 +456,7 @@ export function ReportsPage() {
                     <div style={{ padding: "40px 24px", textAlign: "center", color: T.t3, fontSize: 13 }}>No activity recorded yet. Start by adding sales or purchases.</div>
                 ) : (
                     <div className="table-scroll">
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                        <table className="rpt-logs-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                             <thead>
                                 <tr>
                                     {["Time", "Type", "Details", "Amount"].map(h => (
@@ -484,7 +484,7 @@ export function ReportsPage() {
             </div>
 
             {/* ── QUICK STATS STRIP ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+            <div className="kpi-grid-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                 {[
                     { label: "Total Sales Revenue", value: fmt(stats.totalSales), color: T.emerald, icon: "💰" },
                     { label: "Total Purchases (COGS)", value: fmt(stats.totalPurchases), color: T.sky, icon: "📥" },

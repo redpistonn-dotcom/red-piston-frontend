@@ -172,8 +172,8 @@ export function DashboardPage() {
       )}
 
       {/* TREND CHART */}
-      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: "20px 20px 12px", boxShadow: SHADOWS.sm }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+      <div className="dash-card" style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: "20px 20px 12px", boxShadow: SHADOWS.sm }}>
+        <div className="dash-card-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, fontFamily: FONT.display, letterSpacing: "-0.01em" }}>Performance Intelligence</div>
             <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>{days}-Day Outlook · Revenue, Profit & Expenses</div>
@@ -223,17 +223,17 @@ export function DashboardPage() {
       </div>
 
       {/* PROFIT INTELLIGENCE TABLE */}
-      <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.sm }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+      <div className="dash-card" style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.sm }}>
+        <div className="dash-card-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: "1.5px", textTransform: "uppercase", color: T.t3 }}>Product Profit Intelligence</div>
-          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          <div className="dash-filter-pills" style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {[["unit_profit", "Profit/U"], ["margin", "Margin%"], ["total_profit", "Total"], ["revenue", "Revenue"]].map(([v, l]) => (
               <button key={v} onClick={() => setProfitView(v)} style={{ background: profitView === v ? T.amber : "transparent", color: profitView === v ? "#fff" : T.t2, border: `1px solid ${profitView === v ? T.amber : T.border}`, borderRadius: 6, padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>{l}</button>
             ))}
           </div>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table className="dash-table" style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
                 {["#", "Product", "Category", "Buy", "Sell", "Profit/Unit", "Margin", "Sold", "Total Profit", "Signal"].map(h => (
@@ -285,7 +285,7 @@ export function DashboardPage() {
       <div className="rp-grid-3" style={{ display: "grid" }}>
 
         {/* Panel 1: Inventory Valuation — white card */}
-        <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.xs }}>
+        <div className="dash-card" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.xs }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, fontFamily: FONT.ui }}>Inventory Valuation</div>
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 11, color: T.t3, marginBottom: 2 }}>Current Stock Cost</div>
@@ -308,7 +308,7 @@ export function DashboardPage() {
         </div>
 
         {/* Panel 2: Dead Stock — dark card (inverseSurface #313030) */}
-        <div style={{ background: "#313030", border: "1px solid #444", borderRadius: 16, padding: 20, boxShadow: SHADOWS.md, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+        <div className="dash-card" style={{ background: "#313030", border: "1px solid #444", borderRadius: 16, padding: 20, boxShadow: SHADOWS.md, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, fontFamily: FONT.ui }}>Dead Stock</div>
             <div style={{ fontSize: 36, fontWeight: 800, color: "#FFFFFF", fontFamily: FONT.mono, letterSpacing: "-0.03em", lineHeight: 1 }}>
@@ -336,7 +336,7 @@ export function DashboardPage() {
         </div>
 
         {/* Panel 3: Financial Snapshot — white card, 2×2 grid */}
-        <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.xs }}>
+        <div className="dash-card" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.xs }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 14, fontFamily: FONT.ui }}>Financial Snapshot</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {/* Receivable */}
