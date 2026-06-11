@@ -200,7 +200,14 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
   const totalValue = cart.reduce((s, c) => s + (c.buyPrice || c.sellPrice) * c.qty, 0);
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0, overflow: 'hidden' }}>
+    <div className="bsim-row" style={{ display: 'flex', height: '100%', gap: 0, overflow: 'hidden' }}>
+      <style>{`
+        @media (max-width: 760px) {
+          .bsim-row { flex-direction: column !important; height: auto !important; overflow: visible !important; }
+          .bsim-row > div { flex: 1 1 auto !important; border-right: none !important; }
+          .bsim-cart { border-top: 1px solid #E0D5C8; max-height: 45vh; }
+        }
+      `}</style>
 
       {/* ── LEFT: Search + Configure ──────────────────────────────────── */}
       <div style={{ flex: '1 1 58%', display: 'flex', flexDirection: 'column', borderRight: `1px solid ${T.border}`, overflow: 'hidden' }}>
@@ -373,7 +380,7 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
       </div>
 
       {/* ── RIGHT: Cart ───────────────────────────────────────────────── */}
-      <div style={{ flex: '0 0 42%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="bsim-cart" style={{ flex: '0 0 42%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px 10px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>🛒</span>
           <span style={{ fontSize: 13, fontWeight: 800, color: T.t1 }}>Cart</span>

@@ -151,7 +151,7 @@ function BackButton({ onClick, label = "Back to search" }) {
 // ─── sub-component: CartPanel ─────────────────────────────────────────────────
 function CartPanel({ cart, onRemove, onSaveAll, saving }) {
   return (
-    <div style={{
+    <div className="csim-cart" style={{
       width: 268,
       flexShrink: 0,
       borderLeft: `1px solid ${T.border}`,
@@ -1109,7 +1109,14 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
       subtitle={subtitles[step]}
       width={980}
     >
-      <div style={{ display: "flex", gap: 0, alignItems: "flex-start", minHeight: 480 }}>
+      <div className="csim-row" style={{ display: "flex", gap: 0, alignItems: "flex-start", minHeight: 480 }}>
+        <style>{`
+          @media (max-width: 760px) {
+            .csim-row { flex-direction: column !important; min-height: 0 !important; }
+            .csim-row > div { padding-right: 0 !important; width: 100% !important; }
+            .csim-cart { border-left: none !important; padding-left: 0 !important; border-top: 1px solid #E0D5C8; padding-top: 16px; margin-top: 16px; }
+          }
+        `}</style>
 
         {/* ── Left panel: search / configure / contribute ── */}
         <div style={{ flex: 1, minWidth: 0, paddingRight: 20, overflowY: "auto" }}>

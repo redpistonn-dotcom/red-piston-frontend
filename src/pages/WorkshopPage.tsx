@@ -363,7 +363,7 @@ export function WorkshopPage() {
             {/* ── PAGE TAB SWITCHER ── */}
             <div className="ws-tabs" style={{ display: "flex", gap: 6 }}>
                 {([["jobs", "🔧", "Job Cards"], ["marketplace", "🌐", "Parts Marketplace"]] as const).map(([id, icon, label]) => (
-                    <button key={id} onClick={() => setWorkshopTab(id)}
+                    <button key={id} onClick={() => { setWorkshopTab(id); setSearch(""); setMpSearch(""); setMpFilter("all"); }}
                         style={{ height: 40, padding: "0 18px", borderRadius: 9, border: `1.5px solid ${workshopTab === id ? T.amber : T.border}`, background: workshopTab === id ? T.amber : "#FFFFFF", color: workshopTab === id ? "#FFFFFF" : T.t2, fontSize: 13, fontWeight: workshopTab === id ? 700 : 500, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s" }}>
                         <span>{icon}</span> {label}
                         {id === "marketplace" && mpKpi.liveCount > 0 && (

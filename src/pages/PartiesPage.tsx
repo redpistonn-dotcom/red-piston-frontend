@@ -187,12 +187,12 @@ export function PartiesPage() {
 
             {/* ── TOP ROW: Tabs + Export + Add ── */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                {/* Tab pills */}
-                <div style={{ display: "flex", gap: 6, flex: 1, minWidth: 0 }}>
+                {/* Tab pills — horizontally scrollable so all three fit on narrow phones */}
+                <div style={{ display: "flex", gap: 6, flex: 1, minWidth: 0, overflowX: "auto", scrollbarWidth: "none" }}>
                     {TAB_DEFS.map(t => (
                         <button key={t.id} onClick={() => { setView(t.id); setSearch(""); }}
                             style={{
-                                height: 38, padding: "0 18px", borderRadius: 9, border: `1.5px solid ${view === t.id ? T.amber : T.border}`,
+                                height: 38, padding: "0 14px", flexShrink: 0, borderRadius: 9, border: `1.5px solid ${view === t.id ? T.amber : T.border}`,
                                 background: view === t.id ? T.amber : "#FFFFFF",
                                 color: view === t.id ? "#FFFFFF" : T.t2,
                                 fontSize: 13, fontWeight: view === t.id ? 700 : 500,

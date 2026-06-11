@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment, useContext } from "react";
+import { useState, useMemo, useEffect, Fragment, useContext } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { CATEGORIES, stockStatus, margin, fmt, downloadCSV, generateCSV, useDebounce } from "../utils";
 import { Badge, Btn, Input, Select, useIsMobile, ResponsiveTable } from "../components/ui";
@@ -43,6 +43,12 @@ export function InventoryPage() {
     const [selectedIds, setSelectedIds] = useState([]);
 
     const debouncedSearch = useDebounce(search, 300);
+
+    // Reset pagination whenever a filter changes — otherwise a previous
+    // "Load more" depth carries over to a freshly-filtered (shorter) list
+    useEffect(() => {
+        setVisibleCount(50);
+    }, [debouncedSearch, cat, statusF, selBrand, selModel, selYear]);
 
     // Vehicle data via TanStack Query — auto-cached, no manual useEffect needed
     const { data: mfgData } = useVehicleManufacturers();
@@ -319,7 +325,7 @@ export function InventoryPage() {
                 <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
                     Showing <span style={{ color: T.t1, fontWeight: 700 }}>{Math.min(visibleCount, filtered.length)}</span> of <span style={{ color: T.t1, fontWeight: 700 }}>{filtered.length}</span> products
                     {(search || cat !== "All" || statusF !== "All") && (
-                        <button onClick={() => { setSearch(""); setCat("All"); setStatusF("All"); }} style={{ marginLeft: 10, background: "none", border: "none", color: T.amber, fontSize: 12, cursor: "pointer", fontWeight: 600, fontFamily: FONT.ui }}>Clear filters</button>
+                        <button onClick={() => { setSearch(""); setCat("All"); setStatusF("All"); setSelBrand(null); setSelModel(null); setSelYear(""); }} style={{ marginLeft: 10, background: "none", border: "none", color: T.amber, fontSize: 12, cursor: "pointer", fontWeight: 600, fontFamily: FONT.ui }}>Clear filters</button>
                     )}
                 </div>
                 <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>{shopProducts.length} total SKUs</div>
@@ -331,7 +337,7 @@ export function InventoryPage() {
                     <div style={{ fontSize: 56, opacity: 0.3, marginBottom: 16 }}>📦</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: T.t2, marginBottom: 8, fontFamily: FONT.display }}>No products found</div>
                     <div style={{ fontSize: 13, color: T.t3, marginBottom: 20 }}>Try adjusting your search or filters</div>
-                    <button onClick={() => { setSearch(""); setCat("All"); setStatusF("All"); }} style={{ background: T.amber, border: "none", borderRadius: 10, padding: "8px 20px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>Clear Filters</button>
+                    <button onClick={() => { setSearch(""); setCat("All"); setStatusF("All"); setSelBrand(null); setSelModel(null); setSelYear(""); }} style={{ background: T.amber, border: "none", borderRadius: 10, padding: "8px 20px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>Clear Filters</button>
                 </div>
             )}
 

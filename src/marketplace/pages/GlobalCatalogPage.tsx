@@ -128,7 +128,7 @@ export function GlobalCatalogPage({ onBack }) {
             </div>
 
             {/* Stats Row */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, marginBottom: 28 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 28 }}>
                 {[
                     { label: "Total SKUs", value: stats.total, icon: "📦", color: T.sky },
                     { label: "Published", value: stats.published, icon: "✓", color: T.emerald },

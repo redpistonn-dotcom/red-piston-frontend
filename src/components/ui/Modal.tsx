@@ -85,6 +85,9 @@ export function Modal({ open, onClose, title, subtitle, width = 560, children }:
         >
             <div
                 ref={containerRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={title || "Dialog"}
                 style={{
                     background: T.card,
                     border: isMobile ? "none" : `1px solid ${T.borderHi}`,

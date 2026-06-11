@@ -73,7 +73,7 @@ export function ProductCard({ item, onClick, inCompare, onCompareToggle, variant
         borderRadius: 14, padding: 0, cursor: "pointer",
         transition: "all 0.18s", display: "flex", flexDirection: "column",
         position: "relative", boxShadow: C.cardShadow,
-        width: 260, flexShrink: 0, overflow: "hidden",
+        width: 260, maxWidth: "calc(100vw - 32px)", flexShrink: 0, overflow: "hidden",
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = variant === "light" ? "0 8px 28px rgba(190,43,26,0.15)" : "0 8px 28px rgba(0,0,0,0.3)"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = C.cardShadow; }}
@@ -83,7 +83,7 @@ export function ProductCard({ item, onClick, inCompare, onCompareToggle, variant
         onClick={e => { e.stopPropagation(); handleWishlist(); }}
         style={{
           position: "absolute", top: 10, right: 10, zIndex: 10,
-          width: 30, height: 30, borderRadius: "50%",
+          width: 38, height: 38, borderRadius: "50%",
           background: wishlisted ? "rgba(239,68,68,0.1)" : C.heartBg,
           border: wishlisted ? "1.5px solid #DC2626" : C.heartBorder || "none",
           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",

@@ -177,8 +177,10 @@ export function ReportsPage() {
     };
 
     const handleExportCSV = () => {
-        const fromTs = dateFrom ? new Date(dateFrom.split("-").reverse().join("-")).getTime() : 0;
-        const toTs = dateTo ? new Date(dateTo.split("-").reverse().join("-")).getTime() + 86399999 : Date.now();
+        // <input type="date"> values are already ISO (YYYY-MM-DD) — reversing
+        // them produced DD-MM-YYYY, which Date() can't parse (NaN broke the export)
+        const fromTs = dateFrom ? new Date(dateFrom + "T00:00:00").getTime() : 0;
+        const toTs = dateTo ? new Date(dateTo + "T23:59:59.999").getTime() : Date.now();
         const filtered = shopMovements.filter(m => m.date >= fromTs && m.date <= toTs);
 
         if (reportType === "Sales Summary" || reportType === "P&L Statement") {
