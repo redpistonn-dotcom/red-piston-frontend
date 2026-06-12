@@ -751,7 +751,7 @@ function AppContent() {
           <Route path="/marketplace/checkout" element={currentUser ? <MPShell><CheckoutPage /></MPShell>       : <Navigate to="/login" replace />} />
 
           {/* Shared pages — shell matches role */}
-          <Route path="/profile"  element={<AuthenticatedShell user={currentUser}><ProfilePage user={currentUser} onUserUpdate={(u) => setCurrentUser(u)} /></AuthenticatedShell>} />
+          <Route path="/profile"  element={<AuthenticatedShell user={currentUser}><ProfilePage user={currentUser} onUserUpdate={(u) => setCurrentUser(u)} onLogout={handleLogout} /></AuthenticatedShell>} />
           <Route path="/settings" element={<AuthenticatedShell user={currentUser}><SettingsPage onLogout={handleLogout} /></AuthenticatedShell>} />
 
           {/* Admin */}

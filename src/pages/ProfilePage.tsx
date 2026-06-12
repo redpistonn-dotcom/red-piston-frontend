@@ -203,7 +203,7 @@ function GarageForm({ initial, onSave, onCancel, saving }) {
 }
 
 // ─── Main ProfilePage ──────────────────────────────────────────────────────────
-export function ProfilePage({ user, onUserUpdate }) {
+export function ProfilePage({ user, onUserUpdate, onLogout }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -969,6 +969,23 @@ export function ProfilePage({ user, onUserUpdate }) {
             </button>
           </div>
         )}
+
+        {/* ─── Log Out (all users) ─── */}
+        <div style={{ ...S.section, border: `1px solid rgba(186,26,26,0.25)` }}>
+          <div style={{ ...S.sectionTitle, color: T.crimson }}>⏻ Log Out</div>
+          <div style={{ fontSize: 13, color: T.t3, marginBottom: 12, lineHeight: 1.5 }}>
+            You'll be signed out of this device and returned to the login page.
+          </div>
+          <button
+            style={S.btn("danger")}
+            onClick={() => {
+              if (onLogout) onLogout();
+              else window.location.replace("/login");
+            }}
+          >
+            Log Out
+          </button>
+        </div>
       </div>
 
       {toast && <div style={S.toast}>{toast}</div>}

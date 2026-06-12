@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, Fragment, useContext } from "react";
 import { T, FONT, SHADOWS } from "../theme";
-import { CATEGORIES, stockStatus, margin, fmt, downloadCSV, generateCSV, useDebounce } from "../utils";
+import { CATEGORIES, stockStatus, margin, fmt, useDebounce } from "../utils";
 import { Badge, Btn, Input, Select, useIsMobile, ResponsiveTable } from "../components/ui";
 import { PurchaseModal } from "../components/PurchaseModal";
+import { PurchaseOrderModal } from "../components/PurchaseOrderModal";
 import { SaleModal } from "../components/SaleModal";
 import { StockAdjustmentModal } from "../components/StockAdjustmentModal";
 import { printBarcodeLabels } from "../barcode";
@@ -23,7 +24,7 @@ function isProductCompatible(product, matchStr) {
 }
 
 export function InventoryPage() {
-  const { movements, activeShopId, saveProducts } = useStore();
+  const { movements, activeShopId, saveProducts, shops } = useStore();
   const { handleSale: onSale, handlePurchase: onPurchase, handleAdjustment: onAdjust, toast, setAddProdOpen, setPModal } = useContext(AppCtx);
 
   // Fetch inventory directly from the API on every mount — never trust
@@ -54,6 +55,7 @@ export function InventoryPage() {
     const [selModel, setSelModel] = useState(null);   // full VehicleModel object
     const [selYear, setSelYear] = useState("");
     const [selectedIds, setSelectedIds] = useState([]);
+    const [poModalOpen, setPoModalOpen] = useState(false);
 
     const debouncedSearch = useDebounce(search, 300);
 
@@ -137,43 +139,14 @@ export function InventoryPage() {
     };
 
     const handleGeneratePO = () => {
-        // Use selected items if any, otherwise default to all low stock items
-        let itemsToPO = [];
-        if (selectedIds.length > 0) {
-            itemsToPO = shopProducts.filter(p => selectedIds.includes(p.id));
-        } else {
-            itemsToPO = shopProducts.filter(p => p.stock < p.minStock);
-        }
-
+        const itemsToPO = selectedIds.length > 0
+            ? shopProducts.filter(p => selectedIds.includes(p.id))
+            : shopProducts.filter(p => p.stock < p.minStock);
         if (itemsToPO.length === 0) {
             toast?.("No items selected or below minimum stock!", "info");
             return;
         }
-
-        // Group by supplier for real PO generation
-        const bySupplier = {};
-        itemsToPO.forEach(p => {
-            const supplier = p.supplier || "Unknown Supplier";
-            if (!bySupplier[supplier]) bySupplier[supplier] = [];
-            const reorderQty = Math.max(p.minStock * 2 - p.stock, p.minStock);
-            bySupplier[supplier].push({ ...p, reorderQty, estimatedCost: reorderQty * p.buyPrice });
-        });
-        // Generate CSV
-        const headers = ["Supplier", "Product", "SKU", "Category", "Current Stock", "Min Stock", "Reorder Qty", "Buy Price", "Estimated Cost"];
-        const rows = [];
-        Object.entries(bySupplier).forEach(([supplier, items]) => {
-            items.forEach(p => {
-                rows.push([supplier, p.name, p.sku, p.category, p.stock, p.minStock, p.reorderQty, p.buyPrice, p.estimatedCost]);
-            });
-        });
-        const totalCost = rows.reduce((s, r) => s + r[8], 0);
-        rows.push(["", "", "", "", "", "", "TOTAL:", "", totalCost]);
-        const dateStr = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }).replace(/\s/g, "_");
-        downloadCSV(`Draft_PO_${dateStr}.csv`, generateCSV(headers, rows));
-        toast?.(`Draft PO generated: ${itemsToPO.length} items across ${Object.keys(bySupplier).length} suppliers · ${fmt(totalCost)} estimated cost`, "success", "📦 PO Downloaded");
-        
-        // Clear selection after generation
-        setSelectedIds([]);
+        setPoModalOpen(true);
     };
 
     const toggleSelect = (id, e) => {
@@ -563,6 +536,14 @@ export function InventoryPage() {
             <SaleModal open={!!saleP} product={saleP} products={products} onClose={() => setSaleP(null)} onSave={(data) => onSale(data)} toast={toast} />
             <PurchaseModal open={!!purchP} product={purchP} products={products} onClose={() => setPurchP(null)} onSave={(data) => onPurchase(data)} toast={toast} />
             <StockAdjustmentModal open={!!adjP} product={adjP} products={products} onClose={() => setAdjP(null)} onSave={(data) => onAdjust(data)} toast={toast} />
+            <PurchaseOrderModal
+                open={poModalOpen}
+                onClose={() => { setPoModalOpen(false); setSelectedIds([]); }}
+                products={shopProducts}
+                preselectedIds={selectedIds}
+                shopName={(shops || []).find(s => (s.id ?? s.shopId) === activeShopId)?.name || "RED PISTON — Shop"}
+                toast={toast}
+            />
         </div>
     );
 }
