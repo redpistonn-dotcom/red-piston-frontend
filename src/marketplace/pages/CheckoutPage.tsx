@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { T, FONT } from "../../theme";
 import { useStore } from "../../store";
+import { api } from "../../api/client";
 import { fmt, uid } from "../../utils";
 import { DELIVERY_SLOTS } from "../api/mockDatabase";
 import { assignDeliveryPartner } from "../api/engine";
@@ -97,6 +98,41 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
             return;
         }
 
+        // Try to create real backend orders first. Mock-seeded cart items carry no
+        // numeric DB inventoryId — in that case skip the API silently. The local
+        // order flow below ALWAYS runs, so the UI never breaks on API failure.
+        let backendOrders: any[] = [];
+        const hasDbIds = safeCart.length > 0 && safeCart.every(item => {
+            const invId = Number(item.listing?.inventoryId);
+            return Number.isInteger(invId) && invId > 0;
+        });
+        if (hasDbIds) {
+            try {
+                const paymentMode =
+                    paymentMethod === "cod" ? "COD"
+                    : paymentMethod === "card" ? "CARD"
+                    : paymentMethod === "netbanking" ? "NETBANKING"
+                    : "UPI";
+                const res = await api.post<{ success?: boolean; orders?: any[]; orderNumber?: string }>("/api/marketplace/orders", {
+                    items: safeCart.map(item => ({
+                        inventoryId: Number(item.listing?.inventoryId),
+                        shopId: item.listing?.shop_id,
+                        qty: item.qty,
+                        unitPrice: item.listing?.selling_price || 0,
+                        partName: item.product?.name || "Part",
+                        brand: item.product?.brand || null,
+                    })),
+                    customerName: address.name,
+                    deliveryAddress: `${address.line1}${address.line2 ? `, ${address.line2}` : ""}, ${address.city}, ${address.state} - ${address.pincode}`,
+                    paymentMode,
+                    customerVehicleId: null,
+                });
+                backendOrders = res?.orders || [];
+            } catch (err) {
+                console.error("[CheckoutPage] Backend order creation failed — keeping local order only:", err);
+            }
+        }
+
         // Create orders per shop
         const newOrders = [...(orders || [])];
         const newMovements = [...(movements || [])];
@@ -109,6 +145,8 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
             ids.push(orderId);
             const itemStr = group.items.map(i => `${i.product?.name || "Part"} × ${i.qty}`).join(", ");
             const deliveryPartner = assignDeliveryPartner(group.shop);
+            // Backend creates one order per shop — attach its id to the local order.
+            const backendOrder = backendOrders.find(o => Number(o.shopId) === Number(group.shopId));
 
             newOrders.push({
                 id: orderId, shopId: group.shopId,
@@ -124,6 +162,8 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                 estimatedDelivery: selectedSlot.desc,
                 paymentSettled: false,
                 customerConfirmed: false,
+                backendOrderId: backendOrder?.orderId ?? null,
+                backendOrderNumber: backendOrder?.orderNumber ?? null,
             });
 
             group.items.forEach(ci => {

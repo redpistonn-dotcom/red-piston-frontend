@@ -648,6 +648,35 @@ export function ProfilePage({ user, onUserUpdate }) {
           </div>
         )}
 
+        {/* ─── Customer: Danger Zone — delete account ─── */}
+        {role === "CUSTOMER" && (
+          <div style={{ ...S.section, border: `1px solid rgba(186,26,26,0.25)` }}>
+            <div style={{ ...S.sectionTitle, color: T.crimson }}>⚠️ Danger Zone</div>
+            <div style={{ fontSize: 13, color: T.t3, marginBottom: 12, lineHeight: 1.5 }}>
+              Deleting your account removes your personal details, addresses and saved vehicles.
+              This cannot be undone.
+            </div>
+            <button
+              style={{ ...S.btn("danger") }}
+              onClick={async () => {
+                if (!window.confirm("Delete your account permanently? This cannot be undone.")) return;
+                if (!window.confirm("Last check — all your saved vehicles and addresses will be removed. Continue?")) return;
+                try {
+                  await api.delete("/api/auth/me");
+                  localStorage.removeItem("as_user");
+                  localStorage.removeItem("as_refresh_token");
+                  window.location.replace("/");
+                } catch (e) {
+                  console.error("[ProfilePage] account deletion failed", e);
+                  alert("Could not delete your account — please try again or contact support.");
+                }
+              }}
+            >
+              Delete My Account
+            </button>
+          </div>
+        )}
+
         {/* ─── Shop Owner: Staff Management ─── */}
         {role === "SHOP_OWNER" && (
           <div style={S.section}>

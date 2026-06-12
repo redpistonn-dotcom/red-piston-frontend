@@ -1,7 +1,8 @@
-import { useState, useMemo, useContext } from "react";
+import { useState, useMemo, useContext, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { T, FONT, SHADOWS } from "../theme";
 import { useStore } from "../store";
+import { api } from "../api/client";
 import { AppCtx } from "../AppCtx";
 import { fmt, fmtDate, downloadCSV, generateCSV, uid } from "../utils";
 import { MobileCard, MobileCardList, useIsMobile } from "../components/ui";
@@ -54,6 +55,23 @@ function TypeBadge({ type }: { type: "Sale" | "Purchase" }) {
         }}>{type}</span>
     );
 }
+
+// ─── Backend marketplace order helpers ───────────────────────────────────────
+// Backend lifecycle (PENDING|CONFIRMED|PACKED|SHIPPED|DELIVERED|CANCELLED|RETURNED)
+// → this page's OrderStatus badge values.
+const MKT_STATUS_TO_LOCAL: Record<string, OrderStatus> = {
+    PENDING: "Pending", NEW: "Pending", CONFIRMED: "Processing", PACKED: "Processing",
+    SHIPPED: "Shipped", DELIVERED: "Delivered", CANCELLED: "Cancelled", RETURNED: "Cancelled",
+};
+
+// Next step in the fulfilment chain, used by the "advance status" pill button.
+const MKT_NEXT_STATUS: Record<string, { next: string; label: string }> = {
+    PENDING:   { next: "CONFIRMED", label: "Confirm" },
+    NEW:       { next: "CONFIRMED", label: "Confirm" },
+    CONFIRMED: { next: "PACKED",    label: "Packed" },
+    PACKED:    { next: "SHIPPED",   label: "Shipped" },
+    SHIPPED:   { next: "DELIVERED", label: "Delivered" },
+};
 
 // ─── Derive orders from movements ────────────────────────────────────────────
 function movementToOrder(m: any) {
@@ -162,6 +180,31 @@ export function OrdersPage() {
     const [search, setSearch] = useState("");
     const [showCreate, setShowCreate] = useState(false);
     const [visibleCount, setVisibleCount] = useState(25);
+    const [shopApiOrders, setShopApiOrders] = useState<any[]>([]);
+
+    // Real incoming marketplace orders for this shop. Non-blocking: failure just
+    // leaves the local-store derivation as-is.
+    const fetchShopOrders = useCallback(async () => {
+        try {
+            const res = await api.get<{ success?: boolean; data?: { orders?: any[]; total?: number } }>("/api/marketplace/orders/shop");
+            setShopApiOrders(res?.data?.orders || []);
+        } catch (err) {
+            console.error("[OrdersPage] Failed to fetch marketplace shop orders:", err);
+        }
+    }, []);
+
+    useEffect(() => { fetchShopOrders(); }, [fetchShopOrders]);
+
+    const handleAdvanceStatus = async (backendId: number, next: string) => {
+        try {
+            await api.put(`/api/marketplace/orders/${backendId}/status`, { status: next });
+            toast?.(`Order moved to ${next}.`, "success");
+            await fetchShopOrders();
+        } catch (err) {
+            console.error("[OrdersPage] Failed to update marketplace order status:", err);
+            toast?.("Could not update order status. Please try again.", "error");
+        }
+    };
 
     const shopMovements = useMemo(
         () => (movements || []).filter(m => m.shopId === activeShopId),
@@ -175,9 +218,27 @@ export function OrdersPage() {
             .filter((o): o is NonNullable<ReturnType<typeof movementToOrder>> => o !== null)
             .sort((a, b) => b.date - a.date);
 
-        // Also include marketplace orders if any
+        // Real backend marketplace orders (GET /api/marketplace/orders/shop)
+        const backendIdSet = new Set(shopApiOrders.map(o => Number(o.orderId)));
+        const fromBackendMkt = shopApiOrders.map(o => ({
+            id: `mkt-${o.orderId}`,
+            orderId: `#MO-${String(o.orderId).padStart(5, "0")}`,
+            date: o.createdAt ? new Date(o.createdAt).getTime() : Date.now(),
+            partyName: o.customerName || o.customer?.name || "Customer",
+            partyId: `PT-${String(o.orderId).padStart(5, "0")}`,
+            type: "Sale" as const,
+            status: MKT_STATUS_TO_LOCAL[o.status] || "Pending",
+            amount: Number(o.total) || 0,
+            product: (o.items || []).map((i: any) => `${i.partName || i.inventory?.masterPart?.partName || "Part"} × ${i.qty}`).join(", "),
+            cancelled: o.status === "CANCELLED" || o.status === "RETURNED",
+            mktBackendId: o.orderId as number,
+            mktStatus: o.status as string,
+        }));
+
+        // Also include local marketplace orders if any (skip ones the backend
+        // already returned — checkout attaches backendOrderId; backend wins)
         const fromMarket = (mktOrders || [])
-            .filter(o => !activeShopId || o.shopId === activeShopId)
+            .filter((o: any) => (!activeShopId || o.shopId === activeShopId) && !(o.backendOrderId && backendIdSet.has(Number(o.backendOrderId))))
             .map(o => ({
                 id: o.id,
                 orderId: `#SO-${String(o.id).slice(-5).padStart(5, "0")}`,
@@ -193,12 +254,12 @@ export function OrdersPage() {
 
         // Merge (deduplicate by orderId)
         const seen = new Set<string>();
-        return [...fromMovements, ...fromMarket].filter(o => {
+        return [...fromMovements, ...fromBackendMkt, ...fromMarket].filter(o => {
             if (seen.has(o.orderId)) return false;
             seen.add(o.orderId);
             return true;
         });
-    }, [shopMovements, mktOrders, activeShopId]);
+    }, [shopMovements, mktOrders, activeShopId, shopApiOrders]);
 
     // KPI stats
     const kpi = useMemo(() => {
@@ -384,6 +445,7 @@ export function OrdersPage() {
                         {filtered.slice(0, visibleCount).map((order) => {
                             const isSale = order.type === "Sale";
                             const isCancelled = order.status === "Cancelled";
+                            const adv = (order as any).mktBackendId ? MKT_NEXT_STATUS[(order as any).mktStatus] : undefined;
                             const iconBtnStyle = { width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: T.t2 } as const;
                             return (
                                 <MobileCard key={order.orderId} accent={isSale ? T.amber : T.sky}>
@@ -407,7 +469,14 @@ export function OrdersPage() {
                                     {/* Bottom: type chip + icon actions */}
                                     <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
                                         <TypeBadge type={order.type} />
-                                        <div style={{ display: "flex", gap: 6 }}>
+                                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                            {adv && (
+                                                <button
+                                                    title={`Mark as ${adv.next}`}
+                                                    onClick={() => handleAdvanceStatus((order as any).mktBackendId, adv.next)}
+                                                    style={{ height: 30, padding: "0 12px", borderRadius: 20, border: `1px solid rgba(139,30,30,0.25)`, background: T.amberGlow, color: T.amber, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}
+                                                >{adv.label} →</button>
+                                            )}
                                             <button title="View" style={iconBtnStyle}>👁</button>
                                             <button title={isCancelled ? "Restore" : "Print"} onClick={() => { if (!isCancelled) window.print(); }} style={iconBtnStyle}>{isCancelled ? "↺" : "🖨"}</button>
                                             <button title="More options" style={iconBtnStyle}>⋯</button>
@@ -439,6 +508,7 @@ export function OrdersPage() {
                                 {filtered.slice(0, visibleCount).map((order, i) => {
                                     const isSale = order.type === "Sale";
                                     const isCancelled = order.status === "Cancelled";
+                                    const adv = (order as any).mktBackendId ? MKT_NEXT_STATUS[(order as any).mktStatus] : undefined;
                                     return (
                                         <tr key={order.orderId} className="trow" style={{
                                             borderBottom: i < Math.min(visibleCount, filtered.length) - 1 ? `1px solid ${T.border}` : "none",
@@ -477,6 +547,13 @@ export function OrdersPage() {
                                             {/* ACTIONS */}
                                             <td style={{ padding: "14px 16px", textAlign: "center" }}>
                                                 <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
+                                                    {adv && (
+                                                        <button
+                                                            title={`Mark as ${adv.next}`}
+                                                            onClick={() => handleAdvanceStatus((order as any).mktBackendId, adv.next)}
+                                                            style={{ height: 26, padding: "0 12px", borderRadius: 20, border: `1px solid rgba(139,30,30,0.25)`, background: T.amberGlow, color: T.amber, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap", transition: "all 0.12s" }}
+                                                        >{adv.label} →</button>
+                                                    )}
                                                     <button title="View" style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
                                                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
                                                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>

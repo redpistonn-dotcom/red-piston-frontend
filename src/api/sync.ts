@@ -206,6 +206,8 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
         rackLocation: product.rack,
         minStockAlert: product.minStock,
         isMarketplaceListed: product.isMarketplaceListed,
+        // Cloudinary photo from the ProductModal uploader — emoji placeholders stay local-only
+        ...(typeof product.image === 'string' && product.image.startsWith('http') && { imageUrl: product.image }),
       });
     }
   } catch (err: unknown) {

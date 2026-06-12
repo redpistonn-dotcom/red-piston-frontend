@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { T, FONT } from "../../theme";
 import { useStore } from "../../store";
+import { api } from "../../api/client";
 import { fmt, fmtDateTime, daysAgo } from "../../utils";
 
 const STATUS_META = {
@@ -13,6 +14,35 @@ const STATUS_META = {
 };
 
 const FLOW = ["NEW", "ACCEPTED", "PACKED", "DISPATCHED", "DELIVERED"];
+
+// Backend order lifecycle → this page's STATUS_META keys
+const BACKEND_STATUS_TO_LOCAL = {
+    PENDING: "NEW", NEW: "NEW", CONFIRMED: "ACCEPTED", PACKED: "PACKED",
+    SHIPPED: "DISPATCHED", DELIVERED: "DELIVERED", CANCELLED: "CANCELLED", RETURNED: "CANCELLED",
+};
+
+// Map one backend marketplace order → the local display shape used by this page.
+function mapBackendOrder(o: any) {
+    const itemStr = (o.items || [])
+        .map((i: any) => `${i.partName || i.inventory?.masterPart?.partName || "Part"} × ${i.qty}`)
+        .join(", ");
+    return {
+        id: o.orderNumber || `#ORD-${o.orderId}`,
+        backendOrderId: o.orderId,
+        shopId: o.shopId,
+        shopName: o.shop?.name || null,
+        customer: o.customerName || "Customer",
+        address: o.deliveryAddress || "—",
+        items: itemStr,
+        total: Number(o.total) || 0,
+        status: BACKEND_STATUS_TO_LOCAL[o.status] || "NEW",
+        time: o.createdAt ? new Date(o.createdAt).getTime() : Date.now(),
+        payment: o.paymentMode === "COD" ? "COD" : `Prepaid (${o.paymentMode || "Escrow"})`,
+        paymentSettled: o.paymentStatus === "PAID",
+        customerConfirmed: o.status === "DELIVERED",
+        deliveredAt: o.deliveredAt ? new Date(o.deliveredAt).getTime() : null,
+    };
+}
 
 // Simulated GPS route waypoints (Hyderabad context)
 const GPS_ROUTE = [
@@ -30,12 +60,35 @@ export function OrderTrackingPage({ onBack }) {
 
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [gpsPosition, setGpsPosition] = useState(0);
+    const [apiOrders, setApiOrders] = useState<any[]>([]);
 
-    // Get customer-facing orders (marketplace orders)
-    const myOrders = useMemo(
-        () => safeOrders.filter(o => o.address || o.payment?.includes("Escrow") || o.payment?.includes("COD") || o.payment?.includes("Prepaid")).sort((a, b) => b.time - a.time),
-        [safeOrders]
-    );
+    // Fetch real backend orders on mount — merged with local-store orders below.
+    // Failure is non-fatal: local orders keep rendering either way.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await api.get<{ success?: boolean; data?: { orders?: any[] } }>("/api/marketplace/orders");
+                const backendOrders = res?.data?.orders || [];
+                if (!cancelled) setApiOrders(backendOrders.map(mapBackendOrder));
+            } catch (err) {
+                console.error("[OrderTrackingPage] Failed to fetch backend orders:", err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Get customer-facing orders (marketplace orders) — backend + local merged.
+    // Dedupe by id and by backendOrderId (attached at checkout); backend wins.
+    const myOrders = useMemo(() => {
+        const local = safeOrders.filter(o => o.address || o.payment?.includes("Escrow") || o.payment?.includes("COD") || o.payment?.includes("Prepaid"));
+        const backendIds = new Set(apiOrders.map(o => o.backendOrderId));
+        const apiIds = new Set(apiOrders.map(o => o.id));
+        return [
+            ...apiOrders,
+            ...local.filter((o: any) => !apiIds.has(o.id) && !(o.backendOrderId && backendIds.has(o.backendOrderId))),
+        ].sort((a, b) => b.time - a.time);
+    }, [safeOrders, apiOrders]);
 
     // Simulate GPS movement for dispatched orders
     useEffect(() => {
@@ -266,7 +319,7 @@ export function OrderTrackingPage({ onBack }) {
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontSize: 16, fontWeight: 900, color: T.emerald }}>Payment Settled ✓</div>
                                             <div style={{ fontSize: 13, color: T.t2, marginTop: 4 }}>
-                                                {fmt(activeOrder.total)} released to {shop?.name || "Shop"}
+                                                {fmt(activeOrder.total)} released to {shop?.name || activeOrder.shopName || "Shop"}
                                             </div>
                                         </div>
                                         {/* Return Button */}
@@ -343,7 +396,7 @@ export function OrderTrackingPage({ onBack }) {
                                         </div>
                                         <div>
                                             <div style={{ color: T.t3, marginBottom: 4 }}>Shop</div>
-                                            <div style={{ fontWeight: 700, color: T.t1 }}>{shop?.name || "Local Shop"}</div>
+                                            <div style={{ fontWeight: 700, color: T.t1 }}>{shop?.name || activeOrder.shopName || "Local Shop"}</div>
                                         </div>
                                         <div>
                                             <div style={{ color: T.t3, marginBottom: 4 }}>Items</div>
