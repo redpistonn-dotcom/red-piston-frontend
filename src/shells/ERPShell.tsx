@@ -15,6 +15,7 @@ import { T, FONT, GLOBAL_CSS, SP, SHADOWS } from "../theme";
 import { fmt } from "../utils";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
+import { api } from "../api/client.js";
 import { Toast } from "../components/ui";
 import { ProfileDropdown } from "../components/ProfileDropdown";
 import { ProductModal } from "../components/ProductModal";
@@ -22,6 +23,7 @@ import { BulkStockInModal } from "../components/BulkStockInModal";
 import { CatalogStockInModal } from "../components/CatalogStockInModal";
 import { ProfileNudge } from "../components/ProfileNudge";
 import { BrandHeader } from "../components/BrandHeader";
+import { ImageUploader } from "../components/ImageUploader";
 
 // ── Sidebar width constants ─────────────────────────────────────────────────
 // Desktop default is a collapsed 68px icon rail; hovering expands it to 236px
@@ -79,6 +81,42 @@ export function ERPShell({ children }: ERPShellProps) {
 
   // ── Period filter ──────────────────────────────────────────────────────
   const [period, setPeriod] = useState<Period>("30D");
+
+  // ── Mandatory shop profile completion (photo + contact number) ─────────
+  const needsShopSetup = useMemo(() => {
+    if (currentUser?.role !== "SHOP_OWNER") return false;
+    const s = currentUser.shop;
+    if (!s) return false;
+    return !s.photoUrl || !s.whatsappNumber;
+  }, [currentUser]);
+  const [setupDone, setSetupDone] = useState(false);
+  const [setupPhone, setSetupPhone] = useState("");
+  const [setupPhoto, setSetupPhoto] = useState("");
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  // Pre-fill from existing data when modal first appears
+  useEffect(() => {
+    if (!needsShopSetup || setupDone) return;
+    const s = currentUser?.shop;
+    if (s?.whatsappNumber) setSetupPhone(s.whatsappNumber);
+    if (s?.photoUrl) setSetupPhoto(s.photoUrl);
+  }, [needsShopSetup, setupDone, currentUser]);
+
+  const handleSetupSave = async () => {
+    if (!setupPhone.trim()) { setSetupError("Shop contact number is required."); return; }
+    if (!setupPhoto) { setSetupError("Please upload a shop photo."); return; }
+    setSetupSaving(true); setSetupError("");
+    try {
+      await api.patch("/api/auth/me/shop", {
+        whatsappNumber: setupPhone.trim(),
+        photoUrl: setupPhoto.trim(),
+      });
+      setSetupDone(true);
+    } catch (e: any) {
+      setSetupError(e?.data?.error?.message || e?.message || "Failed to save. Please try again.");
+    }
+    setSetupSaving(false);
+  };
 
   // ── Shop name (editable in topbar) ────────────────────────────────────
   const shop = useMemo(() => {
@@ -584,26 +622,6 @@ export function ERPShell({ children }: ERPShellProps) {
             <MSIcon name="point_of_sale" size={20} />
           </button>
 
-          {/* Settings icon button */}
-          <button
-            onClick={() => navigate("/settings")}
-            title="Settings"
-            aria-label="Settings"
-            className="topbar-icon-btn"
-            style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: "transparent",
-              border: `1px solid ${T.border}`,
-              color: T.t2, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#8B1E1E"; (e.currentTarget as HTMLButtonElement).style.color = "#8B1E1E"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}
-          >
-            <MSIcon name="settings" size={20} />
-          </button>
-
           {/* Avatar / ProfileDropdown */}
           <ProfileDropdown user={currentUser} onLogout={handleLogout} />
         </div>
@@ -762,6 +780,100 @@ export function ERPShell({ children }: ERPShellProps) {
       </nav>
 
       <Toast items={toasts} onRemove={removeToast} />
+
+      {/* ── Mandatory shop setup modal ─────────────────────────────────────
+          Blocks all access until shop photo + contact number are filled in. */}
+      {needsShopSetup && !setupDone && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 99999,
+          background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24,
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 20, padding: "36px 32px",
+            width: "100%", maxWidth: 480, fontFamily: FONT.ui,
+            boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: "#8B1E1E18", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{ fontSize: 22 }}>🏪</span>
+              </div>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.3px" }}>
+                  Complete Your Shop Profile
+                </div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                  Required before you can access the dashboard
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              background: "#FEF3C7", border: "1px solid #F59E0B40", borderRadius: 10,
+              padding: "10px 14px", fontSize: 13, color: "#92400E", marginBottom: 24, marginTop: 16,
+              display: "flex", alignItems: "flex-start", gap: 8,
+            }}>
+              <span>⚠️</span>
+              <span>Your shop is missing a <strong>contact number</strong> and/or <strong>shop photo</strong>. Customers need these to reach and recognise your shop.</span>
+            </div>
+
+            {setupError && (
+              <div style={{
+                background: "#FEE2E2", border: "1px solid #FCA5A5", borderRadius: 8,
+                padding: "9px 12px", fontSize: 13, color: "#991B1B", marginBottom: 16,
+              }}>{setupError}</div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 8 }}>
+                Shop Photo <span style={{ color: "#8B1E1E" }}>*</span>
+              </label>
+              <ImageUploader
+                folder="shops"
+                currentUrl={setupPhoto || null}
+                onUploaded={(url) => { setSetupPhoto(url); setSetupError(""); }}
+                onError={(msg) => setSetupError(msg)}
+                label="Upload Shop Photo"
+                maxMb={5}
+              />
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: 6 }}>
+                Shop Contact Number <span style={{ color: "#8B1E1E" }}>*</span>
+              </label>
+              <input
+                style={{
+                  width: "100%", background: "#F9FAFB", border: "1.5px solid #E5E7EB",
+                  borderRadius: 10, padding: "11px 14px", fontSize: 14, color: "#111827",
+                  outline: "none", boxSizing: "border-box", fontFamily: FONT.ui,
+                }}
+                placeholder="+91 XXXXX XXXXX"
+                value={setupPhone}
+                onChange={e => setSetupPhone(e.target.value)}
+              />
+            </div>
+
+            <button
+              onClick={handleSetupSave}
+              disabled={setupSaving}
+              style={{
+                width: "100%", padding: "13px 0", background: setupSaving ? "#9ca3af" : "#8B1E1E",
+                color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                cursor: setupSaving ? "not-allowed" : "pointer", fontFamily: FONT.ui,
+                transition: "background 0.15s",
+              }}
+            >
+              {setupSaving ? "Saving…" : "Complete Setup & Continue"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

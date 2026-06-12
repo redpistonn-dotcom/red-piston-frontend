@@ -85,6 +85,17 @@ const STAFF_ROLE_COLORS = {
   MECHANIC: T.emerald, DELIVERY: "#F97316",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  SHOP_OWNER: "Shop Owner",
+  SHOP_STAFF: "Shop Staff",
+  CUSTOMER: "Customer",
+  PLATFORM_ADMIN: "Platform Admin",
+};
+function formatRole(role?: string) {
+  if (!role) return "";
+  return ROLE_LABELS[role] ?? role.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // ─── Address Form Modal ────────────────────────────────────────────────────────
 function AddressForm({ initial, onSave, onCancel, saving }) {
   const [form, setForm] = useState(initial || { label: "Home", fullName: "", phone: "", line1: "", line2: "", landmark: "", city: "", state: "", pincode: "" });
@@ -209,6 +220,7 @@ export function ProfilePage({ user, onUserUpdate }) {
   const [addresses, setAddresses] = useState([]);
   const [garageVehicles, setGarageVehicles] = useState([]);
   const [shopStaff, setShopStaff] = useState([]);
+  const [shopMetrics, setShopMetrics] = useState<{ inventoryCount: number; invoiceCount: number; activeStaffCount: number } | null>(null);
 
   // UI states
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -222,6 +234,14 @@ export function ProfilePage({ user, onUserUpdate }) {
   // Editable fields
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+
+  // Password change
+  const [pwdCurrent, setPwdCurrent] = useState("");
+  const [pwdNew, setPwdNew] = useState("");
+  const [pwdConfirm, setPwdConfirm] = useState("");
+  const [pwdSaving, setPwdSaving] = useState(false);
+  const [pwdError, setPwdError] = useState("");
+  const [pwdSuccess, setPwdSuccess] = useState("");
 
   // Pre-populate from the cached user prop immediately (no API wait)
   useEffect(() => {
@@ -251,13 +271,16 @@ export function ProfilePage({ user, onUserUpdate }) {
       if (data.addresses) setAddresses(data.addresses);
       if (data.garageVehicles) setGarageVehicles(data.garageVehicles);
       if (data.shopStaff) setShopStaff(data.shopStaff);
+      if (data.shopMetrics) setShopMetrics(data.shopMetrics);
     } catch (e) {
       // Non-fatal: we already have the user prop — just note the refresh failed
       // Don't block the UI with a hard error; the cached data is sufficient to use
       console.warn("[Profile] API refresh failed:", e.message);
-      if (!userData) {
-        // Only show error if we have no data at all
-        setError("Could not refresh profile from server. Showing cached data.");
+      // Use the `user` PROP (not `userData` state) — the state update from the
+      // first useEffect is still queued when this async catch runs, so `userData`
+      // reads as null even though cached data is available.
+      if (!user) {
+        setError("Could not load profile. Please try again.");
       }
     }
     setLoading(false);
@@ -313,6 +336,22 @@ export function ProfilePage({ user, onUserUpdate }) {
       setError(e.data?.error?.message || e.message || "Failed to save");
     }
     setSaving(false);
+  };
+
+  const handleChangePassword = async () => {
+    setPwdError(""); setPwdSuccess("");
+    if (!pwdCurrent.trim()) { setPwdError("Current password is required."); return; }
+    if (pwdNew.length < 6) { setPwdError("New password must be at least 6 characters."); return; }
+    if (pwdNew !== pwdConfirm) { setPwdError("Passwords do not match."); return; }
+    setPwdSaving(true);
+    try {
+      await api.post("/api/auth/change-password", { currentPassword: pwdCurrent, newPassword: pwdNew });
+      setPwdSuccess("Password changed successfully.");
+      setPwdCurrent(""); setPwdNew(""); setPwdConfirm("");
+    } catch (e: any) {
+      setPwdError(e?.data?.error?.message || e?.message || "Failed to change password.");
+    }
+    setPwdSaving(false);
   };
 
   // ── Address handlers ──────────────────────────────────────────────────────────
@@ -501,7 +540,7 @@ export function ProfilePage({ user, onUserUpdate }) {
             <div>
               <div style={{ fontSize: 18, fontWeight: 700 }}>{userData?.name || "—"}</div>
               <div style={{ fontSize: 13, color: T.t3 }}>{userData?.email || userData?.phone || "—"}</div>
-              <span style={S.badge(T.amber)}>{userData?.role}</span>
+              <span style={S.badge(T.amber)}>{formatRole(userData?.role)}</span>
               {userData?.emailVerified && <span style={{ ...S.badge(T.emerald), marginLeft: 6 }}>Email Verified</span>}
               {userData?.phoneVerified && <span style={{ ...S.badge(T.emerald), marginLeft: 6 }}>Phone Verified</span>}
             </div>
@@ -739,6 +778,47 @@ export function ProfilePage({ user, onUserUpdate }) {
           </div>
         )}
 
+        {/* ─── Change Password ─── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>🔒 Change Password</div>
+          {pwdError && <div style={{ ...S.error, marginBottom: 14 }}>{pwdError}</div>}
+          {pwdSuccess && (
+            <div style={{
+              background: "#0a1f12", border: `1.5px solid ${T.emerald}`, borderRadius: 10,
+              padding: "11px 14px", color: T.emerald, fontSize: 13, marginBottom: 14,
+            }}>{pwdSuccess}</div>
+          )}
+          <div style={S.field}>
+            <label style={S.label}>Current Password</label>
+            <input
+              style={S.input} type="password"
+              value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)}
+              placeholder="Enter current password"
+            />
+          </div>
+          <div className="settings-grid" style={S.row}>
+            <div style={S.field}>
+              <label style={S.label}>New Password</label>
+              <input
+                style={S.input} type="password"
+                value={pwdNew} onChange={e => setPwdNew(e.target.value)}
+                placeholder="Min. 6 characters"
+              />
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Confirm New Password</label>
+              <input
+                style={S.input} type="password"
+                value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)}
+                placeholder="Repeat new password"
+              />
+            </div>
+          </div>
+          <button style={S.btn("primary")} onClick={handleChangePassword} disabled={pwdSaving}>
+            {pwdSaving ? "Saving..." : "Update Password"}
+          </button>
+        </div>
+
         {/* ─── Linked Accounts ─── */}
         <div style={S.section}>
           <div style={S.sectionTitle}>🔗 Linked Accounts</div>
@@ -765,10 +845,66 @@ export function ProfilePage({ user, onUserUpdate }) {
           )}
         </div>
 
+        {/* ─── Shop Owner: Stats Overview ─── */}
+        {role === "SHOP_OWNER" && shopMetrics && (
+          <div style={S.section}>
+            <div style={S.sectionTitle}>📊 Shop Overview</div>
+            <div style={S.statRow}>
+              <div style={S.stat}>
+                <div style={S.statVal}>{shopMetrics.inventoryCount}</div>
+                <div style={S.statLabel}>Parts in Stock</div>
+              </div>
+              <div style={S.stat}>
+                <div style={S.statVal}>{shopMetrics.invoiceCount}</div>
+                <div style={S.statLabel}>Total Invoices</div>
+              </div>
+              <div style={S.stat}>
+                <div style={S.statVal}>{shopMetrics.activeStaffCount}</div>
+                <div style={S.statLabel}>Active Staff</div>
+              </div>
+              <div style={S.stat}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: shopData?.isVerified ? T.emerald : T.amber }}>
+                  {shopData?.isVerified ? "✓" : "⏳"}
+                </div>
+                <div style={S.statLabel}>{shopData?.isVerified ? "Verified" : "Pending"}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ─── Shop Details (Shop Owners only) ─── */}
         {shopData && (
           <div style={S.section}>
             <div style={S.sectionTitle}>🏪 Shop Details</div>
+
+            {/* Shop photo/logo preview */}
+            {(shopData.photoUrl || shopData.logoUrl) && (
+              <div style={{ display: "flex", gap: 16, marginBottom: 20, alignItems: "flex-start" }}>
+                {shopData.photoUrl && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Shop Photo</div>
+                    <img
+                      src={shopData.photoUrl}
+                      alt="Shop"
+                      style={{ width: 120, height: 80, objectFit: "cover", borderRadius: 10, border: `1px solid ${T.border}` }}
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  </div>
+                )}
+                {shopData.logoUrl && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Logo</div>
+                    <img
+                      src={shopData.logoUrl}
+                      alt="Logo"
+                      style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 10, border: `1px solid ${T.border}` }}
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="settings-grid" style={S.row}>
               <div style={S.field}>
                 <label style={S.label}>Shop Name</label>
@@ -785,8 +921,26 @@ export function ProfilePage({ user, onUserUpdate }) {
                 <input style={S.input} value={shopData.gstin || ""} onChange={e => setShopData(p => ({ ...p, gstin: e.target.value.toUpperCase() }))} placeholder="36AABCS1429B1Z1" />
               </div>
               <div style={S.field}>
+                <label style={S.label}>Shop Category</label>
+                <select style={{ ...S.input, cursor: "pointer" }} value={shopData.shopCategory || ""} onChange={e => setShopData(p => ({ ...p, shopCategory: e.target.value }))}>
+                  <option value="">Select category</option>
+                  <option value="AUTO_PARTS">Auto Parts</option>
+                  <option value="WORKSHOP">Workshop</option>
+                  <option value="BOTH">Auto Parts + Workshop</option>
+                  <option value="TYRES">Tyres</option>
+                  <option value="ELECTRICAL">Electrical</option>
+                  <option value="GENERAL">General</option>
+                </select>
+              </div>
+            </div>
+            <div className="settings-grid" style={S.row}>
+              <div style={S.field}>
                 <label style={S.label}>City</label>
                 <input style={S.input} value={shopData.city || ""} onChange={e => setShopData(p => ({ ...p, city: e.target.value }))} />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Pincode</label>
+                <input style={S.input} value={shopData.pincode || ""} onChange={e => setShopData(p => ({ ...p, pincode: e.target.value }))} placeholder="6-digit pincode" maxLength={6} />
               </div>
             </div>
             <div style={S.field}>
@@ -801,6 +955,14 @@ export function ProfilePage({ user, onUserUpdate }) {
                 onChange={e => setShopData(p => ({ ...p, shopDescription: e.target.value }))}
                 placeholder="Tell customers about your shop..."
               />
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Photo URL</label>
+              <input style={S.input} value={shopData.photoUrl || ""} onChange={e => setShopData(p => ({ ...p, photoUrl: e.target.value }))} placeholder="https://..." />
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>Logo URL</label>
+              <input style={S.input} value={shopData.logoUrl || ""} onChange={e => setShopData(p => ({ ...p, logoUrl: e.target.value }))} placeholder="https://..." />
             </div>
             <button style={S.btn("primary")} onClick={handleSaveShop} disabled={saving}>
               {saving ? "Saving..." : "Update Shop"}

@@ -15,9 +15,8 @@ const LOGO =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuAHoRqueT7rYQ9UU0uaqdoukDlx38GMecl-iaxA_YPsKta4MkYIh1zNn8Cq0sPsr7M4RgQ_U9qftq7c7PW05n3PYedVKG1_Cpvw5_kyltJtcea9-H5bNgTqs1NRGHFnhX112m_HSJaZ_F722rFQmkTxVmCCp4R5IZWlInV5SCBfQPTQHPO3YJFw6En0MQgRNEFl44PmMZH8bZyTjh0btvYW3gM2r1JgFZvpQS67UpJr1SYz_N81ByrPkXv3k89WFF_7n0z5A0S4BE4';
 
 const NAV_LINKS = [
-  { label: 'Home',        href: '/'            },
-  { label: 'Marketplace', href: '/marketplace' },
-  { label: 'Suppliers',   href: '/suppliers'   },
+  { label: 'Home',      href: '/marketplace' },
+  { label: 'Suppliers', href: '/suppliers'   },
 ];
 
 interface PublicHeaderProps {

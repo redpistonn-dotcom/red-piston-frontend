@@ -9,6 +9,7 @@ import { printBarcodeLabels } from "../barcode";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { useVehicleManufacturers, useVehicleModels } from "../hooks/queries";
+import { fetchInventory } from "../api/sync.js";
 
 // Pure helper — no fitment data = show universally (don't hide DB-backed parts)
 function isProductCompatible(product, matchStr) {
@@ -22,8 +23,20 @@ function isProductCompatible(product, matchStr) {
 }
 
 export function InventoryPage() {
-  const { products, movements, activeShopId } = useStore();
+  const { movements, activeShopId, saveProducts } = useStore();
   const { handleSale: onSale, handlePurchase: onPurchase, handleAdjustment: onAdjust, toast, setAddProdOpen, setPModal } = useContext(AppCtx);
+
+  // Fetch inventory directly from the API on every mount — never trust
+  // vl_products localStorage which may be stale from a previous session.
+  const [products, setProducts] = useState(null); // null = loading
+  useEffect(() => {
+    fetchInventory().then(data => {
+      const result = data ?? [];
+      setProducts(result);
+      saveProducts(result); // keep store in sync for other pages
+    });
+  }, []);
+
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });
     const [search, setSearch] = useState("");
@@ -73,7 +86,7 @@ export function InventoryPage() {
         return `${selBrand.name} ${selModel.name}`;
     }, [selBrand, selModel]);
 
-    const shopProducts = useMemo(() => products.filter(p => p.shopId === activeShopId), [products, activeShopId]);
+    const shopProducts = useMemo(() => (products ?? []).filter(p => p.shopId === activeShopId), [products, activeShopId]);
 
     const filtered = useMemo(() => {
         let list = shopProducts
@@ -177,6 +190,15 @@ export function InventoryPage() {
     };
 
     const isMobile = useIsMobile();
+
+    // Block render until API responds — prevents stale localStorage flash
+    if (products === null) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 320, color: "#9ca3af", fontFamily: FONT.ui, fontSize: 14 }}>
+          Loading inventory…
+        </div>
+      );
+    }
 
     return (
         <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>

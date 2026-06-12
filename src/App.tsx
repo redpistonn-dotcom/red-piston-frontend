@@ -288,14 +288,19 @@ function AppContent() {
 
   // ── Auth handlers ─────────────────────────────────────────────────────────────
   const handleLogin = useCallback((user) => {
+    // Clear stale inventory/movement data from any previous session so a fresh
+    // shop owner never sees another shop's products or leftover dev seed data.
+    // clearStore() wipes vl_products, vl_movements, vl_parties, etc. from both
+    // state and localStorage. We then re-set the new user's shopId immediately.
+    clearStore();
     setCurrentUser(user);
+    try { localStorage.setItem("as_user", JSON.stringify(user)); } catch {}
     if (user?.shopId) {
       setActiveShopId(user.shopId);
-      try { localStorage.setItem("vl_shopId", user.shopId); } catch {}
-      try { localStorage.setItem("as_user", JSON.stringify(user)); } catch {}
+      try { localStorage.setItem("vl_shopId", String(user.shopId)); } catch {}
     }
     navigate(getDefaultRoute(user), { replace: true });
-  }, [navigate, setActiveShopId]);
+  }, [navigate, setActiveShopId, clearStore]);
 
   useEffect(() => {
     if (!currentUser || !authReady) return;

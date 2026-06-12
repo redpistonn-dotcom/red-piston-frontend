@@ -15,12 +15,13 @@
  *   global brain (Layer 1) before writing to the per-shop ledger (Layer 3).
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { T, FONT } from "../theme";
 import { Modal, Field, Input, Select, Btn } from "./ui";
 import { BarcodeScanner } from "./BarcodeScanner.jsx";
 import { lookupCatalog, lookupByBarcode, scanBarcode, addInventory, contributePart } from "../api/inventory.js";
 import { uid, CATEGORIES, fmt } from "../utils";
+import { ImageUploader } from "./ImageUploader";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -484,7 +485,7 @@ function SearchStep({ onSelect, onManual, initialQuery }) {
               className="row-hover"
               style={{
                 padding: "12px 16px",
-                borderBottom: i < results.length - 1 ? `1px solid ${T.border}` : "none",
+                borderBottom: `1px solid ${T.border}`,
                 cursor: "pointer",
                 display: "flex", alignItems: "center", gap: 14,
                 background: T.card,
@@ -528,6 +529,35 @@ function SearchStep({ onSelect, onManual, initialQuery }) {
               </Btn>
             </div>
           ))}
+
+          {/* "Other" row — always shown at bottom of results */}
+          <div
+            onClick={() => onManual(query)}
+            className="row-hover"
+            style={{
+              padding: "11px 16px",
+              cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 14,
+              background: T.surface,
+              transition: "background 0.12s",
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center",
+              background: `${T.amber}14`, borderRadius: 8, flexShrink: 0, fontSize: 18,
+            }}>
+              ＋
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.amber }}>Other — not in the list</div>
+              <div style={{ fontSize: 11, color: T.t3, marginTop: 1 }}>
+                Add a new part manually and contribute it to the catalog
+              </div>
+            </div>
+            <Btn size="xs" variant="ghost" style={{ flexShrink: 0, borderColor: T.amber, color: T.amber }}>
+              Add →
+            </Btn>
+          </div>
         </div>
       )}
 
@@ -583,9 +613,11 @@ function SearchStep({ onSelect, onManual, initialQuery }) {
 
 // ─── Step 2: Configure price + stock ──────────────────────────────────────────
 function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
+  const catalogImage = part.imageUrl || (part.images && part.images[0]) || "";
   const [f, setF] = useState({
     buyPrice: "", sellPrice: "", stockQty: "0",
     rackLocation: "", minStockAlert: "5",
+    shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
   const [errors, setErrors] = useState({});
 
@@ -603,6 +635,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
     if (!f.buyPrice  || isNaN(f.buyPrice))  e.buyPrice  = "Required";
     if (!f.sellPrice || isNaN(f.sellPrice)) e.sellPrice = "Required";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
+    if (!f.shopImageUrl) e.shopImageUrl = "Product photo is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -685,6 +718,25 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
         <div style={{ fontSize: 11, fontWeight: 800, color: T.amber, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
           Your Shop Details — Price &amp; Stock
         </div>
+        {/* Shop photo — mandatory; can override catalog image */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: errors.shopImageUrl ? "#EF4444" : T.amber, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+            Product Photo <span style={{ color: "#EF4444" }}>*</span>
+            {catalogImage && <span style={{ fontWeight: 400, color: T.t3, textTransform: "none", letterSpacing: 0 }}> — catalog image pre-loaded; upload your own to override</span>}
+          </div>
+          <ImageUploader
+            folder="inventory"
+            currentUrl={f.shopImageUrl || null}
+            onUploaded={(url) => { set("shopImageUrl")(url); setErrors(e => ({ ...e, shopImageUrl: undefined })); }}
+            onError={(msg) => setErrors(e => ({ ...e, shopImageUrl: msg }))}
+            label="Upload Shop Photo"
+            maxMb={8}
+          />
+          {errors.shopImageUrl && (
+            <div style={{ fontSize: 11, color: "#EF4444", marginTop: 4, fontFamily: FONT.ui }}>{errors.shopImageUrl}</div>
+          )}
+        </div>
+
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <Field label="Buying Price (₹)" required error={errors.buyPrice}>
             <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" autoFocus />
@@ -753,10 +805,10 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
 // ─── Fallback: Contribute new part ────────────────────────────────────────────
 function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving }) {
   const blank = {
-    partName: initialName || "", brand: "", categoryL1: "Engine", categoryL2: "",
+    partName: initialName || "", brand: "", categoryL1: "", categoryL2: "",
     oemNumber: initialBarcode || "", hsnCode: "", gstRate: "18", unitOfSale: "Piece", description: "",
     buyPrice: "", sellPrice: "", stockQty: "0", rackLocation: "", minStockAlert: "5",
-    image: "📦",
+    imageUrl: "", partType: "OEM",
     _scannedBarcode: initialBarcode || "",
   };
   const [f, setF] = useState(blank);
@@ -767,6 +819,8 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
   const validate = () => {
     const e = {};
     if (!f.partName.trim()) e.partName  = "Required";
+    if (!f.categoryL1)      e.categoryL1 = "Select a category";
+    if (!f.imageUrl)        e.imageUrl  = "Product photo is required";
     if (!f.buyPrice  || isNaN(f.buyPrice))  e.buyPrice  = "Required";
     if (!f.sellPrice || isNaN(f.sellPrice)) e.sellPrice = "Required";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
@@ -809,12 +863,47 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
             <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" />
           </Field>
         </div>
+        <div style={{ gridColumn: "span 2" }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: errors.imageUrl ? "#EF4444" : T.amber, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+            Product Photo <span style={{ color: "#EF4444" }}>*</span>
+          </div>
+          <ImageUploader
+            folder="inventory"
+            currentUrl={f.imageUrl || null}
+            onUploaded={(url) => { set("imageUrl")(url); setErrors(e => ({ ...e, imageUrl: undefined })); }}
+            onError={(msg) => setErrors(e => ({ ...e, imageUrl: msg }))}
+            label="Upload Product Photo"
+            maxMb={8}
+          />
+          {errors.imageUrl && (
+            <div style={{ fontSize: 11, color: "#EF4444", marginTop: 4, fontFamily: FONT.ui }}>{errors.imageUrl}</div>
+          )}
+        </div>
         <Field label="Brand">
           <Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK, Denso…" />
         </Field>
-        <Field label="Category">
-          <Select value={f.categoryL1} onChange={set("categoryL1")} options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
+        <Field label="Category" required error={errors.categoryL1}>
+          <Select
+            value={f.categoryL1}
+            onChange={set("categoryL1")}
+            options={[
+              { value: "", label: "Select category…" },
+              ...CATEGORIES.map((c) => ({ value: c, label: c })),
+            ]}
+          />
         </Field>
+        <div style={{ gridColumn: "span 2" }}>
+          <Field label="Part Type" hint="OEM = original manufacturer part · OES = aftermarket / compatible">
+            <Select
+              value={f.partType}
+              onChange={set("partType")}
+              options={[
+                { value: "OEM", label: "OEM — Original Equipment Manufacturer" },
+                { value: "OES", label: "OES — Original Equipment Supplier (Aftermarket)" },
+              ]}
+            />
+          </Field>
+        </div>
         <div style={{ gridColumn: "span 2" }}>
           <Field label="OEM Part Number" hint="From the box / manufacturer website">
             <Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="04465-02220" />
@@ -925,6 +1014,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
           const { part, form } = item;
           let product;
 
+          const resolvedImage = form.shopImageUrl || part.imageUrl || (part.images && part.images[0]) || "";
           try {
             const res = await addInventory({
               masterPartId:  part.masterPartId,
@@ -933,6 +1023,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               stockQty:      parseInt(form.stockQty) || 0,
               rackLocation:  form.rackLocation || null,
               minStockAlert: parseInt(form.minStockAlert) || 5,
+              imageUrl:      resolvedImage || undefined,
             });
             const inv = res.item;
             product = {
@@ -957,7 +1048,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               minStock:       parseInt(form.minStockAlert) || 5,
               rack:           form.rackLocation || "",
               location:       form.rackLocation || "",
-              image:          part.imageUrl || (part.images && part.images[0]) || catEmoji(part.categoryL1),
+              image:          resolvedImage || catEmoji(part.categoryL1),
               sku:            part.oemNumber || (Array.isArray(part.oemNumbers) ? part.oemNumbers[0] : part.oemNumbers) || String(inv.inventoryId).slice(0, 8),
               shopId:         activeShopId,
             };
@@ -981,7 +1072,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               minStock:     parseInt(form.minStockAlert) || 5,
               rack:         form.rackLocation || "",
               location:     form.rackLocation || "",
-              image:        catEmoji(part.categoryL1),
+              image:        resolvedImage || catEmoji(part.categoryL1),
               sku:          part.oemNumber || localId.slice(0, 8),
               shopId:       activeShopId,
               _pendingSync: true,
@@ -997,6 +1088,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
           let masterPartId = null;
           let product;
 
+          const contribImage = form.imageUrl || "";
           try {
             const catalogRes = await contributePart({
               partName:    form.partName,
@@ -1007,6 +1099,9 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               gstRate:     parseFloat(form.gstRate || 18),
               unitOfSale:  form.unitOfSale  || "Piece",
               description: form.description || undefined,
+              partType:    form.partType    || "OEM",
+              // backend reads images[] array, not imageUrl
+              ...(contribImage && { images: [contribImage] }),
               ...(form._scannedBarcode && { barcodes: [form._scannedBarcode] }),
               ...(form.oemNumber && { oemNumbers: [form.oemNumber] }),
             });
@@ -1020,6 +1115,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
                 stockQty:      parseInt(form.stockQty) || 0,
                 rackLocation:  form.rackLocation || null,
                 minStockAlert: parseInt(form.minStockAlert) || 5,
+                imageUrl:      contribImage || undefined,
               });
               product = {
                 id:           invRes.item.inventoryId,
@@ -1039,7 +1135,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
                 minStock:     parseInt(form.minStockAlert) || 5,
                 rack:         form.rackLocation || "",
                 location:     form.rackLocation || "",
-                image:        catEmoji(form.categoryL1),
+                image:        contribImage || catEmoji(form.categoryL1),
                 sku:          form.oemNumber || String(invRes.item.inventoryId).slice(0, 8),
                 shopId:       activeShopId,
                 _pendingCatalogVerification: true,
@@ -1067,7 +1163,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               minStock:  parseInt(form.minStockAlert) || 5,
               rack:      form.rackLocation || "",
               location:  form.rackLocation || "",
-              image:     catEmoji(form.categoryL1),
+              image:     contribImage || catEmoji(form.categoryL1),
               sku:       form.oemNumber || localId.slice(0, 8),
               shopId:    activeShopId,
             };
