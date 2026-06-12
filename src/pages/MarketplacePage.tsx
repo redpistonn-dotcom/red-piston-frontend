@@ -16,6 +16,7 @@ import { CatalogSearchBar } from '../components/CatalogSearchBar';
 import { PublicHeader } from '../components/PublicHeader';
 import { browseMarketplace, fetchShops, fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from '../api/marketplace';
 import { isSaved, toggleSavedItem } from '../marketplace/savedItems';
+import { ProfileDropdown } from '../components/ProfileDropdown';
 
 /* ── Shared icon shorthand ─────────────────────────────────────────── */
 function Icon({ n, style }: { n: string; style?: React.CSSProperties }) {
@@ -44,19 +45,20 @@ function PartImagePlaceholder({ category }: { category?: string }) {
 
 /* ── Nav bar — uses shared PublicHeader ─────────────────────────── */
 function MarketplaceNav({
-  onCartClick, onAuthClick, cartCount, currentUser,
+  onCartClick, onAuthClick, cartCount, currentUser, onLogout,
 }: {
   onCartClick: () => void;
   onAuthClick: () => void;
   cartCount: number;
   currentUser: any;
+  onLogout?: () => void;
 }) {
   const navigate = useNavigate();
   return (
     <PublicHeader
       searchPlaceholder="Search by Part Name, OEM Number, or Brand..."
       rightSlot={currentUser ? (
-        /* ── Logged in: wishlist + cart + account ── */
+        /* ── Logged in: wishlist + cart + profile dropdown ── */
         <>
           <button onClick={() => navigate('/saved')} title="Saved Items"
             style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', border: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}>
@@ -69,12 +71,8 @@ function MarketplaceNav({
               <span style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#8b1e1e', color: '#fff', fontSize: 10, width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{cartCount}</span>
             )}
           </button>
-          <button onClick={onAuthClick}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', border: '1px solid #dfbfbc', borderRadius: 8, backgroundColor: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1c1b1b' }}>
-            <Icon n="account_circle" style={{ fontSize: 20, color: '#58413f' }} />
-            {currentUser.name || currentUser.email?.split('@')[0] || 'Account'}
-          </button>
-        </>
+          <ProfileDropdown user={currentUser} onLogout={onLogout} />
+</>
       ) : (
         /* ── Not logged in: Sign In + Get Started (matches landing page) ── */
         <>
@@ -557,6 +555,7 @@ export function MarketplacePage() {
         onAuthClick={() => currentUser ? null : setAuthModalOpen(true)}
         cartCount={cartCount}
         currentUser={currentUser}
+        onLogout={ctx?.handleLogout}
       />
 
       <main className="mp-main-layout" style={{ maxWidth: 1440, margin: '0 auto', display: 'flex', gap: 24, padding: '24px 24px 48px' }}>

@@ -4,6 +4,7 @@ import { T, FONT, GLOBAL_CSS } from "../theme";
 import { AppCtx } from "../AppCtx";
 import { Toast } from "../components/ui";
 import { CartDrawer } from "../marketplace/components/CartDrawer";
+import { clearTokens, api } from "../api/client.js";
 
 const MP_NAV = [
   { key: "home",   path: "/marketplace",         icon: "🏠", label: "Home",    color: "#10B981" },
@@ -13,10 +14,19 @@ const MP_NAV = [
 
 interface MPShellProps { children: import('react').ReactNode; }
 export function MPShell({ children }: MPShellProps) {
-  const { toasts, removeToast } = useContext(AppCtx);
+  const { toasts, removeToast, handleLogout } = useContext(AppCtx);
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+
+  const doLogout = async () => {
+    try { await api.post("/api/auth/logout", {}); } catch {}
+    clearTokens();
+    localStorage.removeItem("as_user");
+    localStorage.removeItem("as_refresh_token");
+    if (handleLogout) handleLogout();
+    else window.location.replace("/login");
+  };
 
   return (
     <>
@@ -78,6 +88,26 @@ export function MPShell({ children }: MPShellProps) {
           );
         })}
         <div className="sidebar-spacer" style={{ flex: 1 }} />
+
+        {/* Logout */}
+        <button
+          onClick={doLogout}
+          title="Log Out"
+          style={{
+            width: 64, height: 56, borderRadius: 10, border: "none", cursor: "pointer",
+            background: "transparent",
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            gap: 4, transition: "background 0.15s", padding: "4px 0",
+            marginBottom: 8,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "#EF444418"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+        >
+          <span style={{ fontSize: 20 }}>⏻</span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#EF4444", fontFamily: FONT.ui, letterSpacing: "0.02em" }}>
+            Logout
+          </span>
+        </button>
       </div>
 
       <Toast items={toasts} onRemove={removeToast} />
