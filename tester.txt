@@ -1,0 +1,544 @@
+================================================================================
+REDPISTON — MANUAL TEST PLAN (tester.txt)
+================================================================================
+Version    : 1.0 (2026-06-12)
+App URL    : https://red-piston.vercel.app  (or http://localhost:5173 for local)
+Backend    : https://red-piston-backend.onrender.com (or http://localhost:3001)
+Roles      : PLATFORM_ADMIN (admin console), SHOP_OWNER (ERP), CUSTOMER (marketplace)
+
+HOW TO USE THIS DOCUMENT
+- Each test case has: ID, Pre-conditions, Steps, Expected Result.
+- Mark each case PASS / FAIL / BLOCKED and note actual behaviour on failure.
+- NOTE: backend is on Render free tier — after ~15 min idle the FIRST request
+  takes 30–60 seconds (cold start). This is expected; the app must NOT log you
+  out during it (see AUTH-20). Wait for it, then continue.
+- Email checks: emails are sent from "RedPiston <noreply@notifications.gearitup.me>".
+  Check spam folders. Phone-only accounts receive no emails (expected).
+- Create fresh throwaway accounts for destructive tests (deletion, rejection).
+
+================================================================================
+SECTION 1 — CUSTOMER REGISTRATION & LOGIN
+================================================================================
+
+AUTH-01  Customer registration with email
+  Pre: not logged in. Steps: Landing page -> Get Started / Create Account ->
+  Customer -> Email tab -> enter new email + password (8+ chars) + confirm ->
+  Create Account. Expected: account created, taken to "Quick setup" profile
+  step (name + I-am-a + optional vehicle), then lands in marketplace.
+
+AUTH-02  Customer registration password rules
+  Steps: try password shorter than 8 chars; try mismatched confirm password.
+  Expected: inline error for each; no account created.
+
+AUTH-03  Customer registration with existing email
+  Steps: register again with an email already used. Expected: error message
+  "account already exists... sign in instead" — suggests resume via sign-in.
+
+AUTH-04  Customer profile (name) resume after abandoning setup
+  Steps: register a customer, close the tab at the "Quick setup" (name) step
+  WITHOUT entering name. Re-open app and Sign In with same email/password.
+  Expected: taken straight back to the name step with a green "Welcome back"
+  banner — NOT into the app with a blank name.
+
+AUTH-05  Customer registration via phone OTP
+  Pre: valid Indian mobile. Steps: Create Account -> Customer -> Phone OTP ->
+  enter number -> receive SMS OTP -> enter 6 digits. Expected: account created,
+  profile step shown. (OTP comes via Firebase; if SMS does not arrive mark BLOCKED.)
+
+AUTH-06  Customer registration via Google
+  Steps: Create Account -> Customer -> Continue with Google -> pick account.
+  Expected: account created with Google name/photo prefilled.
+
+AUTH-07  Sign-in with non-existent email
+  Steps: Sign In -> Email tab -> enter an email never registered.
+  Expected: explicit message "No account found with this email. Please create
+  an account first." — NOT a generic invalid-credentials error.
+
+AUTH-08  Sign-in with wrong password (existing account)
+  Steps: sign in with valid email + wrong password. Expected: "Invalid email or
+  password. N attempt(s) remaining." After 5 failures account locks 30 minutes.
+
+AUTH-09  Sign-in via Google in SIGN-IN mode with no account
+  Steps: Sign In (not register) -> Continue with Google with a Google account
+  never used here. Expected: "No account found... please create one" — a new
+  account must NOT be silently created.
+
+AUTH-10  Forgot password
+  Steps: Sign In -> Email tab -> Forgot password -> enter registered email.
+  Expected: success message; reset email arrives; link opens reset page; new
+  password works; old password stops working; "password changed" email arrives.
+
+AUTH-11  Logout
+  Steps: from any logged-in role, log out. Expected: returned to landing/login;
+  pressing Back does not re-enter authenticated pages with data.
+
+================================================================================
+SECTION 2 — SHOP OWNER REGISTRATION & APPROVAL (CRITICAL FLOW)
+================================================================================
+
+SHOP-01  Shop owner registration -> shop details form
+  Steps: Create Account -> Shop Owner (Register Shop) -> verify via phone OTP
+  or Google. Expected: taken to "Tell us about your shop" form (Step 3 of 3)
+  with name/phone prefilled where known.
+
+SHOP-02  Shop details validation
+  Steps: try submitting with (a) empty owner name, (b) empty shop name,
+  (c) empty address, (d) pincode not 6 digits, (e) contact phone not 10 digits,
+  (f) WhatsApp number not 10 digits (when filled).
+  Expected: each blocked with a clear inline error.
+
+SHOP-03  Shop category mandatory + shop photo upload
+  Steps: on the shop form, leave category unselected -> submit button stays
+  disabled. Upload a shop PHOTO (jpg/png) -> progress bar -> green "Photo
+  uploaded" tick. Expected: photo uploads; category required.
+
+SHOP-04  Submit application -> pending screen + emails
+  Steps: complete the shop form and submit.
+  Expected: (1) "pending verification" screen shown; (2) the APPLICANT receives
+  email "Profile Under Review — RedPiston"; (3) every platform admin receives
+  "New Shop Owner Pending Verification" email.
+
+SHOP-05  Pending shop owner cannot log in
+  Steps: try signing in with the pending account (email or phone).
+  Expected: blocked with "Your account is pending verification by our team."
+  No dashboard access. Refreshing/reopening the tab must not grant access.
+
+SHOP-06  Abandoned registration resume
+  Steps: register a shop owner but CLOSE the browser at the shop-details form
+  (before submitting). Later, Sign In with the same credentials.
+  Expected: NOT logged into the app; instead returned to the shop-details form
+  with a green "Welcome back — finish your shop details" banner and previously
+  known fields prefilled.
+
+SHOP-07  Admin approval
+  Pre: admin login; a pending application exists. Steps: Admin Console ->
+  Verifications tab -> find applicant -> Approve.
+  Expected: status changes to approved; applicant receives "Your RedPiston Shop
+  Account is Approved!" email.
+
+SHOP-08  Approved shop owner can log in
+  Steps: sign in with the approved account. Expected: lands on ERP dashboard
+  with sidebar (Dashboard/Inventory/POS Billing/...).
+
+SHOP-09  Admin rejection requires a reason
+  Steps: Admin Console -> Verifications -> Reject WITHOUT typing a reason.
+  Expected: blocked ("reason required"). With a reason: applicant receives
+  rejection email CONTAINING that exact reason.
+
+SHOP-10  Rejected shop owner login
+  Steps: sign in with a rejected account. Expected: blocked screen showing the
+  admin's rejection reason; no app access.
+
+SHOP-11  Shop photo nudge banner
+  Pre: approved shop owner whose shop has NO photo. Steps: log in to ERP.
+  Expected: banner at top "Add a shop photo so customers can recognise your
+  shop" with Upload Photo + dismiss (X). Upload Photo opens a CENTERED modal
+  (dark blurred backdrop, page behind cannot scroll); uploading a photo closes
+  it and the banner disappears. Dismissing with X hides it for this session but
+  it returns on next login until a photo is uploaded.
+
+================================================================================
+SECTION 3 — SESSION STABILITY (AUTO-LOGOUT FIXES)
+================================================================================
+
+AUTH-20  No logout on backend cold start
+  Steps: log in, leave the app idle for 20+ minutes (Render backend sleeps),
+  then click anything that loads data. Expected: a slow first request
+  (30–60s) but the user STAYS LOGGED IN. No redirect to /login.
+
+AUTH-21  Session survives page reload
+  Steps: log in, press F5. Expected: still logged in after reload.
+
+AUTH-22  Two tabs refresh race
+  Steps: open the app in two tabs, leave both idle 10+ min, then use both
+  quickly. Expected: neither tab is force-logged-out.
+
+AUTH-23  Session expiry only on real invalidation
+  Steps: log in, then clear ONLY the as_refresh_token from localStorage
+  (DevTools), then navigate. Expected: eventually returned to login — this is
+  the correct logout case.
+
+================================================================================
+SECTION 4 — ADMIN CONSOLE
+================================================================================
+
+ADM-01  Admin access control
+  Steps: try opening /admin as CUSTOMER and as SHOP_OWNER. Expected: blocked /
+  redirected. Only PLATFORM_ADMIN sees the console.
+
+ADM-02  All Users tab
+  Steps: open Admin Console -> All Users. Expected: stats cards (Total Users,
+  Shop Owners, Customers, Total Shops, Admins) + paginated user table with
+  role badges, last login, status.
+
+ADM-03  User search + role filter
+  Steps: type a name/email in search; select a role in the dropdown.
+  Expected: table filters accordingly; clearing restores the full list.
+
+ADM-04  Login-as (impersonation)
+  Steps: All Users -> "Login as" on a shop owner. Expected: enters that shop's
+  ERP with a "Viewing as" bar pinned at the bottom; "Back to Admin Console"
+  returns to admin.
+
+ADM-05  Deactivate / activate user
+  Steps: toggle a test user's Active status. Expected: deactivated user cannot
+  log in; reactivation restores access.
+
+ADM-06  Parts Catalog tab (master DB)
+  Steps: Admin Console -> Parts Catalog. Expected: live DB stats (Total Parts /
+  Verified / Pending / Rejected), search box filters parts table.
+
+ADM-07  Bulk import (Excel)
+  Steps: upload a supplier Excel in Parts Catalog; map columns; run import.
+  Expected: progress bar + live counters (added/updated/unchanged/skipped);
+  completion popup; duplicate report when applicable.
+
+ADM-08  Admin console on mobile (375px)
+  Steps: open admin console with browser at 375px width. Expected: header
+  collapses to two rows (brand+avatar on top, scrollable tabs below); stats
+  grid 2 columns; users table becomes cards; no horizontal scrolling.
+
+================================================================================
+SECTION 5 — CUSTOMER PROFILE & VEHICLE GARAGE
+================================================================================
+
+CUST-01  View + edit profile
+  Steps: as customer open Profile; edit name; save. Expected: change persists
+  after reload (saved to backend, not just screen).
+
+CUST-02  My Garage — add vehicle
+  Steps: Profile -> My Garage -> + Add Vehicle -> fill make/model/year (+
+  variant, fuel, registration optional) -> save. Expected: vehicle appears in
+  list and persists after reload.
+
+CUST-03  Edit vehicle
+  Steps: Edit on an existing vehicle, change year/variant, save.
+  Expected: changes persist.
+
+CUST-04  Delete vehicle
+  Steps: Remove a vehicle. Expected: gone from the list and stays gone after
+  reload.
+
+CUST-05  Set default (primary) vehicle
+  Pre: 2+ vehicles. Steps: Set Default on the non-default one.
+  Expected: "Default" badge moves; persists after reload.
+
+CUST-06  Vehicle captured at signup
+  Steps: register a new customer and fill the optional vehicle (make/model/
+  year) at the profile step. Expected: that vehicle appears in My Garage.
+
+CUST-07  Delete account (Danger Zone)
+  Pre: throwaway customer account. Steps: Profile -> Danger Zone -> Delete My
+  Account -> confirm TWICE. Expected: logged out to landing page; signing in
+  with the old credentials no longer works.
+
+================================================================================
+SECTION 6 — SHOP OWNER: INVENTORY MANAGEMENT
+================================================================================
+
+INV-01  Inventory list + low stock
+  Steps: open Inventory. Expected: product list with stock, prices, margin;
+  items below min-stock highlighted; low-stock count badge on sidebar.
+
+INV-02  Search + filters combined
+  Steps: use the search box together with a category tab and stock filter
+  (All/Low/Out). Expected: filters combine (AND); result count updates.
+
+INV-03  Clear filters resets EVERYTHING
+  Steps: apply search + category + status + a vehicle (brand/model/year)
+  filter, then click "Clear filters". Expected: ALL filters reset including
+  the vehicle filter; full list returns.
+
+INV-04  Filter change resets pagination
+  Steps: click "Load 50 more" a few times, then change any filter.
+  Expected: list restarts from the first page of results (no blank list).
+
+INV-05  Add product with photo
+  Steps: + Add Product (or edit one) -> upload a part PHOTO in the modal ->
+  save. Expected: upload shows progress; after save AND a full page reload the
+  photo is still on the product (persisted to the backend, not just locally).
+
+INV-06  Catalog stock-in (search master catalog)
+  Steps: topbar "+" (Add stock) -> search a part by name/OEM -> select ->
+  enter price/qty -> add to cart -> save. Expected: stock added; movement
+  recorded; appears in Inventory.
+
+INV-07  Contribute a new part (OTHER flow)
+  Steps: in stock-in search, search something that has no results -> choose
+  contribute/add-new-part -> fill name, brand, category, etc. -> submit.
+  Expected: part is created and usable by this shop; (admin side: it shows as
+  PENDING in the master catalog until verified).
+
+INV-08  Stock-in modal on mobile
+  Steps: open the Add Stock modal with browser at 375px. Expected: search area
+  and cart stack VERTICALLY (no side-by-side squeeze); modal is a bottom sheet;
+  no horizontal scroll.
+
+INV-09  Stock adjustment cannot go negative
+  Steps: on a product with stock 2, attempt a damage/adjustment of more than 2.
+  Expected: blocked with an error; stock never shows below 0.
+
+================================================================================
+SECTION 7 — PURCHASE BILLS (PDF OCR) — CRITICAL FEATURE
+================================================================================
+Pre for this section: shop-owner login; have the sample Tally invoices
+(Sales_499.pdf / Sales_500.pdf or similar GST PDF invoices) on the device.
+
+BILL-01  Tab visibility
+  Steps: open POS Billing. Expected: two tabs — "Point of Sale" and
+  "Purchase Bills".
+
+BILL-02  Upload + extraction
+  Steps: Purchase Bills tab -> click upload zone -> choose Sales_499.pdf.
+  Expected: "Reading invoice..." then a review screen with supplier name
+  (e.g. SHRI MAHESH AUTOMOBILES), bill number, date, and ALL line items with
+  part name, HSN, qty, buy rate, amount.
+
+BILL-03  Totals validation banner (green)
+  Steps: after BILL-02. Expected: a GREEN banner "All items captured — line
+  items sum to ₹X matching the invoice's taxable total exactly".
+
+BILL-04  Review table editing
+  Steps: edit a part name, change a qty, change a sell price; untick one row.
+  Expected: edits stick; amount column recalculates with qty; selected-count
+  and purchase value at the bottom update.
+
+BILL-05  Import to inventory
+  Steps: click "Add to Inventory". Expected: success toast with item count;
+  returns to upload view; the bill appears in "Your uploaded bills" with
+  status ✓ IMPORTED; imported parts appear in the Inventory page with stock
+  and buy price; History shows PURCHASE/OPENING movements referencing the
+  bill number.
+
+BILL-06  Duplicate import blocked
+  Steps: re-open the same bill (if UI allows) or re-import.
+  Expected: "This bill has already been imported".
+
+BILL-07  Bill history persistence
+  Steps: reload the page / log out and in. Expected: previously uploaded bills
+  still listed under Purchase Bills with correct status.
+
+BILL-08  Wrong file type
+  Steps: try uploading a JPG/PNG photo of a bill. Expected: clear message that
+  only PDF invoices are supported right now (photos/scans coming soon).
+
+BILL-09  Non-invoice PDF
+  Steps: upload some random PDF (not an invoice). Expected: friendly error
+  ("no line items found / format not recognised") — not a crash.
+
+BILL-10  Oversized file
+  Steps: upload a PDF larger than 12 MB. Expected: rejected with a size error.
+
+BILL-11  Mismatch warning (if a partial invoice is available)
+  Steps: upload an invoice known to have unusual formatting. If extraction
+  misses items: Expected: RED banner stating items-sum vs invoice-total
+  mismatch, telling the user to cross-check before importing.
+
+================================================================================
+SECTION 8 — POS BILLING (SALES)
+================================================================================
+
+POS-01  Build a bill
+  Steps: POS tab -> search a product -> add -> adjust qty/discount.
+  Expected: line totals, GST, grand total all recalculate live.
+
+POS-02  Stock guard
+  Steps: set qty greater than available stock on a Sale. Expected: blocked
+  with "Only N units in stock".
+
+POS-03  Finalize sale + invoice preview
+  Steps: fill customer name + WhatsApp number (10 digits) -> FINALIZE.
+  Expected: success banner + a printable tax-invoice preview with shop header,
+  GSTIN, items, totals; buttons: Print / Download PDF / Share WhatsApp /
+  New Bill. Stock decremented in Inventory; sale appears in History.
+
+POS-04  Download PDF
+  Steps: a few seconds after finalizing, click Download PDF. Expected: a
+  server-generated PDF invoice opens in a new tab (proper invoice number like
+  202606-0001). If clicked too early: an info toast "PDF is being prepared".
+
+POS-05  Share WhatsApp
+  Steps: click Share WhatsApp. Expected: WhatsApp opens with a prefilled
+  message (shop name, invoice no, item count, total). With a 10-digit customer
+  number entered, the chat opens directly to that number.
+
+POS-06  Quotation flow
+  Steps: switch bill type to Quotation and finalize. Expected: estimate
+  preview (no stock deduction), labelled ESTIMATE/QUOTATION.
+
+POS-07  Suspend + resume bill
+  Steps: add items -> Suspend -> build another bill -> Resume.
+  Expected: suspended items/customer restored exactly.
+
+POS-08  Barcode scan
+  Steps: open scanner, scan a product barcode (or enter manually).
+  Expected: product added to the bill.
+
+================================================================================
+SECTION 9 — GO LIVE & SHOP MARKETPLACE LISTINGS
+================================================================================
+
+LIVE-01  Go Live on a product
+  Steps: Workshop -> Parts Marketplace tab -> Go Live on an in-stock product
+  with a price. Expected: product marked LIVE; appears in marketplace search
+  (log in as customer or open marketplace in incognito and search the part).
+
+LIVE-02  Go Live blocked without price
+  Steps: attempt to list an item whose selling price is 0/empty.
+  Expected: blocked with a message to set a selling price first (server
+  enforces this too).
+
+LIVE-03  Take offline
+  Steps: toggle a live item offline. Expected: removed from marketplace
+  results within a refresh.
+
+LIVE-04  Out-of-stock auto-hide
+  Steps: sell/adjust a live item's stock to 0. Expected: it no longer appears
+  in marketplace browse.
+
+================================================================================
+SECTION 10 — MARKETPLACE (CUSTOMER)
+================================================================================
+
+MKT-01  Browse + search
+  Steps: open marketplace; search a real listed part by name and by brand.
+  Expected: relevant results with price, shop name, stock.
+
+MKT-02  Vehicle fitment filter
+  Steps: select a vehicle (make/model/year) in the vehicle selector, browse.
+  Expected: only parts fitting that vehicle (or universal parts) are shown;
+  fitment badge (exact/compatible/universal) visible where applicable.
+
+MKT-03  Category + price filters
+  Steps: apply a category and a max-price filter. Expected: results respect
+  both; clearing restores.
+
+MKT-04  Product details
+  Steps: open a product. Expected: images, price comparison across shops,
+  shop info, fitment info.
+
+MKT-05  Cart
+  Steps: add 2+ items from the same shop and (if available) different shops;
+  open cart. Expected: items grouped BY SHOP with per-shop subtotal and
+  delivery option; qty +/- works; remove works; totals correct.
+
+MKT-06  Checkout -> real order
+  Steps: checkout with address + payment mode (COD) -> place order.
+  Expected: confirmation screen; ORDER IS REAL — verify in a second browser as
+  the SHOP OWNER that it appears under Orders (see ORD-01). Customer receives
+  an order-confirmation email (if account has an email).
+
+MKT-07  Order tracking
+  Steps: customer -> Orders/Track Orders. Expected: the placed order is listed
+  with live status from the server; status visual progression NEW -> ACCEPTED
+  -> PACKED -> DISPATCHED -> DELIVERED.
+
+MKT-08  Cart drawer on mobile
+  Steps: open cart drawer at 375px width. Expected: full-screen drawer, no
+  horizontal scroll, close works.
+
+================================================================================
+SECTION 11 — SHOP OWNER: INCOMING MARKETPLACE ORDERS
+================================================================================
+
+ORD-01  Incoming order visible
+  Pre: a customer placed an order (MKT-06). Steps: shop owner -> Orders page.
+  Expected: the marketplace order row (#MO-xxxxx) with customer name, items,
+  amount, status Pending. Customer PHONE must NOT be shown in the list.
+
+ORD-02  Advance status chain
+  Steps: click the status action on the order: Confirm -> Packed -> Shipped ->
+  Delivered (one per click, page refreshes data each time).
+  Expected: each transition succeeds; the CUSTOMER's tracking page reflects
+  each new status.
+
+ORD-03  Unauthorized status change
+  Steps: (API-level / second shop) attempt to update an order belonging to a
+  different shop. Expected: rejected (forbidden / not found).
+
+================================================================================
+SECTION 12 — EMAIL CHECKLIST (verify real delivery, not just UI)
+================================================================================
+
+MAIL-01  Customer welcome email on email registration ........... arrives
+MAIL-02  Email verification OTP .................................. arrives
+MAIL-03  Shop owner "Profile Under Review" (to applicant) ........ arrives
+MAIL-04  Admin alert "New Shop Owner Pending Verification" ....... arrives (all admins)
+MAIL-05  Shop owner approval email ............................... arrives
+MAIL-06  Shop owner rejection email (includes admin's reason) .... arrives
+MAIL-07  Password reset link ..................................... arrives + works
+MAIL-08  Password changed notice ................................. arrives
+MAIL-09  Order confirmation (customer with email) ................ arrives
+MAIL-10  ALL of the above are branded "RedPiston" (no "AutoSpace" anywhere)
+
+================================================================================
+SECTION 13 — RESPONSIVE & UI QUALITY
+================================================================================
+Test at: 320, 375, 414, 768, 1024, 1440 px (browser device toolbar).
+
+UI-01  No horizontal scrolling on ANY page at 320–414px (landing, login,
+       marketplace, cart, every ERP page, admin console).
+UI-02  ERP on mobile: sidebar hidden, bottom navigation bar with 4 tabs +
+       More drawer; drawer opens/closes; current page highlighted.
+UI-03  ERP on desktop: sidebar is a narrow icon rail (~68px) that smoothly
+       expands on hover over the content WITHOUT shifting the page; labels
+       fade in; active page clearly highlighted; orders/low-stock red dot
+       visible when collapsed.
+UI-04  All modals (product, stock-in, sale, upload photo, login) are centered
+       in the VIEWPORT with a dark blurred backdrop; page behind cannot
+       scroll; ESC and backdrop click close them; on mobile they appear as
+       bottom sheets.
+UI-05  Dashboard charts resize correctly when rotating the device or
+       shrinking the window (no giant horizontal overflow after resize).
+UI-06  Wide tables (admin users, inventory, review tables) scroll
+       horizontally within their card with a visible edge shadow hint.
+UI-07  Brand lockup (logo + REDPISTON wordmark) looks identical in: ERP
+       sidebar, mobile drawer, admin console header.
+UI-08  Parties page tabs (Customers/Suppliers/Vehicles) all reachable at
+       375px (scrollable pills, nothing cut off).
+UI-09  Keyboard: Tab focus visibly outlines interactive elements; modals
+       close on Escape.
+UI-10  Animations: pages fade in; nothing flickers in a loop; with OS
+       "reduce motion" enabled, animations are effectively off.
+
+================================================================================
+SECTION 14 — SECURITY / NEGATIVE TESTS
+================================================================================
+
+SEC-01  Customer cannot open ERP routes (/dashboard, /inventory, /billing...)
+        by typing the URL. Expected: redirected away.
+SEC-02  Shop owner cannot open /admin. Expected: blocked.
+SEC-03  Pending/rejected shop owner cannot reach the ERP even with an old tab
+        open (refresh forces them out).
+SEC-04  Invoice/bill/PDF endpoints of ANOTHER shop are not accessible (change
+        ids in URLs / API). Expected: 404/forbidden, no data leak.
+SEC-05  Marketplace order of another customer/shop not viewable by id
+        guessing. Expected: 404.
+SEC-06  Negative/zero values rejected: negative payment amount on an invoice,
+        zero qty line items, negative discount (treated as 0), adjustment
+        below zero stock.
+SEC-07  Pagination abuse: API list endpoints with limit=-50 or offset=-100
+        do not return reversed/unbounded data (clamped server-side).
+SEC-08  No customer phone numbers visible in shop order LISTS; no captain/
+        passenger contact data anywhere it shouldn't be.
+SEC-09  Session tokens: as_refresh_token in localStorage only; no passwords
+        or card data stored client-side (inspect localStorage).
+SEC-10  Rate limiting: 6+ rapid OTP requests for the same number get blocked
+        with a clear message.
+
+================================================================================
+KNOWN LIMITATIONS (do NOT file as bugs)
+================================================================================
+K-01  Purchase-bill upload supports PDF text invoices (Tally-style GST bills).
+      Photographed/scanned bills show "not supported yet" by design.
+K-02  In-app WhatsApp API (WATI) is not configured — WhatsApp sharing uses the
+      wa.me deep link, which is the intended behaviour for now.
+K-03  First request after ~15 min idle is slow (Render free-tier cold start).
+      The session must survive it (AUTH-20), but the delay itself is expected.
+K-04  Order status-change emails (shipped/delivered) are not sent yet — only
+      the order-confirmation email exists.
+K-05  Phone-only accounts (no email) receive no emails anywhere — expected.
+
+================================================================================
+END OF TEST PLAN — report results per ID (PASS/FAIL/BLOCKED + notes).
+================================================================================
