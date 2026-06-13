@@ -4,7 +4,7 @@ import type {
   AuditEntry, Receipt, CartItem, Vehicle as VehicleType,
 } from '../types';
 import { SEED_PRODUCTS, SEED_SHOPS, genSeededMovements, SEED_ORDERS, SEED_PURCHASES, SEED_PARTIES, SEED_VEHICLES, SEED_JOB_CARDS, uid } from '../utils/utils';
-import { fetchInventory, fetchParties, syncProductSave } from '../api/sync.js';
+import { fetchInventory, fetchParties, fetchMovements, syncProductSave } from '../api/sync.js';
 import { getAccessToken } from '../api/client.js';
 
 // ─── Typed store value shape ──────────────────────────────────────────────────
@@ -106,7 +106,7 @@ export function useStoreProvider(): StoreContextValue {
       return;
     }
     try {
-      const [apiProducts, apiParties] = await Promise.all([fetchInventory(), fetchParties()]);
+      const [apiProducts, apiParties, apiMovements] = await Promise.all([fetchInventory(), fetchParties(), fetchMovements()]);
 
       if (Array.isArray(apiProducts)) {
         const realShopId = apiProducts[0]?.shopId;
@@ -123,6 +123,12 @@ export function useStoreProvider(): StoreContextValue {
         setParties(apiParties);
         try { localStorage.setItem('vl_parties', JSON.stringify(apiParties)); } catch {}
         console.log(`[Store] Synced ${apiParties.length} parties from API`);
+      }
+
+      if (Array.isArray(apiMovements)) {
+        setM(apiMovements);
+        try { localStorage.setItem('vl_movements', JSON.stringify(apiMovements)); } catch {}
+        console.log(`[Store] Synced ${apiMovements.length} movements from API`);
       }
 
       setApiSynced(true);

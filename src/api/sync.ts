@@ -50,6 +50,7 @@ interface BackendMovement {
   shopId?: number;
   inventoryId?: number;
   productId?: string | number;
+  partyId?: string | number | null;
   type: string;
   qty: number;
   unitPrice?: number | string;
@@ -61,7 +62,8 @@ interface BackendMovement {
   notes?: string;
   createdAt?: string;
   invoiceId?: string;
-  inventory?: { masterPart?: { partName?: string } };
+  inventory?: { customPartName?: string | null; masterPart?: { partName?: string } };
+  party?: { name?: string; type?: string } | null;
   productName?: string;
 }
 
@@ -134,11 +136,14 @@ function getCategoryEmoji(category?: string | null): string {
 }
 
 export function mapMovement(m: BackendMovement): Movement {
+  const isSupply = ['PURCHASE', 'OPENING', 'RETURN_IN'].includes(m.type);
+  const partyName = m.party?.name || null;
+  const productName = m.inventory?.customPartName || m.inventory?.masterPart?.partName || m.productName || '';
   return {
     id: String(m.movementId || m.id),
     shopId: m.shopId ?? 0,
     productId: m.inventoryId || m.productId || null,
-    productName: m.inventory?.masterPart?.partName || m.productName || '',
+    productName,
     type: m.type as Movement['type'],
     qty: m.qty,
     unitPrice: parseFloat(String(m.unitPrice ?? 0)),
@@ -151,7 +156,10 @@ export function mapMovement(m: BackendMovement): Movement {
     paymentStatus: 'paid',
     note: m.notes || '',
     date: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-    invoiceNo: m.invoiceId || null,
+    invoiceNo: m.invoiceId ? String(m.invoiceId) : null,
+    partyId: m.partyId ? String(m.partyId) : null,
+    supplierName: isSupply ? partyName : null,
+    customerName: isSupply ? null : partyName,
   };
 }
 
@@ -193,8 +201,18 @@ export async function fetchParties(): Promise<Party[] | null> {
   }
 }
 
-export async function fetchMovements(): Promise<null> {
-  return null; // Global movements endpoint not yet available
+interface MovementsApiResponse {
+  movements?: BackendMovement[];
+}
+
+export async function fetchMovements(): Promise<Movement[] | null> {
+  try {
+    const data = await api.get<MovementsApiResponse>('/api/shop/movements');
+    return (data.movements || []).map(mapMovement);
+  } catch (err: unknown) {
+    console.warn('[Sync] Could not fetch movements:', (err as Error).message);
+    return null;
+  }
 }
 
 export async function syncProductSave(product: Partial<Product>): Promise<void> {

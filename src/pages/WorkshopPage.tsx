@@ -217,7 +217,7 @@ export function WorkshopPage() {
         sku:             String(item.masterPartId || item.inventoryId),
         category:        item.masterPart?.categoryL1 || "General",
         brand:           item.masterPart?.brand || "",
-        image:           item.masterPart?.imageUrl || null,
+        image:           item.imageUrl || item.masterPart?.imageUrl || null,
         stock:           item.computedStock ?? item.stockQty,
         sellPrice:       Number(item.sellingPrice || 0),
         buyPrice:        Number(item.buyingPrice  || 0),
@@ -261,6 +261,14 @@ export function WorkshopPage() {
     const confirmGoLive = async () => {
         if (!goLiveProd) return;
         if (glPrice <= 0) { toast?.("Please enter a selling price", "warning"); return; }
+        // Image is mandatory for new listings — customers need to see the product
+        if (!editMode) {
+            const hasImage = typeof goLiveProd.image === "string" && goLiveProd.image.startsWith("http");
+            if (!hasImage) {
+                toast?.("Upload a product image before listing on marketplace", "warning");
+                return;
+            }
+        }
         setGlSaving(true);
         try {
             // 1. Update the selling price
@@ -991,16 +999,32 @@ export function WorkshopPage() {
                                 </div>
                             </div>
 
-                            {/* Listing preview strip — only for Go Live mode */}
-                            {!editMode && (
-                                <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>Marketplace listing preview</div>
-                                    <div style={{ textAlign: "right" }}>
-                                        <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 900, color: T.amber }}>₹{glPrice.toLocaleString("en-IN")}</div>
-                                        <div style={{ fontSize: 11, color: T.t3 }}>{(goLiveProd.stock || 0) + glQty} units · {goLiveProd.name?.slice(0, 24)}</div>
+                            {/* Image requirement notice — only for Go Live mode */}
+                            {!editMode && (() => {
+                                const hasImg = typeof goLiveProd.image === "string" && goLiveProd.image.startsWith("http");
+                                return hasImg ? (
+                                    <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                            <img src={goLiveProd.image} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                                            <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>Marketplace listing preview</div>
+                                        </div>
+                                        <div style={{ textAlign: "right" }}>
+                                            <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 900, color: T.amber }}>₹{glPrice.toLocaleString("en-IN")}</div>
+                                            <div style={{ fontSize: 11, color: T.t3 }}>{(goLiveProd.stock || 0) + glQty} units · {goLiveProd.name?.slice(0, 24)}</div>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                ) : (
+                                    <div style={{ background: "#FFF7ED", border: `1px solid #FED7AA`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+                                        <span style={{ fontSize: 20, flexShrink: 0 }}>🖼</span>
+                                        <div>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", fontFamily: FONT.ui }}>Product image required</div>
+                                            <div style={{ fontSize: 11, color: "#B45309", fontFamily: FONT.ui, marginTop: 2 }}>
+                                                Go to Inventory → edit this item → upload a photo, then come back to list it.
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Action buttons */}
                             {editMode ? (
