@@ -164,6 +164,10 @@ export function mapMovement(m: BackendMovement): Movement {
 }
 
 export function mapParty(p: BackendParty): Party {
+  // Normalize to lowercase so PartiesPage comparisons ("customer","supplier") work
+  // whether the party came from the API (uppercase "CUSTOMER") or local store (lowercase).
+  const rawType = (p.type || 'customer').toLowerCase();
+  const type = (['customer', 'supplier', 'both'].includes(rawType) ? rawType : 'customer') as Party['type'];
   return {
     id: p.partyId,
     partyId: p.partyId,
@@ -171,7 +175,7 @@ export function mapParty(p: BackendParty): Party {
     phone: p.phone || null,
     gstin: p.gstin || null,
     address: p.address || null,
-    type: (p.type as Party['type']) || 'CUSTOMER',
+    type,
     creditLimit: parseFloat(String(p.creditLimit ?? 0)),
     outstanding: parseFloat(String(p.outstanding ?? 0)),
     notes: p.notes || null,
@@ -203,14 +207,70 @@ export async function fetchParties(): Promise<Party[] | null> {
 
 interface MovementsApiResponse {
   movements?: BackendMovement[];
+  total?: number;
 }
 
-export async function fetchMovements(): Promise<Movement[] | null> {
+export interface MovementsParams {
+  limit?: number;
+  offset?: number;
+  type?: string;
+  from?: string;
+  to?: string;
+  search?: string;
+  partyId?: string;
+}
+
+export async function fetchMovements(params?: MovementsParams): Promise<Movement[] | null> {
   try {
-    const data = await api.get<MovementsApiResponse>('/api/shop/movements');
+    const qp = new URLSearchParams();
+    if (params?.limit   != null) qp.set('limit',   String(params.limit));
+    if (params?.offset  != null) qp.set('offset',  String(params.offset));
+    if (params?.type)            qp.set('type',    params.type);
+    if (params?.from)            qp.set('from',    params.from);
+    if (params?.to)              qp.set('to',      params.to);
+    if (params?.search)          qp.set('search',  params.search);
+    if (params?.partyId)         qp.set('partyId', params.partyId);
+    const qs = qp.toString();
+    const data = await api.get<MovementsApiResponse>(`/api/shop/movements${qs ? `?${qs}` : ''}`);
     return (data.movements || []).map(mapMovement);
   } catch (err: unknown) {
     console.warn('[Sync] Could not fetch movements:', (err as Error).message);
+    return null;
+  }
+}
+
+// ─── Party ledger ─────────────────────────────────────────────────────────────
+
+export interface LedgerEntry {
+  ledgerId: string;
+  entryType: string;
+  debitAmount: number;
+  creditAmount: number;
+  balanceAfter: number;
+  createdAt: string;
+  referenceNo?: string | null;
+  notes?: string | null;
+  invoice?: { invoiceNumber: string; totalAmount: number; invoiceType: string } | null;
+}
+
+export interface PartyLedgerResult {
+  party: { partyId: string; name: string; outstanding: number; creditLimit: number; creditDays: number };
+  entries: LedgerEntry[];
+  total: number;
+}
+
+export async function fetchPartyLedger(partyId: string | number, params?: { limit?: number; offset?: number }): Promise<PartyLedgerResult | null> {
+  try {
+    const qp = new URLSearchParams();
+    if (params?.limit  != null) qp.set('limit',  String(params.limit));
+    if (params?.offset != null) qp.set('offset', String(params.offset));
+    const qs = qp.toString();
+    const data = await api.get<PartyLedgerResult & { success: boolean }>(
+      `/api/shop/parties/${partyId}/ledger${qs ? `?${qs}` : ''}`
+    );
+    return data;
+  } catch (err: unknown) {
+    console.warn('[Sync] Could not fetch party ledger:', (err as Error).message);
     return null;
   }
 }

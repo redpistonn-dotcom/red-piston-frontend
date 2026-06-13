@@ -3,6 +3,7 @@ import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, uid, downloadCSV, generateCSV } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
+import { fetchPartyLedger, type LedgerEntry } from "../api/sync";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 
@@ -52,6 +53,8 @@ export function PartiesPage() {
     const [expandedId, setExpandedId]    = useState<string | null>(null);
     const [sortField, setSortField]      = useState<"name" | "balance" | "txns">("name");
     const [sortAsc, setSortAsc]          = useState(true);
+    const [ledgerCache, setLedgerCache]  = useState<Record<string, LedgerEntry[]>>({});
+    const [ledgerLoading, setLedgerLoading] = useState<string | null>(null);
 
     // Vehicle form state
     const [showVehForm, setShowVehForm] = useState(false);
@@ -93,17 +96,31 @@ export function PartiesPage() {
     const shopVehicles  = useMemo(() => (vehicles || []).filter((v: any) => v.shopId === activeShopId), [vehicles, activeShopId]);
     const shopMovements = useMemo(() => (movements || []).filter((m: any) => m.shopId === activeShopId), [movements, activeShopId]);
 
-    // Match a movement to a party by id (preferred) or by name (fallback for legacy data)
-    const matchesParty = (m: any, party: any): boolean => {
-        const byId = m.partyId && (m.partyId === party.id || m.partyId === String(party.id));
-        const byName = m.customerName === party.name || m.supplierName === party.name || m.supplier === party.name;
-        return byId || byName;
-    };
+    // Fetch real PartyLedger entries from the API whenever a row is expanded.
+    useEffect(() => {
+        if (!expandedId || ledgerCache[expandedId]) return;
+        setLedgerLoading(expandedId);
+        fetchPartyLedger(expandedId, { limit: 30 })
+            .then(res => {
+                setLedgerCache(prev => ({ ...prev, [expandedId]: res?.entries ?? [] }));
+            })
+            .finally(() => setLedgerLoading(null));
+    }, [expandedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const getBalance = (party: any) => {
+    // Balance comes directly from the DB-maintained Party.outstanding field (pre-computed
+    // by billing.js writeLedgerDebit on every credit sale/payment). Falls back to
+    // movement-scan for locally-created parties that haven't synced yet.
+    const getBalance = (party: any): number => {
+        if (typeof party.outstanding === 'number') return party.outstanding;
+        // Fallback: scan local movements for offline/pre-API parties
         let bal = party.openingBalance || 0;
+        const matchesParty = (m: any) => {
+            const byId = m.partyId && (m.partyId === party.id || m.partyId === String(party.id));
+            const byName = m.customerName === party.name || m.supplierName === party.name || m.supplier === party.name;
+            return byId || byName;
+        };
         shopMovements.forEach((m: any) => {
-            if (!matchesParty(m, party)) return;
+            if (!matchesParty(m)) return;
             if (party.type === "customer" || party.type === "both") {
                 if (m.type === "SALE"    && (m.paymentStatus === "pending" || m.paymentMode === "Credit")) bal += m.total;
                 if (m.type === "RECEIPT") bal -= m.total;
@@ -116,6 +133,12 @@ export function PartiesPage() {
         return bal;
     };
 
+    const matchesParty = (m: any, party: any): boolean => {
+        const byId = m.partyId && (m.partyId === party.id || m.partyId === String(party.id));
+        const byName = m.customerName === party.name || m.supplierName === party.name || m.supplier === party.name;
+        return byId || byName;
+    };
+
     const getTransactionCount = (party: any) =>
         shopMovements.filter((m: any) => matchesParty(m, party)).length;
 
@@ -124,13 +147,8 @@ export function PartiesPage() {
             return matchesParty(m, party) && (m.paymentStatus === "pending" || m.paymentMode === "Credit") && (m.type === "SALE" || m.type === "PURCHASE");
         }).sort((a: any, b: any) => a.date - b.date);
         if (!moves.length) return 0;
-        // Use the most recent unpaid transaction to reflect current credit age
         return Math.floor((Date.now() - moves[moves.length - 1].date) / 86400000);
     };
-
-    const getPartyLedger = (party: any) =>
-        shopMovements.filter((m: any) => m.customerName === party.name || m.supplierName === party.name || m.supplier === party.name)
-            .sort((a: any, b: any) => b.date - a.date).slice(0, 20);
 
     const typeFilter = view === "customers" ? "customer" : "supplier";
     const baseParties = useMemo(() =>
@@ -565,50 +583,49 @@ export function PartiesPage() {
                                                         </td>
                                                     </tr>
 
-                                                    {/* Expanded ledger row */}
+                                                    {/* Expanded ledger row — real PartyLedger from API */}
                                                     {isEx && (
                                                         <tr key={p.id + "_detail"}>
                                                             <td colSpan={9} style={{ padding: "0 14px 14px 14px", background: `${T.bg}` }}>
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 10px" }}>
                                                                     <div style={{ width: 3, height: 14, background: T.amber, borderRadius: 2 }} />
-                                                                    <span style={{ fontSize: 9, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: FONT.ui }}>RECENT LEDGER</span>
+                                                                    <span style={{ fontSize: 9, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: FONT.ui }}>UDHAAR LEDGER</span>
                                                                     <div style={{ flex: 1, height: 1, background: T.border }} />
+                                                                    <span style={{ fontSize: 10, color: T.emerald, fontWeight: 700, fontFamily: FONT.mono }}>Outstanding: {fmt(getBalance(p))}</span>
                                                                 </div>
-                                                                {getPartyLedger(p).length === 0 ? (
-                                                                    <div style={{ color: T.t3, fontSize: 12 }}>No transactions yet.</div>
-                                                                ) : (() => {
-                                                                    let running = p.openingBalance || 0;
-                                                                    const ledger = getPartyLedger(p).slice().reverse().map((m: any) => {
-                                                                        if (m.type === "SALE"     && (m.paymentStatus === "pending" || m.paymentMode === "Credit")) running += m.total;
-                                                                        else if (m.type === "RECEIPT")  running -= m.total;
-                                                                        else if (m.type === "PURCHASE" && (m.paymentStatus === "pending" || m.paymentMode === "Credit")) running += m.total;
-                                                                        else if (m.type === "PAYMENT")  running -= m.total;
-                                                                        return { ...m, runningBal: running };
-                                                                    }).reverse();
-                                                                    return (
-                                                                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                                                                            <thead>
-                                                                                <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                                                                                    {["Date","Type","Product","Amount","Status","Balance"].map(h => (
-                                                                                        <th key={h} style={{ padding: "5px 8px", textAlign: "left", color: T.t4, fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FONT.ui }}>{h}</th>
-                                                                                    ))}
-                                                                                </tr>
-                                                                            </thead>
-                                                                            <tbody>
-                                                                                {ledger.map((m: any) => (
-                                                                                    <tr key={m.id} style={{ borderBottom: `1px solid ${T.border}` }}>
-                                                                                        <td style={{ padding: "6px 8px", color: T.t3 }}>{fmtDate(m.date)}</td>
-                                                                                        <td style={{ padding: "6px 8px", color: T.t2, fontWeight: 600 }}>{m.type}</td>
-                                                                                        <td style={{ padding: "6px 8px", color: T.t2 }}>{m.productName || "—"}</td>
-                                                                                        <td style={{ padding: "6px 8px", fontFamily: FONT.mono, fontWeight: 700, color: m.type === "SALE" || m.type === "PURCHASE" ? T.amber : T.emerald }}>{fmt(m.total)}</td>
-                                                                                        <td style={{ padding: "6px 8px", color: m.paymentStatus === "paid" || m.paymentStatus === "completed" ? T.emerald : T.crimson, fontWeight: 600, fontSize: 10 }}>{m.paymentStatus || "—"}</td>
-                                                                                        <td style={{ padding: "6px 8px", fontFamily: FONT.mono, fontWeight: 700, color: T.amber }}>{fmt(m.runningBal)}</td>
-                                                                                    </tr>
+                                                                {ledgerLoading === p.id ? (
+                                                                    <div style={{ color: T.t3, fontSize: 12, padding: "10px 0" }}>Loading ledger…</div>
+                                                                ) : !ledgerCache[p.id] || ledgerCache[p.id].length === 0 ? (
+                                                                    <div style={{ color: T.t3, fontSize: 12 }}>No ledger entries yet.</div>
+                                                                ) : (
+                                                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                                                                        <thead>
+                                                                            <tr style={{ borderBottom: `1px solid ${T.border}` }}>
+                                                                                {["Date","Entry Type","Invoice","Debit (↑ owes)","Credit (↓ paid)","Balance"].map(h => (
+                                                                                    <th key={h} style={{ padding: "5px 8px", textAlign: "left", color: T.t4, fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FONT.ui }}>{h}</th>
                                                                                 ))}
-                                                                            </tbody>
-                                                                        </table>
-                                                                    );
-                                                                })()}
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {ledgerCache[p.id].map((entry: LedgerEntry) => (
+                                                                                <tr key={entry.ledgerId} style={{ borderBottom: `1px solid ${T.border}` }}>
+                                                                                    <td style={{ padding: "6px 8px", color: T.t3, fontFamily: FONT.mono }}>{fmtDate(new Date(entry.createdAt).getTime())}</td>
+                                                                                    <td style={{ padding: "6px 8px", color: T.t2, fontWeight: 600 }}>{entry.entryType.replace(/_/g, " ")}</td>
+                                                                                    <td style={{ padding: "6px 8px", color: T.sky, fontFamily: FONT.mono, fontSize: 10 }}>{entry.invoice?.invoiceNumber || entry.referenceNo || "—"}</td>
+                                                                                    <td style={{ padding: "6px 8px", fontFamily: FONT.mono, fontWeight: 700, color: entry.debitAmount > 0 ? T.crimson : T.t4 }}>
+                                                                                        {entry.debitAmount > 0 ? fmt(entry.debitAmount) : "—"}
+                                                                                    </td>
+                                                                                    <td style={{ padding: "6px 8px", fontFamily: FONT.mono, fontWeight: 700, color: entry.creditAmount > 0 ? T.emerald : T.t4 }}>
+                                                                                        {entry.creditAmount > 0 ? fmt(entry.creditAmount) : "—"}
+                                                                                    </td>
+                                                                                    <td style={{ padding: "6px 8px", fontFamily: FONT.mono, fontWeight: 700, color: entry.balanceAfter > 0 ? T.amber : T.emerald }}>
+                                                                                        {fmt(entry.balanceAfter)}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                )}
                                                                 {p.notes && <div style={{ marginTop: 8, padding: "6px 10px", background: `${T.amber}08`, borderRadius: 6, fontSize: 11, color: T.t3 }}>📝 {p.notes}</div>}
                                                             </td>
                                                         </tr>
