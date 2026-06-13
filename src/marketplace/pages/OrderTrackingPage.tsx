@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { T, FONT } from "../../theme";
 import { useStore } from "../../store";
 import { api } from "../../api/client";
@@ -54,13 +55,16 @@ const GPS_ROUTE = [
     { lat: 17.4060, lng: 78.4500, label: "Destination" },
 ];
 
-export function OrderTrackingPage({ onBack }) {
+export function OrderTrackingPage({ onBack }: { onBack?: () => void }) {
     const { orders, saveOrders, shops } = useStore();
     const safeOrders = orders || [];
+    const navigate = useNavigate();
+    const handleBack = onBack || (() => navigate("/marketplace"));
 
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [gpsPosition, setGpsPosition] = useState(0);
     const [apiOrders, setApiOrders] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     // Fetch real backend orders on mount — merged with local-store orders below.
     // Failure is non-fatal: local orders keep rendering either way.
@@ -73,6 +77,8 @@ export function OrderTrackingPage({ onBack }) {
                 if (!cancelled) setApiOrders(backendOrders.map(mapBackendOrder));
             } catch (err) {
                 console.error("[OrderTrackingPage] Failed to fetch backend orders:", err);
+            } finally {
+                if (!cancelled) setLoading(false);
             }
         })();
         return () => { cancelled = true; };
@@ -116,14 +122,22 @@ export function OrderTrackingPage({ onBack }) {
         saveOrders(updated);
     };
 
+    if (loading) {
+        return (
+            <div style={{ maxWidth: 800, margin: "0 auto", padding: "60px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: 14, color: T.t3 }}>Loading your orders…</div>
+            </div>
+        );
+    }
+
     if (myOrders.length === 0) {
         return (
             <div style={{ maxWidth: 800, margin: "0 auto", padding: "60px 20px", textAlign: "center" }}>
-                <button onClick={onBack} style={{ background: "transparent", border: "none", color: T.t3, fontSize: 13, cursor: "pointer", marginBottom: 30 }}>← Back to Marketplace</button>
+                <button onClick={handleBack} style={{ background: "transparent", border: "none", color: T.t3, fontSize: 13, cursor: "pointer", marginBottom: 30 }}>← Back to Marketplace</button>
                 <div style={{ fontSize: 56, marginBottom: 16, opacity: 0.4 }}>📦</div>
                 <div style={{ fontSize: 20, fontWeight: 800, color: T.t1 }}>No orders yet</div>
                 <p style={{ color: T.t3, marginTop: 8 }}>Your order history will appear here after your first purchase.</p>
-                <button onClick={onBack} style={{ marginTop: 24, background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Start Shopping →</button>
+                <button onClick={handleBack} style={{ marginTop: 24, background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer" }}>Start Shopping →</button>
             </div>
         );
     }
@@ -132,7 +146,7 @@ export function OrderTrackingPage({ onBack }) {
 
     return (
         <div style={{ maxWidth: 1000, margin: "0 auto", padding: "40px 20px" }}>
-            <button onClick={onBack} style={{ background: "transparent", border: "none", color: T.t3, fontSize: 13, cursor: "pointer", marginBottom: 24 }}>← Back to Marketplace</button>
+            <button onClick={handleBack} style={{ background: "transparent", border: "none", color: T.t3, fontSize: 13, cursor: "pointer", marginBottom: 24 }}>← Back to Marketplace</button>
             <h1 style={{ fontSize: 28, fontWeight: 900, color: T.t1, margin: "0 0 8px" }}>My Orders</h1>
             <p style={{ fontSize: 14, color: T.t3, margin: "0 0 32px" }}>{myOrders.length} order{myOrders.length > 1 ? "s" : ""} found</p>
 
