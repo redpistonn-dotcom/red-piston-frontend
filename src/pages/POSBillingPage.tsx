@@ -148,6 +148,13 @@ export function POSBillingPage() {
         for (const item of items) {
             if (item.qty <= 0) { toast?.(`Invalid qty for ${item.name}`, "warning"); return false; }
             if (billType === "Sale" && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
+            const isCustom = String(item.productId || "").startsWith("custom_");
+            if (isCustom && (!item.name || item.name === "Custom Item")) {
+                toast?.("Enter a name for the custom item before submitting", "warning"); return false;
+            }
+            if (isCustom && item.price <= 0) {
+                toast?.(`Set a price for "${item.name}" before submitting`, "warning"); return false;
+            }
         }
         return true;
     };

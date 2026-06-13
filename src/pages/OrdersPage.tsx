@@ -181,6 +181,13 @@ export function OrdersPage() {
     const [showCreate, setShowCreate] = useState(false);
     const [visibleCount, setVisibleCount] = useState(25);
     const [shopApiOrders, setShopApiOrders] = useState<any[]>([]);
+    const [viewOrder, setViewOrder] = useState<any>(null);
+
+    const STATUS_CYCLE = ["All", "Pending", "Processing", "Shipped", "Delivered", "Cancelled"] as const;
+    const cycleStatusFilter = () => {
+        const idx = STATUS_CYCLE.indexOf(statusFilter as typeof STATUS_CYCLE[number]);
+        setStatusFilter(STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length]);
+    };
 
     // Real incoming marketplace orders for this shop. Non-blocking: failure just
     // leaves the local-store derivation as-is.
@@ -309,9 +316,9 @@ export function OrdersPage() {
     // mobile stacked layout (search → KPIs → CTA → Filter/Export → Recent Orders).
     const filterBtn = (
         <button
-            onClick={() => setStatusFilter(statusFilter === "All" ? "Pending" : "All")}
-            style={{ height: isMobile ? 46 : 40, padding: "0 16px", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
-        >≡ Filter</button>
+            onClick={cycleStatusFilter}
+            style={{ height: isMobile ? 46 : 40, padding: "0 16px", background: statusFilter !== "All" ? T.amberGlow : "#FFFFFF", border: `1px solid ${statusFilter !== "All" ? T.amber : T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: statusFilter !== "All" ? T.amber : T.t2, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}
+        >≡ {statusFilter === "All" ? "Filter" : statusFilter}</button>
     );
     const exportBtn = (
         <button
@@ -554,7 +561,7 @@ export function OrdersPage() {
                                                             style={{ height: 26, padding: "0 12px", borderRadius: 20, border: `1px solid rgba(139,30,30,0.25)`, background: T.amberGlow, color: T.amber, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap", transition: "all 0.12s" }}
                                                         >{adv.label} →</button>
                                                     )}
-                                                    <button title="View" style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
+                                                    <button title="View order details" onClick={() => setViewOrder(order)} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
                                                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
                                                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
                                                         👁
@@ -590,6 +597,40 @@ export function OrdersPage() {
                         Load more ({filtered.length - visibleCount} remaining)
                     </button>
                 </div>
+            )}
+
+            {/* Order Detail Modal */}
+            {viewOrder && createPortal(
+                <div style={{ position: "fixed", inset: 0, zIndex: 2147483647, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+                    <div onClick={() => setViewOrder(null)} style={{ position: "absolute", inset: 0, background: "rgba(28,27,27,0.55)", backdropFilter: "blur(4px)" }} />
+                    <div style={{ position: "relative", background: "#FFFFFF", borderRadius: 18, width: "100%", maxWidth: 480, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", overflow: "hidden" }}>
+                        <div style={{ background: `linear-gradient(135deg, ${T.amber}, #6A020A)`, padding: "20px 24px 16px" }}>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>Order Details</div>
+                            <div style={{ fontSize: 18, fontWeight: 900, color: "#FFFFFF", fontFamily: FONT.display, marginTop: 4 }}>{viewOrder.orderId}</div>
+                        </div>
+                        <div style={{ padding: "20px 24px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+                            {[
+                                { label: "Type",    value: viewOrder.type },
+                                { label: "Party",   value: viewOrder.partyName || "—" },
+                                { label: "Amount",  value: fmt(viewOrder.amount) },
+                                { label: "Status",  value: viewOrder.status },
+                                { label: "Date",    value: fmtDate(viewOrder.date) },
+                                ...(viewOrder.product ? [{ label: "Product", value: viewOrder.product }] : []),
+                                ...(viewOrder.qty !== undefined ? [{ label: "Qty", value: String(viewOrder.qty) }] : []),
+                                ...(viewOrder.notes ? [{ label: "Notes", value: viewOrder.notes }] : []),
+                            ].map(row => (
+                                <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                                    <span style={{ color: T.t3, fontFamily: FONT.ui, fontWeight: 600 }}>{row.label}</span>
+                                    <span style={{ color: T.t1, fontFamily: FONT.ui, fontWeight: 700, textAlign: "right", maxWidth: 280, wordBreak: "break-word" }}>{row.value}</span>
+                                </div>
+                            ))}
+                            <button onClick={() => setViewOrder(null)} style={{ marginTop: 8, height: 44, background: T.amber, border: "none", borderRadius: 10, fontSize: 14, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui }}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
 
             {/* Create Order Modal */}

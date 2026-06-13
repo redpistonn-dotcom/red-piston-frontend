@@ -43,8 +43,6 @@ const NAV_ITEMS = [
   { key: "orders",    path: "/orders",    icon: "shopping_cart",  label: "Orders"       },
 ] as const;
 
-type Period = "7D" | "30D" | "3M" | "1Y";
-const PERIODS: Period[] = ["7D", "30D", "3M", "1Y"];
 
 // ── Helper: Material Symbols span ──────────────────────────────────────────
 function MSIcon({ name, filled = false, size = 22 }: { name: string; filled?: boolean; size?: number }) {
@@ -79,8 +77,6 @@ export function ERPShell({ children }: ERPShellProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ── Period filter ──────────────────────────────────────────────────────
-  const [period, setPeriod] = useState<Period>("30D");
 
   // ── Mandatory shop profile completion (photo + contact number) ─────────
   const needsShopSetup = useMemo(() => {
@@ -558,30 +554,7 @@ export function ERPShell({ children }: ERPShellProps) {
 
         {/* ── RIGHT: action icons (period pills only on dashboard) ──── */}
         <div style={{ display: "flex", alignItems: "center", gap: SP.sm, flexShrink: 0 }}>
-          {/* Period pills — ONLY on dashboard */}
-          {currentPath === "/dashboard" && (
-            <div style={{
-              display: "flex", alignItems: "center",
-              background: T.surfaceContainerHigh,
-              borderRadius: 10, padding: 3, gap: 2,
-            }}>
-              {PERIODS.map(p => (
-                <button
-                  key={p}
-                  className="period-btn"
-                  onClick={() => setPeriod(p)}
-                  style={{
-                    padding: "4px 12px", borderRadius: 8,
-                    fontSize: 12, fontWeight: period === p ? 700 : 500,
-                    background: period === p ? "#FFFFFF" : "transparent",
-                    color: period === p ? "#8B1E1E" : T.t2,
-                    boxShadow: period === p ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
-                    transition: "all 0.15s",
-                  }}
-                >{p}</button>
-              ))}
-            </div>
-          )}
+          {/* Period pills removed — DashboardPage owns its own period state */}
 
           {/* Add stock icon button */}
           <button
