@@ -228,10 +228,10 @@ export function InventoryPage() {
                 )}
               </div>
 
-              {/* Filter / sort icon button (≡) — opens a sort popover in the future */}
+              {/* Sort cycle button — name → stock → margin → name */}
               <button
                 className="inv-filter-btn"
-                title="Sort & Filter"
+                title={`Sort: ${sortBy === "name" ? "Name ↑ (click for Stock)" : sortBy === "stock" ? "Stock ↑ (click for Margin)" : "Margin ↑ (click for Name)"}`}
                 onClick={() => setSortBy(sortBy === "name" ? "stock" : sortBy === "stock" ? "margin" : "name")}
                 style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16 }}
               >≡</button>

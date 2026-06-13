@@ -113,7 +113,8 @@ function movementToOrder(m: any) {
 }
 
 // ─── Create New Order Modal ───────────────────────────────────────────────────
-function CreateOrderModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () => void; onCreated: (id: string) => void; activeShopId: any }) {
+    const { orders, saveOrders } = useStore();
     const [form, setForm] = useState({
         type: "Sale", party: "", amount: "", product: "", status: "Pending",
     });
@@ -121,7 +122,19 @@ function CreateOrderModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
     const handleSubmit = () => {
         if (!form.party || !form.amount) return;
-        const newId = `#${form.type === "Sale" ? "SO" : "PO"}-${String(Math.floor(Math.random() * 90000) + 10000)}`;
+        const numId = Math.floor(Math.random() * 90000) + 10000;
+        const newId = `#${form.type === "Sale" ? "SO" : "PO"}-${numId}`;
+        const newOrder = {
+            id: `manual_${numId}`,
+            shopId: activeShopId,
+            customer: form.type === "Sale" ? form.party : undefined,
+            supplier: form.type === "Purchase" ? form.party : undefined,
+            items: form.product || "",
+            total: parseFloat(form.amount.replace(/,/g, "")) || 0,
+            status: form.status === "Delivered" ? "DELIVERED" : form.status === "Shipped" ? "DISPATCHED" : "PENDING",
+            time: Date.now(),
+        };
+        saveOrders([...(orders || []), newOrder]);
         onCreated(newId);
         onClose();
     };
@@ -634,7 +647,7 @@ export function OrdersPage() {
             )}
 
             {/* Create Order Modal */}
-            {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />}
+            {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} onCreated={handleCreated} activeShopId={activeShopId} />}
         </div>
     );
 }

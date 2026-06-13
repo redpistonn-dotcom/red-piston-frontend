@@ -93,31 +93,39 @@ export function PartiesPage() {
     const shopVehicles  = useMemo(() => (vehicles || []).filter((v: any) => v.shopId === activeShopId), [vehicles, activeShopId]);
     const shopMovements = useMemo(() => (movements || []).filter((m: any) => m.shopId === activeShopId), [movements, activeShopId]);
 
+    // Match a movement to a party by id (preferred) or by name (fallback for legacy data)
+    const matchesParty = (m: any, party: any): boolean => {
+        const byId = m.partyId && (m.partyId === party.id || m.partyId === String(party.id));
+        const byName = m.customerName === party.name || m.supplierName === party.name || m.supplier === party.name;
+        return byId || byName;
+    };
+
     const getBalance = (party: any) => {
         let bal = party.openingBalance || 0;
         shopMovements.forEach((m: any) => {
+            if (!matchesParty(m, party)) return;
             if (party.type === "customer" || party.type === "both") {
-                if (m.customerName === party.name && m.type === "SALE"    && (m.paymentStatus === "pending" || m.paymentMode === "Credit")) bal += m.total;
-                if (m.type === "RECEIPT" && m.customerName === party.name) bal -= m.total;
+                if (m.type === "SALE"    && (m.paymentStatus === "pending" || m.paymentMode === "Credit")) bal += m.total;
+                if (m.type === "RECEIPT") bal -= m.total;
             }
             if (party.type === "supplier" || party.type === "both") {
-                if ((m.supplierName === party.name || m.supplier === party.name) && m.type === "PURCHASE" && (m.paymentStatus === "pending" || m.paymentMode === "Credit")) bal += m.total;
-                if (m.type === "PAYMENT" && m.supplierName === party.name) bal -= m.total;
+                if (m.type === "PURCHASE" && (m.paymentStatus === "pending" || m.paymentMode === "Credit")) bal += m.total;
+                if (m.type === "PAYMENT") bal -= m.total;
             }
         });
         return bal;
     };
 
     const getTransactionCount = (party: any) =>
-        shopMovements.filter((m: any) => m.customerName === party.name || m.supplierName === party.name || m.supplier === party.name).length;
+        shopMovements.filter((m: any) => matchesParty(m, party)).length;
 
     const getCreditAge = (party: any) => {
         const moves = shopMovements.filter((m: any) => {
-            const match = m.customerName === party.name || m.supplierName === party.name || m.supplier === party.name;
-            return match && (m.paymentStatus === "pending" || m.paymentMode === "Credit") && (m.type === "SALE" || m.type === "PURCHASE");
+            return matchesParty(m, party) && (m.paymentStatus === "pending" || m.paymentMode === "Credit") && (m.type === "SALE" || m.type === "PURCHASE");
         }).sort((a: any, b: any) => a.date - b.date);
         if (!moves.length) return 0;
-        return Math.floor((Date.now() - moves[0].date) / 86400000);
+        // Use the most recent unpaid transaction to reflect current credit age
+        return Math.floor((Date.now() - moves[moves.length - 1].date) / 86400000);
     };
 
     const getPartyLedger = (party: any) =>
@@ -547,7 +555,9 @@ export function PartiesPage() {
                                                                 {bal > 0 && p.phone && (
                                                                     <button onClick={e => {
                                                                         e.stopPropagation();
-                                                                        window.open(`https://wa.me/91${(p.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Namaste ${p.name}, aapka hamare shop mein ${fmt(bal)} ka baki hai. Kripya jald payment karein.`)}`, "_blank");
+                                                                        const digits = (p.phone || "").replace(/\D/g, "");
+                                                                        if (digits.length !== 10) { toast?.("Party phone number must be 10 digits to send WhatsApp", "warning"); return; }
+                                                                        window.open(`https://wa.me/91${digits}?text=${encodeURIComponent(`Namaste ${p.name}, aapka hamare shop mein ${fmt(bal)} ka baki hai. Kripya jald payment karein.`)}`, "_blank");
                                                                         toast?.("WhatsApp reminder opened", "success");
                                                                     }} style={{ height: 28, padding: "0 10px", borderRadius: 6, border: `1px solid ${T.emerald}55`, background: `${T.emerald}10`, color: T.emerald, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>WA</button>
                                                                 )}

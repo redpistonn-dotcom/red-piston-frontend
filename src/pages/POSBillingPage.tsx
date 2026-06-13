@@ -304,8 +304,11 @@ export function POSBillingPage() {
                             `*${shopName}*\n${billType === "Sale" ? "Tax Invoice" : "Quotation"} ${invoiceNo}\nItems: ${items.length}\nTotal: ₹${finalTotal.toFixed(2)}\n\nThank you for your business! 🙏`
                         );
                         const ph = customerPhone.replace(/\D/g, "");
-                        const url = ph.length === 10 ? `https://wa.me/91${ph}?text=${msg}` : `https://wa.me/?text=${msg}`;
-                        window.open(url, "_blank");
+                        if (ph.length !== 10) {
+                            toast?.("Enter a 10-digit WhatsApp number in the Customer fields above to send directly", "warning");
+                            return;
+                        }
+                        window.open(`https://wa.me/91${ph}?text=${msg}`, "_blank");
                     }}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#25D366", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui }}>
                     💬 Share WhatsApp
@@ -569,7 +572,7 @@ export function POSBillingPage() {
                                 </div>
                             )}
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: T.t2 }}>
-                                <span>Taxes (GST avg {items.length > 0 ? Math.round(grandGst / grandTotal * 100) : 18}%)</span>
+                                <span>Taxes (GST avg {grandTotal > 0 ? Math.round(grandGst / grandTotal * 100) : 18}%)</span>
                                 <span style={{ fontFamily: FONT.mono, fontWeight: 600 }}>{fmt(grandGst)} <span style={{ fontSize: 10, color: T.t3 }}>inc.</span></span>
                             </div>
                             {/* Additional Discount */}
