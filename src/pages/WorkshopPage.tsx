@@ -149,6 +149,19 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
         if (Array.isArray(fresh)) saveJobCards(fresh);
     }, [saveJobCards]);
 
+    // Mark a job "invoiced" when its bill is issued from the InvoiceModal, so it
+    // shows in History with the generated invoice number (INV-<jobNumber>).
+    const markJobInvoiced = useCallback(async (job: any) => {
+        if (!job || job.status === "invoiced") return;
+        saveJobCards((jobCards || []).map((x: any) => (x.id === job.id ? { ...x, status: "invoiced" } : x)));
+        logAudit("JOB_CARD_INVOICED", "job_card", job.id, `${job.jobNumber} → invoiced`);
+        if (!job.jobId) return;
+        try {
+            await updateJobCardStatus(job.jobId, "invoiced");
+            await refreshJobs();
+        } catch (err) { console.error("[markJobInvoiced]", err); }
+    }, [jobCards, saveJobCards, refreshJobs, logAudit]);
+
     // Add / remove a part on an EXISTING job card — backend recomputes the total
     // (parts + labour); we refetch so the grand total reflects the change.
     const addPartToJob = useCallback(async (job: any, prod: any) => {
@@ -1349,6 +1362,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                 <InvoiceModal
                     job={invoiceJob}
                     user={currentUser}
+                    onInvoiced={() => markJobInvoiced(invoiceJob)}
                     onClose={() => setInvoiceJob(null)}
                 />
             )}

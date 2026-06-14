@@ -21,6 +21,9 @@ interface Props {
   user: AppUser | null;
   /** Optional recipient phone (digits ok) — used only for the wa.me URL. */
   customerPhone?: string;
+  /** Fired when the invoice is issued (Print / Download / WhatsApp) — used to
+   *  mark the job card as invoiced so it appears in History with the invoice no. */
+  onInvoiced?: () => void;
   onClose: () => void;
 }
 
@@ -97,8 +100,8 @@ function printInvoice(m: InvoiceModel) {
   w.document.close();
 }
 
-// ─── Download: real .pdf via jsPDF + autotable (lazy-loaded on demand) ──────────
-async function downloadPDF(m: InvoiceModel) {
+// ─── Build the invoice PDF (jsPDF, lazy-loaded). Shared by Download + WhatsApp ──
+async function buildInvoiceDoc(m: InvoiceModel) {
   const [{ jsPDF }, autoTableMod] = await Promise.all([
     import("jspdf"),
     import("jspdf-autotable"),
@@ -162,6 +165,11 @@ async function downloadPDF(m: InvoiceModel) {
   doc.text("This is a computer-generated invoice.", M, 800);
   doc.text("Authorised Signatory", R, 800, { align: "right" });
 
+  return doc;
+}
+
+async function downloadPDF(m: InvoiceModel) {
+  const doc = await buildInvoiceDoc(m);
   doc.save(`${m.invoiceNo}.pdf`);
 }
 
@@ -170,12 +178,29 @@ function escapeHtml(s: string): string {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }
 
-export default function InvoiceModal({ job, user, customerPhone, onClose }: Props) {
+export default function InvoiceModal({ job, user, customerPhone, onInvoiced, onClose }: Props) {
   const m = useMemo(() => buildInvoice(job, user), [job, user]);
 
-  const shareWhatsApp = () => {
+  const shareWhatsApp = async () => {
+    const text = invoiceWhatsAppText(m);
+    // Best path (mobile): share the actual invoice PDF *and* the text together via
+    // the native share sheet — WhatsApp appears as a target and receives both.
+    try {
+      const doc = await buildInvoiceDoc(m);
+      const blob = doc.output("blob");
+      const file = new File([blob], `${m.invoiceNo}.pdf`, { type: "application/pdf" });
+      const nav: any = navigator;
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        try { await nav.share({ files: [file], text, title: m.invoiceNo }); return; }
+        catch (e: any) { if (e?.name === "AbortError") return; /* else fall through */ }
+      }
+      // Desktop / no file-share support: download the PDF so it can be attached.
+      doc.save(`${m.invoiceNo}.pdf`);
+    } catch { /* PDF unavailable — still send the text below */ }
     const digits = (customerPhone || "").replace(/\D/g, "");
-    const url = `https://wa.me/${digits}?text=${encodeURIComponent(invoiceWhatsAppText(m))}`;
+    const url = digits
+      ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank", "noopener");
   };
 
@@ -258,9 +283,9 @@ export default function InvoiceModal({ job, user, customerPhone, onClose }: Prop
         {/* Actions */}
         <div style={{ borderTop: `1px solid ${LINE}`, padding: "14px 22px", display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ ...btn("#fff"), color: MUTE, border: `1px solid ${LINE}` }}>Close</button>
-          <button onClick={shareWhatsApp} style={btn("#25D366")}>WhatsApp</button>
-          <button onClick={() => printInvoice(m)} style={btn("#475569")}>Print</button>
-          <button onClick={() => { downloadPDF(m).catch(() => alert("Could not generate PDF — use Print → Save as PDF instead.")); }} style={btn(ACCENT)}>Download PDF</button>
+          <button onClick={() => { shareWhatsApp(); onInvoiced?.(); }} style={btn("#25D366")}>WhatsApp</button>
+          <button onClick={() => { printInvoice(m); onInvoiced?.(); }} style={btn("#475569")}>Print</button>
+          <button onClick={() => { downloadPDF(m).catch(() => alert("Could not generate PDF — use Print → Save as PDF instead.")); onInvoiced?.(); }} style={btn(ACCENT)}>Download PDF</button>
         </div>
       </div>
     </div>,

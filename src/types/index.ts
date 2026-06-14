@@ -100,7 +100,8 @@ export type MovementType =
   | 'ESTIMATE'
   | 'RECEIPT'
   | 'CREDIT_NOTE'
-  | 'DEBIT_NOTE';
+  | 'DEBIT_NOTE'
+  | 'JOBCARD';
 
 export type PaymentStatus = 'paid' | 'pending' | 'completed';
 

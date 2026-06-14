@@ -4,6 +4,7 @@ import { T, FONT, SHADOWS } from "../theme";
 import { fmt, pct, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV, inDateRange } from "../utils";
 import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
+import { useJobCardHistory } from "../hooks/useJobCardHistory";
 
 // ─── Group movements that share the same invoiceNo or batchId ─────────────────
 function groupMovements(filtered: any[]) {
@@ -241,6 +242,7 @@ const TABS = [
     { key: "PURCHASE",    label: "Purchases"        },
     { key: "ADJUSTMENTS", label: "Returns"          },
     { key: "ESTIMATE",    label: "Adjustments"      },
+    { key: "JOBCARD",     label: "Job Cards"        },
 ] as const;
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -258,12 +260,16 @@ export function HistoryPage() {
     // Marketplace sales (non-cancelled orders) fold into the movement ledger so
     // they show in History alongside POS movements. Cancelled orders are excluded.
     const { saleMovements: mpSales } = useShopMarketplaceSales(activeShopId);
+    // Workshop job cards fold into the ledger as "JOBCARD" entries — invoiced jobs
+    // carry their generated invoice number (INV-<jobNumber>).
+    const { jobMovements } = useJobCardHistory(activeShopId);
     const shopMovements = useMemo(
         () => [
             ...(movements || []).filter(m => m.shopId === activeShopId),
             ...mpSales,
+            ...jobMovements,
         ],
-        [movements, activeShopId, mpSales],
+        [movements, activeShopId, mpSales, jobMovements],
     );
 
     // Apply period quick-filter (overrides manual dates when set)

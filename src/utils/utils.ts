@@ -36,6 +36,7 @@ export const MOVEMENT_TYPES = {
     RECEIPT: { label: "Payment Received", icon: "💰", sym: "", stockEffect: 0, revenueEffect: 0, color: T.emerald, bg: T.emeraldBg },
     PAYMENT: { label: "Payment Made", icon: "💸", sym: "", stockEffect: 0, revenueEffect: 0, color: "#FB923C", bg: "rgba(251,146,60,0.12)" },
     ADJUST: { label: "Adjustment", icon: "⚖️", sym: "±", stockEffect: 0, revenueEffect: 0, color: T.violet, bg: T.violetBg },
+    JOBCARD: { label: "Job Card", icon: "🔧", sym: "", stockEffect: 0, revenueEffect: 0, color: "#0EA5E9", bg: "rgba(14,165,233,0.12)" },
 };
 
 export const getMovementConfig = (type) => MOVEMENT_TYPES[type] || MOVEMENT_TYPES.ADJUST;

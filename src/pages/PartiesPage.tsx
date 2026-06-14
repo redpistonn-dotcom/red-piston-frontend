@@ -284,6 +284,19 @@ export function PartiesPage() {
     }, [filtered, shopMovements]);
 
     const handleExportCSV = () => {
+        // The Vehicles tab must export VEHICLES, not the parties list (it was always
+        // exporting `filtered`, i.e. suppliers/customers, regardless of the tab).
+        if (view === "vehicles") {
+            const ownerName = (id: any) => (shopParties || []).find((p: any) => String(p.id) === String(id))?.name || "";
+            const headers = ["Registration", "Make", "Model", "Year", "Fuel", "Engine", "Odometer", "Owner"];
+            const rows = shopVehicles.map((v: any) => [
+                v.registrationNumber || "", v.make || "", v.model || "", v.year || "",
+                v.fuelType || "", v.engineType || "", v.odometer || "", ownerName(v.ownerId),
+            ]);
+            downloadCSV(`vehicles_${Date.now()}.csv`, generateCSV(headers, rows));
+            toast?.("Exported!", "success");
+            return;
+        }
         const headers = ["Name", "Type", "Phone", "GSTIN", "City", "Credit Limit", "Outstanding", "Transactions", "Tags"];
         const rows = filtered.map((p: any) => [p.name, p.type, p.phone, p.gstin || "", p.city || "", p.creditLimit, getBalance(p), getTransactionCount(p), (p.tags || []).join(", ")]);
         downloadCSV(`${view}_${Date.now()}.csv`, generateCSV(headers, rows));
