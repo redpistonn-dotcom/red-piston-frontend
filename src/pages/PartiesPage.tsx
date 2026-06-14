@@ -33,7 +33,7 @@ function Avatar({ name, size = 34 }: { name: string; size?: number }) {
 }
 
 export function PartiesPage() {
-    const { parties, movements, vehicles, activeShopId, saveParties, saveVehicles, logAudit, apiSynced } = useStore();
+    const { parties, movements, vehicles, activeShopId, saveParties, saveVehicles, logAudit } = useStore();
     const { toast } = useContext(AppCtx);
     const isMobile = useIsMobile();
 
@@ -73,6 +73,17 @@ export function PartiesPage() {
         const exists = (vehicles || []).find((x: any) => x.id === v.id);
         saveVehicles(exists ? vehicles.map((x: any) => (x.id === v.id ? v : x)) : [...(vehicles || []), v]);
     }, [vehicles, saveVehicles]);
+
+    // Always pull this shop's parties fresh on mount (resilient to a missed
+    // initial store sync) — mirrors how Inventory loads. The backend scopes
+    // parties to req.shopId, so this returns exactly the active shop's parties.
+    const [partiesLoaded, setPartiesLoaded] = useState(false);
+    useEffect(() => {
+        fetchParties()
+            .then(data => { if (Array.isArray(data)) saveParties(data); })
+            .catch(() => {})
+            .finally(() => setPartiesLoaded(true));
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [view, setView]           = useState("customers");
     const [search, setSearch]       = useState("");
@@ -148,8 +159,12 @@ export function PartiesPage() {
         resetVehForm();
     };
 
-    const shopParties   = useMemo(() => (parties  || []).filter((p: any) => p.shopId === activeShopId), [parties, activeShopId]);
-    const shopVehicles  = useMemo(() => (vehicles || []).filter((v: any) => v.shopId === activeShopId), [vehicles, activeShopId]);
+    // Tolerant shopId match — activeShopId can be a number (from products) or a
+    // string (cookie/impersonation), and party.shopId comes from the DB as a
+    // number; a strict === silently hid saved parties when the types differed.
+    const sameShop = (a: any, b: any) => String(a ?? "") === String(b ?? "");
+    const shopParties   = useMemo(() => (parties  || []).filter((p: any) => sameShop(p.shopId, activeShopId)), [parties, activeShopId]);
+    const shopVehicles  = useMemo(() => (vehicles || []).filter((v: any) => sameShop(v.shopId, activeShopId)), [vehicles, activeShopId]);
     const shopMovements = useMemo(() => (movements || []).filter((m: any) => m.shopId === activeShopId), [movements, activeShopId]);
 
     // Fetch real PartyLedger entries from the API whenever a row is expanded.
@@ -264,8 +279,8 @@ export function PartiesPage() {
         { id: "vehicles",  icon: "🚗", label: "Vehicles"  },
     ];
 
-    // First-load skeleton: show until the initial API sync brings parties in.
-    if (!apiSynced && shopParties.length === 0) {
+    // First-load skeleton: show until this page's own fetch resolves.
+    if (!partiesLoaded && shopParties.length === 0) {
         return <Skeleton.Page kpis={4} cols={7} />;
     }
 
