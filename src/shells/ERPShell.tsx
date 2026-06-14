@@ -70,6 +70,7 @@ export function ERPShell({ children }: ERPShellProps) {
     addProdOpen, setAddProdOpen,
     toast, toasts, removeToast,
     currentUser, setCurrentUser, handleLogout,
+    impersonating,
     saveProduct, handleBulkStockIn,
   } = useContext(AppCtx);
 
@@ -767,9 +768,10 @@ export function ERPShell({ children }: ERPShellProps) {
 
       <Toast items={toasts} onRemove={removeToast} />
 
-      {/* ── Mandatory shop setup modal ─────────────────────────────────────
-          Blocks all access until shop photo + contact number are filled in. */}
-      {needsShopSetup && !setupDone && (
+      {/* ── Shop setup nudge modal ────────────────────────────────────────
+          Prompts shop owners to add photo + contact; dismissible via X.
+          Hidden during admin impersonation so admins can browse freely. */}
+      {needsShopSetup && !setupDone && !impersonating && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 99999,
           background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)",
@@ -789,14 +791,24 @@ export function ERPShell({ children }: ERPShellProps) {
               }}>
                 <span style={{ fontSize: 22 }}>🏪</span>
               </div>
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: "#1a1a1a", letterSpacing: "-0.3px" }}>
                   Complete Your Shop Profile
                 </div>
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                  Required before you can access the dashboard
+                  Customers need these to reach and recognise your shop
                 </div>
               </div>
+              <button
+                onClick={() => setSetupDone(true)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8, border: "1.5px solid #E5E7EB",
+                  background: "#F9FAFB", cursor: "pointer", display: "flex",
+                  alignItems: "center", justifyContent: "center", fontSize: 18,
+                  color: "#6b7280", flexShrink: 0, lineHeight: 1,
+                }}
+                title="Close"
+              >×</button>
             </div>
 
             <div style={{
@@ -805,7 +817,7 @@ export function ERPShell({ children }: ERPShellProps) {
               display: "flex", alignItems: "flex-start", gap: 8,
             }}>
               <span>⚠️</span>
-              <span>Your shop is missing a <strong>contact number</strong> and/or <strong>shop photo</strong>. Customers need these to reach and recognise your shop.</span>
+              <span>Your shop is missing a <strong>contact number</strong> and/or <strong>shop photo</strong>. Add them so customers can reach and recognise your shop.</span>
             </div>
 
             {setupError && (

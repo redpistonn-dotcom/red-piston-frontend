@@ -609,6 +609,7 @@ function AppContent() {
     toast, toasts, removeToast,
     // Auth (consumed by shells + LandingPage modal)
     currentUser, setCurrentUser, handleLogin, handleLogout,
+    impersonating, handleExitImpersonation,
     // Business handlers (consumed by pages via useContext — no prop drilling)
     saveProduct,
     handleBulkStockIn,
@@ -622,6 +623,7 @@ function AppContent() {
     toast, toasts, removeToast, currentUser, setCurrentUser, handleLogin, handleLogout,
     saveProduct, handleBulkStockIn, handleSale, handleMultiItemSale,
     handlePurchase, handleAdjustment, handlePaymentReceipt,
+    impersonating, handleExitImpersonation,
   ]);
 
   const genInvoiceNo = useCallback(() => {
