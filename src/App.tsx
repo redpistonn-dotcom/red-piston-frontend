@@ -324,7 +324,10 @@ function AppContent() {
     localStorage.removeItem("as_user");
     localStorage.removeItem("as_refresh_token");
     localStorage.removeItem("as_impersonating");
-    try { sessionStorage.removeItem("as_imp_token"); } catch {}
+    try {
+      sessionStorage.removeItem("as_imp_token");
+      sessionStorage.removeItem("vl_low_stock_dismissed");
+    } catch {}
     setCurrentUser(null);
     window.location.replace("/login");
   }, [clearStore]);
@@ -605,7 +608,7 @@ function AppContent() {
     // Toast (consumed by all shells and pages)
     toast, toasts, removeToast,
     // Auth (consumed by shells + LandingPage modal)
-    currentUser, handleLogin, handleLogout,
+    currentUser, setCurrentUser, handleLogin, handleLogout,
     // Business handlers (consumed by pages via useContext — no prop drilling)
     saveProduct,
     handleBulkStockIn,
@@ -616,7 +619,7 @@ function AppContent() {
     handlePaymentReceipt,
   }), [
     pModal, setPModal, catalogModal, setCatalogModal, addProdOpen, setAddProdOpen,
-    toast, toasts, removeToast, currentUser, handleLogin, handleLogout,
+    toast, toasts, removeToast, currentUser, setCurrentUser, handleLogin, handleLogout,
     saveProduct, handleBulkStockIn, handleSale, handleMultiItemSale,
     handlePurchase, handleAdjustment, handlePaymentReceipt,
   ]);

@@ -330,7 +330,12 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
     setSaving(true); setError("");
     try {
       const res = await api.patch("/api/auth/me/shop", shopData);
-      setShopData(res.data || res);
+      const updatedShop = res.data || res;
+      setShopData(updatedShop);
+      const stored = JSON.parse(localStorage.getItem("as_user") || "{}");
+      const newUser = { ...stored, shop: updatedShop };
+      localStorage.setItem("as_user", JSON.stringify(newUser));
+      if (onUserUpdate) onUserUpdate(newUser);
       showToast("Shop details updated");
     } catch (e) {
       setError(e.data?.error?.message || e.message || "Failed to save");

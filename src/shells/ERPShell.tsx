@@ -69,7 +69,7 @@ export function ERPShell({ children }: ERPShellProps) {
     pModal, setPModal, catalogModal, setCatalogModal,
     addProdOpen, setAddProdOpen,
     toast, toasts, removeToast,
-    currentUser, handleLogout,
+    currentUser, setCurrentUser, handleLogout,
     saveProduct, handleBulkStockIn,
   } = useContext(AppCtx);
 
@@ -107,6 +107,19 @@ export function ERPShell({ children }: ERPShellProps) {
         whatsappNumber: setupPhone.trim(),
         photoUrl: setupPhoto.trim(),
       });
+      setCurrentUser((prev: any) => ({
+        ...prev,
+        shop: {
+          ...(prev?.shop || {}),
+          photoUrl: setupPhoto.trim(),
+          whatsappNumber: setupPhone.trim(),
+        },
+      }));
+      const stored = JSON.parse(localStorage.getItem("as_user") || "{}");
+      localStorage.setItem("as_user", JSON.stringify({
+        ...stored,
+        shop: { ...(stored.shop || {}), photoUrl: setupPhoto.trim(), whatsappNumber: setupPhone.trim() },
+      }));
       setSetupDone(true);
     } catch (e: any) {
       setSetupError(e?.data?.error?.message || e?.message || "Failed to save. Please try again.");
