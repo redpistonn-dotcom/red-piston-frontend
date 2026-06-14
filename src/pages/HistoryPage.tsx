@@ -270,7 +270,10 @@ export function HistoryPage() {
     // so we only take the manual ones here to avoid double-counting.)
     const manualOrders = useMemo(
         () => (orders || [])
-            .filter((o: any) => String(o.id || "").startsWith("manual_") && String(o.shopId ?? "") === String(activeShopId ?? ""))
+            .filter((o: any) => String(o.id || "").startsWith("manual_")
+                && String(o.shopId ?? "") === String(activeShopId ?? "")
+                // Cancelled orders must NOT appear in History.
+                && o.status !== "CANCELLED" && o.status !== "Cancelled")
             .map((o: any) => ({
                 id: `ord-${o.id}`,
                 shopId: o.shopId,

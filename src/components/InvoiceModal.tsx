@@ -154,7 +154,11 @@ async function buildInvoiceDoc(m: InvoiceModel) {
   totLine("Subtotal", pdfINR(m.subTotal));
   totLine(`CGST (${m.gstRate / 2}%)`, pdfINR(m.cgst));
   totLine(`SGST (${m.gstRate / 2}%)`, pdfINR(m.sgst));
-  doc.setDrawColor(139, 30, 30).line(lx, fy - 6, R, fy - 6);
+  // Divider sits in a clear gap ABOVE the Total row — previously drawn at fy-6,
+  // which fell inside the bold Total text and crossed through the value.
+  fy += 4;
+  doc.setDrawColor(139, 30, 30).line(lx, fy, R, fy);
+  fy += 18;
   totLine("Total", pdfINR(m.total), true);
 
   fy += 6;

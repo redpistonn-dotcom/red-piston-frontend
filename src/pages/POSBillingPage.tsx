@@ -261,7 +261,10 @@ export function POSBillingPage() {
         if (grandDiscount > 0) trow("Item Discounts", `-${rs(grandDiscount)}`);
         if (additionalDisc > 0) trow("Additional Discount", `-${rs(additionalDisc)}`);
         trow("GST (Inclusive)", rs(grandGst));
-        doc.setDrawColor(139, 30, 30).line(lx, fy - 6, R, fy - 6);
+        // Divider in a clear gap above TOTAL (was fy-6, which crossed the bold text).
+        fy += 4;
+        doc.setDrawColor(139, 30, 30).line(lx, fy, R, fy);
+        fy += 18;
         trow("TOTAL", rs(finalTotal), true);
         fy += 8;
         doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(120);

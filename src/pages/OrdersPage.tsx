@@ -114,24 +114,49 @@ function movementToOrder(m: any) {
 
 // ─── Create New Order Modal ───────────────────────────────────────────────────
 function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () => void; onCreated: (id: string) => void; activeShopId: any }) {
-    const { orders, saveOrders } = useStore();
+    const { orders, saveOrders, products } = useStore();
     const [form, setForm] = useState({
-        type: "Sale", party: "", amount: "", product: "", status: "Pending",
+        type: "Sale", party: "", productId: "", qty: "1", amount: "", status: "Pending",
     });
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
+    // The order product MUST come from the shop's inventory (no free text).
+    const shopProducts = useMemo(
+        () => (products || []).filter((p: any) => String(p.shopId ?? "") === String(activeShopId ?? "")),
+        [products, activeShopId],
+    );
+    const selectedProd = shopProducts.find((p: any) => String(p.id) === String(form.productId));
+
+    // Auto-fill amount = sellPrice × qty when a product/qty is picked (still editable).
+    const pickProduct = (pid: string) => {
+        const p = shopProducts.find((x: any) => String(x.id) === String(pid));
+        const q = Math.max(1, parseInt(form.qty) || 1);
+        setForm(f => ({ ...f, productId: pid, amount: p ? String((Number(p.sellPrice) || 0) * q) : f.amount }));
+    };
+    const setQty = (v: string) => {
+        const q = Math.max(1, parseInt(v) || 1);
+        setForm(f => ({ ...f, qty: String(q), amount: selectedProd ? String((Number(selectedProd.sellPrice) || 0) * q) : f.amount }));
+    };
+
     const handleSubmit = () => {
-        if (!form.party || !form.amount) return;
+        if (!form.party || !selectedProd) return;   // require a party + an inventory product
         const numId = Math.floor(Math.random() * 90000) + 10000;
         const newId = `#${form.type === "Sale" ? "SO" : "PO"}-${numId}`;
+        const qty = Math.max(1, parseInt(form.qty) || 1);
+        const unitPrice = Number(selectedProd.sellPrice) || 0;
+        const total = parseFloat(String(form.amount).replace(/,/g, "")) || unitPrice * qty;
         const newOrder = {
             id: `manual_${numId}`,
             shopId: activeShopId,
             customer: form.type === "Sale" ? form.party : undefined,
             supplier: form.type === "Purchase" ? form.party : undefined,
-            items: form.product || "",
-            total: parseFloat(form.amount.replace(/,/g, "")) || 0,
-            status: form.status === "Delivered" ? "DELIVERED" : form.status === "Shipped" ? "DISPATCHED" : "PENDING",
+            items: `${selectedProd.name} × ${qty}`,
+            inventoryId: selectedProd.inventoryId ?? selectedProd.id,
+            productName: selectedProd.name,
+            qty,
+            unitPrice,
+            total,
+            status: form.status === "Delivered" ? "DELIVERED" : form.status === "Shipped" ? "DISPATCHED" : form.status === "Cancelled" ? "CANCELLED" : "PENDING",
             time: Date.now(),
         };
         saveOrders([...(orders || []), newOrder]);
@@ -157,20 +182,38 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
                     </div>
                 ))}
 
-                {[
-                    { label: form.type === "Sale" ? "Customer Name" : "Supplier Name", key: "party", placeholder: form.type === "Sale" ? "Titan Logistics Corp." : "Industrial Gear Ltd." },
-                    { label: "Product / Description", key: "product", placeholder: "Hydraulic pistons, 50 units" },
-                    { label: "Amount (₹)", key: "amount", placeholder: "45,200" },
-                ].map(field => (
-                    <div key={field.key} style={{ marginBottom: 14 }}>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: T.t2, display: "block", marginBottom: 5, fontFamily: FONT.ui }}>{field.label}</label>
-                        <input value={(form as any)[field.key]} onChange={e => set(field.key, e.target.value)} placeholder={field.placeholder}
-                            style={{ width: "100%", height: 38, border: `1px solid ${T.border}`, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, outline: "none", background: "#FFFFFF", color: T.t1, boxSizing: "border-box" }}
-                            onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
-                            onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }}
-                        />
+                {/* Party (customer/supplier) */}
+                <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: T.t2, display: "block", marginBottom: 5, fontFamily: FONT.ui }}>{form.type === "Sale" ? "Customer Name" : "Supplier Name"}</label>
+                    <input value={form.party} onChange={e => set("party", e.target.value)} placeholder={form.type === "Sale" ? "Titan Logistics Corp." : "Industrial Gear Ltd."}
+                        style={{ width: "100%", height: 38, border: `1px solid ${T.border}`, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, outline: "none", background: "#FFFFFF", color: T.t1, boxSizing: "border-box" }} />
+                </div>
+
+                {/* Product — MUST be chosen from the shop's inventory */}
+                <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: T.t2, display: "block", marginBottom: 5, fontFamily: FONT.ui }}>Product (from inventory)</label>
+                    <select value={form.productId} onChange={e => pickProduct(e.target.value)}
+                        style={{ width: "100%", height: 38, border: `1px solid ${T.border}`, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, outline: "none", background: "#FFFFFF", color: T.t1 }}>
+                        <option value="">{shopProducts.length ? "Select a product…" : "No inventory products yet"}</option>
+                        {shopProducts.map((p: any) => (
+                            <option key={p.id} value={p.id}>{`${p.name} — ₹${p.sellPrice} · ${p.stock} in stock`}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Quantity + Amount */}
+                <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+                    <div style={{ width: 110 }}>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: T.t2, display: "block", marginBottom: 5, fontFamily: FONT.ui }}>Quantity</label>
+                        <input type="number" min={1} value={form.qty} onChange={e => setQty(e.target.value)}
+                            style={{ width: "100%", height: 38, border: `1px solid ${T.border}`, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, outline: "none", background: "#FFFFFF", color: T.t1, boxSizing: "border-box" }} />
                     </div>
-                ))}
+                    <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: T.t2, display: "block", marginBottom: 5, fontFamily: FONT.ui }}>Amount (₹)</label>
+                        <input value={form.amount} onChange={e => set("amount", e.target.value)} placeholder="0"
+                            style={{ width: "100%", height: 38, border: `1px solid ${T.border}`, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, outline: "none", background: "#FFFFFF", color: T.t1, boxSizing: "border-box" }} />
+                    </div>
+                </div>
 
                 <div style={{ display: "flex", gap: 10, marginTop: 22 }}>
                     <button onClick={onClose} style={{ flex: 1, height: 40, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>Cancel</button>
