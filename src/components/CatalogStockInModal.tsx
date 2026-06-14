@@ -149,7 +149,7 @@ function BackButton({ onClick, label = "Back to search" }) {
 }
 
 // ─── sub-component: CartPanel ─────────────────────────────────────────────────
-function CartPanel({ cart, onRemove, onSaveAll, saving }) {
+function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving }) {
   return (
     <div className="csim-cart" style={{
       width: 268,
@@ -203,8 +203,6 @@ function CartPanel({ cart, onRemove, onSaveAll, saving }) {
             const imgSrc   = item.type === "catalog"
               ? (item.part.imageUrl || (item.part.images && item.part.images[0]))
               : null;
-            const sellPrice = parseFloat(item.form.sellPrice) || 0;
-            const stockQty  = parseInt(item.form.stockQty) || 0;
 
             return (
               <div key={item.cartId} style={{
@@ -232,12 +230,15 @@ function CartPanel({ cart, onRemove, onSaveAll, saving }) {
                   {brand && (
                     <div style={{ fontSize: 10, color: T.t3, marginBottom: 4 }}>{brand}</div>
                   )}
+                  {/* Inline-editable price + qty so cart items can be adjusted before Save All. */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", fontSize: 10 }}>
-                    <span style={{ fontFamily: FONT.mono, color: T.emerald, fontWeight: 700 }}>
-                      ₹{fmt(sellPrice)}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 2, color: T.emerald, fontWeight: 700 }}>₹
+                      <input type="number" value={item.form.sellPrice} onChange={e => onEdit?.(item.cartId, "sellPrice", e.target.value)} title="Selling price"
+                        style={{ width: 66, height: 26, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", fontSize: 11, fontFamily: FONT.mono, color: T.emerald, fontWeight: 700, outline: "none", background: "#fff" }} />
                     </span>
-                    <span style={{ color: T.t4 }}>·</span>
-                    <span style={{ color: T.t2 }}>{stockQty} units</span>
+                    <input type="number" min={0} value={item.form.stockQty} onChange={e => onEdit?.(item.cartId, "stockQty", e.target.value)} title="Quantity"
+                      style={{ width: 56, height: 26, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", fontSize: 11, fontFamily: FONT.mono, color: T.t2, outline: "none", background: "#fff" }} />
+                    <span style={{ color: T.t4 }}>units</span>
                     {item.type === "contribution" && (
                       <span style={{
                         fontSize: 9, color: T.amber, fontWeight: 700,
@@ -616,6 +617,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
   const [f, setF] = useState({
     buyPrice: "", sellPrice: "", stockQty: "0",
     rackLocation: "", minStockAlert: "5",
+    supplierName: "", // who this stock was bought from (recorded on the opening movement)
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
   const [errors, setErrors] = useState({});
@@ -734,6 +736,11 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
           <div style={{ gridColumn: "span 2" }}>
             <Field label="Rack / Storage Location" hint="e.g. Rack A-12, Shelf 3B">
               <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" />
+            </Field>
+          </div>
+          <div style={{ gridColumn: "span 2" }}>
+            <Field label="Supplier (optional)" hint="Who you bought this stock from — recorded on the opening stock entry">
+              <Input value={f.supplierName} onChange={set("supplierName")} placeholder="e.g. Industrial Gear Ltd." />
             </Field>
           </div>
         </div>
@@ -967,6 +974,11 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
     setCart((c) => c.filter((item) => item.cartId !== cartId));
   }, []);
 
+  // ── Edit a cart item's price / qty inline (before Save All) ───────────────
+  const handleEditCartItem = useCallback((cartId, field, value) => {
+    setCart((c) => c.map((item) => (item.cartId === cartId ? { ...item, form: { ...item.form, [field]: value } } : item)));
+  }, []);
+
   // ── Save All: process every cart item and call the API ────────────────────
   const handleSaveAll = useCallback(async () => {
     if (cart.length === 0) return;
@@ -988,6 +1000,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               stockQty:      parseInt(form.stockQty) || 0,
               rackLocation:  form.rackLocation || null,
               minStockAlert: parseInt(form.minStockAlert) || 5,
+              supplierName:  form.supplierName || undefined,
               imageUrl:      resolvedImage || undefined,
             });
             const inv = res.item;
@@ -1215,6 +1228,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
         <CartPanel
           cart={cart}
           onRemove={handleRemoveFromCart}
+          onEdit={handleEditCartItem}
           onSaveAll={handleSaveAll}
           saving={saving}
         />

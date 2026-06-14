@@ -171,13 +171,58 @@ export function ReportsPage() {
     , [shopMovements]);
 
     // ── Report generation ─────────────────────────────────────────────────
-    const handleGeneratePDF = () => {
+    // Build a real DATA PDF (jsPDF) — previously this called window.print(), which
+    // printed the whole page and produced a "screenshot of the dashboard" instead
+    // of the report's actual data.
+    const handleGeneratePDF = async () => {
         setGenerating(true);
-        setTimeout(() => {
-            window.print();
-            setGenerating(false);
+        try {
+            const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+            const autoTable = autoTableMod.default;
+            const doc = new jsPDF({ unit: "pt", format: "a4" });
+            const M = 40, R = 555;
+            const rs = (n: number) => "Rs. " + Math.round(Number(n) || 0).toLocaleString("en-IN");
+
+            doc.setFont("helvetica", "bold").setFontSize(16).setTextColor(139, 30, 30);
+            doc.text(reportType, M, 48);
+            doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
+            doc.text((dateFrom || dateTo) ? `${dateFrom || "…"} to ${dateTo || "…"}` : "All dates", M, 64);
+            doc.text(`Generated: ${fmtDate(Date.now())}`, R, 64, { align: "right" });
+
+            const filtered = shopMovements.filter(m => inDateRange(m.date, dateFrom, dateTo));
+            let head: string[][], body: string[][];
+            if (reportType === "Inventory Valuation") {
+                head = [["SKU", "Product", "Category", "Stock", "Buy", "Cost Value", "Sell"]];
+                body = shopProducts.map((p: any) => [p.sku || "", p.name, p.category || "", String(p.stock), rs(p.buyPrice), rs((p.buyPrice || 0) * (p.stock || 0)), rs(p.sellPrice)]);
+            } else if (reportType === "GST Report" || reportType === "Tax Report") {
+                head = [["Date", "Type", "Product", "Total", "GST"]];
+                body = filtered.map((m: any) => [fmtDate(m.date), m.type, m.productName || "", rs(m.total), rs(m.gstAmount || 0)]);
+            } else {
+                head = [["Date", "Type", "Product", "Party", "Qty", "Total", "Profit"]];
+                body = filtered.map((m: any) => [fmtDate(m.date), m.type, m.productName || "", m.customerName || m.supplierName || "", String(m.qty || 1), rs(m.total), rs(m.profit || 0)]);
+            }
+
+            autoTable(doc, { startY: 80, head, body, styles: { fontSize: 8, cellPadding: 4 }, headStyles: { fillColor: [139, 30, 30] }, margin: { left: M, right: M } });
+
+            let fy = ((doc as any).lastAutoTable?.finalY || 80) + 18;
+            doc.setFont("helvetica", "bold").setFontSize(10).setTextColor(20);
+            if (reportType === "Inventory Valuation") {
+                doc.text(`Total Stock Value: ${rs(shopProducts.reduce((s: number, p: any) => s + (p.buyPrice || 0) * (p.stock || 0), 0))}`, R, fy, { align: "right" });
+            } else {
+                doc.text(`Total: ${rs(filtered.reduce((s, m) => s + (m.total || 0), 0))}`, R, fy, { align: "right" });
+                if (reportType !== "GST Report" && reportType !== "Tax Report") {
+                    fy += 14;
+                    doc.text(`Profit: ${rs(filtered.reduce((s, m) => s + (m.profit || 0), 0))}`, R, fy, { align: "right" });
+                }
+            }
+            doc.save(`${reportType.replace(/\s/g, "_")}_${fmtDate(Date.now()).replace(/\s/g, "_")}.pdf`);
             toast?.(`${reportType} report generated!`, "success", "📄 Report");
-        }, 400);
+        } catch (e) {
+            console.error("[handleGeneratePDF]", e);
+            toast?.("Could not generate the report PDF.", "warning");
+        } finally {
+            setGenerating(false);
+        }
     };
 
     const handleExportCSV = () => {
