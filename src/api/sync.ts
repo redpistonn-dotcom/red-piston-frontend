@@ -253,7 +253,10 @@ export async function fetchMovements(params?: MovementsParams): Promise<Movement
     if (params?.search)          qp.set('search',  params.search);
     if (params?.partyId)         qp.set('partyId', params.partyId);
     const qs = qp.toString();
-    const data = await api.get<MovementsApiResponse>(`/api/shop/movements${qs ? `?${qs}` : ''}`);
+    // Movements live under the inventory router (mounted at /api/shop/inventory),
+    // so the real path is /api/shop/inventory/movements (NOT /api/shop/movements,
+    // which 404s and silently left History/Reports empty).
+    const data = await api.get<MovementsApiResponse>(`/api/shop/inventory/movements${qs ? `?${qs}` : ''}`);
     return (data.movements || []).map(mapMovement);
   } catch (err: unknown) {
     console.warn('[Sync] Could not fetch movements:', (err as Error).message);

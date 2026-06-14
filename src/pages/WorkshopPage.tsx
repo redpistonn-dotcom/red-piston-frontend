@@ -140,6 +140,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
     const [glQty, setGlQty]               = useState(0);
     const [glPrice, setGlPrice]           = useState(0);
     const [glSaving, setGlSaving]         = useState(false);
+    const [glImages, setGlImages]         = useState<string[]>([]); // up to 3 product photos
 
     // Keep the active section in sync with the route/sidebar selection.
     useEffect(() => { setWorkshopTab(section); }, [section]);
@@ -147,6 +148,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
     // Real inventory from DB
     const [inventory,   setInventory]     = useState<any[]>([]);
     const [invLoading,  setInvLoading]    = useState(false);
+    const [detailIdx,   setDetailIdx]     = useState<number | null>(null);  // Parts Listing detail popup
 
     // Add Qty modal
     const [addQtyItem,   setAddQtyItem]   = useState<any>(null);
@@ -259,21 +261,30 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
     ];
 
     // ── Map a real ShopInventory DB row to the shape the table expects ───────────
-    const mapInv = (item: any) => ({
-        id:              item.inventoryId,
-        inventoryId:     item.inventoryId,
-        name:            item.customPartName || item.masterPart?.partName || "—",
-        sku:             String(item.masterPartId || item.inventoryId),
-        category:        item.masterPart?.categoryL1 || "General",
-        brand:           item.masterPart?.brand || "",
-        image:           item.imageUrl || item.masterPart?.imageUrl || null,
-        stock:           item.computedStock ?? item.stockQty,
-        sellPrice:       Number(item.sellingPrice || 0),
-        buyPrice:        Number(item.buyingPrice  || 0),
-        marketplaceLive: !!item.isMarketplaceListed,
-        marketplaceQty:  item.computedStock ?? item.stockQty,
-        marketplacePrice:Number(item.sellingPrice || 0),
-    });
+    const mapInv = (item: any) => {
+        // Parse the JSON image array; primary imageUrl stays first. Cap at 3.
+        let images: string[] = [];
+        try { const parsed = item.images ? JSON.parse(item.images) : []; if (Array.isArray(parsed)) images = parsed; } catch { images = []; }
+        const primary = item.imageUrl || item.masterPart?.imageUrl || null;
+        if (primary && !images.includes(primary)) images = [primary, ...images];
+        images = images.filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 3);
+        return {
+            id:              item.inventoryId,
+            inventoryId:     item.inventoryId,
+            name:            item.customPartName || item.masterPart?.partName || "—",
+            sku:             String(item.masterPartId || item.inventoryId),
+            category:        item.masterPart?.categoryL1 || "General",
+            brand:           item.masterPart?.brand || "",
+            image:           primary,
+            images,
+            stock:           item.computedStock ?? item.stockQty,
+            sellPrice:       Number(item.sellingPrice || 0),
+            buyPrice:        Number(item.buyingPrice  || 0),
+            marketplaceLive: !!item.isMarketplaceListed,
+            marketplaceQty:  item.computedStock ?? item.stockQty,
+            marketplacePrice:Number(item.sellingPrice || 0),
+        };
+    };
 
     // Real inventory from DB (replaces local useStore products for marketplace tab)
     const shopProducts = useMemo(() => inventory.map(mapInv), [inventory]);
@@ -308,6 +319,8 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
         setGlQty(0);                       // extra stock to add (Go Live mode only)
         setGlTargetQty(prod.stock || 0);   // target qty (Edit mode)
         setGlPrice(prod.marketplacePrice || prod.sellPrice || 0);
+        setGlImages((prod.images && prod.images.length) ? [...prod.images]
+            : (prod.image && String(prod.image).startsWith("http") ? [prod.image] : []));
     };
 
     // Confirm go-live (new listing) or save edits (existing listing).
@@ -317,12 +330,9 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
         if (!goLiveProd) return;
         if (glPrice <= 0) { toast?.("Please enter a selling price", "warning"); return; }
         // Image is mandatory for new listings — customers need to see the product
-        if (!editMode) {
-            const hasImage = typeof goLiveProd.image === "string" && goLiveProd.image.startsWith("http");
-            if (!hasImage) {
-                toast?.("Upload a product image before listing on marketplace", "warning");
-                return;
-            }
+        if (!editMode && glImages.length === 0) {
+            toast?.("Upload at least one product image before listing on marketplace", "warning");
+            return;
         }
         setGlSaving(true);
         try {
@@ -367,20 +377,41 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
         finally { setGlSaving(false); }
     };
 
-    // Upload a product photo directly from the Go Live modal — persists imageUrl
-    // to the shop inventory item so the "image required" gate clears in place
-    // (no need to bounce to the Inventory page).
-    const handleGoLiveImageUpload = async (url: string) => {
+    // Persist the current image set (up to 3) to the shop inventory item.
+    // imageUrl stays the primary/first photo for back-compat; `images` is the
+    // full JSON array. Updates the in-modal product + the list in place.
+    const persistGoLiveImages = async (imgs: string[]) => {
         if (!goLiveProd) return;
+        const next = imgs.slice(0, 3);
         try {
-            await api.put(`/api/shop/inventory/${goLiveProd.inventoryId}`, { imageUrl: url });
-            setGoLiveProd((p: any) => (p ? { ...p, image: url } : p));
-            setInventory(inv => inv.map(i => i.inventoryId === goLiveProd.inventoryId ? { ...i, imageUrl: url } : i));
-            toast?.("📸 Image saved — you can now go live", "success");
+            await api.put(`/api/shop/inventory/${goLiveProd.inventoryId}`, {
+                imageUrl: next[0] || null,
+                images: JSON.stringify(next),
+            });
+            setGoLiveProd((p: any) => (p ? { ...p, image: next[0] || null, images: next } : p));
+            setInventory(inv => inv.map(i => i.inventoryId === goLiveProd.inventoryId ? { ...i, imageUrl: next[0] || null, images: JSON.stringify(next) } : i));
         } catch (err) {
-            console.error("[handleGoLiveImageUpload]", err);
-            toast?.("Image uploaded but couldn't be attached — please try again.", "error");
+            console.error("[persistGoLiveImages]", err);
+            toast?.("Image saved to cloud but couldn't be attached — try again.", "error");
         }
+    };
+
+    const handleGoLiveImageUpload = (url: string) => {
+        setGlImages(prev => {
+            if (prev.length >= 3) { toast?.("Up to 3 photos per product", "warning"); return prev; }
+            const next = [...prev, url];
+            persistGoLiveImages(next);
+            toast?.(`📸 Photo ${next.length}/3 added`, "success");
+            return next;
+        });
+    };
+
+    const removeGoLiveImage = (url: string) => {
+        setGlImages(prev => {
+            const next = prev.filter(u => u !== url);
+            persistGoLiveImages(next);
+            return next;
+        });
     };
 
     // Take a live item offline (from the table action column)
@@ -532,14 +563,14 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                                 </div>
                                             </td>
                                         </tr>
-                                    ) : mpFiltered.map((prod: any) => {
+                                    ) : mpFiltered.map((prod: any, idx: number) => {
                                         const isLive  = !!prod.marketplaceLive;
                                         const mpPrice = prod.marketplacePrice || prod.sellPrice || 0;
                                         const mpQty   = prod.marketplaceQty ?? 0;
                                         const lowStock = prod.stock <= 5;
                                         const hasImage = typeof prod.image === "string" && prod.image.startsWith("http");
                                         return (
-                                            <tr key={prod.id} className="trow" style={{ borderBottom: `1px solid ${T.border}`, borderLeft: `3px solid ${isLive ? T.emerald : "transparent"}`, background: isLive ? `${T.emerald}05` : "transparent", transition: "background 0.15s" }}>
+                                            <tr key={prod.id} className="trow" onClick={() => setDetailIdx(idx)} title="View details" style={{ borderBottom: `1px solid ${T.border}`, borderLeft: `3px solid ${isLive ? T.emerald : "transparent"}`, background: isLive ? `${T.emerald}05` : "transparent", transition: "background 0.15s", cursor: "pointer" }}>
 
                                                 {/* PRODUCT */}
                                                 <td style={{ padding: "12px 16px" }}>
@@ -595,8 +626,8 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                                     )}
                                                 </td>
 
-                                                {/* ACTION */}
-                                                <td style={{ padding: "12px 16px" }}>
+                                                {/* ACTION — stopPropagation so buttons don't open the detail popup */}
+                                                <td style={{ padding: "12px 16px" }} onClick={e => e.stopPropagation()}>
                                                     {isLive ? (
                                                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                                             <button onClick={() => openGoLive(prod)}
@@ -952,6 +983,79 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
 
             </>)} {/* end workshopTab === "jobs" */}
 
+            {/* ── Parts Listing detail popup — clear photos + details + Next/Back ── */}
+            {detailIdx !== null && mpFiltered[detailIdx] && createPortal(
+                <div style={{ position: "fixed", inset: 0, zIndex: 2147483646, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, overflowY: "auto" }}>
+                    <div onClick={() => setDetailIdx(null)} style={{ position: "absolute", inset: 0, background: "rgba(28,27,27,0.6)", backdropFilter: "blur(4px)" }} />
+                    {(() => {
+                        const p: any = mpFiltered[detailIdx];
+                        const imgs: string[] = (p.images && p.images.length) ? p.images : [];
+                        const isLive = !!p.marketplaceLive;
+                        const rows: [string, string][] = [
+                            ["Stock", `${p.stock ?? 0} units`],
+                            ["Sell Price", fmt(p.sellPrice)],
+                            ["Buy Price", fmt(p.buyPrice)],
+                            ["Brand", p.brand || "Generic"],
+                        ];
+                        if (isLive) { rows.push(["Marketplace Price", fmt(p.marketplacePrice)]); rows.push(["Units Listed", String(p.marketplaceQty ?? 0)]); }
+                        return (
+                            <div style={{ position: "relative", background: "#fff", borderRadius: 18, width: "100%", maxWidth: 560, maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.28)", animation: "fadeUp 0.2s ease", margin: "auto" }}>
+                                {/* Header */}
+                                <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "20px 22px 14px", borderBottom: `1px solid ${T.border}` }}>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 17, fontWeight: 900, color: T.t1, fontFamily: FONT.display }}>{p.name}</div>
+                                        <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                                            <span style={{ background: T.bg, color: T.t3, fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, fontFamily: FONT.mono }}>{p.sku}</span>
+                                            <span style={{ background: T.surfaceContainerHigh, color: T.t2, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20 }}>{p.category}</span>
+                                            <span style={{ background: isLive ? `${T.emerald}18` : T.bg, color: isLive ? T.emerald : T.t3, fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20 }}>{isLive ? "● Live" : "Not listed"}</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setDetailIdx(null)} title="Close" style={{ width: 32, height: 32, borderRadius: 8, border: `1.5px solid ${T.border}`, background: "#fff", cursor: "pointer", fontSize: 18, color: T.t3, flexShrink: 0, lineHeight: 1 }}>×</button>
+                                </div>
+                                {/* Body — gallery + details */}
+                                <div style={{ padding: "18px 22px", overflowY: "auto", flex: 1 }}>
+                                    {imgs.length > 0 ? (
+                                        <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+                                            {imgs.map((u, i) => (
+                                                <img key={i} src={u} alt="" style={{ width: imgs.length === 1 ? "100%" : 158, maxWidth: "100%", height: 175, objectFit: "cover", borderRadius: 12, border: `1px solid ${T.border}` }} />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div style={{ height: 150, borderRadius: 12, border: `1.5px dashed ${T.border}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: T.t4, marginBottom: 18, gap: 6 }}>
+                                            <span style={{ fontSize: 32, opacity: 0.4 }}>🔧</span>
+                                            <span style={{ fontSize: 12 }}>No photos yet — add up to 3 at Go Live</span>
+                                        </div>
+                                    )}
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                        {rows.map(([k, v]) => (
+                                            <div key={k} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px" }}>
+                                                <div style={{ fontSize: 10, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{k}</div>
+                                                <div style={{ fontSize: 14, fontWeight: 800, color: T.t1, fontFamily: FONT.mono }}>{v}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+                                        <button onClick={() => { const prod = p; setDetailIdx(null); openGoLive(prod); }}
+                                            style={{ flex: 1, height: 44, borderRadius: 10, border: "none", background: isLive ? `linear-gradient(135deg, #1e3a5f, #374151)` : `linear-gradient(135deg, ${T.amber}, #6A020A)`, color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: FONT.ui }}>
+                                            {isLive ? "✏ Edit Listing" : "🚀 Go Live"}
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Footer — Next / Back */}
+                                <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 22px", borderTop: `1px solid ${T.border}`, background: T.bg }}>
+                                    <button disabled={detailIdx <= 0} onClick={() => setDetailIdx(i => Math.max(0, (i ?? 0) - 1))}
+                                        style={{ height: 36, padding: "0 16px", borderRadius: 8, border: `1.5px solid ${T.border}`, background: "#fff", color: detailIdx <= 0 ? T.t4 : T.t2, fontSize: 12, fontWeight: 700, cursor: detailIdx <= 0 ? "not-allowed" : "pointer", fontFamily: FONT.ui }}>← Back</button>
+                                    <span style={{ fontSize: 12, color: T.t3, fontFamily: FONT.mono }}>{(detailIdx ?? 0) + 1} of {mpFiltered.length}</span>
+                                    <button disabled={detailIdx >= mpFiltered.length - 1} onClick={() => setDetailIdx(i => Math.min(mpFiltered.length - 1, (i ?? 0) + 1))}
+                                        style={{ height: 36, padding: "0 16px", borderRadius: 8, border: `1.5px solid ${T.border}`, background: "#fff", color: detailIdx >= mpFiltered.length - 1 ? T.t4 : T.t2, fontSize: 12, fontWeight: 700, cursor: detailIdx >= mpFiltered.length - 1 ? "not-allowed" : "pointer", fontFamily: FONT.ui }}>Next →</button>
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </div>,
+                document.body
+            )}
+
             {/* ── Go Live / Edit Listing Modal ── rendered via portal to escape stacking context */}
             {goLiveProd && createPortal(
                 <div style={{ position: "fixed", inset: 0, zIndex: 2147483647, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", overflowY: "auto" }}>
@@ -1053,39 +1157,38 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                 </div>
                             </div>
 
-                            {/* Image requirement notice — only for Go Live mode */}
-                            {!editMode && (() => {
-                                const hasImg = typeof goLiveProd.image === "string" && goLiveProd.image.startsWith("http");
-                                return hasImg ? (
-                                    <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                            <img src={goLiveProd.image} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
-                                            <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>Marketplace listing preview</div>
-                                        </div>
-                                        <div style={{ textAlign: "right" }}>
-                                            <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 900, color: T.amber }}>₹{glPrice.toLocaleString("en-IN")}</div>
-                                            <div style={{ fontSize: 11, color: T.t3 }}>{(goLiveProd.stock || 0) + glQty} units · {goLiveProd.name?.slice(0, 24)}</div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div style={{ background: "#FFF7ED", border: `1px solid #FED7AA`, borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                                            <span style={{ fontSize: 20, flexShrink: 0 }}>🖼</span>
-                                            <div>
-                                                <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", fontFamily: FONT.ui }}>Product image required</div>
-                                                <div style={{ fontSize: 11, color: "#B45309", fontFamily: FONT.ui, marginTop: 2 }}>
-                                                    Upload a photo here — it's shown to customers on the marketplace listing.
-                                                </div>
+                            {/* Product photos — up to 3 per product; at least 1 required to go live */}
+                            {(() => {
+                                const needsImg = !editMode && glImages.length === 0;
+                                return (
+                                    <div style={{ background: needsImg ? "#FFF7ED" : T.bg, border: `1px solid ${needsImg ? "#FED7AA" : T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: needsImg ? "#92400E" : T.t2, fontFamily: FONT.ui }}>
+                                                🖼 Product photos <span style={{ color: T.t3, fontWeight: 600 }}>({glImages.length}/3)</span>
                                             </div>
+                                            {needsImg && <span style={{ fontSize: 11, color: "#B45309", fontWeight: 600 }}>At least 1 required</span>}
                                         </div>
-                                        <ImageUploader
-                                            folder="products"
-                                            currentUrl={null}
-                                            onUploaded={(url) => handleGoLiveImageUpload(url)}
-                                            onError={(msg) => toast?.(msg, "error")}
-                                            label="Upload Product Photo"
-                                            maxMb={5}
-                                        />
+                                        {glImages.length > 0 && (
+                                            <div style={{ display: "flex", gap: 8, marginBottom: glImages.length < 3 ? 12 : 0, flexWrap: "wrap" }}>
+                                                {glImages.map((u, i) => (
+                                                    <div key={i} style={{ position: "relative", width: 88, height: 88, flexShrink: 0 }}>
+                                                        <img src={u} alt="" style={{ width: 88, height: 88, borderRadius: 8, objectFit: "cover", border: `1px solid ${T.border}` }} />
+                                                        <button onClick={() => removeGoLiveImage(u)} title="Remove" style={{ position: "absolute", top: -6, right: -6, width: 22, height: 22, borderRadius: "50%", border: "none", background: T.crimson, color: "#fff", fontSize: 13, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+                                                        {i === 0 && <span style={{ position: "absolute", bottom: 4, left: 4, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 4 }}>MAIN</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {glImages.length < 3 && (
+                                            <ImageUploader
+                                                folder="products"
+                                                currentUrl={null}
+                                                onUploaded={(url) => handleGoLiveImageUpload(url)}
+                                                onError={(msg) => toast?.(msg, "error")}
+                                                label={glImages.length === 0 ? "Upload Product Photo" : "Add another photo"}
+                                                maxMb={5}
+                                            />
+                                        )}
                                     </div>
                                 );
                             })()}
