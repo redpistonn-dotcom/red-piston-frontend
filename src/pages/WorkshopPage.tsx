@@ -1368,9 +1368,11 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
     const [labourAmt, setLabourAmt]       = useState("");
 
     const handleAddPart = (pId: string) => {
-        const prod = products.find((p: any) => p.id === pId);
-        if (prod && !selectedParts.find(sp => sp.itemId === pId)) {
-            setSelectedParts(prev => [...prev, { itemId: pId, name: prod.name, qty: 1, price: prod.sellPrice }]);
+        // The <Select> hands back a STRING; inventory ids are numbers, so a strict
+        // `p.id === pId` never matched and nothing was added. Compare as strings.
+        const prod = products.find((p: any) => String(p.id) === String(pId));
+        if (prod && !selectedParts.find(sp => String(sp.itemId) === String(prod.id))) {
+            setSelectedParts(prev => [...prev, { itemId: prod.id, name: prod.name, qty: 1, price: prod.sellPrice }]);
         }
     };
 

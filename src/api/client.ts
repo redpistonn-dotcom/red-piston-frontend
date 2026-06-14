@@ -24,6 +24,18 @@ export const getAccessToken = (): string | null => accessToken;
 let _refreshPromise: Promise<string | null> | null = null;
 
 async function _doRefresh(): Promise<string> {
+  // Impersonation sessions have NO refresh token of their own. If we tried to
+  // refresh here we'd use the ADMIN's refresh token and silently swap into the
+  // admin's (shop-less) context — every shop-scoped endpoint then returns empty
+  // while the UI still shows the impersonated user. Treat an expired impersonation
+  // token as session-expired so the app prompts a re-enter instead of blanks.
+  let isImpersonating = false;
+  try { isImpersonating = !!sessionStorage.getItem('as_imp_token'); } catch {}
+  if (isImpersonating) {
+    clearTokens();
+    throw Object.assign(new Error('Impersonation session expired — re-enter from the admin console.'), { code: 'SESSION_EXPIRED' });
+  }
+
   const fallbackToken = (() => {
     try { return localStorage.getItem('as_refresh_token'); } catch { return null; }
   })();

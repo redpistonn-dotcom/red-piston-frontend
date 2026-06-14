@@ -285,15 +285,67 @@ export function POSBillingPage() {
                 <button onClick={() => window.print()} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
                 <button
                     onClick={async () => {
-                        if (!syncedInvoiceId) { toast?.("PDF is being prepared — try again in a few seconds", "info"); return; }
+                        // Prefer the server-rendered invoice PDF once the sale has synced.
+                        if (syncedInvoiceId) {
+                            try {
+                                const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
+                                    headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                                });
+                                if (res.ok) { window.open(URL.createObjectURL(await res.blob()), "_blank"); return; }
+                            } catch { /* fall through to the client-side PDF */ }
+                        }
+                        // Fallback (or sale not yet synced): build the PDF client-side from
+                        // the on-screen bill so Download ALWAYS works, regardless of backend
+                        // sync / cold starts (jsPDF lazy-loaded only on click).
                         try {
-                            const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
-                                headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                            const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+                            const autoTable = autoTableMod.default;
+                            const doc = new jsPDF({ unit: "pt", format: "a4" });
+                            const M = 40, R = 555;
+                            const rs = (n: number) => "Rs. " + Math.round(Number(n) || 0).toLocaleString("en-IN");
+                            doc.setFont("helvetica", "bold").setFontSize(16).setTextColor(20);
+                            doc.text(shopName || "—", M, 50);
+                            doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
+                            let y = 64;
+                            if (shopAddress) { doc.text(String(shopAddress), M, y); y += 12; }
+                            if (shopGst) { doc.text(`GSTIN: ${shopGst}`, M, y); y += 12; }
+                            doc.setFont("helvetica", "bold").setFontSize(13).setTextColor(20);
+                            doc.text(billType === "Sale" ? "TAX INVOICE" : "QUOTATION", R, 50, { align: "right" });
+                            doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
+                            doc.text(`No: ${invoiceNo}`, R, 64, { align: "right" });
+                            if (invoiceAt) doc.text(String(fmtDateTime(invoiceAt)), R, 76, { align: "right" });
+                            y = Math.max(y, 90);
+                            if (customerName) { doc.text(`Customer: ${customerName}`, M, y); y += 12; }
+                            if (vehicleReg) { doc.text(`Vehicle: ${vehicleReg}`, M, y); y += 12; }
+                            autoTable(doc, {
+                                startY: y + 8,
+                                head: [["#", "Item", "Qty", "Rate", "Disc", "GST", "Amount"]],
+                                body: items.map((it: any, i: number) => {
+                                    const lc = lineCalcs[i];
+                                    return [String(i + 1), it.name, String(it.qty), rs(it.price),
+                                        lc.discAmt > 0 ? `-${rs(lc.discAmt)}` : "-", rs(lc.gstAmt), rs(lc.afterDisc)];
+                                }),
+                                styles: { fontSize: 9, cellPadding: 5 },
+                                headStyles: { fillColor: [139, 30, 30] },
+                                columnStyles: { 0: { cellWidth: 24, halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
+                                margin: { left: M, right: M },
                             });
-                            if (!res.ok) throw new Error("pdf fetch failed");
-                            const url = URL.createObjectURL(await res.blob());
-                            window.open(url, "_blank");
-                        } catch { toast?.("Could not fetch the PDF — check your connection", "warning"); }
+                            let fy = ((doc as any).lastAutoTable?.finalY || y + 40) + 16;
+                            const lx = 360;
+                            const trow = (l: string, v: string, b = false) => {
+                                doc.setFont("helvetica", b ? "bold" : "normal").setFontSize(b ? 13 : 10).setTextColor(b ? 139 : 40, b ? 30 : 40, b ? 30 : 40);
+                                doc.text(l, lx, fy); doc.text(v, R, fy, { align: "right" }); fy += b ? 18 : 15;
+                            };
+                            if (grandDiscount > 0) trow("Item Discounts", `-${rs(grandDiscount)}`);
+                            if (additionalDisc > 0) trow("Additional Discount", `-${rs(additionalDisc)}`);
+                            trow("GST (Inclusive)", rs(grandGst));
+                            doc.setDrawColor(139, 30, 30).line(lx, fy - 6, R, fy - 6);
+                            trow("TOTAL", rs(finalTotal), true);
+                            fy += 8;
+                            doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(120);
+                            doc.text(`Paid via ${paymentMode} - computer-generated ${billType === "Sale" ? "tax invoice" : "quotation"}.`, M, fy);
+                            doc.save(`${invoiceNo || "invoice"}.pdf`);
+                        } catch { toast?.("Could not generate the PDF", "warning"); }
                     }}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: syncedInvoiceId ? T.t1 : T.t3, cursor: "pointer", fontFamily: FONT.ui }}>
                     📄 Download PDF
