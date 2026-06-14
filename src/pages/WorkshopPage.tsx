@@ -8,6 +8,7 @@ import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { api } from "../api/client";
 import { fetchJobCards, createJobCard, updateJobCardStatus, addJobCardItem, removeJobCardItem } from "../api/jobcards";
+import InvoiceModal from "../components/InvoiceModal";
 
 // ─── Status config for table ──────────────────────────────────────────────────
 const STATUS_DISPLAY: Record<string, { label: string; dot: string; color: string }> = {
@@ -76,7 +77,10 @@ function KpiCard({ label, main, sub, subColor, icon }: { label: string; main: st
 // are now SEPARATE sidebar entries, not in-page tabs.
 export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketplace" } = {}) {
     const { jobCards, vehicles, parties, products, activeShopId, saveJobCards, saveProducts, logAudit } = useStore();
-    const { toast } = useContext(AppCtx);
+    const { toast, currentUser } = useContext(AppCtx);
+
+    // Job whose GST service bill is open in the InvoiceModal (null = closed).
+    const [invoiceJob, setInvoiceJob] = useState<any>(null);
 
     const onSaveJobCard = useCallback(async (jc: any) => {
         const exists = (jobCards || []).find((x: any) => x.id === jc.id);
@@ -1007,6 +1011,10 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
 
                                                             {/* Action buttons */}
                                                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                                                <button onClick={() => setInvoiceJob(job)}
+                                                                    style={{ height: 34, padding: "0 16px", borderRadius: 8, border: `1px solid ${T.crimson}`, background: "#FFFFFF", color: T.crimson, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
+                                                                    🧾 Invoice / Bill
+                                                                </button>
                                                                 {getNextActions(job.status).map((next: string) => (
                                                                     <button key={next} onClick={() => handleStatusChange(job, next)}
                                                                         style={{ height: 34, padding: "0 16px", borderRadius: 8, border: "none", background: next === "cancelled" ? T.crimson : next === "completed" ? T.emerald : next === "invoiced" ? T.violet : T.amber, color: "#FFFFFF", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
@@ -1335,6 +1343,15 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                 existingCount={shopJobs.length}
                 onSave={(jc: any) => { onSaveJobCard(jc); setShowCreate(false); toast?.(`Job Card ${jc.jobNumber} created!`, "success", "🔧 Workshop"); }}
             />
+
+            {/* GST service bill — Print / Download PDF / WhatsApp */}
+            {invoiceJob && (
+                <InvoiceModal
+                    job={invoiceJob}
+                    user={currentUser}
+                    onClose={() => setInvoiceJob(null)}
+                />
+            )}
         </div>
     );
 }

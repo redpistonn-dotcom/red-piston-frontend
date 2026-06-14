@@ -62,8 +62,15 @@ async function _doRefresh(): Promise<string> {
 
   const data = await res.json();
   accessToken = data.accessToken || data.data?.accessToken;
-  if (data.refreshToken) {
-    try { localStorage.setItem('as_refresh_token', data.refreshToken); } catch {}
+  // Persist the ROTATED refresh token. The httpOnly cookie is a third-party
+  // cookie in production (Vercel ↔ Render are different sites) and gets blocked
+  // by Safari/modern-Chrome, so it can't be relied on for the next refresh.
+  // Keeping the localStorage fallback fresh is what makes the session survive
+  // past the first refresh — previously we deleted it, so the 2nd refresh found
+  // no token and silently killed the session (app looked logged-in, data empty).
+  const newRefresh = data.refreshToken || data.data?.refreshToken;
+  if (newRefresh) {
+    try { localStorage.setItem('as_refresh_token', newRefresh); } catch {}
   }
   return accessToken as string;
 }
