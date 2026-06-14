@@ -60,6 +60,7 @@ export function PartiesPage() {
     const [showVehForm, setShowVehForm] = useState(false);
     const blankVeh = { makeId: "", make: "", modelId: "", model: "", year: "", fuelType: "Petrol", registrationNumber: "", ownerId: "", engineType: "", odometer: "" };
     const [vehForm, setVehForm] = useState(blankVeh);
+    const [editVehId, setEditVehId] = useState<string | null>(null);   // null = creating
     const setVF = (k: string) => (v: any) => setVehForm(p => ({ ...p, [k]: v }));
     const currentYear = new Date().getFullYear();
     const yearOpts = Array.from({ length: 30 }, (_, i) => currentYear - i);
@@ -78,18 +79,45 @@ export function PartiesPage() {
             .catch(() => setVehModels([]));
     }, [vehForm.makeId]);
 
+    // Open the form pre-filled to edit an existing vehicle. Make/model are stored
+    // as free-text names; resolve the makeId from the manufacturer list so the
+    // make dropdown reflects the selection (model name is retained as-is).
+    const openEditVehicle = (v: any) => {
+        const mfg = manufacturers.find((m: any) => m.name === v.make);
+        setVehForm({
+            makeId: mfg ? String(mfg.manufacturerId) : "",
+            make: v.make || "",
+            modelId: "",
+            model: v.model || "",
+            year: v.year ? String(v.year) : "",
+            fuelType: v.fuelType || "Petrol",
+            registrationNumber: v.registrationNumber || "",
+            ownerId: v.ownerId || "",
+            engineType: v.engineType || "",
+            odometer: v.odometer != null ? String(v.odometer) : "",
+        });
+        setEditVehId(v.id);
+        setShowVehForm(true);
+    };
+
+    const resetVehForm = () => { setVehForm(blankVeh); setEditVehId(null); setShowVehForm(false); };
+
     const handleSaveVehicle = () => {
         if (!vehForm.make || !vehForm.model || !vehForm.registrationNumber) {
             toast?.("Make, model and registration number are required", "error"); return;
         }
+        const existing = editVehId ? (vehicles || []).find((x: any) => x.id === editVehId) : null;
         onSaveVehicle?.({
-            id: "veh_" + uid(), shopId: activeShopId, make: vehForm.make, model: vehForm.model, variant: "",
+            ...(existing || {}),
+            id: editVehId || ("veh_" + uid()),
+            shopId: activeShopId, make: vehForm.make, model: vehForm.model, variant: existing?.variant || "",
             year: +vehForm.year || currentYear, fuelType: vehForm.fuelType || "Petrol",
             engineType: vehForm.engineType || "", registrationNumber: vehForm.registrationNumber.toUpperCase(),
-            odometer: +vehForm.odometer || 0, vin: "", ownerId: vehForm.ownerId || "", notes: "", createdAt: Date.now(),
+            odometer: +vehForm.odometer || 0, vin: existing?.vin || "", ownerId: vehForm.ownerId || "", notes: existing?.notes || "",
+            createdAt: existing?.createdAt || Date.now(),
         });
-        toast?.(`Vehicle ${vehForm.registrationNumber.toUpperCase()} added!`, "success", "🚗");
-        setVehForm(blankVeh); setShowVehForm(false);
+        toast?.(`Vehicle ${vehForm.registrationNumber.toUpperCase()} ${editVehId ? "updated" : "added"}!`, "success", "🚗");
+        resetVehForm();
     };
 
     const shopParties   = useMemo(() => (parties  || []).filter((p: any) => p.shopId === activeShopId), [parties, activeShopId]);
@@ -255,7 +283,7 @@ export function PartiesPage() {
                 <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", boxShadow: SHADOWS.xs }}>
                     {showVehForm && (
                         <div style={{ borderBottom: `1px solid ${T.border}`, padding: 20 }}>
-                            <div style={{ fontSize: 11, fontWeight: 800, color: T.amber, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 14, fontFamily: FONT.ui }}>New Vehicle</div>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: T.amber, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 14, fontFamily: FONT.ui }}>{editVehId ? "Edit Vehicle" : "New Vehicle"}</div>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, alignItems: "end" }}>
                                 <Field label="Make *">
                                     <select value={vehForm.makeId} onChange={e => {
@@ -297,8 +325,8 @@ export function PartiesPage() {
                                 <Field label="Odometer (km)"><Input type="number" value={vehForm.odometer} onChange={setVF("odometer")} placeholder="45000" suffix="km" /></Field>
                             </div>
                             <div style={{ display: "flex", gap: 10, marginTop: 14, justifyContent: "flex-end" }}>
-                                <Btn variant="ghost" size="sm" onClick={() => { setVehForm(blankVeh); setShowVehForm(false); }}>Cancel</Btn>
-                                <Btn size="sm" onClick={handleSaveVehicle}>🚗 Save Vehicle</Btn>
+                                <Btn variant="ghost" size="sm" onClick={resetVehForm}>Cancel</Btn>
+                                <Btn size="sm" onClick={handleSaveVehicle}>🚗 {editVehId ? "Update Vehicle" : "Save Vehicle"}</Btn>
                             </div>
                         </div>
                     )}
@@ -320,12 +348,18 @@ export function PartiesPage() {
                                     const owner = shopParties.find((p: any) => p.id === v.ownerId);
                                     return (
                                         <div key={v.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 }} className="card-hover">
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                                                <div>
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, gap: 8 }}>
+                                                <div style={{ minWidth: 0 }}>
                                                     <div style={{ fontSize: 16, fontWeight: 900, color: T.t1 }}>{v.make} {v.model}</div>
                                                     <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>{v.variant} {v.year} · {v.fuelType}</div>
                                                 </div>
-                                                <span style={{ background: T.skyBg, color: T.sky, padding: "4px 10px", borderRadius: 6, fontWeight: 800, fontFamily: FONT.mono, fontSize: 12 }}>{v.registrationNumber}</span>
+                                                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+                                                    <span style={{ background: T.skyBg, color: T.sky, padding: "4px 10px", borderRadius: 6, fontWeight: 800, fontFamily: FONT.mono, fontSize: 12 }}>{v.registrationNumber}</span>
+                                                    <button onClick={() => openEditVehicle(v)}
+                                                        style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
+                                                        ✎ Edit
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 12 }}>
                                                 <div><span style={{ color: T.t3 }}>Owner: </span><span style={{ fontWeight: 600 }}>{owner?.name || "—"}</span></div>

@@ -245,10 +245,16 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
         finally { setInvLoading(false); }
     }, []);
 
-    // Load when marketplace tab first opens
+    // Load when the marketplace tab opens, and refresh whenever the window
+    // regains focus / the shop changes — so stock edited on the Inventory page
+    // (which syncs to the backend) shows up here without a hard reload.
     useEffect(() => {
-        if (workshopTab === "marketplace") loadInventory();
-    }, [workshopTab]);
+        if (workshopTab !== "marketplace") return;
+        loadInventory();
+        const onFocus = () => loadInventory();
+        window.addEventListener("focus", onFocus);
+        return () => window.removeEventListener("focus", onFocus);
+    }, [workshopTab, activeShopId, loadInventory]);
 
     // Open the Go Live / Edit modal.
     // editMode = true  → already-live item: show target qty + take-offline option
@@ -308,9 +314,12 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                 toast?.(`🚀 ${goLiveProd.name} is now LIVE on marketplace!`, "success");
             }
             setGoLiveProd(null);
-        } catch (err) {
+        } catch (err: any) {
             console.error("[confirmGoLive]", err);
-            toast?.("Failed — please try again.", "error");
+            // Surface the real backend reason (e.g. "Adjustment would make stock
+            // negative") instead of a generic failure so the user can act on it.
+            const msg = err?.data?.error || err?.data?.error?.message || err?.message || "Failed — please try again.";
+            toast?.(typeof msg === "string" ? msg : "Failed — please try again.", "error");
         }
         finally { setGlSaving(false); }
     };
@@ -967,21 +976,21 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                 </div>
                             ) : (
                                 /* ── GO LIVE MODE: current stock + optional extra qty ── */
-                                <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                    <div>
+                                <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                                    <div style={{ minWidth: 0 }}>
                                         <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginBottom: 2 }}>Current stock</div>
                                         <div style={{ fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>{goLiveProd.stock} units</div>
                                     </div>
-                                    <div style={{ textAlign: "right" }}>
+                                    <div style={{ textAlign: "right", flexShrink: 0 }}>
                                         <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginBottom: 4 }}>Add more stock? (optional)</div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
                                             <button onClick={() => setGlQty(q => Math.max(0, q - 1))}
-                                                style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                                                style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" as const }}>−</button>
                                             <input type="number" value={glQty} min={0}
                                                 onChange={e => setGlQty(Math.max(0, +e.target.value))}
-                                                style={{ width: 60, height: 30, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 7, textAlign: "center", fontSize: 15, fontWeight: 700, color: T.t1, fontFamily: FONT.mono, outline: "none" }} />
+                                                style={{ width: 54, height: 30, flexShrink: 0, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 7, textAlign: "center", fontSize: 15, fontWeight: 700, color: T.t1, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" as const, appearance: "textfield" as const, MozAppearance: "textfield" as const }} />
                                             <button onClick={() => setGlQty(q => q + 1)}
-                                                style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                                                style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" as const }}>+</button>
                                         </div>
                                     </div>
                                 </div>

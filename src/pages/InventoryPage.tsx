@@ -32,7 +32,7 @@ export function InventoryPage() {
   useEffect(() => {
     fetchInventory().then(data => {
       const result = data ?? [];
-      saveProducts(result); // populates storeProducts, which this page then reads reactively
+      saveProducts(result, true); // initial fetch — skip API write-back (skipApiSync=true)
       setApiLoaded(true);
     });
   }, []);
@@ -91,11 +91,22 @@ export function InventoryPage() {
 
     const shopProducts = useMemo(() => (products ?? []).filter(p => p.shopId === activeShopId), [products, activeShopId]);
 
+    // Category pills derived from the products actually present, so a pill's value
+    // always matches a real `p.category` and filtering can never silently return
+    // nothing (the hardcoded CATEGORIES list could mismatch normalized DB values).
+    // Known categories keep their canonical order; any extra DB categories follow.
+    const availableCats = useMemo(() => {
+        const present = new Set(shopProducts.map(p => p.category).filter(Boolean));
+        const ordered = CATEGORIES.filter(c => present.has(c));
+        const extras = [...present].filter(c => !CATEGORIES.includes(c)).sort();
+        return [...ordered, ...extras];
+    }, [shopProducts]);
+
     const filtered = useMemo(() => {
         let list = shopProducts
             .filter(p => cat === "All" || p.category === cat)
             .filter(p => statusF === "All" || stockStatus(p) === statusF)
-            .filter(p => !debouncedSearch || [p.name, p.sku, p.brand, p.supplier, p.oemNumber].some(s => (s || "").toLowerCase().includes(debouncedSearch.toLowerCase())));
+            .filter(p => !debouncedSearch || [p.name, p.sku, p.brand, p.oemNumber].some(s => (s || "").toLowerCase().includes(debouncedSearch.toLowerCase())));
 
         // Vehicle compatibility filter
         if (vehicleMatchStr) {
@@ -166,8 +177,8 @@ export function InventoryPage() {
     const isMobile = useIsMobile();
 
     // Low-stock banner: dismissed per browser session so it resets on next login
-    const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem('vl_lowstock_dismissed') === '1');
-    const dismissBanner = () => { sessionStorage.setItem('vl_lowstock_dismissed', '1'); setBannerDismissed(true); };
+    const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem('vl_low_stock_dismissed') === '1');
+    const dismissBanner = () => { sessionStorage.setItem('vl_low_stock_dismissed', '1'); setBannerDismissed(true); };
 
     // Block render until API responds — prevents stale localStorage flash
     if (products === null) {
@@ -263,7 +274,7 @@ export function InventoryPage() {
 
             {/* ── CATEGORY TABS (design: pill tabs; mobile = one scrollable row) ── */}
             <div className="inv-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {["All", ...CATEGORIES].map(c => {
+              {["All", ...availableCats].map(c => {
                 const isAct = c === cat;
                 return (
                   <button key={c} onClick={() => setCat(c)} style={{
