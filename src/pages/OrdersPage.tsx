@@ -5,7 +5,7 @@ import { useStore } from "../store";
 import { api } from "../api/client";
 import { AppCtx } from "../AppCtx";
 import { fmt, fmtDate, downloadCSV, generateCSV, uid } from "../utils";
-import { MobileCard, MobileCardList, useIsMobile } from "../components/ui";
+import { MobileCard, MobileCardList, useIsMobile, Skeleton } from "../components/ui";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 type OrderStatus = "Shipped" | "Pending" | "Delivered" | "Cancelled" | "Processing";
@@ -184,7 +184,7 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function OrdersPage() {
-    const { movements, products, orders: mktOrders, activeShopId, syncFromAPI } = useStore();
+    const { movements, products, orders: mktOrders, activeShopId, syncFromAPI, apiSynced } = useStore();
     const { toast } = useContext(AppCtx);
     const isMobile = useIsMobile();
 
@@ -361,6 +361,11 @@ export function OrdersPage() {
             />
         </div>
     );
+
+    // First-load skeleton: show until the initial API sync brings orders in.
+    if (!apiSynced && allOrders.length === 0) {
+        return <Skeleton.Page kpis={4} cols={6} />;
+    }
 
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: isMobile ? 14 : 18 }}>

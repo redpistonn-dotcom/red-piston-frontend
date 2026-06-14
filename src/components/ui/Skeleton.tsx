@@ -167,6 +167,24 @@ Skeleton.Chart = function SkeletonChart({ height = 260 }: { height?: number }) {
   );
 };
 
+// ── Whole-page loading skeleton (KPI cards + optional chart + table) ──────────
+// Drop-in for a data page's first load: <Skeleton.Page kpis={4} chart table cols={6} />
+Skeleton.Page = function SkeletonPage({
+  kpis = 4,
+  chart = false,
+  table = true,
+  rows = 6,
+  cols = 5,
+}: { kpis?: number; chart?: boolean; table?: boolean; rows?: number; cols?: number }) {
+  return (
+    <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {kpis > 0 && <Skeleton.Card count={kpis} />}
+      {chart && <Skeleton.Chart />}
+      {table && <Skeleton.Table rows={rows} cols={cols} />}
+    </div>
+  );
+};
+
 // ── Detail page header skeleton ───────────────────────────────────────────────
 Skeleton.PageHeader = function SkeletonPageHeader() {
   return (

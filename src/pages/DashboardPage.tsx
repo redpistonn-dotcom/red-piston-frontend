@@ -4,14 +4,14 @@ import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tool
 import { T, FONT, SHADOWS } from "../theme";
 import { GRID_PROPS, AXIS_PROPS, YAXIS_PROPS, AREA_ANIMATION, PIE_ANIMATION, LEGEND_PROPS, TOOLTIP_STYLE, CHART_COLORS } from "../components/charts/ChartTheme";
 import { CATEGORIES, fmt, fmtN, pct, margin } from "../utils";
-import { StatCard, ChartTip } from "../components/ui";
+import { StatCard, ChartTip, Skeleton } from "../components/ui";
 import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 
 const PIE_C = CHART_COLORS;
 
 export function DashboardPage() {
-  const { products, movements, orders, activeShopId, jobCards, parties, vehicles } = useStore();
+  const { products, movements, orders, activeShopId, jobCards, parties, vehicles, apiSynced } = useStore();
   const navigate = useNavigate();
   // Legacy onNavigate calls replaced with navigate("/" + p) inline below
   const [period, setPeriod] = useState("30");
@@ -167,6 +167,11 @@ export function DashboardPage() {
     if (p.mg > 20) return { icon: "✅", label: "Healthy", color: T.emerald };
     return { icon: "⚡", label: "Average", color: T.sky };
   };
+
+  // First-load skeleton: show until the initial API sync brings data in.
+  if (!apiSynced && shopProducts.length === 0 && shopMovements.length === 0) {
+    return <Skeleton.Page kpis={6} chart cols={6} />;
+  }
 
   return (
     <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useContext, useCallback } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, uid, downloadCSV, generateCSV } from "../utils";
-import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
+import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
 import { fetchPartyLedger, fetchParties, type LedgerEntry } from "../api/sync";
 import { createParty } from "../api/parties";
@@ -33,7 +33,7 @@ function Avatar({ name, size = 34 }: { name: string; size?: number }) {
 }
 
 export function PartiesPage() {
-    const { parties, movements, vehicles, activeShopId, saveParties, saveVehicles, logAudit } = useStore();
+    const { parties, movements, vehicles, activeShopId, saveParties, saveVehicles, logAudit, apiSynced } = useStore();
     const { toast } = useContext(AppCtx);
     const isMobile = useIsMobile();
 
@@ -263,6 +263,11 @@ export function PartiesPage() {
         { id: "suppliers", icon: "🏭", label: "Suppliers" },
         { id: "vehicles",  icon: "🚗", label: "Vehicles"  },
     ];
+
+    // First-load skeleton: show until the initial API sync brings parties in.
+    if (!apiSynced && shopParties.length === 0) {
+        return <Skeleton.Page kpis={4} cols={7} />;
+    }
 
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>

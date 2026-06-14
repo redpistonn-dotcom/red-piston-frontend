@@ -8,7 +8,7 @@ import {
     fmt, fmtDate, pct, getDebtAging,
     downloadCSV, generateCSV, stockStatus, inDateRange,
 } from "../utils";
-import { Btn, ChartTip } from "../components/ui";
+import { Btn, ChartTip, Skeleton } from "../components/ui";
 import { GRID_PROPS, AXIS_PROPS, YAXIS_PROPS, AREA_ANIMATION } from "../components/charts/ChartTheme";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
@@ -65,7 +65,7 @@ function KpiCard({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function ReportsPage() {
-    const { movements, products, activeShopId, auditLog } = useStore();
+    const { movements, products, activeShopId, auditLog, apiSynced } = useStore();
     const { toast } = useContext(AppCtx);
 
     const [chartMode, setChartMode] = useState<"Weekly" | "Monthly">("Weekly");
@@ -201,6 +201,11 @@ export function ReportsPage() {
     };
 
     // ─────────────────────────────────────────────────────────────────────
+    // First-load skeleton: show until the initial API sync brings data in.
+    if (!apiSynced && shopMovements.length === 0 && shopProducts.length === 0) {
+        return <Skeleton.Page kpis={4} chart cols={6} />;
+    }
+
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 

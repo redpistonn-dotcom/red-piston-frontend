@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
+import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, pct, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV, inDateRange } from "../utils";
 import { useStore } from "../store";
@@ -245,7 +245,7 @@ const TABS = [
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function HistoryPage() {
-    const { movements, activeShopId } = useStore();
+    const { movements, activeShopId, apiSynced } = useStore();
     const isMobile = useIsMobile();
     const [tab, setTab]             = useState<string>("ALL");
     const [period, setPeriod]       = useState<Period>("7D");
@@ -308,6 +308,11 @@ export function HistoryPage() {
     }, [shopMovements, cutoff]);
 
     const VERSION = "V4.6.1-STABLE";
+
+    // First-load skeleton: show until the initial API sync brings movements in.
+    if (!apiSynced && shopMovements.length === 0) {
+        return <Skeleton.Page kpis={4} cols={10} />;
+    }
 
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: "calc(100vh - 80px)" }}>

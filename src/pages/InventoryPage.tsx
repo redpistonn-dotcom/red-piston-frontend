@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, Fragment, useContext } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { CATEGORIES, stockStatus, margin, fmt, useDebounce } from "../utils";
-import { Badge, Btn, Input, Select, useIsMobile, ResponsiveTable } from "../components/ui";
+import { Badge, Btn, Input, Select, useIsMobile, ResponsiveTable, Skeleton } from "../components/ui";
 import { PurchaseModal } from "../components/PurchaseModal";
 import { PurchaseOrderModal } from "../components/PurchaseOrderModal";
 import { SaleModal } from "../components/SaleModal";
@@ -180,13 +180,10 @@ export function InventoryPage() {
     const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem('vl_low_stock_dismissed') === '1');
     const dismissBanner = () => { sessionStorage.setItem('vl_low_stock_dismissed', '1'); setBannerDismissed(true); };
 
-    // Block render until API responds — prevents stale localStorage flash
+    // Block render until API responds — prevents stale localStorage flash.
+    // Shimmer skeleton so the load is clearly visible.
     if (products === null) {
-      return (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 320, color: "#9ca3af", fontFamily: FONT.ui, fontSize: 14 }}>
-          Loading inventory…
-        </div>
-      );
+      return <Skeleton.Page kpis={4} cols={6} rows={8} />;
     }
 
     return (
