@@ -617,7 +617,8 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
   const [f, setF] = useState({
     buyPrice: "", sellPrice: "", stockQty: "0",
     rackLocation: "", minStockAlert: "5",
-    supplierName: "", // who this stock was bought from (recorded on the opening movement)
+    // Supplier details — recorded on the opening-stock movement.
+    supplierName: "", supplierGstin: "", supplierPhone: "", supplierInvoiceNo: "",
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
   const [errors, setErrors] = useState({});
@@ -738,11 +739,21 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
               <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" />
             </Field>
           </div>
-          <div style={{ gridColumn: "span 2" }}>
-            <Field label="Supplier (optional)" hint="Who you bought this stock from — recorded on the opening stock entry">
-              <Input value={f.supplierName} onChange={set("supplierName")} placeholder="e.g. Industrial Gear Ltd." />
-            </Field>
+          <div style={{ gridColumn: "span 2", borderTop: `1px solid ${T.border}`, paddingTop: 10, marginTop: 2 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Supplier Details (optional)</div>
           </div>
+          <Field label="Supplier Name">
+            <Input value={f.supplierName} onChange={set("supplierName")} placeholder="e.g. Industrial Gear Ltd." />
+          </Field>
+          <Field label="Supplier GSTIN">
+            <Input value={f.supplierGstin} onChange={set("supplierGstin")} placeholder="29ABCDE1234F1Z5" />
+          </Field>
+          <Field label="Supplier Phone">
+            <Input value={f.supplierPhone} onChange={set("supplierPhone")} placeholder="Contact number" />
+          </Field>
+          <Field label="Invoice Number">
+            <Input value={f.supplierInvoiceNo} onChange={set("supplierInvoiceNo")} placeholder="e.g. INV-2045" />
+          </Field>
         </div>
 
         {/* Profit preview — only shown once both prices are entered */}
@@ -1001,6 +1012,9 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               rackLocation:  form.rackLocation || null,
               minStockAlert: parseInt(form.minStockAlert) || 5,
               supplierName:  form.supplierName || undefined,
+              supplierGstin: form.supplierGstin || undefined,
+              supplierPhone: form.supplierPhone || undefined,
+              supplierInvoiceNo: form.supplierInvoiceNo || undefined,
               imageUrl:      resolvedImage || undefined,
             });
             const inv = res.item;
