@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { fetchJobCards } from "../api/jobcards";
+import { invoiceNoForJob } from "../utils/invoice";
 import type { Movement } from "../types";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -45,7 +46,7 @@ function toMovement(j: any): Movement {
     profit: 0,
     customerName: j.customerName || "Walk-in",
     // Show the generated invoice number once invoiced; otherwise the job number.
-    invoiceNo: invoiced ? `INV-${j.jobNumber}` : (j.jobNumber || ""),
+    invoiceNo: invoiced ? invoiceNoForJob(j.jobNumber, j.jobId ?? j.id) : (j.jobNumber || ""),
     paymentMode: "—",
     paymentStatus: "paid",
     note: `Job Card · ${STATUS_LABEL[j.status] || j.status || ""}`.trim(),

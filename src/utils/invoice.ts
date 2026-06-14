@@ -31,6 +31,16 @@ export interface InvoiceModel {
   amountWords: string;
 }
 
+/**
+ * Invoice number for a job card. The job number is already "JOB-YYYYMM-NNNN",
+ * so prefixing with "INV-" produced the redundant "INV-JOB-202606-0003". Strip
+ * the leading "JOB-" so it reads cleanly as "INV-202606-0003".
+ */
+export function invoiceNoForJob(jobNumber?: string | null, fallbackId?: string | number | null): string {
+  const jn = String(jobNumber || "").replace(/^JOB-?/i, "").trim();
+  return jn ? `INV-${jn}` : `INV-${fallbackId || ""}`;
+}
+
 /** ₹ formatting for on-screen + print (browser fonts render the glyph fine). */
 export function fmtINR(n: number): string {
   return "₹" + Math.round(Number(n) || 0).toLocaleString("en-IN");
@@ -103,7 +113,7 @@ export function buildInvoice(job: any, user: AppUser | null): InvoiceModel {
     .filter(Boolean).join(" ").trim();
 
   return {
-    invoiceNo: job?.jobNumber ? `INV-${job.jobNumber}` : `INV-${job?.id || ""}`,
+    invoiceNo: invoiceNoForJob(job?.jobNumber, job?.id),
     dateStr: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
     shop: {
       name: shop.name || "—",
