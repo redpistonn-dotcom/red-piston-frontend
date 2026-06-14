@@ -5,7 +5,7 @@
  * and has different data shapes (product images, part numbers, shipping info)
  * vs the ERP store which is shop-owner-facing inventory management.
  */
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 
 export interface CartItem {
   id: string;
@@ -70,14 +70,16 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
-  const count    = items.reduce((s, i) => s + i.qty, 0);
-  const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
+  // Memoize so the context value only changes when `items` changes — otherwise
+  // every CartProvider render hands consumers a new object and re-renders them all.
+  const value = useMemo<CartCtxValue>(() => ({
+    items,
+    count:    items.reduce((s, i) => s + i.qty, 0),
+    subtotal: items.reduce((s, i) => s + i.price * i.qty, 0),
+    addItem, removeItem, updateQty, clearCart,
+  }), [items, addItem, removeItem, updateQty, clearCart]);
 
-  return (
-    <CartCtx.Provider value={{ items, count, subtotal, addItem, removeItem, updateQty, clearCart }}>
-      {children}
-    </CartCtx.Provider>
-  );
+  return <CartCtx.Provider value={value}>{children}</CartCtx.Provider>;
 }
 
 export function useCart(): CartCtxValue {

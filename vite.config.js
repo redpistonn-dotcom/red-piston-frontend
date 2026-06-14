@@ -22,20 +22,23 @@ export default defineConfig({
         // Group chunks by feature area so the browser can cache them independently.
         // ERP chunks never re-download when only the marketplace changes, and vice versa.
         manualChunks(id) {
-          // Keep all node_modules together to avoid React internals circular warnings.
-          // Recharts and Firebase are the only two worth splitting (large, rarely change).
+          // Keep core node_modules together to avoid React internals circular warnings.
           if (id.includes('node_modules/recharts'))  return 'vendor-recharts';
-          if (id.includes('node_modules/firebase'))  return 'vendor-firebase';
+          // Firebase Auth (large) — only needed on the login/landing flow. Match the
+          // internal @firebase/* packages too, else it leaks into the main vendor chunk.
+          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase'))
+            return 'vendor-firebase';
           // jsPDF is only used by the invoice modal — keep it in its own chunk so it
           // lazy-loads on "Download PDF" instead of bloating the main vendor bundle.
           if (id.includes('node_modules/jspdf'))     return 'vendor-pdf';
           if (id.includes('node_modules'))           return 'vendor';
 
-          // ERP pages — only loaded by SHOP_OWNER
-          if (id.includes('/pages/'))                return 'erp-pages';
-
-          // Marketplace pages — only loaded by CUSTOMER
-          if (id.includes('/marketplace/pages/'))    return 'mp-pages';
+          // Page components are React.lazy()-loaded (see src/App.tsx). Do NOT group
+          // them into one chunk — let Rollup auto-split each lazy import into its own
+          // per-route chunk so the first paint only downloads the entry route, not all
+          // 16 pages. (They were previously collapsed into one ~931KB 'erp-pages' chunk
+          // that index.html then modulepreloaded on every load, fully defeating the
+          // lazy boundaries and forcing ~2.9MB of JS before anything rendered.)
         },
       },
     },
