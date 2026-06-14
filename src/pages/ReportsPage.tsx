@@ -6,7 +6,7 @@ import {
 import { T, FONT, SHADOWS } from "../theme";
 import {
     fmt, fmtDate, pct, getDebtAging,
-    downloadCSV, generateCSV, stockStatus,
+    downloadCSV, generateCSV, stockStatus, inDateRange,
 } from "../utils";
 import { Btn, ChartTip } from "../components/ui";
 import { GRID_PROPS, AXIS_PROPS, YAXIS_PROPS, AREA_ANIMATION } from "../components/charts/ChartTheme";
@@ -181,11 +181,8 @@ export function ReportsPage() {
     };
 
     const handleExportCSV = () => {
-        // <input type="date"> values are already ISO (YYYY-MM-DD) — reversing
-        // them produced DD-MM-YYYY, which Date() can't parse (NaN broke the export)
-        const fromTs = dateFrom ? new Date(dateFrom + "T00:00:00").getTime() : 0;
-        const toTs = dateTo ? new Date(dateTo + "T23:59:59.999").getTime() : Date.now();
-        const filtered = shopMovements.filter(m => m.date >= fromTs && m.date <= toTs);
+        // Shared timezone-correct range filter (parses YYYY-MM-DD as local midnight).
+        const filtered = shopMovements.filter(m => inDateRange(m.date, dateFrom, dateTo));
 
         if (reportType === "Sales Summary" || reportType === "P&L Statement") {
             const headers = ["Date", "Type", "Product", "Customer/Supplier", "Qty", "Total", "Profit"];

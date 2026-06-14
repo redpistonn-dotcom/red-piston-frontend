@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
 import { T, FONT, SHADOWS } from "../theme";
-import { fmt, pct, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV } from "../utils";
+import { fmt, pct, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV, inDateRange } from "../utils";
 import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 
@@ -279,11 +279,11 @@ export function HistoryPage() {
                 return true;
             })
             .filter(m => {
-                // Period filter (if no manual dates)
+                // Manual date range takes precedence over the period pills.
+                // inDateRange parses YYYY-MM-DD as LOCAL midnight (not UTC) so the
+                // "from" boundary doesn't drop the first hours of the day in IST.
                 if (!dateFrom && !dateTo) return m.date >= cutoff;
-                if (dateFrom) { const f = new Date(dateFrom).getTime(); if (m.date < f) return false; }
-                if (dateTo)   { const t = new Date(dateTo).setHours(23,59,59,999); if (m.date > t) return false; }
-                return true;
+                return inDateRange(m.date, dateFrom, dateTo);
             })
             .filter(m => !search || [m.productName, m.invoiceNo, m.batchId, m.supplier, m.supplierName, m.customerName, m.note].some(s => (s || "").toLowerCase().includes(search.toLowerCase())));
     }, [shopMovements, tab, search, cutoff, dateFrom, dateTo]);

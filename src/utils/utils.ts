@@ -122,6 +122,37 @@ export const daysAgo = ts => {
     return `${diff}d ago`;
 };
 
+// ===== DATE-RANGE FILTER HELPERS =====
+// <input type="date"> yields "YYYY-MM-DD". Parsing that bare string with
+// `new Date("YYYY-MM-DD")` is interpreted as UTC midnight, which in a +offset
+// timezone (e.g. IST +05:30) lands hours INTO the local day — so a "from"
+// filter built that way wrongly excludes entries in the first few hours of the
+// selected day. Appending an explicit local time forces local-midnight parsing.
+// Returns null for empty/invalid input so callers can treat it as "no bound".
+export const startOfDayMs = (dateStr?: string | null): number | null => {
+    if (!dateStr) return null;
+    const d = new Date(`${dateStr}T00:00:00`);
+    return isNaN(d.getTime()) ? null : d.getTime();
+};
+export const endOfDayMs = (dateStr?: string | null): number | null => {
+    if (!dateStr) return null;
+    const d = new Date(`${dateStr}T23:59:59.999`);
+    return isNaN(d.getTime()) ? null : d.getTime();
+};
+// Inclusive range test for a ms timestamp against optional from/to date strings.
+// An absent bound (empty string / null) is treated as open-ended on that side.
+export const inDateRange = (
+    ts: number,
+    fromStr?: string | null,
+    toStr?: string | null,
+): boolean => {
+    const f = startOfDayMs(fromStr);
+    const t = endOfDayMs(toStr);
+    if (f !== null && ts < f) return false;
+    if (t !== null && ts > t) return false;
+    return true;
+};
+
 // ===== STOCK STATUS =====
 export const stockStatus = p => {
     if (p.stock <= 0) return "out";
