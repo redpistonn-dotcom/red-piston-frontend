@@ -839,6 +839,21 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
   };
   const [f, setF] = useState(blank);
   const [errors, setErrors] = useState({});
+  // Vehicle fitment state
+  const [fitments, setFitments] = useState([]); // [{ make, model, yearFrom, yearTo, fitType }]
+  const [fitMake, setFitMake]   = useState("");
+  const [fitModel, setFitModel] = useState("");
+  const [fitYear, setFitYear]   = useState("");
+
+  const addFitment = () => {
+    const make  = fitMake.trim();
+    const model = fitModel.trim();
+    if (!make || !model) return;
+    if (fitments.some(f => f.make.toLowerCase() === make.toLowerCase() && f.model.toLowerCase() === model.toLowerCase())) return;
+    setFitments(prev => [...prev, { make, model, yearFrom: fitYear || null, yearTo: null, fitType: "COMPATIBLE" }]);
+    setFitMake(""); setFitModel(""); setFitYear("");
+  };
+  const removeFitment = (i) => setFitments(prev => prev.filter((_, idx) => idx !== i));
 
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
 
@@ -854,7 +869,7 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
   };
 
   const handleSave = () => {
-    if (validate()) onSave(f);
+    if (validate()) onSave({ ...f, _fitments: fitments });
   };
 
   return (
@@ -950,6 +965,59 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
             <Input value={f.description} onChange={set("description")} placeholder="Ceramic brake pads for front axle…" />
           </Field>
         </div>
+      </div>
+
+      {/* Vehicle Fitment */}
+      <div style={{ gridColumn: "span 2", borderTop: `1px solid ${T.border}`, paddingTop: 12, marginTop: 4 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+          Vehicle Fitment (optional) — which vehicles does this part fit?
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 10 }}>
+          <div style={{ flex: "1 1 120px" }}>
+            <div style={{ fontSize: 10, color: T.t3, marginBottom: 3 }}>Make</div>
+            <input
+              value={fitMake}
+              onChange={e => setFitMake(e.target.value)}
+              placeholder="e.g. Maruti"
+              style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 7, padding: "8px 10px", fontSize: 12, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+            />
+          </div>
+          <div style={{ flex: "1 1 140px" }}>
+            <div style={{ fontSize: 10, color: T.t3, marginBottom: 3 }}>Model</div>
+            <input
+              value={fitModel}
+              onChange={e => setFitModel(e.target.value)}
+              placeholder="e.g. Swift"
+              style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 7, padding: "8px 10px", fontSize: 12, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+            />
+          </div>
+          <div style={{ flex: "0 1 90px" }}>
+            <div style={{ fontSize: 10, color: T.t3, marginBottom: 3 }}>Year (from)</div>
+            <input
+              type="number"
+              value={fitYear}
+              onChange={e => setFitYear(e.target.value)}
+              placeholder="2015"
+              min={1980} max={2030}
+              style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 7, padding: "8px 10px", fontSize: 12, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addFitment}
+            style={{ background: T.sky, color: "#fff", border: "none", borderRadius: 7, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", fontFamily: FONT.ui }}
+          >+ Add</button>
+        </div>
+        {fitments.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {fitments.map((ft, i) => (
+              <span key={i} style={{ display: "flex", alignItems: "center", gap: 5, background: `${T.sky}14`, border: `1px solid ${T.sky}44`, borderRadius: 20, padding: "3px 10px 3px 12px", fontSize: 11, color: T.sky, fontWeight: 700 }}>
+                {ft.make} {ft.model}{ft.yearFrom ? ` (${ft.yearFrom})` : ""}
+                <button onClick={() => removeFitment(i)} style={{ background: "none", border: "none", cursor: "pointer", color: T.sky, fontSize: 13, lineHeight: 1, padding: "0 2px" }}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
@@ -1139,6 +1207,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               unitOfSale:  form.unitOfSale  || "Piece",
               description: form.description || undefined,
               partType:    form.partType    || "OEM",
+              fitments:    form._fitments?.length ? form._fitments : undefined,
               // backend reads images[] array, not imageUrl
               ...(contribImage && { images: [contribImage] }),
               ...(form._scannedBarcode && { barcodes: [form._scannedBarcode] }),
