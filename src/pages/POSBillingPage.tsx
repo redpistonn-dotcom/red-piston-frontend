@@ -193,7 +193,9 @@ export function POSBillingPage() {
 
     const handleSuspend = () => {
         if (items.length === 0) return;
-        const draft = { items, customerName, customerPhone, vehicleReg, notes, billType, timestamp: Date.now() };
+        // Persist the FULL bill state — additionalDisc + paymentMode were missing,
+        // so the extra discount was lost on resume.
+        const draft = { items, customerName, customerPhone, vehicleReg, notes, billType, additionalDisc, paymentMode, timestamp: Date.now() };
         localStorage.setItem("vl_suspended_bill", JSON.stringify(draft));
         setSuspendedBill(draft); newBill();
         toast?.("Bill suspended.", "info");
@@ -208,9 +210,63 @@ export function POSBillingPage() {
         setVehicleReg(suspendedBill.vehicleReg || "");
         setNotes(suspendedBill.notes || "");
         setBillType(suspendedBill.billType || "Sale");
+        setAdditionalDisc(Number(suspendedBill.additionalDisc) || 0);
+        setPaymentMode(suspendedBill.paymentMode || "Cash");
         localStorage.removeItem("vl_suspended_bill");
         setSuspendedBill(null);
         toast?.("Bill restored.", "success");
+    };
+
+    // Build the GST invoice as a jsPDF doc from the on-screen bill (jsPDF lazy-loaded).
+    // Shared by "Download PDF" and "Share WhatsApp" (so WhatsApp can attach the file).
+    const buildBillPdf = async () => {
+        const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+        const autoTable = autoTableMod.default;
+        const doc = new jsPDF({ unit: "pt", format: "a4" });
+        const M = 40, R = 555;
+        const rs = (n: number) => "Rs. " + Math.round(Number(n) || 0).toLocaleString("en-IN");
+        doc.setFont("helvetica", "bold").setFontSize(16).setTextColor(20);
+        doc.text(shopName || "—", M, 50);
+        doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
+        let y = 64;
+        if (shopAddress) { doc.text(String(shopAddress), M, y); y += 12; }
+        if (shopGst) { doc.text(`GSTIN: ${shopGst}`, M, y); y += 12; }
+        doc.setFont("helvetica", "bold").setFontSize(13).setTextColor(20);
+        doc.text(billType === "Sale" ? "TAX INVOICE" : "QUOTATION", R, 50, { align: "right" });
+        doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
+        doc.text(`No: ${invoiceNo}`, R, 64, { align: "right" });
+        if (invoiceAt) doc.text(String(fmtDateTime(invoiceAt)), R, 76, { align: "right" });
+        y = Math.max(y, 90);
+        if (customerName) { doc.text(`Customer: ${customerName}`, M, y); y += 12; }
+        if (vehicleReg) { doc.text(`Vehicle: ${vehicleReg}`, M, y); y += 12; }
+        autoTable(doc, {
+            startY: y + 8,
+            head: [["#", "Item", "Qty", "Rate", "Disc", "GST", "Amount"]],
+            body: items.map((it: any, i: number) => {
+                const lc = lineCalcs[i];
+                return [String(i + 1), it.name, String(it.qty), rs(it.price),
+                    lc.discAmt > 0 ? `-${rs(lc.discAmt)}` : "-", rs(lc.gstAmt), rs(lc.afterDisc)];
+            }),
+            styles: { fontSize: 9, cellPadding: 5 },
+            headStyles: { fillColor: [139, 30, 30] },
+            columnStyles: { 0: { cellWidth: 24, halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
+            margin: { left: M, right: M },
+        });
+        let fy = ((doc as any).lastAutoTable?.finalY || y + 40) + 16;
+        const lx = 360;
+        const trow = (l: string, v: string, b = false) => {
+            doc.setFont("helvetica", b ? "bold" : "normal").setFontSize(b ? 13 : 10).setTextColor(b ? 139 : 40, b ? 30 : 40, b ? 30 : 40);
+            doc.text(l, lx, fy); doc.text(v, R, fy, { align: "right" }); fy += b ? 18 : 15;
+        };
+        if (grandDiscount > 0) trow("Item Discounts", `-${rs(grandDiscount)}`);
+        if (additionalDisc > 0) trow("Additional Discount", `-${rs(additionalDisc)}`);
+        trow("GST (Inclusive)", rs(grandGst));
+        doc.setDrawColor(139, 30, 30).line(lx, fy - 6, R, fy - 6);
+        trow("TOTAL", rs(finalTotal), true);
+        fy += 8;
+        doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(120);
+        doc.text(`Paid via ${paymentMode} - computer-generated ${billType === "Sale" ? "tax invoice" : "quotation"}.`, M, fy);
+        return doc;
     };
 
     // ─── Invoice Preview ───────────────────────────────────────────────────────
@@ -296,54 +352,9 @@ export function POSBillingPage() {
                         }
                         // Fallback (or sale not yet synced): build the PDF client-side from
                         // the on-screen bill so Download ALWAYS works, regardless of backend
-                        // sync / cold starts (jsPDF lazy-loaded only on click).
+                        // sync / cold starts.
                         try {
-                            const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-                            const autoTable = autoTableMod.default;
-                            const doc = new jsPDF({ unit: "pt", format: "a4" });
-                            const M = 40, R = 555;
-                            const rs = (n: number) => "Rs. " + Math.round(Number(n) || 0).toLocaleString("en-IN");
-                            doc.setFont("helvetica", "bold").setFontSize(16).setTextColor(20);
-                            doc.text(shopName || "—", M, 50);
-                            doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
-                            let y = 64;
-                            if (shopAddress) { doc.text(String(shopAddress), M, y); y += 12; }
-                            if (shopGst) { doc.text(`GSTIN: ${shopGst}`, M, y); y += 12; }
-                            doc.setFont("helvetica", "bold").setFontSize(13).setTextColor(20);
-                            doc.text(billType === "Sale" ? "TAX INVOICE" : "QUOTATION", R, 50, { align: "right" });
-                            doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
-                            doc.text(`No: ${invoiceNo}`, R, 64, { align: "right" });
-                            if (invoiceAt) doc.text(String(fmtDateTime(invoiceAt)), R, 76, { align: "right" });
-                            y = Math.max(y, 90);
-                            if (customerName) { doc.text(`Customer: ${customerName}`, M, y); y += 12; }
-                            if (vehicleReg) { doc.text(`Vehicle: ${vehicleReg}`, M, y); y += 12; }
-                            autoTable(doc, {
-                                startY: y + 8,
-                                head: [["#", "Item", "Qty", "Rate", "Disc", "GST", "Amount"]],
-                                body: items.map((it: any, i: number) => {
-                                    const lc = lineCalcs[i];
-                                    return [String(i + 1), it.name, String(it.qty), rs(it.price),
-                                        lc.discAmt > 0 ? `-${rs(lc.discAmt)}` : "-", rs(lc.gstAmt), rs(lc.afterDisc)];
-                                }),
-                                styles: { fontSize: 9, cellPadding: 5 },
-                                headStyles: { fillColor: [139, 30, 30] },
-                                columnStyles: { 0: { cellWidth: 24, halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
-                                margin: { left: M, right: M },
-                            });
-                            let fy = ((doc as any).lastAutoTable?.finalY || y + 40) + 16;
-                            const lx = 360;
-                            const trow = (l: string, v: string, b = false) => {
-                                doc.setFont("helvetica", b ? "bold" : "normal").setFontSize(b ? 13 : 10).setTextColor(b ? 139 : 40, b ? 30 : 40, b ? 30 : 40);
-                                doc.text(l, lx, fy); doc.text(v, R, fy, { align: "right" }); fy += b ? 18 : 15;
-                            };
-                            if (grandDiscount > 0) trow("Item Discounts", `-${rs(grandDiscount)}`);
-                            if (additionalDisc > 0) trow("Additional Discount", `-${rs(additionalDisc)}`);
-                            trow("GST (Inclusive)", rs(grandGst));
-                            doc.setDrawColor(139, 30, 30).line(lx, fy - 6, R, fy - 6);
-                            trow("TOTAL", rs(finalTotal), true);
-                            fy += 8;
-                            doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(120);
-                            doc.text(`Paid via ${paymentMode} - computer-generated ${billType === "Sale" ? "tax invoice" : "quotation"}.`, M, fy);
+                            const doc = await buildBillPdf();
                             doc.save(`${invoiceNo || "invoice"}.pdf`);
                         } catch { toast?.("Could not generate the PDF", "warning"); }
                     }}
@@ -351,16 +362,32 @@ export function POSBillingPage() {
                     📄 Download PDF
                 </button>
                 <button
-                    onClick={() => {
-                        const msg = encodeURIComponent(
-                            `*${shopName}*\n${billType === "Sale" ? "Tax Invoice" : "Quotation"} ${invoiceNo}\nItems: ${items.length}\nTotal: ₹${finalTotal.toFixed(2)}\n\nThank you for your business! 🙏`
-                        );
+                    onClick={async () => {
+                        const text =
+                            `*${shopName}*\n${billType === "Sale" ? "Tax Invoice" : "Quotation"} ${invoiceNo}\nItems: ${items.length}\nTotal: ₹${finalTotal.toFixed(2)}\n\nThank you for your business! 🙏`;
+                        // Best path (mobile): share the actual PDF *and* the text in one go via
+                        // the native share sheet — WhatsApp appears as a target and receives both.
+                        let pdfDownloaded = false;
+                        try {
+                            const doc = await buildBillPdf();
+                            const blob = doc.output("blob");
+                            const file = new File([blob], `${invoiceNo || "invoice"}.pdf`, { type: "application/pdf" });
+                            const nav: any = navigator;
+                            if (nav.canShare && nav.canShare({ files: [file] })) {
+                                try { await nav.share({ files: [file], text, title: `Invoice ${invoiceNo}` }); return; }
+                                catch (e: any) { if (e?.name === "AbortError") return; /* else fall through */ }
+                            }
+                            // Desktop / no file-share support: download the PDF so it can be attached.
+                            doc.save(`${invoiceNo || "invoice"}.pdf`);
+                            pdfDownloaded = true;
+                        } catch { /* PDF unavailable — still send the text */ }
+                        // Open WhatsApp with the text (to the customer's number if provided).
                         const ph = customerPhone.replace(/\D/g, "");
-                        if (ph.length !== 10) {
-                            toast?.("Enter a 10-digit WhatsApp number in the Customer fields above to send directly", "warning");
-                            return;
-                        }
-                        window.open(`https://wa.me/91${ph}?text=${msg}`, "_blank");
+                        const url = ph.length === 10
+                            ? `https://wa.me/91${ph}?text=${encodeURIComponent(text)}`
+                            : `https://wa.me/?text=${encodeURIComponent(text)}`;
+                        window.open(url, "_blank");
+                        if (pdfDownloaded) toast?.("Invoice PDF downloaded — attach it in the WhatsApp chat that just opened.", "info");
                     }}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#25D366", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui }}>
                     💬 Share WhatsApp
@@ -487,7 +514,12 @@ export function POSBillingPage() {
                                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                                     <span style={{ fontSize: 18, flexShrink: 0 }}>{item.image}</span>
                                                     <div>
-                                                        <div style={{ fontWeight: 700, color: T.t1, fontSize: 13, whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                                                        {String(item.productId || "").startsWith("custom_") ? (
+                                                            <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Item name…"
+                                                                style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name && item.name !== "Custom Item" ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
+                                                        ) : (
+                                                            <div style={{ fontWeight: 700, color: T.t1, fontSize: 13, whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
+                                                        )}
                                                         <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>Stock: {item.maxStock} · GST {item.gstRate}%</div>
                                                     </div>
                                                 </div>
