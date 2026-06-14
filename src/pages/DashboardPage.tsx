@@ -100,16 +100,37 @@ export function DashboardPage() {
       return { ...p, sold, revP, profP, bought, spentP, profitPU, mg };
     }), [shopProducts, curSales, curPurch]);
 
-  // chart data: daily
+  // chart data: daily (≤30D), weekly (90D), monthly (365D)
   const chartData = useMemo(() => {
-    const pts = Math.min(days, 30);
-    return Array.from({ length: pts }, (_, i) => {
-      const end = now - i * 86400000;
-      const start = end - 86400000;
+    const bucket = (start: number, end: number, lbl: string) => {
       const ds = shopMovements.filter(m => m.type === "SALE" && m.date >= start && m.date < end);
       const dp = shopMovements.filter(m => m.type === "PURCHASE" && m.date >= start && m.date < end);
-      const lbl = new Date(end).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
       return { date: lbl, Revenue: ds.reduce((t, m) => t + m.total, 0), Profit: ds.reduce((t, m) => t + (m.profit || 0), 0), Expenses: dp.reduce((t, m) => t + m.total, 0) };
+    };
+    if (days <= 30) {
+      return Array.from({ length: days }, (_, i) => {
+        const end = now - i * 86400000;
+        const lbl = new Date(end).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+        return bucket(end - 86400000, end, lbl);
+      }).reverse();
+    }
+    if (days <= 90) {
+      const weeks = Math.ceil(days / 7);
+      return Array.from({ length: weeks }, (_, i) => {
+        const end = now - i * 7 * 86400000;
+        const lbl = new Date(end).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+        return bucket(end - 7 * 86400000, end, lbl);
+      }).reverse();
+    }
+    // 365D → 12 calendar months
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      const start = d.getTime();
+      const end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+      const lbl = d.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+      return bucket(start, end, lbl);
     }).reverse();
   }, [shopMovements, days, now]);
 

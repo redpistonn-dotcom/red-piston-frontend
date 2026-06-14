@@ -107,7 +107,7 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     oemNumber: oemStr || null,
     barcodes: barcodesArr as string[],
     brand: mp?.brand || null,
-    category: mp?.categoryL1 || 'General',
+    category: normalizeCategory(mp?.categoryL1),
     hsnCode: mp?.hsnCode || null,
     gstRate: parseFloat(String(mp?.gstRate ?? 18)),
     unitOfSale: mp?.unitOfSale || null,
@@ -124,6 +124,28 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     imageEmoji: getCategoryEmoji(mp?.categoryL1),
     sku: oemStr || String(inv.inventoryId).slice(0, 8),
   };
+}
+
+// Maps DB categoryL1 values → CATEGORIES constant (used by the inventory filter pills).
+// When the DB adds new category names, add them here so the filter pills work correctly.
+const DB_TO_CATEGORY: Record<string, string> = {
+  'Engine Oils':          'Engine',
+  'Fuel System':          'Engine',
+  'Exhaust':              'Engine',
+  'Body & Exterior':      'Body',
+  'Clutch & Transmission':'Clutch',
+  'Ignition':             'Electrical',
+  'AC & Heating':         'Cooling',
+  'Fluids':               'Cooling',
+  'Radiator':             'Cooling',
+  'Wheel & Tyre':         'Tyres',
+  'Tyres & Wheels':       'Tyres',
+  'Steering & Suspension':'Suspension',
+};
+
+function normalizeCategory(raw?: string | null): string {
+  if (!raw) return 'General';
+  return DB_TO_CATEGORY[raw] ?? raw;
 }
 
 function getCategoryEmoji(category?: string | null): string {

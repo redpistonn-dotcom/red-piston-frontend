@@ -152,8 +152,8 @@ export function POSBillingPage() {
             if (isCustom && (!item.name || item.name === "Custom Item")) {
                 toast?.("Enter a name for the custom item before submitting", "warning"); return false;
             }
-            if (isCustom && item.price <= 0) {
-                toast?.(`Set a price for "${item.name}" before submitting`, "warning"); return false;
+            if (item.price <= 0) {
+                toast?.(`"${item.name}" has no valid price (₹${item.price}). Set a price before submitting`, "warning"); return false;
             }
         }
         return true;

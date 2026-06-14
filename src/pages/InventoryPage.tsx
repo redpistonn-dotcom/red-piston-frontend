@@ -24,19 +24,20 @@ function isProductCompatible(product, matchStr) {
 }
 
 export function InventoryPage() {
-  const { movements, activeShopId, saveProducts, shops } = useStore();
+  const { products: storeProducts, movements, activeShopId, saveProducts, shops } = useStore();
   const { handleSale: onSale, handlePurchase: onPurchase, handleAdjustment: onAdjust, toast, setAddProdOpen, setPModal } = useContext(AppCtx);
 
-  // Fetch inventory directly from the API on every mount — never trust
-  // vl_products localStorage which may be stale from a previous session.
-  const [products, setProducts] = useState(null); // null = loading
+  // Fetch inventory from API on mount, then use the store (reactive to ProductModal edits/purchases).
+  const [apiLoaded, setApiLoaded] = useState(false);
   useEffect(() => {
     fetchInventory().then(data => {
       const result = data ?? [];
-      setProducts(result);
-      saveProducts(result); // keep store in sync for other pages
+      saveProducts(result); // populates storeProducts, which this page then reads reactively
+      setApiLoaded(true);
     });
   }, []);
+  // null while loading (shows skeleton); after load, store is the live source of truth
+  const products = apiLoaded ? storeProducts : null;
 
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });
@@ -164,6 +165,10 @@ export function InventoryPage() {
 
     const isMobile = useIsMobile();
 
+    // Low-stock banner: dismissed per browser session so it resets on next login
+    const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem('vl_lowstock_dismissed') === '1');
+    const dismissBanner = () => { sessionStorage.setItem('vl_lowstock_dismissed', '1'); setBannerDismissed(true); };
+
     // Block render until API responds — prevents stale localStorage flash
     if (products === null) {
       return (
@@ -176,8 +181,8 @@ export function InventoryPage() {
     return (
         <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
 
-            {/* ── LOW STOCK ALERT BANNER (design: left-border card style) ── */}
-            {(counts.low + counts.out) > 0 && (
+            {/* ── LOW STOCK ALERT BANNER — dismissed per session ── */}
+            {(counts.low + counts.out) > 0 && !bannerDismissed && (
               <div style={{
                 background: "#FFFBF0",
                 border: "1px solid rgba(245,158,11,0.25)",
@@ -198,6 +203,11 @@ export function InventoryPage() {
                   onClick={() => setStatusF("low")}
                   style={{ background: "none", border: "none", color: T.amber, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, letterSpacing: "0.05em", flexShrink: 0 }}
                 >VIEW ALL</button>
+                <button
+                  onClick={dismissBanner}
+                  title="Dismiss for this session"
+                  style={{ background: "none", border: "none", color: "#B45309", fontSize: 16, cursor: "pointer", lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
+                >×</button>
               </div>
             )}
 
