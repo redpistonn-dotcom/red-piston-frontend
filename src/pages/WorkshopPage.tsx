@@ -911,15 +911,16 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
 
             {/* ── Go Live / Edit Listing Modal ── rendered via portal to escape stacking context */}
             {goLiveProd && createPortal(
-                <div style={{ position: "fixed", inset: 0, zIndex: 2147483647, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+                <div style={{ position: "fixed", inset: 0, zIndex: 2147483647, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", overflowY: "auto" }}>
                     {/* Backdrop */}
                     <div onClick={() => !glSaving && setGoLiveProd(null)} style={{ position: "absolute", inset: 0, background: "rgba(28,27,27,0.6)", backdropFilter: "blur(4px)" }} />
 
-                    {/* Modal card */}
-                    <div style={{ position: "relative", background: "#FFFFFF", borderRadius: 18, width: "100%", maxWidth: 500, boxShadow: "0 32px 80px rgba(0,0,0,0.28)", overflow: "hidden", animation: "fadeUp 0.2s ease" }}>
+                    {/* Modal card — capped to the viewport with an internally-scrolling
+                        body so a tall form never runs off the top of the screen. */}
+                    <div style={{ position: "relative", background: "#FFFFFF", borderRadius: 18, width: "100%", maxWidth: 500, maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", boxShadow: "0 32px 80px rgba(0,0,0,0.28)", overflow: "hidden", animation: "fadeUp 0.2s ease", margin: "auto" }}>
 
                         {/* Header — blue for Edit, red-amber for Go Live */}
-                        <div style={{ background: editMode ? `linear-gradient(135deg, #1e3a5f, #374151)` : `linear-gradient(135deg, ${T.amber}, #6A020A)`, padding: "22px 24px 18px" }}>
+                        <div style={{ flexShrink: 0, background: editMode ? `linear-gradient(135deg, #1e3a5f, #374151)` : `linear-gradient(135deg, ${T.amber}, #6A020A)`, padding: "22px 24px 18px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
                                 <span style={{ fontSize: 22 }}>{editMode ? "✏️" : "🚀"}</span>
                                 <div>
@@ -936,8 +937,8 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                             </div>
                         </div>
 
-                        {/* Body */}
-                        <div style={{ padding: "24px 24px 20px" }}>
+                        {/* Body — scrolls within the viewport-capped card */}
+                        <div style={{ padding: "24px 24px 20px", overflowY: "auto", flex: 1 }}>
 
                             {editMode ? (
                                 /* ── EDIT MODE: set a new target quantity ── */

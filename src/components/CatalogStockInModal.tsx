@@ -21,7 +21,6 @@ import { Modal, Field, Input, Select, Btn } from "./ui";
 import { BarcodeScanner } from "./BarcodeScanner.jsx";
 import { lookupCatalog, lookupByBarcode, scanBarcode, addInventory, contributePart } from "../api/inventory.js";
 import { uid, CATEGORIES, fmt } from "../utils";
-import { ImageUploader } from "./ImageUploader";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -635,7 +634,6 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
     if (!f.buyPrice  || isNaN(f.buyPrice))  e.buyPrice  = "Required";
     if (!f.sellPrice || isNaN(f.sellPrice)) e.sellPrice = "Required";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
-    if (!f.shopImageUrl) e.shopImageUrl = "Product photo is required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -718,24 +716,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
         <div style={{ fontSize: 11, fontWeight: 800, color: T.amber, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
           Your Shop Details — Price &amp; Stock
         </div>
-        {/* Shop photo — mandatory; can override catalog image */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: errors.shopImageUrl ? "#EF4444" : T.amber, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-            Product Photo <span style={{ color: "#EF4444" }}>*</span>
-            {catalogImage && <span style={{ fontWeight: 400, color: T.t3, textTransform: "none", letterSpacing: 0 }}> — catalog image pre-loaded; upload your own to override</span>}
-          </div>
-          <ImageUploader
-            folder="inventory"
-            currentUrl={f.shopImageUrl || null}
-            onUploaded={(url) => { set("shopImageUrl")(url); setErrors(e => ({ ...e, shopImageUrl: undefined })); }}
-            onError={(msg) => setErrors(e => ({ ...e, shopImageUrl: msg }))}
-            label="Upload Shop Photo"
-            maxMb={8}
-          />
-          {errors.shopImageUrl && (
-            <div style={{ fontSize: 11, color: "#EF4444", marginTop: 4, fontFamily: FONT.ui }}>{errors.shopImageUrl}</div>
-          )}
-        </div>
+        {/* Photo is added later at marketplace "Go Live" — not required here. */}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <Field label="Buying Price (₹)" required error={errors.buyPrice}>
@@ -820,7 +801,6 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
     const e = {};
     if (!f.partName.trim()) e.partName  = "Required";
     if (!f.categoryL1)      e.categoryL1 = "Select a category";
-    if (!f.imageUrl)        e.imageUrl  = "Product photo is required";
     if (!f.buyPrice  || isNaN(f.buyPrice))  e.buyPrice  = "Required";
     if (!f.sellPrice || isNaN(f.sellPrice)) e.sellPrice = "Required";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
@@ -863,22 +843,7 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
             <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" />
           </Field>
         </div>
-        <div style={{ gridColumn: "span 2" }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: errors.imageUrl ? "#EF4444" : T.amber, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-            Product Photo <span style={{ color: "#EF4444" }}>*</span>
-          </div>
-          <ImageUploader
-            folder="inventory"
-            currentUrl={f.imageUrl || null}
-            onUploaded={(url) => { set("imageUrl")(url); setErrors(e => ({ ...e, imageUrl: undefined })); }}
-            onError={(msg) => setErrors(e => ({ ...e, imageUrl: msg }))}
-            label="Upload Product Photo"
-            maxMb={8}
-          />
-          {errors.imageUrl && (
-            <div style={{ fontSize: 11, color: "#EF4444", marginTop: 4, fontFamily: FONT.ui }}>{errors.imageUrl}</div>
-          )}
-        </div>
+        {/* Photo is added later at marketplace "Go Live" — not required here. */}
         <Field label="Brand">
           <Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK, Denso…" />
         </Field>
