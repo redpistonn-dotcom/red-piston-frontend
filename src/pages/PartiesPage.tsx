@@ -3,7 +3,9 @@ import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, uid, downloadCSV, generateCSV } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
-import { fetchPartyLedger, type LedgerEntry } from "../api/sync";
+import { fetchPartyLedger, fetchParties, type LedgerEntry } from "../api/sync";
+import { createParty } from "../api/parties";
+import { api } from "../api/client";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 
@@ -35,10 +37,36 @@ export function PartiesPage() {
     const { toast } = useContext(AppCtx);
     const isMobile = useIsMobile();
 
-    const onSaveParty = useCallback((p: any) => {
+    const onSaveParty = useCallback(async (p: any) => {
         const exists = (parties || []).find((x: any) => x.id === p.id);
+        // Optimistic local update for instant UI.
         saveParties(exists ? parties.map((x: any) => (x.id === p.id ? p : x)) : [...(parties || []), p]);
         logAudit(exists ? "PARTY_UPDATED" : "PARTY_CREATED", "party", p.id, p.name);
+
+        // Persist to the backend DB so the party survives logout. A DB-loaded
+        // party has a numeric id (mapParty → partyId); a freshly-created one has
+        // a local "cust_/sup_" string id → create it.
+        const body = {
+            name: p.name, phone: p.phone || null, email: p.email || null,
+            gstin: p.gstin || null, address: p.address || null,
+            type: String(p.type || "customer").toUpperCase(),
+            creditLimit: p.creditLimit || 0, creditDays: p.creditDays || 30,
+            notes: p.notes || null, openingBalance: p.openingBalance || 0,
+        };
+        const isDbId = typeof p.id === "number" || /^\d+$/.test(String(p.id));
+        try {
+            if (exists && isDbId) {
+                await api.put(`/api/shop/parties/${p.id}`, body);
+            } else {
+                await createParty(body);
+            }
+            // Re-sync from the DB so local ids reconcile to real partyIds
+            // (prevents a later edit from creating a duplicate).
+            const fresh = await fetchParties();
+            if (Array.isArray(fresh)) saveParties(fresh);
+        } catch (err) {
+            console.error("[onSaveParty] DB sync failed — kept locally:", err);
+        }
     }, [parties, saveParties, logAudit]);
 
     const onSaveVehicle = useCallback((v: any) => {

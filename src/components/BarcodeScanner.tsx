@@ -33,6 +33,13 @@ async function getReader() {
   return BrowserMultiFormatReader;
 }
 
+// Warm up the (heavy) ZXing module ahead of time so opening the scanner is
+// instant. Safe to call repeatedly — the dynamic import is cached after the
+// first call. Call this when the POS/billing page mounts.
+export function preloadScanner() {
+  getReader().catch(() => {});
+}
+
 // ─── Overlay styles ───────────────────────────────────────────────────────────
 const OVERLAY = {
   position: "fixed",
@@ -66,6 +73,9 @@ export function BarcodeScanner({ open, onScan, onClose, hint }) {
   const [status, setStatus]       = useState("starting"); // "starting" | "scanning" | "error"
   const [errorMsg, setErrorMsg]   = useState("");
   const [lastScan, setLastScan]   = useState("");
+
+  // Preload the ZXing decoder once on mount so the first open is instant.
+  useEffect(() => { getReader().catch(() => {}); }, []);
 
   // ── Stop any active scan / release camera ─────────────────────────────────
   const stopScan = useCallback(() => {
