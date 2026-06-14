@@ -227,7 +227,7 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function OrdersPage() {
-    const { movements, products, orders: mktOrders, activeShopId, syncFromAPI, apiSynced } = useStore();
+    const { movements, products, orders: mktOrders, saveOrders, activeShopId, syncFromAPI, apiSynced } = useStore();
     const { toast } = useContext(AppCtx);
     const isMobile = useIsMobile();
 
@@ -272,6 +272,34 @@ export function OrdersPage() {
         }
     };
 
+    // Status workflow for MANUAL pipeline orders (Create Order).
+    //   Pending → Delivered: reduce stock by qty (shows in History as a sale).
+    //   Delivered → Cancelled: restore the stock (and drops out of History).
+    //   Pending → Cancelled: no stock change (nothing was taken).
+    // The stock move uses a signed ADJUSTMENT tagged "[order]" so History can hide
+    // it (the order entry itself is the History record — avoids a double row).
+    const updateManualOrderStatus = async (row: any, next: "DELIVERED" | "CANCELLED") => {
+        const local = (mktOrders || []).find((o: any) => o.id === row.localId);
+        if (!local) return;
+        const cur = local.status; // PENDING / DELIVERED / CANCELLED
+        if (cur === next) return;
+        const qty = Number(local.qty) || 0;
+        const invId = local.inventoryId;
+        try {
+            if (next === "DELIVERED" && cur !== "DELIVERED" && invId && qty > 0) {
+                await api.post("/api/shop/inventory/adjust", { inventoryId: invId, type: "ADJUSTMENT", qty: -qty, notes: `[order] ${row.orderId} delivered` });
+            } else if (next === "CANCELLED" && cur === "DELIVERED" && invId && qty > 0) {
+                await api.post("/api/shop/inventory/adjust", { inventoryId: invId, type: "ADJUSTMENT", qty: qty, notes: `[order] ${row.orderId} cancelled (restock)` });
+            }
+            saveOrders((mktOrders || []).map((o: any) => (o.id === row.localId ? { ...o, status: next } : o)));
+            toast?.(`Order ${row.orderId} → ${next === "DELIVERED" ? "Delivered" : "Cancelled"}.`, "success");
+            syncFromAPI().catch(() => {});
+        } catch (e: any) {
+            console.error("[updateManualOrderStatus]", e);
+            toast?.(e?.data?.error || "Could not update the order.", "error");
+        }
+    };
+
     const shopMovements = useMemo(
         () => (movements || []).filter(m => m.shopId === activeShopId),
         [movements, activeShopId],
@@ -305,18 +333,29 @@ export function OrdersPage() {
         // already returned — checkout attaches backendOrderId; backend wins)
         const fromMarket = (mktOrders || [])
             .filter((o: any) => (!activeShopId || o.shopId === activeShopId) && !(o.backendOrderId && backendIdSet.has(Number(o.backendOrderId))))
-            .map(o => ({
-                id: o.id,
-                orderId: `#SO-${String(o.id).slice(-5).padStart(5, "0")}`,
-                date: o.time || o.date || Date.now(),
-                partyName: o.customer || "Customer",
-                partyId: `PT-${String(o.id).slice(-5).padStart(5, "0")}`,
-                type: "Sale" as const,
-                status: (o.status === "DELIVERED" ? "Delivered" : o.status === "CANCELLED" ? "Cancelled" : o.status === "DISPATCHED" ? "Shipped" : "Pending") as OrderStatus,
-                amount: o.total || 0,
-                product: o.items || "",
-                cancelled: o.status === "CANCELLED",
-            }));
+            .map((o: any) => {
+                const isManual = String(o.id || "").startsWith("manual_");
+                const isPurchase = !!o.supplier;
+                return {
+                    id: o.id,
+                    orderId: `#${isPurchase ? "PO" : "SO"}-${String(o.id).slice(-5).padStart(5, "0")}`,
+                    date: o.time || o.date || Date.now(),
+                    partyName: o.customer || o.supplier || "Customer",
+                    partyId: `PT-${String(o.id).slice(-5).padStart(5, "0")}`,
+                    type: (isPurchase ? "Purchase" : "Sale") as "Sale" | "Purchase",
+                    status: (o.status === "DELIVERED" ? "Delivered" : o.status === "CANCELLED" ? "Cancelled" : o.status === "DISPATCHED" ? "Shipped" : "Pending") as OrderStatus,
+                    amount: o.total || 0,
+                    product: o.items || "",
+                    cancelled: o.status === "CANCELLED",
+                    // Manual pipeline orders carry their inventory link so the status
+                    // control can reduce/restore stock on deliver/cancel.
+                    isManual,
+                    localId: o.id,
+                    inventoryId: o.inventoryId,
+                    qty: o.qty,
+                    rawStatus: o.status,
+                };
+            });
 
         // Merge (deduplicate by orderId)
         const seen = new Set<string>();
@@ -548,6 +587,16 @@ export function OrdersPage() {
                                                     style={{ height: 30, padding: "0 12px", borderRadius: 20, border: `1px solid rgba(139,30,30,0.25)`, background: T.amberGlow, color: T.amber, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}
                                                 >{adv.label} →</button>
                                             )}
+                                            {(order as any).isManual && (order as any).rawStatus !== "CANCELLED" && (
+                                                <>
+                                                    {(order as any).rawStatus !== "DELIVERED" && (
+                                                        <button title="Mark Delivered (reduces stock)" onClick={() => updateManualOrderStatus(order, "DELIVERED")}
+                                                            style={{ height: 30, padding: "0 11px", borderRadius: 20, border: `1px solid rgba(16,185,129,0.3)`, background: T.emeraldBg, color: T.emerald, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>Deliver →</button>
+                                                    )}
+                                                    <button title={(order as any).rawStatus === "DELIVERED" ? "Cancel (restock)" : "Cancel order"} onClick={() => updateManualOrderStatus(order, "CANCELLED")}
+                                                        style={{ height: 30, padding: "0 11px", borderRadius: 20, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.crimson, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>Cancel</button>
+                                                </>
+                                            )}
                                             <button title="View" style={iconBtnStyle}>👁</button>
                                             <button title={isCancelled ? "Restore" : "Print"} onClick={() => { if (!isCancelled) window.print(); }} style={iconBtnStyle}>{isCancelled ? "↺" : "🖨"}</button>
                                             <button title="More options" style={iconBtnStyle}>⋯</button>
@@ -624,6 +673,16 @@ export function OrdersPage() {
                                                             onClick={() => handleAdvanceStatus((order as any).mktBackendId, adv.next)}
                                                             style={{ height: 26, padding: "0 12px", borderRadius: 20, border: `1px solid rgba(139,30,30,0.25)`, background: T.amberGlow, color: T.amber, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap", transition: "all 0.12s" }}
                                                         >{adv.label} →</button>
+                                                    )}
+                                                    {(order as any).isManual && (order as any).rawStatus !== "CANCELLED" && (
+                                                        <>
+                                                            {(order as any).rawStatus !== "DELIVERED" && (
+                                                                <button title="Mark Delivered (reduces stock)" onClick={() => updateManualOrderStatus(order, "DELIVERED")}
+                                                                    style={{ height: 26, padding: "0 11px", borderRadius: 20, border: `1px solid rgba(16,185,129,0.3)`, background: T.emeraldBg, color: T.emerald, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>Deliver →</button>
+                                                            )}
+                                                            <button title={(order as any).rawStatus === "DELIVERED" ? "Cancel (restock)" : "Cancel order"} onClick={() => updateManualOrderStatus(order, "CANCELLED")}
+                                                                style={{ height: 26, padding: "0 11px", borderRadius: 20, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.crimson, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>Cancel</button>
+                                                        </>
                                                     )}
                                                     <button title="View order details" onClick={() => setViewOrder(order)} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
                                                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}

@@ -297,7 +297,9 @@ export function HistoryPage() {
 
     const shopMovements = useMemo(
         () => [
-            ...(movements || []).filter(m => m.shopId === activeShopId),
+            // Hide the internal "[order]" stock adjustments — the manual order entry
+            // below is the History record for a delivered order (avoids a double row).
+            ...(movements || []).filter(m => m.shopId === activeShopId && !String((m as any).note ?? (m as any).notes ?? "").includes("[order]")),
             ...mpSales,
             ...jobMovements,
             ...manualOrders,
