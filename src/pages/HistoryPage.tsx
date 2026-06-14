@@ -3,6 +3,7 @@ import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from 
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, pct, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV } from "../utils";
 import { useStore } from "../store";
+import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 
 // ─── Group movements that share the same invoiceNo or batchId ─────────────────
 function groupMovements(filtered: any[]) {
@@ -254,9 +255,15 @@ export function HistoryPage() {
     const [dateTo, setDateTo]       = useState("");
     const [visibleCount, setVisibleCount] = useState(50);
 
+    // Marketplace sales (non-cancelled orders) fold into the movement ledger so
+    // they show in History alongside POS movements. Cancelled orders are excluded.
+    const { saleMovements: mpSales } = useShopMarketplaceSales(activeShopId);
     const shopMovements = useMemo(
-        () => (movements || []).filter(m => m.shopId === activeShopId),
-        [movements, activeShopId],
+        () => [
+            ...(movements || []).filter(m => m.shopId === activeShopId),
+            ...mpSales,
+        ],
+        [movements, activeShopId, mpSales],
     );
 
     // Apply period quick-filter (overrides manual dates when set)

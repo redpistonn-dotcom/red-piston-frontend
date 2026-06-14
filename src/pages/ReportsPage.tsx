@@ -12,6 +12,7 @@ import { Btn, ChartTip } from "../components/ui";
 import { GRID_PROPS, AXIS_PROPS, YAXIS_PROPS, AREA_ANIMATION } from "../components/charts/ChartTheme";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
+import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 
 // ─── Tiny helpers ────────────────────────────────────────────────────────────
 function KpiCard({
@@ -75,9 +76,12 @@ export function ReportsPage() {
     const [applyGst, setApplyGst] = useState(false);
     const [generating, setGenerating] = useState(false);
 
+    // Marketplace sales (non-cancelled) count as revenue from order placement;
+    // cancelled orders are surfaced separately in the cancellation analysis.
+    const { saleMovements: mpSales, cancelled, refresh: refreshMpSales } = useShopMarketplaceSales(activeShopId);
     const shopMovements = useMemo(
-        () => movements.filter(m => m.shopId === activeShopId),
-        [movements, activeShopId],
+        () => [...movements.filter(m => m.shopId === activeShopId), ...mpSales],
+        [movements, activeShopId, mpSales],
     );
     const shopProducts = useMemo(
         () => (products || []).filter(p => p.shopId === activeShopId),
@@ -219,7 +223,7 @@ export function ReportsPage() {
                         <span style={{ fontSize: 15 }}>↓</span> Export All
                     </button>
                     <button
-                        onClick={() => { toast?.("Data refreshed!", "success", "🔄 Sync"); }}
+                        onClick={() => { refreshMpSales(); toast?.("Data refreshed!", "success", "🔄 Sync"); }}
                         style={{ height: 40, padding: "0 18px", background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7 }}
                     >
                         <span style={{ fontSize: 15 }}>↺</span> Update Data
@@ -258,6 +262,45 @@ export function ReportsPage() {
                     trendUp={false}
                     icon="📦"
                 />
+            </div>
+
+            {/* ── CANCELLED ORDERS ANALYSIS ── */}
+            <div style={{
+                background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14,
+                padding: "16px 20px", display: "flex", alignItems: "center", gap: 20,
+                flexWrap: "wrap", boxShadow: SHADOWS.xs,
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                    <span style={{ width: 38, height: 38, borderRadius: 10, background: T.crimsonBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🚫</span>
+                    <div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: FONT.ui }}>Cancelled Orders</div>
+                        <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>Marketplace cancellations &amp; returns</div>
+                    </div>
+                </div>
+                <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+                    <div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: T.crimson, fontFamily: FONT.mono, letterSpacing: "-0.03em" }}>{cancelled.count}</div>
+                        <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>orders</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: T.crimson, fontFamily: FONT.mono, letterSpacing: "-0.03em" }}>{fmt(cancelled.total)}</div>
+                        <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>lost revenue</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: T.t2, fontFamily: FONT.mono, letterSpacing: "-0.03em" }}>
+                            {(() => {
+                                const denom = stats.totalSales + cancelled.total;
+                                return denom > 0 ? `${((cancelled.total / denom) * 100).toFixed(1)}%` : "0%";
+                            })()}
+                        </div>
+                        <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>cancellation rate</div>
+                    </div>
+                </div>
+                {cancelled.count === 0 && (
+                    <span style={{ fontSize: 12, color: T.emerald, fontWeight: 600, fontFamily: FONT.ui, marginLeft: "auto" }}>
+                        ✓ No cancellations in this period
+                    </span>
+                )}
             </div>
 
             {/* ── MAIN TWO-COLUMN ── */}

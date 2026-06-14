@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { T, FONT, SHADOWS } from "../theme";
@@ -6,6 +6,7 @@ import { GRID_PROPS, AXIS_PROPS, YAXIS_PROPS, AREA_ANIMATION, PIE_ANIMATION, LEG
 import { CATEGORIES, fmt, fmtN, pct, margin } from "../utils";
 import { StatCard, ChartTip } from "../components/ui";
 import { useStore } from "../store";
+import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 
 const PIE_C = CHART_COLORS;
 
@@ -16,14 +17,21 @@ export function DashboardPage() {
   const [period, setPeriod] = useState("30");
   const [profitView, setProfitView] = useState("unit_profit");
 
-  const now = Date.now();
   const days = +period;
+  // Memoized on period change — prevents chartData from re-computing on every render
+  const now = useMemo(() => Date.now(), [period]);
   const cutoff = now - days * 86400000;
   const prevCut = now - days * 2 * 86400000;
 
   // 1. FILTER BY ACTIVE SHOP
   const shopProducts = useMemo(() => products.filter(p => p.shopId === activeShopId), [products, activeShopId]);
-  const shopMovements = useMemo(() => movements.filter(m => m.shopId === activeShopId), [movements, activeShopId]);
+  // Fold marketplace sales (non-cancelled orders) into the movement ledger so
+  // revenue/units reflect online orders as soon as they're placed.
+  const { saleMovements: mpSales } = useShopMarketplaceSales(activeShopId);
+  const shopMovements = useMemo(
+    () => [...movements.filter(m => m.shopId === activeShopId), ...mpSales],
+    [movements, activeShopId, mpSales],
+  );
 
   // 2. TIME FILTERING
   const curMov = useMemo(() => shopMovements.filter(m => m.date >= cutoff), [shopMovements, cutoff]);

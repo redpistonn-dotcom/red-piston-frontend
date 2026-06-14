@@ -737,7 +737,8 @@ function AppContent() {
           <Route path="/inventory"  element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><InventoryPage /></ERPShell>)} />
           <Route path="/billing"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><POSBillingPage /></ERPShell>)} />
           <Route path="/parties"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PartiesPage /></ERPShell>)} />
-          <Route path="/workshop"   element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><WorkshopPage /></ERPShell>)} />
+          <Route path="/workshop"             element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><WorkshopPage section="jobs" /></ERPShell>)} />
+          <Route path="/workshop/marketplace" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><WorkshopPage section="marketplace" /></ERPShell>)} />
           <Route path="/history"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><HistoryPage /></ERPShell>)} />
           <Route path="/reports"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><ReportsPage /></ERPShell>)} />
           <Route path="/orders"     element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><OrdersPage /></ERPShell>)} />

@@ -11,6 +11,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMarketplaceFonts } from '../hooks/useMarketplaceFonts';
 import { PublicHeader } from '../components/PublicHeader';
+import { ProfileDropdown } from '../components/ProfileDropdown';
 import { AppCtx } from '../context/AppCtx';
 import { fetchShops } from '../api/marketplace';
 
@@ -63,6 +64,7 @@ export function SuppliersPage() {
   const navigate = useNavigate();
   const ctx = useContext(AppCtx);
   const currentUser = ctx?.currentUser ?? null;
+  const onLogout = ctx?.handleLogout;
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [suppLoading, setSuppLoading] = useState(true);
@@ -83,13 +85,16 @@ export function SuppliersPage() {
         searchPlaceholder="Search parts by brand, OEM number…"
         rightSlot={
           currentUser ? (
-            /* Logged in — keep "Browse Parts" action */
-            <button
-              onClick={() => navigate('/marketplace')}
-              style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}
-            >
-              Browse Parts
-            </button>
+            /* Logged in — "Browse Parts" action + profile dropdown (logout/profile) */
+            <>
+              <button
+                onClick={() => navigate('/marketplace')}
+                style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 44 }}
+              >
+                Browse Parts
+              </button>
+              <ProfileDropdown user={currentUser} onLogout={onLogout} />
+            </>
           ) : (
             /* Not logged in — match landing page header */
             <>

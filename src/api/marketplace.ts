@@ -19,23 +19,23 @@ export const trackOrder         = (id)     => api.get(`/api/marketplace/orders/$
 // Backend proxies API Setu so the secret key never reaches the browser.
 // Returns { make, model, year, fuelType, plate } on success.
 export async function fetchShops({ q = '', city = '', lat, lng } = {}) {
-  const params = new URLSearchParams({ limit: 80 });
-  if (q)   params.set('q', q);
-  if (city) params.set('city', city);
-  if (lat)  params.set('lat', lat);
-  if (lng)  params.set('lng', lng);
-  const res = await fetch(`/api/marketplace/shops?${params}`);
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Failed to load shops');
+  // Route through the api client so VITE_API_URL (the backend host) is applied.
+  // A raw relative fetch('/api/...') hits the frontend domain in production
+  // (Vercel) where no backend lives → always returned empty.
+  const params = { limit: '80' };
+  if (q)   params.q = q;
+  if (city) params.city = city;
+  if (lat)  params.lat = String(lat);
+  if (lng)  params.lng = String(lng);
+  const res = await api.get('/api/marketplace/shops', params);
+  const json = res.data || res;
   return json.shops || [];
 }
 
 export async function lookupPlate(plate) {
   const clean = plate.toUpperCase().replace(/\s/g, '');
-  const res = await fetch(`/api/marketplace/plate-lookup?plate=${encodeURIComponent(clean)}`);
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || 'Plate lookup failed');
-  return json;
+  const res = await api.get('/api/marketplace/plate-lookup', { plate: clean });
+  return res.data || res;
 }
 
 // ─── Category → emoji fallback ────────────────────────────────────────────────

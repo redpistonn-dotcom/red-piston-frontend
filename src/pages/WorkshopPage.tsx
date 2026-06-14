@@ -70,7 +70,9 @@ function KpiCard({ label, main, sub, subColor, icon }: { label: string; main: st
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export function WorkshopPage() {
+// `section` is driven by the route / sidebar item — Job Cards and Parts Listing
+// are now SEPARATE sidebar entries, not in-page tabs.
+export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketplace" } = {}) {
     const { jobCards, vehicles, parties, products, activeShopId, saveJobCards, saveProducts, logAudit } = useStore();
     const { toast } = useContext(AppCtx);
 
@@ -80,7 +82,7 @@ export function WorkshopPage() {
         logAudit(exists ? "JOB_CARD_UPDATED" : "JOB_CARD_CREATED", "job_card", jc.id, `${jc.jobNumber} — ${jc.status}`);
     }, [jobCards, saveJobCards, logAudit]);
 
-    const [workshopTab, setWorkshopTab]   = useState<"jobs" | "marketplace">("jobs");
+    const [workshopTab, setWorkshopTab]   = useState<"jobs" | "marketplace">(section);
     const [expandedId, setExpandedId]     = useState<string | null>(null);
     const [showCreate, setShowCreate]     = useState(false);
     const [statusFilter, setStatusFilter] = useState("all");
@@ -94,6 +96,9 @@ export function WorkshopPage() {
     const [glQty, setGlQty]               = useState(0);
     const [glPrice, setGlPrice]           = useState(0);
     const [glSaving, setGlSaving]         = useState(false);
+
+    // Keep the active section in sync with the route/sidebar selection.
+    useEffect(() => { setWorkshopTab(section); }, [section]);
 
     // Real inventory from DB
     const [inventory,   setInventory]     = useState<any[]>([]);
@@ -367,19 +372,6 @@ export function WorkshopPage() {
 
     return (
         <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
-
-            {/* ── PAGE TAB SWITCHER ── */}
-            <div className="ws-tabs" style={{ display: "flex", gap: 6 }}>
-                {([["jobs", "🔧", "Job Cards"], ["marketplace", "🌐", "Parts Marketplace"]] as const).map(([id, icon, label]) => (
-                    <button key={id} onClick={() => { setWorkshopTab(id); setSearch(""); setMpSearch(""); setMpFilter("all"); }}
-                        style={{ height: 40, padding: "0 18px", borderRadius: 9, border: `1.5px solid ${workshopTab === id ? T.amber : T.border}`, background: workshopTab === id ? T.amber : "#FFFFFF", color: workshopTab === id ? "#FFFFFF" : T.t2, fontSize: 13, fontWeight: workshopTab === id ? 700 : 500, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 7, transition: "all 0.15s" }}>
-                        <span>{icon}</span> {label}
-                        {id === "marketplace" && mpKpi.liveCount > 0 && (
-                            <span style={{ background: T.emerald, color: "#fff", fontSize: 10, fontWeight: 800, padding: "1px 7px", borderRadius: 20, marginLeft: 2 }}>{mpKpi.liveCount} LIVE</span>
-                        )}
-                    </button>
-                ))}
-            </div>
 
             {/* ── PARTS MARKETPLACE TAB ── */}
             {workshopTab === "marketplace" && (

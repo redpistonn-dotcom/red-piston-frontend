@@ -184,7 +184,7 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function OrdersPage() {
-    const { movements, products, orders: mktOrders, activeShopId } = useStore();
+    const { movements, products, orders: mktOrders, activeShopId, syncFromAPI } = useStore();
     const { toast } = useContext(AppCtx);
     const isMobile = useIsMobile();
 
@@ -220,6 +220,9 @@ export function OrdersPage() {
             await api.put(`/api/marketplace/orders/${backendId}/status`, { status: next });
             toast?.(`Order moved to ${next}.`, "success");
             await fetchShopOrders();
+            // Stock is restored on cancel / stamped on delivery server-side —
+            // re-sync inventory so quantities update dynamically.
+            syncFromAPI().catch(() => {});
         } catch (err) {
             console.error("[OrdersPage] Failed to update marketplace order status:", err);
             toast?.("Could not update order status. Please try again.", "error");

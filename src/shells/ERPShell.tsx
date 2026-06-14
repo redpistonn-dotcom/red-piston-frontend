@@ -33,15 +33,29 @@ const TOPBAR_H  = 64;    // topbar height
 
 // ── Nav definition — Material Symbols Outlined icon names ──────────────────
 const NAV_ITEMS = [
-  { key: "dashboard", path: "/dashboard", icon: "dashboard",      label: "Dashboard"    },
-  { key: "inventory", path: "/inventory", icon: "inventory_2",    label: "Inventory"    },
-  { key: "pos",       path: "/billing",   icon: "point_of_sale",  label: "POS Billing"  },
-  { key: "parties",   path: "/parties",   icon: "groups",         label: "Parties"      },
-  { key: "workshop",  path: "/workshop",  icon: "build",          label: "Workshop"     },
-  { key: "history",   path: "/history",   icon: "history",        label: "History"      },
-  { key: "reports",   path: "/reports",   icon: "analytics",      label: "Reports"      },
-  { key: "orders",    path: "/orders",    icon: "shopping_cart",  label: "Orders"       },
+  { key: "dashboard",   path: "/dashboard",          icon: "dashboard",      label: "Dashboard"      },
+  { key: "inventory",   path: "/inventory",          icon: "inventory_2",    label: "Inventory"      },
+  { key: "pos",         path: "/billing",            icon: "point_of_sale",  label: "POS Billing"    },
+  { key: "parties",     path: "/parties",            icon: "groups",         label: "Parties"        },
+  { key: "workshop",    path: "/workshop",           icon: "build",          label: "Job Cards"      },
+  { key: "workshop-mp", path: "/workshop/marketplace", icon: "storefront",   label: "Parts Listing"  },
+  { key: "history",     path: "/history",            icon: "history",        label: "History"        },
+  { key: "reports",     path: "/reports",            icon: "analytics",      label: "Reports"        },
+  { key: "orders",      path: "/orders",             icon: "shopping_cart",  label: "Orders"         },
 ] as const;
+
+// Resolve a single active nav key: the item whose path is the LONGEST match for
+// the current path. This stops a parent route (/workshop) from highlighting at
+// the same time as its child (/workshop/marketplace).
+function resolveActiveNavKey(currentPath: string): string | null {
+  let best: { key: string; path: string } | null = null;
+  for (const n of NAV_ITEMS) {
+    if (currentPath === n.path || currentPath.startsWith(n.path + "/")) {
+      if (!best || n.path.length > best.path.length) best = n;
+    }
+  }
+  return best?.key ?? null;
+}
 
 
 // ── Helper: Material Symbols span ──────────────────────────────────────────
@@ -171,6 +185,7 @@ export function ERPShell({ children }: ERPShellProps) {
   const userInitials = userName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
 
   const currentPath = location.pathname;
+  const navActiveKey = resolveActiveNavKey(currentPath);
 
   // ── Mobile drawer state ───────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -242,7 +257,7 @@ export function ERPShell({ children }: ERPShellProps) {
           display: "flex", flexDirection: "column", gap: 1,
         }}>
           {NAV_ITEMS.map(n => {
-            const isActive = currentPath === n.path || currentPath.startsWith(n.path + "/");
+            const isActive = n.key === navActiveKey;
             return (
               <button
                 key={n.key}
@@ -414,7 +429,7 @@ export function ERPShell({ children }: ERPShellProps) {
         {/* Drawer nav — all 8 items */}
         <nav style={{ flex: 1, overflowY: "auto", padding: "12px 12px" }}>
           {NAV_ITEMS.map(n => {
-            const isActive = currentPath === n.path || currentPath.startsWith(n.path + "/");
+            const isActive = n.key === navActiveKey;
             return (
               <button
                 key={n.key}
@@ -705,7 +720,7 @@ export function ERPShell({ children }: ERPShellProps) {
       ══════════════════════════════════════════════════════════════ */}
       <nav className="rp-bottom-nav rp-safe-bottom">
         {PRIMARY_NAV.map(n => {
-          const isActive = currentPath === n.path || currentPath.startsWith(n.path + "/");
+          const isActive = n.key === navActiveKey;
           return (
             <button
               key={n.key}
@@ -749,7 +764,7 @@ export function ERPShell({ children }: ERPShellProps) {
             flex: 1, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center", gap: 3,
             border: "none", background: "transparent", cursor: "pointer",
-            color: SECONDARY_NAV.some(n => currentPath === n.path || currentPath.startsWith(n.path + "/")) ? "#8B1E1E" : T.t3,
+            color: SECONDARY_NAV.some(n => n.key === navActiveKey) ? "#8B1E1E" : T.t3,
             fontFamily: FONT.ui, transition: "color 0.15s",
             padding: "6px 4px", position: "relative",
           }}
