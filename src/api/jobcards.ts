@@ -46,7 +46,9 @@ function mapJob(j: any) {
     assignedTo: j.assignedTo || null,
     labour: j.labourCharge ? [{ description: "Labour", amount: Number(j.labourCharge) }] : [],
     parts: (j.items || []).map((it: any) => ({
-      name: it.partName || it.inventory?.masterPart?.partName || "Part",
+      itemId: it.id,                         // JobCardItem.id — needed to remove
+      inventoryId: it.inventoryId || null,
+      name: it.description || it.partName || it.inventory?.masterPart?.partName || "Part",
       qty: it.qty,
       price: Number(it.unitPrice || 0),
     })),
@@ -76,4 +78,16 @@ export async function createJobCard(body: Record<string, any>): Promise<any> {
 
 export async function updateJobCardStatus(jobId: number, feStatus: string): Promise<any> {
   return api.patch(`/api/shop/workshop/jobs/${jobId}/status`, { status: FE_TO_BE[feStatus] || "RECEIVED" });
+}
+
+// Add a part line to a job card. Backend recomputes partsTotal + totalAmount.
+export async function addJobCardItem(
+  jobId: number,
+  item: { inventoryId?: number | string | null; description: string; qty: number; unitPrice: number; type?: string },
+): Promise<any> {
+  return api.post(`/api/shop/workshop/jobs/${jobId}/items`, { type: "PART", ...item });
+}
+
+export async function removeJobCardItem(jobId: number, itemId: number | string): Promise<any> {
+  return api.delete(`/api/shop/workshop/jobs/${jobId}/items/${itemId}`);
 }

@@ -7,7 +7,7 @@ import { ImageUploader } from "../components/ImageUploader";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { api } from "../api/client";
-import { fetchJobCards, createJobCard, updateJobCardStatus } from "../api/jobcards";
+import { fetchJobCards, createJobCard, updateJobCardStatus, addJobCardItem, removeJobCardItem } from "../api/jobcards";
 
 // ─── Status config for table ──────────────────────────────────────────────────
 const STATUS_DISPLAY: Record<string, { label: string; dot: string; color: string }> = {
@@ -94,7 +94,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                 const veh = (vehicles || []).find((v: any) => v.id === jc.vehicleId);
                 const cust = (parties || []).find((p: any) => p.id === jc.customerId);
                 const labourCharge = (jc.labour || []).reduce((s: number, l: any) => s + (Number(l.amount) || 0), 0);
-                await createJobCard({
+                const created = await createJobCard({
                     customerName: cust?.name || jc.customerName || "Walk-in",
                     customerPhone: cust?.phone || undefined,
                     vehicleMake: veh?.make || jc.vehicleMake || "Unknown",
@@ -103,10 +103,24 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                     vehicleReg: veh?.registrationNumber || undefined,
                     vehicleFuel: veh?.fuelType || undefined,
                     complaint: jc.complaints || undefined,
+                    assignedTo: jc.assignedTo || undefined,   // technician name (String? on the model)
                     labourCharge,
                     notes: jc.notes || undefined,
                 });
-                // Re-sync from the DB so ids/jobNumbers reconcile.
+                // Persist any parts added at creation as job-card items (backend
+                // recomputes partsTotal + totalAmount = parts + labour).
+                const newJobId = created?.jobId ?? created?.data?.jobId;
+                if (newJobId) {
+                    for (const part of (jc.parts || [])) {
+                        await addJobCardItem(newJobId, {
+                            inventoryId: part.itemId ?? part.inventoryId ?? null,
+                            description: part.name || "Part",
+                            qty: Number(part.qty) || 1,
+                            unitPrice: Number(part.price) || 0,
+                        }).catch(() => {});
+                    }
+                }
+                // Re-sync from the DB so ids/jobNumbers/items reconcile.
                 const fresh = await fetchJobCards();
                 if (Array.isArray(fresh)) saveJobCards(fresh);
             }
@@ -125,6 +139,41 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
             .finally(() => setJobsLoaded(true));
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
     void jobsLoaded;
+
+    const refreshJobs = useCallback(async () => {
+        const fresh = await fetchJobCards();
+        if (Array.isArray(fresh)) saveJobCards(fresh);
+    }, [saveJobCards]);
+
+    // Add / remove a part on an EXISTING job card — backend recomputes the total
+    // (parts + labour); we refetch so the grand total reflects the change.
+    const addPartToJob = useCallback(async (job: any, prod: any) => {
+        if (!job?.jobId || !prod) return;
+        try {
+            await addJobCardItem(job.jobId, {
+                inventoryId: prod.inventoryId ?? prod.id ?? null,
+                description: prod.name || "Part",
+                qty: 1,
+                unitPrice: Number(prod.sellPrice ?? prod.price) || 0,
+            });
+            await refreshJobs();
+            toast?.(`Added ${prod.name} to ${job.jobNumber}`, "success");
+        } catch (err: any) {
+            console.error("[addPartToJob]", err);
+            toast?.(err?.data?.error?.message || err?.data?.error || "Couldn't add part", "error");
+        }
+    }, [refreshJobs, toast]);
+
+    const removePartFromJob = useCallback(async (job: any, part: any) => {
+        if (!job?.jobId || !part?.itemId) return;
+        try {
+            await removeJobCardItem(job.jobId, part.itemId);
+            await refreshJobs();
+        } catch (err) {
+            console.error("[removePartFromJob]", err);
+            toast?.("Couldn't remove part", "error");
+        }
+    }, [refreshJobs, toast]);
 
     const [workshopTab, setWorkshopTab]   = useState<"jobs" | "marketplace">(section);
     const [expandedId, setExpandedId]     = useState<string | null>(null);
@@ -922,11 +971,23 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                                                 <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px" }}>
                                                                     <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Parts</div>
                                                                     {(job.parts || []).length === 0 ? <span style={{ fontSize: 12, color: T.t4 }}>None</span> : (job.parts || []).map((p: any, i: number) => (
-                                                                        <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                                                                            <span style={{ color: T.t2 }}>{p.name} ×{p.qty}</span>
+                                                                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 4 }}>
+                                                                            <span style={{ color: T.t2, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name} ×{p.qty}</span>
                                                                             <span style={{ fontFamily: FONT.mono, color: T.amber, fontWeight: 700 }}>{fmt(p.qty * p.price)}</span>
+                                                                            {job.jobId && p.itemId != null && (
+                                                                                <button onClick={() => removePartFromJob(job, p)} title="Remove part" style={{ border: "none", background: "none", color: T.crimson, cursor: "pointer", fontSize: 14, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}>×</button>
+                                                                            )}
                                                                         </div>
                                                                     ))}
+                                                                    {job.jobId && (
+                                                                        <select value="" onChange={e => { const prod = shopProducts.find((x: any) => String(x.id) === e.target.value); if (prod) addPartToJob(job, prod); }}
+                                                                            style={{ width: "100%", marginTop: 8, height: 32, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, fontSize: 12, color: T.t2, fontFamily: FONT.ui, cursor: "pointer", outline: "none" }}>
+                                                                            <option value="">+ Add part…</option>
+                                                                            {shopProducts.filter((x: any) => x.stock > 0).map((x: any) => (
+                                                                                <option key={x.id} value={x.id}>{x.name} — {fmt(x.sellPrice)}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    )}
                                                                 </div>
                                                                 <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 16px" }}>
                                                                     <div style={{ fontSize: 9, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Labour</div>
