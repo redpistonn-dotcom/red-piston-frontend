@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useContext, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, uid, JOB_STATUS, generateCSV, downloadCSV } from "../utils";
-import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
+import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { ImageUploader } from "../components/ImageUploader";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
@@ -476,15 +476,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                 </thead>
                                 <tbody>
                                     {invLoading ? (
-                                        [1,2,3].map(i => (
-                                            <tr key={i} style={{ borderBottom: `1px solid ${T.border}` }}>
-                                                {[...Array(7)].map((_, j) => (
-                                                    <td key={j} style={{ padding: "14px 16px" }}>
-                                                        <div style={{ height: 14, borderRadius: 6, background: T.border, opacity: 0.5, animation: "pulse 1.4s ease-in-out infinite", animationDelay: `${i * 0.1}s` }} />
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))
+                                        [1,2,3,4].map(i => <Skeleton.Row key={i} cols={7} />)
                                     ) : mpFiltered.length === 0 ? (
                                         <tr>
                                             <td colSpan={7} style={{ padding: "56px 24px", textAlign: "center" }}>

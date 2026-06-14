@@ -585,24 +585,8 @@ export function ERPShell({ children }: ERPShellProps) {
         <div style={{ display: "flex", alignItems: "center", gap: SP.sm, flexShrink: 0 }}>
           {/* Period pills removed — DashboardPage owns its own period state */}
 
-          {/* Add stock icon button */}
-          <button
-            onClick={() => setCatalogModal(true)}
-            title="Add stock"
-            aria-label="Add stock"
-            className="topbar-icon-btn"
-            style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: "#8B1E1E", border: "none",
-              color: "#fff", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "background 0.15s",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "#6A020A"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "#8B1E1E"; }}
-          >
-            <MSIcon name="add" size={20} />
-          </button>
+          {/* Header "+ Add stock" button removed — adding inventory is now a single
+              entry point via the Inventory page "+ Add Product" (which persists to DB). */}
 
           {/* POS billing icon button */}
           <button

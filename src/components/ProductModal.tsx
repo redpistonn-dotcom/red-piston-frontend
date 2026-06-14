@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { T, FONT } from "../theme";
 import { uid, CATEGORIES, POSITIONS, ENGINE_TYPES, TRANSMISSIONS, EMOJIS, fmt } from "../utils";
-import { searchCatalog } from "../api/inventory";
+import { searchCatalog, addInventory, contributePart } from "../api/inventory";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 
 export function ProductModal({ open, onClose, product, products, onSave, toast, activeShopId }) {
@@ -90,11 +90,65 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
             return;
         }
         setSaving(true);
-        await new Promise(r => setTimeout(r, 200));
-        onSave({ ...f, id: product?.id || "p" + uid(), shopId: product?.shopId || activeShopId, buyPrice: +f.buyPrice, sellPrice: +f.sellPrice, mrp: +f.mrp || null, stock: +f.stock, minStock: +f.minStock || 10, maxStock: +f.maxStock || 1000, reorderQty: +f.reorderQty || 20, gstRate: +f.gstRate || 18, hsnCode: f.hsnCode || "", trackBatch: !!f.trackBatch, batchNumber: f.batchNumber || "", expiryDate: f.expiryDate || "", oemNumber: f.oemNumber || "", position: f.position || "", engineType: f.engineType || "", transmission: f.transmission || "", condition: f.condition || "New", warranty: f.warranty || "", globalSku: f.globalSku });
-        toast(isEdit ? "Product updated!" : "Product added to inventory!", "success", isEdit ? undefined : "New Product");
-        setSaving(false);
-        onClose();
+
+        // Normalized product fields for the local store.
+        const base = {
+            ...f, id: product?.id || "p" + uid(), shopId: product?.shopId || activeShopId,
+            buyPrice: +f.buyPrice, sellPrice: +f.sellPrice, mrp: +f.mrp || null, stock: +f.stock,
+            minStock: +f.minStock || 10, maxStock: +f.maxStock || 1000, reorderQty: +f.reorderQty || 20,
+            gstRate: +f.gstRate || 18, hsnCode: f.hsnCode || "", trackBatch: !!f.trackBatch,
+            batchNumber: f.batchNumber || "", expiryDate: f.expiryDate || "", oemNumber: f.oemNumber || "",
+            position: f.position || "", engineType: f.engineType || "", transmission: f.transmission || "",
+            condition: f.condition || "New", warranty: f.warranty || "", globalSku: f.globalSku,
+            inventoryId: product?.inventoryId,
+        };
+
+        // EDIT: onSave → saveProducts → syncProductSave PUTs price/stock/image.
+        if (isEdit) {
+            onSave(base);
+            toast("Product updated!", "success");
+            setSaving(false);
+            onClose();
+            return;
+        }
+
+        // NEW: persist to the DB so it survives logout. Inventory rows require a
+        // masterPartId, so contribute a catalog part first (or reuse a linked
+        // globalSku), then create the shop inventory row with stock + supplier.
+        try {
+            let masterPartId = f.globalSku || null;
+            if (!masterPartId) {
+                const c: any = await contributePart({
+                    partName: f.name.trim(), brand: f.brand || undefined,
+                    categoryL1: f.category || "General", oemNumber: f.oemNumber || undefined,
+                    hsnCode: f.hsnCode || undefined, gstRate: +f.gstRate || 18,
+                    unitOfSale: "Piece", partType: "OEM",
+                    description: f.notes || undefined,
+                });
+                masterPartId = c?.part?.masterPartId ?? c?.masterPartId ?? null;
+            }
+            if (!masterPartId) throw new Error("Could not create catalog part");
+
+            const inv: any = await addInventory({
+                masterPartId,
+                sellingPrice: +f.sellPrice, buyingPrice: +f.buyPrice,
+                stockQty: +f.stock || 0, rackLocation: f.location || null,
+                minStockAlert: +f.minStock || 5,
+                supplierName: f.supplier || undefined,
+            });
+            const inventoryId = inv?.item?.inventoryId ?? inv?.inventoryId ?? null;
+            onSave({ ...base, id: inventoryId || base.id, inventoryId, masterPartId, globalSku: masterPartId });
+            toast("Product added to inventory!", "success", "New Product");
+            onClose();
+        } catch (err: any) {
+            console.error("[ProductModal] DB save failed:", err);
+            // Keep the user's input locally so it isn't lost; warn that sync failed.
+            onSave(base);
+            toast(err?.data?.error || err?.message || "Saved locally — backend sync failed.", "warning");
+            onClose();
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
