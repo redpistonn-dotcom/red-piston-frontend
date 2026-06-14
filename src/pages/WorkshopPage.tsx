@@ -95,8 +95,11 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                 await updateJobCardStatus(jc.jobId, jc.status);
             } else if (!exists) {
                 // New job — create in the DB (denormalize the local vehicle/customer).
-                const veh = (vehicles || []).find((v: any) => v.id === jc.vehicleId);
-                const cust = (parties || []).find((p: any) => p.id === jc.customerId);
+                // Match by String() — vehicle/party ids are numbers but jc.vehicleId
+                // comes from a <Select> as a string, so `===` silently failed and the
+                // job saved with no vehicle ("Unknown Unknown" on the invoice).
+                const veh = (vehicles || []).find((v: any) => String(v.id) === String(jc.vehicleId));
+                const cust = (parties || []).find((p: any) => String(p.id) === String(jc.customerId));
                 const labourCharge = (jc.labour || []).reduce((s: number, l: any) => s + (Number(l.amount) || 0), 0);
                 const created = await createJobCard({
                     customerName: cust?.name || jc.customerName || "Walk-in",
@@ -1399,7 +1402,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
             shopId: activeShopId,
             jobNumber: `#RP-${String(9000 + existingCount + 1)}`,
             vehicleId,
-            customerId: customerId || vehicles.find((v: any) => v.id === vehicleId)?.ownerId || "",
+            customerId: customerId || vehicles.find((v: any) => String(v.id) === String(vehicleId))?.ownerId || "",
             status: "draft",
             assignedTo: assignedTo || null,
             estimatedAmount: estimated,
@@ -1428,7 +1431,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
         <Modal open={open} onClose={onClose} title="🔧 New Job Card" subtitle="Create a workshop job card" width={640}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Field label="Vehicle" required>
-                    <Select value={vehicleId} onChange={(v: string) => { setVehicleId(v); const veh = vehicles.find((x: any) => x.id === v); if (veh) setCustomerId(veh.ownerId); }}
+                    <Select value={vehicleId} onChange={(v: string) => { setVehicleId(v); const veh = vehicles.find((x: any) => String(x.id) === String(v)); if (veh) setCustomerId(veh.ownerId); }}
                         options={[{ value: "", label: "Select vehicle…" }, ...vehicles.map((v: any) => ({ value: v.id, label: `${v.registrationNumber} — ${v.make} ${v.model}` }))]} />
                 </Field>
                 <Field label="Customer">

@@ -11,6 +11,7 @@ import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { useVehicleManufacturers, useVehicleModels } from "../hooks/queries";
 import { fetchInventory } from "../api/sync.js";
+import { deleteInventory } from "../api/inventory.js";
 
 // Pure helper — no fitment data = show universally (don't hide DB-backed parts)
 function isProductCompatible(product, matchStr) {
@@ -41,6 +42,17 @@ export function InventoryPage() {
 
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });
+  const onDelete = async (p) => {
+    if (!window.confirm(`Delete "${p.name}" from inventory? This removes the product and its stock history.`)) return;
+    const invId = p.inventoryId ?? p.id;
+    try {
+      await deleteInventory(invId);
+      saveProducts((storeProducts || []).filter(x => (x.inventoryId ?? x.id) !== invId), true);
+      toast?.("Product deleted", "success");
+    } catch (e) {
+      toast?.(e?.data?.error || e?.message || "Could not delete product", "warning");
+    }
+  };
     const [search, setSearch] = useState("");
     const [cat, setCat] = useState("All");
     const [statusF, setStatusF] = useState("All");
@@ -396,7 +408,8 @@ export function InventoryPage() {
                                                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                                             ) : (
                                                 <div style={{ width: 36, height: 36, borderRadius: 8, background: T.amberGlow, border: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-                                                    {p.imageEmoji || "📦"}
+                                                    {/* The edit modal stores the chosen emoji in `image`; show it (non-URL) before falling back. */}
+                                                    {(p.image && !String(p.image).startsWith("http") ? p.image : null) || p.imageEmoji || "📦"}
                                                 </div>
                                             )}
                                         </td>
@@ -447,6 +460,8 @@ export function InventoryPage() {
                                                 <button title="Edit" onClick={() => onEdit(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}>✎</button>
                                                 {/* Adjust stock icon button */}
                                                 <button title="Adjust Stock" onClick={() => setAdjP(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}>⚖</button>
+                                                {/* Delete icon button */}
+                                                <button title="Delete" onClick={() => onDelete(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.crimson, transition: "all 0.12s" }}>🗑</button>
                                                 {/* REORDER — only for low/out stock */}
                                                 {(st === "low" || st === "out") && (
                                                     <button onClick={(e) => { e.stopPropagation(); setPurchP(p); }} style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "none", background: T.amber, color: "#FFFFFF", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>REORDER</button>

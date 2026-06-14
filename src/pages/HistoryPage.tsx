@@ -247,7 +247,7 @@ const TABS = [
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function HistoryPage() {
-    const { movements, activeShopId, apiSynced } = useStore();
+    const { movements, orders, activeShopId, apiSynced } = useStore();
     const isMobile = useIsMobile();
     const [tab, setTab]             = useState<string>("ALL");
     const [period, setPeriod]       = useState<Period>("7D");
@@ -263,13 +263,43 @@ export function HistoryPage() {
     // Workshop job cards fold into the ledger as "JOBCARD" entries — invoiced jobs
     // carry their generated invoice number (INV-<jobNumber>).
     const { jobMovements } = useJobCardHistory(activeShopId);
+
+    // Manually-created pipeline orders (Orders → Create Order) are stored locally
+    // (id "manual_…") and aren't movements, so they never showed in History. Fold
+    // them in as SALE/PURCHASE entries. (Marketplace orders come via mpSales above,
+    // so we only take the manual ones here to avoid double-counting.)
+    const manualOrders = useMemo(
+        () => (orders || [])
+            .filter((o: any) => String(o.id || "").startsWith("manual_") && String(o.shopId ?? "") === String(activeShopId ?? ""))
+            .map((o: any) => ({
+                id: `ord-${o.id}`,
+                shopId: o.shopId,
+                productId: o.id,
+                productName: o.items || (o.customer ? `Order · ${o.customer}` : o.supplier ? `Order · ${o.supplier}` : "Order"),
+                type: o.supplier ? "PURCHASE" : "SALE",
+                qty: 0,
+                unitPrice: 0,
+                total: Number(o.total) || 0,
+                profit: 0,
+                customerName: o.customer || "",
+                supplierName: o.supplier || "",
+                invoiceNo: String(o.id).replace("manual_", o.supplier ? "PO-" : "SO-"),
+                paymentMode: "—",
+                paymentStatus: "paid",
+                note: `Order · ${o.status || ""}`.trim(),
+                date: o.time || Date.now(),
+            })) as any[],
+        [orders, activeShopId],
+    );
+
     const shopMovements = useMemo(
         () => [
             ...(movements || []).filter(m => m.shopId === activeShopId),
             ...mpSales,
             ...jobMovements,
+            ...manualOrders,
         ],
-        [movements, activeShopId, mpSales, jobMovements],
+        [movements, activeShopId, mpSales, jobMovements, manualOrders],
     );
 
     // Apply period quick-filter (overrides manual dates when set)

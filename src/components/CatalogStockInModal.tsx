@@ -1018,6 +1018,13 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               shopId:         activeShopId,
             };
           } catch (apiErr) {
+            // Product already in this shop's inventory → do NOT create a duplicate
+            // local copy (that's how duplicates were sneaking in). Tell the user to
+            // adjust stock / price on the existing item instead, and skip this row.
+            if (apiErr?.status === 409) {
+              toast(`"${part.partName}" is already in your inventory — open it to add stock or change the price.`, "warning");
+              continue;
+            }
             console.warn("[CatalogStockIn] API unavailable, saving locally:", apiErr.message);
             const localId = "p" + uid();
             product = {
