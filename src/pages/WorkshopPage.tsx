@@ -7,6 +7,7 @@ import { ImageUploader } from "../components/ImageUploader";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { api } from "../api/client";
+import { fetchJobCards, createJobCard, updateJobCardStatus } from "../api/jobcards";
 
 // ─── Status config for table ──────────────────────────────────────────────────
 const STATUS_DISPLAY: Record<string, { label: string; dot: string; color: string }> = {
@@ -77,11 +78,53 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
     const { jobCards, vehicles, parties, products, activeShopId, saveJobCards, saveProducts, logAudit } = useStore();
     const { toast } = useContext(AppCtx);
 
-    const onSaveJobCard = useCallback((jc: any) => {
+    const onSaveJobCard = useCallback(async (jc: any) => {
         const exists = (jobCards || []).find((x: any) => x.id === jc.id);
+        // Optimistic local update for instant UI.
         saveJobCards(exists ? jobCards.map((x: any) => (x.id === jc.id ? jc : x)) : [...(jobCards || []), jc]);
         logAudit(exists ? "JOB_CARD_UPDATED" : "JOB_CARD_CREATED", "job_card", jc.id, `${jc.jobNumber} — ${jc.status}`);
-    }, [jobCards, saveJobCards, logAudit]);
+
+        // Persist to the DB so job cards survive logout.
+        try {
+            if (jc.jobId) {
+                // Existing DB job — sync its status.
+                await updateJobCardStatus(jc.jobId, jc.status);
+            } else if (!exists) {
+                // New job — create in the DB (denormalize the local vehicle/customer).
+                const veh = (vehicles || []).find((v: any) => v.id === jc.vehicleId);
+                const cust = (parties || []).find((p: any) => p.id === jc.customerId);
+                const labourCharge = (jc.labour || []).reduce((s: number, l: any) => s + (Number(l.amount) || 0), 0);
+                await createJobCard({
+                    customerName: cust?.name || jc.customerName || "Walk-in",
+                    customerPhone: cust?.phone || undefined,
+                    vehicleMake: veh?.make || jc.vehicleMake || "Unknown",
+                    vehicleModel: veh?.model || jc.vehicleModel || "Unknown",
+                    vehicleYear: veh?.year || undefined,
+                    vehicleReg: veh?.registrationNumber || undefined,
+                    vehicleFuel: veh?.fuelType || undefined,
+                    complaint: jc.complaints || undefined,
+                    labourCharge,
+                    notes: jc.notes || undefined,
+                });
+                // Re-sync from the DB so ids/jobNumbers reconcile.
+                const fresh = await fetchJobCards();
+                if (Array.isArray(fresh)) saveJobCards(fresh);
+            }
+        } catch (err) {
+            console.error("[onSaveJobCard] DB sync failed — kept locally:", err);
+        }
+    }, [jobCards, saveJobCards, logAudit, vehicles, parties]);
+
+    // Pull this shop's job cards fresh on mount so they survive logout (the
+    // backend scopes to req.shopId). Mirrors how Inventory/Parties load.
+    const [jobsLoaded, setJobsLoaded] = useState(false);
+    useEffect(() => {
+        fetchJobCards()
+            .then(data => { if (Array.isArray(data)) saveJobCards(data); })
+            .catch(() => {})
+            .finally(() => setJobsLoaded(true));
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    void jobsLoaded;
 
     const [workshopTab, setWorkshopTab]   = useState<"jobs" | "marketplace">(section);
     const [expandedId, setExpandedId]     = useState<string | null>(null);
@@ -119,7 +162,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
         return () => clearInterval(t);
     }, []);
 
-    const shopJobs     = useMemo(() => (jobCards || []).filter((j: any) => j.shopId === activeShopId), [jobCards, activeShopId]);
+    const shopJobs     = useMemo(() => (jobCards || []).filter((j: any) => String(j.shopId ?? "") === String(activeShopId ?? "")), [jobCards, activeShopId]);
     const shopVehicles = useMemo(() => (vehicles || []).filter((v: any) => v.shopId === activeShopId), [vehicles, activeShopId]);
     const shopParties  = useMemo(() => (parties  || []).filter((p: any) => p.shopId === activeShopId), [parties,  activeShopId]);
 
@@ -678,7 +721,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                 {isMobile && filtered.length > 0 && (
                     <MobileCardList>
                         {filtered.map((job: any) => {
-                            const vehicle  = getVehicle(job.vehicleId);
+                            const vehicle  = getVehicle(job.vehicleId) || (job.vehicleMake ? { make: job.vehicleMake, model: job.vehicleModel, year: job.vehicleYear, registrationNumber: job.vehicleReg } : null);
                             const customer = getParty(job.customerId);
                             const sd = STATUS_DISPLAY[job.status];
                             const partsTotal  = (job.parts  || []).reduce((s: number, p: any) => s + p.qty * p.price, 0);
@@ -739,7 +782,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                 </tr>
                             ) : (
                                 filtered.map((job: any, i: number) => {
-                                    const vehicle  = getVehicle(job.vehicleId);
+                                    const vehicle  = getVehicle(job.vehicleId) || (job.vehicleMake ? { make: job.vehicleMake, model: job.vehicleModel, year: job.vehicleYear, registrationNumber: job.vehicleReg } : null);
                                     const customer = getParty(job.customerId);
                                     const isExpanded = expandedId === job.id;
                                     const partsTotal  = (job.parts  || []).reduce((s: number, p: any) => s + p.qty * p.price, 0);
