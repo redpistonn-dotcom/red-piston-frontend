@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, uid, JOB_STATUS, generateCSV, downloadCSV } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile } from "../components/ui";
+import { ImageUploader } from "../components/ImageUploader";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { api } from "../api/client";
@@ -312,6 +313,22 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
             toast?.("Failed — please try again.", "error");
         }
         finally { setGlSaving(false); }
+    };
+
+    // Upload a product photo directly from the Go Live modal — persists imageUrl
+    // to the shop inventory item so the "image required" gate clears in place
+    // (no need to bounce to the Inventory page).
+    const handleGoLiveImageUpload = async (url: string) => {
+        if (!goLiveProd) return;
+        try {
+            await api.put(`/api/shop/inventory/${goLiveProd.inventoryId}`, { imageUrl: url });
+            setGoLiveProd((p: any) => (p ? { ...p, image: url } : p));
+            setInventory(inv => inv.map(i => i.inventoryId === goLiveProd.inventoryId ? { ...i, imageUrl: url } : i));
+            toast?.("📸 Image saved — you can now go live", "success");
+        } catch (err) {
+            console.error("[handleGoLiveImageUpload]", err);
+            toast?.("Image uploaded but couldn't be attached — please try again.", "error");
+        }
     };
 
     // Take a live item offline (from the table action column)
@@ -1006,14 +1023,24 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                         </div>
                                     </div>
                                 ) : (
-                                    <div style={{ background: "#FFF7ED", border: `1px solid #FED7AA`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-                                        <span style={{ fontSize: 20, flexShrink: 0 }}>🖼</span>
-                                        <div>
-                                            <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", fontFamily: FONT.ui }}>Product image required</div>
-                                            <div style={{ fontSize: 11, color: "#B45309", fontFamily: FONT.ui, marginTop: 2 }}>
-                                                Go to Inventory → edit this item → upload a photo, then come back to list it.
+                                    <div style={{ background: "#FFF7ED", border: `1px solid #FED7AA`, borderRadius: 10, padding: "12px 16px", marginBottom: 20 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                                            <span style={{ fontSize: 20, flexShrink: 0 }}>🖼</span>
+                                            <div>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", fontFamily: FONT.ui }}>Product image required</div>
+                                                <div style={{ fontSize: 11, color: "#B45309", fontFamily: FONT.ui, marginTop: 2 }}>
+                                                    Upload a photo here — it's shown to customers on the marketplace listing.
+                                                </div>
                                             </div>
                                         </div>
+                                        <ImageUploader
+                                            folder="products"
+                                            currentUrl={null}
+                                            onUploaded={(url) => handleGoLiveImageUpload(url)}
+                                            onError={(msg) => toast?.(msg, "error")}
+                                            label="Upload Product Photo"
+                                            maxMb={5}
+                                        />
                                     </div>
                                 );
                             })()}
