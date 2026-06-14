@@ -5,6 +5,7 @@ import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, 
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
 import { fetchPartyLedger, fetchParties, type LedgerEntry } from "../api/sync";
 import { createParty } from "../api/parties";
+import { fetchShopVehicles, createShopVehicle, updateShopVehicle } from "../api/shopVehicles";
 import { api } from "../api/client";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
@@ -69,9 +70,27 @@ export function PartiesPage() {
         }
     }, [parties, saveParties, logAudit]);
 
-    const onSaveVehicle = useCallback((v: any) => {
+    const onSaveVehicle = useCallback(async (v: any) => {
         const exists = (vehicles || []).find((x: any) => x.id === v.id);
+        // Optimistic local update for instant UI.
         saveVehicles(exists ? vehicles.map((x: any) => (x.id === v.id ? v : x)) : [...(vehicles || []), v]);
+
+        // Persist to the DB so vehicles survive logout and are usable for job cards.
+        const body = {
+            make: v.make, model: v.model, variant: v.variant || null,
+            year: v.year, fuelType: v.fuelType, registrationNumber: v.registrationNumber,
+            engineType: v.engineType, odometer: v.odometer, vin: v.vin || null,
+            ownerId: v.ownerId || undefined, notes: v.notes || null,
+        };
+        const isDbId = typeof v.id === "number" || /^\d+$/.test(String(v.id));
+        try {
+            if (exists && isDbId) await updateShopVehicle(v.id, body);
+            else await createShopVehicle(body);
+            const fresh = await fetchShopVehicles();
+            if (Array.isArray(fresh)) saveVehicles(fresh);
+        } catch (err) {
+            console.error("[onSaveVehicle] DB sync failed — kept locally:", err);
+        }
     }, [vehicles, saveVehicles]);
 
     // Always pull this shop's parties fresh on mount (resilient to a missed
@@ -83,6 +102,10 @@ export function PartiesPage() {
             .then(data => { if (Array.isArray(data)) saveParties(data); })
             .catch(() => {})
             .finally(() => setPartiesLoaded(true));
+        // Vehicles are DB-backed too — pull this shop's vehicles fresh on mount.
+        fetchShopVehicles()
+            .then(data => { if (Array.isArray(data)) saveVehicles(data); })
+            .catch(() => {});
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const [view, setView]           = useState("customers");
@@ -393,7 +416,7 @@ export function PartiesPage() {
                         ) : (
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px,100%), 1fr))", gap: 14 }}>
                                 {shopVehicles.map((v: any) => {
-                                    const owner = shopParties.find((p: any) => p.id === v.ownerId);
+                                    const owner = shopParties.find((p: any) => String(p.id) === String(v.ownerId));
                                     return (
                                         <div key={v.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 }} className="card-hover">
                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, gap: 8 }}>

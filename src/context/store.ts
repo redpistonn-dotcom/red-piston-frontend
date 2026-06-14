@@ -5,6 +5,7 @@ import type {
 } from '../types';
 import { SEED_PRODUCTS, SEED_SHOPS, genSeededMovements, SEED_ORDERS, SEED_PURCHASES, SEED_PARTIES, SEED_VEHICLES, SEED_JOB_CARDS, uid } from '../utils/utils';
 import { fetchInventory, fetchParties, fetchMovements, syncProductSave } from '../api/sync.js';
+import { fetchShopVehicles } from '../api/shopVehicles';
 import { getAccessToken } from '../api/client.js';
 
 // ─── Typed store value shape ──────────────────────────────────────────────────
@@ -42,7 +43,7 @@ export interface StoreContextValue {
   setMarketplacePage: (p: string) => void;
   /* Persistence helpers */
   saveShops:     (d: Shop[]) => void;
-  saveProducts:  (d: Product[]) => void;
+  saveProducts:  (d: Product[], skipApiSync?: boolean) => void;
   saveMovements: (d: Movement[]) => void;
   saveOrders:    (d: Order[]) => void;
   savePurchases: (d: Movement[]) => void;
@@ -106,7 +107,7 @@ export function useStoreProvider(): StoreContextValue {
       return;
     }
     try {
-      const [apiProducts, apiParties, apiMovements] = await Promise.all([fetchInventory(), fetchParties(), fetchMovements()]);
+      const [apiProducts, apiParties, apiMovements, apiVehicles] = await Promise.all([fetchInventory(), fetchParties(), fetchMovements(), fetchShopVehicles()]);
 
       if (Array.isArray(apiProducts)) {
         const realShopId = apiProducts[0]?.shopId;
@@ -129,6 +130,12 @@ export function useStoreProvider(): StoreContextValue {
         setM(apiMovements);
         try { localStorage.setItem('vl_movements', JSON.stringify(apiMovements)); } catch {}
         console.log(`[Store] Synced ${apiMovements.length} movements from API`);
+      }
+
+      if (Array.isArray(apiVehicles)) {
+        setVehicles(apiVehicles);
+        try { localStorage.setItem('vl_vehicles', JSON.stringify(apiVehicles)); } catch {}
+        console.log(`[Store] Synced ${apiVehicles.length} vehicles from API`);
       }
 
       setApiSynced(true);
@@ -189,9 +196,9 @@ export function useStoreProvider(): StoreContextValue {
 
   // ── Persistence helpers ───────────────────────────────────────────────────
   const saveShops     = useCallback((d: Shop[])     => { setShops(d);    try { localStorage.setItem('vl_shops',     JSON.stringify(d)); } catch {} }, []);
-  const saveProducts  = useCallback((d: Product[])  => {
+  const saveProducts  = useCallback((d: Product[], skipApiSync = false)  => {
     setP(prev => {
-      if (d.length === prev?.length) {
+      if (!skipApiSync && d.length === prev?.length) {
         const changed = d.find((p, i) => p !== prev?.[i]);
         if (changed) syncProductSave(changed).catch(() => {});
       }

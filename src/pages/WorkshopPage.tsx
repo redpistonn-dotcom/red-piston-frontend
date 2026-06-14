@@ -165,7 +165,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
     }, []);
 
     const shopJobs     = useMemo(() => (jobCards || []).filter((j: any) => String(j.shopId ?? "") === String(activeShopId ?? "")), [jobCards, activeShopId]);
-    const shopVehicles = useMemo(() => (vehicles || []).filter((v: any) => v.shopId === activeShopId), [vehicles, activeShopId]);
+    const shopVehicles = useMemo(() => (vehicles || []).filter((v: any) => String(v.shopId ?? "") === String(activeShopId ?? "")), [vehicles, activeShopId]);
     const shopParties  = useMemo(() => (parties  || []).filter((p: any) => p.shopId === activeShopId), [parties,  activeShopId]);
 
     const getVehicle = (id: string) => shopVehicles.find((v: any) => v.id === id);
