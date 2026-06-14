@@ -360,6 +360,102 @@ async function parseExcel(file) {
   return { headers, colMap, parts, total: rows.length, mapped: parts.length, preview, duplicates };
 }
 
+// ─── Pending Parts Review ─────────────────────────────────────────────────────
+function PendingPartsSection() {
+  const [parts, setParts] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [actioning, setActioning] = useState<number | null>(null);
+  const [search, setSearch] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res: any = await api.get(`/api/admin/catalog/parts?status=PENDING&q=${encodeURIComponent(search)}&limit=50`);
+      setParts(res.parts || []);
+      setTotal(res.total || 0);
+    } catch (e) { console.error('[PendingParts]', e); }
+    finally { setLoading(false); }
+  }, [search]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const act = async (partId: number, action: 'approve' | 'reject') => {
+    setActioning(partId);
+    try {
+      await api.patch(`/api/admin/catalog/parts/${partId}/${action}`, {});
+      setMsg(`Part ${action}d`);
+      setParts(p => p.filter(x => x.masterPartId !== partId));
+      setTotal(t => t - 1);
+      setTimeout(() => setMsg(''), 2000);
+    } catch (e) { console.error('[PendingParts] action failed', e); }
+    finally { setActioning(null); }
+  };
+
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 14, fontWeight: 800, color: C.t1, fontFamily: "'Inter', sans-serif" }}>
+          Pending Part Reviews
+          {total > 0 && <span style={{ marginLeft: 8, background: C.amber, color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11, fontWeight: 800 }}>{total}</span>}
+        </div>
+        <div style={{ flex: 1 }} />
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search part name…"
+          style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 12px', fontSize: 12, fontFamily: "'Inter', sans-serif", outline: 'none', width: 200 }}
+        />
+      </div>
+      {msg && <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#166534', marginBottom: 10 }}>{msg}</div>}
+      {loading ? (
+        <div style={{ color: C.t3, fontSize: 13, padding: '16px 0', fontFamily: "'Inter', sans-serif" }}>Loading…</div>
+      ) : parts.length === 0 ? (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px 20px', textAlign: 'center', color: C.t3, fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
+          ✅ No pending parts — all caught up.
+        </div>
+      ) : (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
+            <thead>
+              <tr>
+                {['Part Name', 'Brand', 'Category', 'OEM #', 'Added By Shop', 'Source', ''].map(h => (
+                  <th key={h} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: `1px solid ${C.border}`, textAlign: 'left', whiteSpace: 'nowrap', fontFamily: "'Inter', sans-serif" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {parts.map(p => (
+                <tr key={p.masterPartId} style={{ borderBottom: `1px solid ${C.borderLight}` }}>
+                  <td style={{ padding: '10px 12px', fontSize: 13, fontWeight: 700, color: C.t1, fontFamily: "'Inter', sans-serif" }}>{p.partName}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: C.t2, fontFamily: "'Inter', sans-serif" }}>{p.brand || '—'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: C.t2, fontFamily: "'Inter', sans-serif" }}>{p.categoryL1 || '—'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 11, fontFamily: 'monospace', color: C.amber }}>{p.oemNumber || (p.oemNumbers?.[0]) || '—'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 12, color: C.t3, fontFamily: "'Inter', sans-serif" }}>{p.contributedByShop?.name || '—'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: 11, color: C.t4, fontFamily: "'Inter', sans-serif" }}>{p.source || '—'}</td>
+                  <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+                    <button
+                      disabled={actioning === p.masterPartId}
+                      onClick={() => act(p.masterPartId, 'approve')}
+                      style={{ background: '#16A34A', color: '#fff', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', marginRight: 6, fontFamily: "'Inter', sans-serif" }}
+                    >✓ Approve</button>
+                    <button
+                      disabled={actioning === p.masterPartId}
+                      onClick={() => act(p.masterPartId, 'reject')}
+                      style={{ background: C.red, color: '#fff', border: 'none', borderRadius: 7, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: "'Inter', sans-serif" }}
+                    >✕ Reject</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CatalogTab() {
   const [fileData, setFileData] = useState(null);
   const [parsing, setParsing]   = useState(false);
@@ -1679,7 +1775,17 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
       </div>
 
         {/* ─── CATALOG TAB ─── */}
-        {activeTab === "catalog" && <CatalogTab />}
+        {activeTab === "catalog" && (
+          <>
+            <PendingPartsSection />
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 24, marginTop: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.t1, marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: "'Inter', sans-serif" }}>
+                📦 Bulk Import from Excel
+              </div>
+              <CatalogTab />
+            </div>
+          </>
+        )}
 
       {/* Add User Modal */}
       {showAddUser && (

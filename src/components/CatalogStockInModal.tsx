@@ -382,6 +382,38 @@ function SearchStep({ onSelect, onManual, initialQuery }) {
         hint="Point at a product barcode, EAN-13, or OEM label"
       />
 
+      {/* Primary action: Add manually */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+        <button
+          onClick={() => onManual("")}
+          style={{
+            flex: 1,
+            background: `linear-gradient(135deg, ${T.amber}22, ${T.amber}11)`,
+            border: `2px solid ${T.amber}55`,
+            borderRadius: 12,
+            padding: "14px 18px",
+            cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 12,
+            textAlign: "left",
+            transition: "border-color 0.15s, box-shadow 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = T.amber; e.currentTarget.style.boxShadow = `0 0 0 3px ${T.amber}18`; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = `${T.amber}55`; e.currentTarget.style.boxShadow = "none"; }}
+        >
+          <div style={{ fontSize: 26, flexShrink: 0 }}>✏️</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: T.amber }}>Add item manually</div>
+            <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>Enter part name, price &amp; stock — works for any item</div>
+          </div>
+        </button>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div style={{ flex: 1, height: 1, background: T.border }} />
+        <span style={{ fontSize: 10, fontWeight: 700, color: T.t4, textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap" }}>or search global catalog</span>
+        <div style={{ flex: 1, height: 1, background: T.border }} />
+      </div>
+
       {/* Header hint */}
       <div style={{
         padding: "10px 14px",
@@ -494,7 +526,6 @@ function SearchStep({ onSelect, onManual, initialQuery }) {
                   <span style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>
                     {part.partName}
                   </span>
-                  <StatusBadge status={part.status} />
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   {part.brand && (
@@ -660,7 +691,6 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
               <span style={{ fontSize: 15, fontWeight: 800, color: T.t1 }}>{part.partName}</span>
-              <StatusBadge status={part.status} />
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
               {part.brand && <span style={{ fontSize: 11, fontWeight: 700, color: T.t2 }}>{part.brand}</span>}

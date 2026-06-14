@@ -22,10 +22,10 @@ interface ExtractedItem {
   hsnCode: string | null;
   qty: number;
   unit: string | null;
-  rate: number;
-  rateInclTax: number | null;
+  rateExclGst: number;      // unit price without GST (buying rate)
+  rateInclGst: number | null; // unit price with GST (default selling price)
   discountPct: number;
-  amount: number;
+  amount: number;           // taxable subtotal (qty × rateExclGst)
   mathOk: boolean;
 }
 interface Extracted {
@@ -107,8 +107,8 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
       setRows(res.extracted.items.map((it) => ({
         ...it,
         include: true,
-        // sensible default sell price: the supplier's own incl-tax rate
-        sellingPrice: it.rateInclTax ?? +(it.rate * 1.18).toFixed(2),
+        // default sell price = incl-GST rate from invoice, else estimate +18%
+        sellingPrice: it.rateInclGst ?? +(it.rateExclGst * 1.18).toFixed(2),
       })));
       loadBills();
     } catch (e: any) {
@@ -125,7 +125,7 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
       partName: r.partName,
       hsnCode: r.hsnCode,
       qty: r.qty,
-      rate: r.rate,
+      rateExclGst: r.rateExclGst,
       sellingPrice: r.sellingPrice,
     }));
     if (!items.length) { setError("Select at least one item"); return; }
@@ -148,7 +148,7 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
   const setRow = (i: number, patch: Partial<ReviewRow>) =>
     setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
-  const includedSum = rows.filter((r) => r.include).reduce((s, r) => s + r.rate * r.qty, 0);
+  const includedSum = rows.filter((r) => r.include).reduce((s, r) => s + r.rateExclGst * r.qty, 0);
 
   const inp: React.CSSProperties = {
     width: "100%", background: "#fff", border: `1px solid ${T.border}`, borderRadius: 6,
@@ -188,7 +188,7 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
             <thead>
               <tr>
-                {["", "#", "Part Name", "HSN", "Qty", "Buy Rate ₹", "Sell Price ₹", "Amount"].map((h) => (
+                {["", "#", "Part Name", "HSN", "Qty", "Rate Excl. GST ₹", "Rate Incl. GST ₹", "Sell Price ₹", "Taxable Amount"].map((h) => (
                   <th key={h} style={{ padding: "9px 10px", fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${T.border}`, textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -208,12 +208,15 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
                     <input style={inp} type="number" min={1} value={r.qty} onChange={(e) => setRow(i, { qty: Math.max(1, parseInt(e.target.value) || 1) })} />
                   </td>
                   <td style={{ padding: "7px 10px", borderBottom: `1px solid ${T.border}`, width: 110 }}>
-                    <input style={inp} type="number" min={0} step="0.01" value={r.rate} onChange={(e) => setRow(i, { rate: Math.max(0, parseFloat(e.target.value) || 0) })} />
+                    <input style={inp} type="number" min={0} step="0.01" value={r.rateExclGst} onChange={(e) => setRow(i, { rateExclGst: Math.max(0, parseFloat(e.target.value) || 0) })} />
+                  </td>
+                  <td style={{ padding: "7px 10px", fontSize: 12, fontFamily: FONT.mono, color: T.t2, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>
+                    {r.rateInclGst != null ? fmt(r.rateInclGst) : "—"}
                   </td>
                   <td style={{ padding: "7px 10px", borderBottom: `1px solid ${T.border}`, width: 110 }}>
                     <input style={inp} type="number" min={0} step="0.01" value={r.sellingPrice} onChange={(e) => setRow(i, { sellingPrice: Math.max(0, parseFloat(e.target.value) || 0) })} />
                   </td>
-                  <td style={{ padding: "7px 10px", fontSize: 12, fontFamily: FONT.mono, fontWeight: 600, color: T.t1, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{fmt(r.rate * r.qty)}</td>
+                  <td style={{ padding: "7px 10px", fontSize: 12, fontFamily: FONT.mono, fontWeight: 600, color: T.t1, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{fmt(r.rateExclGst * r.qty)}</td>
                 </tr>
               ))}
             </tbody>

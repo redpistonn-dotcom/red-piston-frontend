@@ -60,7 +60,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
     const validateAddress = () => {
         const e = {};
         if (!address.name.trim()) e.name = "Name is required";
-        if (!address.phone.trim() || address.phone.length < 10) e.phone = "Valid phone number required";
+        if (!address.phone.trim() || !/^\d{10}$/.test(address.phone.trim())) e.phone = "Valid 10-digit phone number required";
         if (!address.pincode.trim() || address.pincode.length < 6) e.pincode = "Valid pincode required";
         if (!address.line1.trim()) e.line1 = "Address is required";
         setErrors(e);
