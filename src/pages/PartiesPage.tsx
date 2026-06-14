@@ -427,32 +427,37 @@ export function PartiesPage() {
                                 <button onClick={() => setShowVehForm(true)} style={{ height: 40, padding: "0 20px", borderRadius: 9, border: "none", background: T.amber, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>+ Add First Vehicle</button>
                             </div>
                         ) : (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(280px,100%), 1fr))", gap: 14 }}>
-                                {shopVehicles.map((v: any) => {
-                                    const owner = shopParties.find((p: any) => String(p.id) === String(v.ownerId));
-                                    return (
-                                        <div key={v.id} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 }} className="card-hover">
-                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, gap: 8 }}>
-                                                <div style={{ minWidth: 0 }}>
-                                                    <div style={{ fontSize: 16, fontWeight: 900, color: T.t1 }}>{v.make} {v.model}</div>
-                                                    <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>{v.variant} {v.year} · {v.fuelType}</div>
-                                                </div>
-                                                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-                                                    <span style={{ background: T.skyBg, color: T.sky, padding: "4px 10px", borderRadius: 6, fontWeight: 800, fontFamily: FONT.mono, fontSize: 12 }}>{v.registrationNumber}</span>
-                                                    <button onClick={() => openEditVehicle(v)}
-                                                        style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 6, padding: "3px 10px", fontSize: 11, fontWeight: 700, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
-                                                        ✎ Edit
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 12 }}>
-                                                <div><span style={{ color: T.t3 }}>Owner: </span><span style={{ fontWeight: 600 }}>{owner?.name || "—"}</span></div>
-                                                <div><span style={{ color: T.t3 }}>Engine: </span><span style={{ color: T.t2 }}>{v.engineType || "—"}</span></div>
-                                                <div><span style={{ color: T.t3 }}>Odo: </span><span style={{ fontFamily: FONT.mono, color: T.amber, fontWeight: 700 }}>{(v.odometer || 0).toLocaleString()} km</span></div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                            <div style={{ overflowX: "auto" }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                                    <thead>
+                                        <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
+                                            {[["Vehicle","left"],["Reg. No.","left"],["Owner","left"],["Engine","left"],["Odometer","right"],["","right"]].map(([h, al], i) => (
+                                                <th key={i} style={{ padding: "10px 14px", textAlign: al as any, fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {shopVehicles.map((v: any) => {
+                                            const owner = shopParties.find((p: any) => String(p.id) === String(v.ownerId));
+                                            return (
+                                                <tr key={v.id} className="trow" style={{ borderBottom: `1px solid ${T.border}` }}>
+                                                    <td style={{ padding: "10px 14px" }}>
+                                                        <div style={{ fontWeight: 700, color: T.t1, fontSize: 13 }}>{v.make} {v.model}</div>
+                                                        <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>{[v.variant, v.year, v.fuelType].filter(Boolean).join(" · ")}</div>
+                                                    </td>
+                                                    <td style={{ padding: "10px 14px" }}><span style={{ background: T.skyBg, color: T.sky, padding: "3px 9px", borderRadius: 6, fontWeight: 800, fontFamily: FONT.mono, fontSize: 12, whiteSpace: "nowrap" }}>{v.registrationNumber}</span></td>
+                                                    <td style={{ padding: "10px 14px", fontSize: 12, color: T.t2, fontWeight: 600 }}>{owner?.name || "—"}</td>
+                                                    <td style={{ padding: "10px 14px", fontSize: 12, color: T.t2 }}>{v.engineType || "—"}</td>
+                                                    <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: FONT.mono, color: T.amber, fontWeight: 700, fontSize: 12, whiteSpace: "nowrap" }}>{(v.odometer || 0).toLocaleString()} km</td>
+                                                    <td style={{ padding: "10px 14px", textAlign: "right" }}>
+                                                        <button onClick={() => openEditVehicle(v)}
+                                                            style={{ background: "transparent", border: `1px solid ${T.border}`, borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>✎ Edit</button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
                     </div>

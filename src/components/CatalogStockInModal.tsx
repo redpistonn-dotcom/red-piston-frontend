@@ -204,16 +204,21 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving }) {
               ? (item.part.imageUrl || (item.part.images && item.part.images[0]))
               : null;
 
+            const editable = item.type === "catalog";
             return (
-              <div key={item.cartId} style={{
-                background: T.surface,
-                border: `1px solid ${T.border}`,
-                borderRadius: 10,
-                padding: "10px 12px",
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-start",
-              }}>
+              <div key={item.cartId}
+                onClick={editable ? () => onEdit?.(item.cartId) : undefined}
+                title={editable ? "Click to edit price / stock / supplier" : undefined}
+                style={{
+                  background: T.surface,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 10,
+                  padding: "10px 12px",
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "flex-start",
+                  cursor: editable ? "pointer" : "default",
+                }}>
                 {/* Icon */}
                 <div style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.1 }}>
                   {imgSrc
@@ -230,29 +235,20 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving }) {
                   {brand && (
                     <div style={{ fontSize: 10, color: T.t3, marginBottom: 4 }}>{brand}</div>
                   )}
-                  {/* Inline-editable price + qty so cart items can be adjusted before Save All. */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", fontSize: 10 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 2, color: T.emerald, fontWeight: 700 }}>₹
-                      <input type="number" value={item.form.sellPrice} onChange={e => onEdit?.(item.cartId, "sellPrice", e.target.value)} title="Selling price"
-                        style={{ width: 66, height: 26, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", fontSize: 11, fontFamily: FONT.mono, color: T.emerald, fontWeight: 700, outline: "none", background: "#fff" }} />
-                    </span>
-                    <input type="number" min={0} value={item.form.stockQty} onChange={e => onEdit?.(item.cartId, "stockQty", e.target.value)} title="Quantity"
-                      style={{ width: 56, height: 26, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", fontSize: 11, fontFamily: FONT.mono, color: T.t2, outline: "none", background: "#fff" }} />
-                    <span style={{ color: T.t4 }}>units</span>
+                    <span style={{ fontFamily: FONT.mono, color: T.emerald, fontWeight: 700 }}>₹{fmt(parseFloat(item.form.sellPrice) || 0)}</span>
+                    <span style={{ color: T.t4 }}>·</span>
+                    <span style={{ color: T.t2 }}>{parseInt(item.form.stockQty) || 0} units</span>
+                    {editable && <span style={{ color: T.amber, fontWeight: 700 }}>· ✎ edit</span>}
                     {item.type === "contribution" && (
-                      <span style={{
-                        fontSize: 9, color: T.amber, fontWeight: 700,
-                        background: `${T.amber}18`, padding: "1px 5px", borderRadius: 3,
-                      }}>
-                        NEW
-                      </span>
+                      <span style={{ fontSize: 9, color: T.amber, fontWeight: 700, background: `${T.amber}18`, padding: "1px 5px", borderRadius: 3 }}>NEW</span>
                     )}
                   </div>
                 </div>
 
                 {/* Remove */}
                 <button
-                  onClick={() => onRemove(item.cartId)}
+                  onClick={(e) => { e.stopPropagation(); onRemove(item.cartId); }}
                   style={{
                     background: "none", border: "none",
                     color: T.t4, cursor: "pointer",
@@ -612,9 +608,10 @@ function SearchStep({ onSelect, onManual, initialQuery }) {
 }
 
 // ─── Step 2: Configure price + stock ──────────────────────────────────────────
-function ConfigureStep({ part, onBack, onSave, saving, activeShopId }) {
+function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm }) {
   const catalogImage = part.imageUrl || (part.images && part.images[0]) || "";
-  const [f, setF] = useState({
+  // When re-editing a cart item, prefill with its saved form; otherwise blank.
+  const [f, setF] = useState(initialForm || {
     buyPrice: "", sellPrice: "", stockQty: "0",
     rackLocation: "", minStockAlert: "5",
     // Supplier details — recorded on the opening-stock movement.
@@ -943,6 +940,8 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
   const [manualBarcode, setManualBarcode] = useState("");
   const [saving, setSaving]           = useState(false);
   const [cart, setCart]               = useState([]); // { cartId, type: 'catalog'|'contribution', part?, form }
+  const [editingCartId, setEditingCartId] = useState(null); // cart item being re-edited
+  const [editForm, setEditForm]       = useState(null);     // its saved form, prefilled into ConfigureStep
 
   // Reset on open / close
   useEffect(() => {
@@ -953,6 +952,8 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
       setManualBarcode("");
       setSaving(false);
       setCart([]);
+      setEditingCartId(null);
+      setEditForm(null);
     }
   }, [open]);
 
@@ -967,12 +968,26 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
     setStep("contribute");
   }, []);
 
-  // ── Add catalog part to cart (no API call yet) ────────────────────────────
+  // ── Add catalog part to cart, OR save edits back to an existing cart item ──
   const handleConfigureSave = useCallback((form) => {
-    setCart((c) => [...c, { cartId: uid(), type: "catalog", part: selected, form }]);
+    setCart((c) => editingCartId
+      ? c.map((it) => (it.cartId === editingCartId ? { ...it, form } : it))
+      : [...c, { cartId: uid(), type: "catalog", part: selected, form }]);
+    setEditingCartId(null);
+    setEditForm(null);
     setSelected(null);
     setStep("search");
-  }, [selected]);
+  }, [selected, editingCartId]);
+
+  // ── Click a (catalog) cart item → re-open it in the configure form ─────────
+  const handleEditCart = useCallback((cartId) => {
+    const item = cart.find((it) => it.cartId === cartId);
+    if (!item || item.type !== "catalog") return;
+    setSelected(item.part);
+    setEditForm(item.form);
+    setEditingCartId(cartId);
+    setStep("configure");
+  }, [cart]);
 
   // ── Add contributed part to cart (no API call yet) ────────────────────────
   const handleContributeSave = useCallback((form) => {
@@ -983,11 +998,6 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
   // ── Remove item from cart ─────────────────────────────────────────────────
   const handleRemoveFromCart = useCallback((cartId) => {
     setCart((c) => c.filter((item) => item.cartId !== cartId));
-  }, []);
-
-  // ── Edit a cart item's price / qty inline (before Save All) ───────────────
-  const handleEditCartItem = useCallback((cartId, field, value) => {
-    setCart((c) => c.map((item) => (item.cartId === cartId ? { ...item, form: { ...item.form, [field]: value } } : item)));
   }, []);
 
   // ── Save All: process every cart item and call the API ────────────────────
@@ -1221,7 +1231,8 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
           {step === "configure" && selected && (
             <ConfigureStep
               part={selected}
-              onBack={() => { setSelected(null); setStep("search"); }}
+              initialForm={editForm}
+              onBack={() => { setSelected(null); setEditingCartId(null); setEditForm(null); setStep("search"); }}
               onSave={handleConfigureSave}
               saving={false}
               activeShopId={activeShopId}
@@ -1242,7 +1253,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
         <CartPanel
           cart={cart}
           onRemove={handleRemoveFromCart}
-          onEdit={handleEditCartItem}
+          onEdit={handleEditCart}
           onSaveAll={handleSaveAll}
           saving={saving}
         />
