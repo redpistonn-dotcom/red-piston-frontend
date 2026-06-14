@@ -299,16 +299,15 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
         finally { setInvLoading(false); }
     }, []);
 
-    // Load when the marketplace tab opens, and refresh whenever the window
-    // regains focus / the shop changes — so stock edited on the Inventory page
-    // (which syncs to the backend) shows up here without a hard reload.
+    // Load the shop's inventory on mount (used by BOTH the Parts Listing and the
+    // job-card "Add part" dropdown) and refresh on window focus / shop change —
+    // so it always reflects exactly what the shop has uploaded, freshly.
     useEffect(() => {
-        if (workshopTab !== "marketplace") return;
         loadInventory();
         const onFocus = () => loadInventory();
         window.addEventListener("focus", onFocus);
         return () => window.removeEventListener("focus", onFocus);
-    }, [workshopTab, activeShopId, loadInventory]);
+    }, [activeShopId, loadInventory]);
 
     // Open the Go Live / Edit modal.
     // editMode = true  → already-live item: show target qty + take-offline option
@@ -1270,7 +1269,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                 onClose={() => setShowCreate(false)}
                 vehicles={shopVehicles}
                 parties={shopParties}
-                products={(products || []).filter((p: any) => p.shopId === activeShopId)}
+                products={shopProducts}
                 activeShopId={activeShopId}
                 existingCount={shopJobs.length}
                 onSave={(jc: any) => { onSaveJobCard(jc); setShowCreate(false); toast?.(`Job Card ${jc.jobNumber} created!`, "success", "🔧 Workshop"); }}
