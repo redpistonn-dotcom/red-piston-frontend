@@ -50,7 +50,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
         if (!f.name.trim()) e.name = "Required";
         if (!f.sku.trim()) e.sku = "Required";
         if (!f.buyPrice || isNaN(+f.buyPrice)) e.buyPrice = "Invalid";
-        else if (+f.buyPrice < 0) e.buyPrice = "Cannot be negative";
+        else if (+f.buyPrice <= 0) e.buyPrice = "Must be greater than 0";
         if (!f.sellPrice || isNaN(+f.sellPrice)) e.sellPrice = "Invalid";
         else if (+f.sellPrice <= 0) e.sellPrice = "Must be greater than 0";
         else if (+f.sellPrice < +f.buyPrice) e.sellPrice = "Sell price below buy price — margin will be negative";

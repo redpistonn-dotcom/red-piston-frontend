@@ -690,6 +690,7 @@ export function ERPShell({ children }: ERPShellProps) {
         onSave={saveProduct}
         toast={toast}
         activeShopId={activeShopId}
+        existingProducts={products || []}
       />
       <BulkStockInModal
         open={catalogModal}

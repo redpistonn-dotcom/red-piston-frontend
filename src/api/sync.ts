@@ -103,7 +103,7 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     inventoryId: inv.inventoryId,
     masterPartId: inv.masterPartId ?? undefined,
     globalSku: String(inv.masterPartId ?? ''),
-    name: mp?.partName || inv.partName || 'Unknown Part',
+    name: inv.customPartName || mp?.partName || inv.partName || 'Unknown Part',
     oemNumber: oemStr || null,
     barcodes: barcodesArr as string[],
     brand: mp?.brand || null,
@@ -306,8 +306,12 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
       await api.put(`/api/shop/inventory/${product.inventoryId}`, {
         sellingPrice: product.sellPrice,
         buyingPrice: product.buyPrice,
-        rackLocation: product.rack,
+        rackLocation: product.rack ?? product.location,
         minStockAlert: product.minStock,
+        maxStockLevel: product.maxStock ?? undefined,
+        // customPartName lets a shop override the catalog part name locally
+        customPartName: product.name ?? undefined,
+        shopSpecificNotes: product.notes ?? undefined,
         isMarketplaceListed: product.isMarketplaceListed,
         // Cloudinary photo from the ProductModal uploader — emoji placeholders stay local-only
         ...(typeof product.image === 'string' && product.image.startsWith('http') && { imageUrl: product.image }),

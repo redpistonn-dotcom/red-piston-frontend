@@ -662,8 +662,8 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
 
   const validate = () => {
     const e = {};
-    if (!f.buyPrice  || isNaN(f.buyPrice))  e.buyPrice  = "Required";
-    if (!f.sellPrice || isNaN(f.sellPrice)) e.sellPrice = "Required";
+    if (!f.buyPrice || isNaN(f.buyPrice) || parseFloat(f.buyPrice) <= 0) e.buyPrice = "Must be greater than 0";
+    if (!f.sellPrice || isNaN(f.sellPrice) || parseFloat(f.sellPrice) <= 0) e.sellPrice = "Must be greater than 0";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -861,8 +861,8 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
     const e = {};
     if (!f.partName.trim()) e.partName  = "Required";
     if (!f.categoryL1)      e.categoryL1 = "Select a category";
-    if (!f.buyPrice  || isNaN(f.buyPrice))  e.buyPrice  = "Required";
-    if (!f.sellPrice || isNaN(f.sellPrice)) e.sellPrice = "Required";
+    if (!f.buyPrice || isNaN(f.buyPrice) || parseFloat(f.buyPrice) <= 0) e.buyPrice = "Must be greater than 0";
+    if (!f.sellPrice || isNaN(f.sellPrice) || parseFloat(f.sellPrice) <= 0) e.sellPrice = "Must be greater than 0";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -1031,7 +1031,7 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
 }
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
-export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId }) {
+export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId, existingProducts = [] }) {
   const [step, setStep]               = useState("search"); // "search" | "configure" | "contribute"
   const [selected, setSelected]       = useState(null);
   const [manualQuery, setManualQuery] = useState("");
@@ -1195,6 +1195,17 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
           let masterPartId = null;
           let product;
 
+          // Prevent duplicates: if the shop already has a product with the same name
+          // (case-insensitive), skip and notify rather than creating a second entry.
+          const dupName = form.partName.trim().toLowerCase();
+          const alreadyExists = existingProducts.some(
+            (p) => (p.name || "").toLowerCase() === dupName
+          );
+          if (alreadyExists) {
+            toast(`"${form.partName}" is already in your inventory — update stock or price on the existing item instead.`, "warning");
+            continue;
+          }
+
           const contribImage = form.imageUrl || "";
           try {
             const catalogRes = await contributePart({
@@ -1250,6 +1261,10 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               };
             }
           } catch (apiErr) {
+            if (apiErr?.status === 409) {
+              toast(`"${form.partName}" is already in your inventory — update stock or price on the existing item instead.`, "warning");
+              continue;
+            }
             console.warn("[CatalogStockIn] Contribute API failed, saving locally:", apiErr.message);
           }
 

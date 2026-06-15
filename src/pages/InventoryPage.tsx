@@ -45,9 +45,15 @@ export function InventoryPage() {
   const onDelete = async (p) => {
     if (!window.confirm(`Delete "${p.name}" from inventory? This removes the product and its stock history.`)) return;
     const invId = p.inventoryId ?? p.id;
+    // Local-only items (never synced to DB) have a "p" string id — just remove from local state.
+    if (!p.inventoryId || !Number.isFinite(Number(invId))) {
+      saveProducts((storeProducts || []).filter(x => (x.inventoryId ?? x.id) !== invId), true);
+      toast?.("Product removed", "success");
+      return;
+    }
     try {
       await deleteInventory(invId);
-      saveProducts((storeProducts || []).filter(x => (x.inventoryId ?? x.id) !== invId), true);
+      saveProducts((storeProducts || []).filter(x => Number(x.inventoryId ?? x.id) !== Number(invId)), true);
       toast?.("Product deleted", "success");
     } catch (e) {
       toast?.(e?.data?.error || e?.message || "Could not delete product", "warning");
