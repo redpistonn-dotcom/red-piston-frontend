@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { sendPhoneOtp, verifyPhoneOtp, signInWithGoogle } from "../firebase.js";
 import { api, setTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
@@ -187,6 +187,14 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [rejectionMsg, setRejectionMsg]   = useState("");
   const [forgotEmail, setForgotEmail]     = useState("");
   const [forgotMode, setForgotMode]       = useState(false);
+
+  // Wake the Render backend as soon as the login page loads — before the user
+  // even types. By the time they enter credentials (~10s), the cold-start (30-60s)
+  // is already in progress or done, so the login API call responds immediately.
+  useEffect(() => {
+    const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    fetch(`${BASE_URL}/health`, { method: 'GET' }).catch(() => {});
+  }, []);
   const [forgotSent, setForgotSent]       = useState(false);
   const [landingTab, setLandingTab]       = useState("owner"); // "owner" | "customer"
 
