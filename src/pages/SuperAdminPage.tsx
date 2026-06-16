@@ -1859,56 +1859,88 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
           const nowMs = Date.now();
           const nextMs = adStats?.nextAvailableAt ? new Date(adStats.nextAvailableAt).getTime() : null;
           const waitMin = nextMs ? Math.ceil((nextMs - nowMs) / 60000) : 0;
-          const waitHr  = nextMs ? (waitMin / 60).toFixed(1) : "0";
 
           const overallPct = adStats?.stagingTotal
             ? Math.min(100, Math.round((adStats.stagingTotal / TOTAL_EXPECTED_PRODUCTS) * 100))
             : 0;
 
+          const doneCats  = (adStats?.scrapeProgress || []).filter((p: any) => p.fullyDone).length;
+          const totalParts = adStats?.stagingTotal || 0;
+          const inMaster   = adStats?.alreadyInMaster || 0;
+
           return (
-            <div style={{ maxWidth: 900 }}>
+            <div style={{ maxWidth: 960 }}>
               {/* ── Header ── */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 18, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
                   Autodukan Parts Pipeline
                 </div>
                 <div style={{ fontSize: 12, color: C.t3, fontFamily: FONT.ui, marginTop: 2 }}>
-                  Scrape from autodukan.com → Staging DB → Import to Master Catalog · Auto-refreshes every 15s
+                  Scrape locally → Staging DB → Import to Master Catalog · Auto-refreshes every 30s
                 </div>
               </div>
 
+              {/* ══ HERO METRICS ══ */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: 'Parts in Staging', value: totalParts.toLocaleString(), color: C.sky, sub: 'source: autodukan' },
+                  { label: 'Categories Scraped', value: `${doneCats} / 25`, color: C.amber, sub: `${25 - doneCats} remaining` },
+                  { label: 'Brands Found', value: (adStats?.brandStats?.length || 0).toString(), color: C.violet || '#8b5cf6', sub: 'unique OEM brands' },
+                  { label: 'In Master Catalog', value: inMaster.toLocaleString(), color: C.green, sub: `${(adStats?.remaining || 0).toLocaleString()} to import` },
+                ].map((s: any) => (
+                  <div key={s.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: s.color, fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1 }}>{s.value}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t2, fontFamily: FONT.ui, marginTop: 5 }}>{s.label}</div>
+                    <div style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui, marginTop: 2 }}>{s.sub}</div>
+                  </div>
+                ))}
+              </div>
 
-              {/* ══ PIPELINE FLOW BAR ══ */}
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 14, overflowX: 'auto' }}>
-                  {[
-                    { step: '1', label: 'Scrape', sub: 'Local script', color: C.t3, active: false },
-                    { step: '→', label: '', sub: '', color: C.t4, active: false },
-                    { step: '2', label: 'Staging DB', sub: (adStats?.stagingTotal || 0).toLocaleString() + ' parts', color: C.sky, active: false },
-                    { step: '→', label: '', sub: '', color: C.t4, active: false },
-                    { step: '3', label: 'Import', sub: (adStats?.todayCount ?? '—') + '/' + (adStats?.maxPerDay ?? 3) + ' today', color: C.amber, active: adImporting },
-                    { step: '→', label: '', sub: '', color: C.t4, active: false },
-                    { step: '4', label: 'Master Catalog', sub: (adStats?.alreadyInMaster || 0).toLocaleString() + ' parts', color: C.green, active: false },
-                  ].map((s: any, i: number) => s.step === '→' ? (
-                    <div key={i} style={{ fontSize: 18, color: C.t4, padding: '0 6px' }}>→</div>
-                  ) : (
-                    <div key={i} style={{ background: s.active ? `${s.color}22` : C.bg, border: `1.5px solid ${s.active ? s.color : C.border}`, borderRadius: 8, padding: '9px 14px', textAlign: 'center', minWidth: 110 }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: s.color, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{s.step}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: s.active ? s.color : C.t1, fontFamily: FONT.ui, marginTop: 3 }}>{s.label}</div>
-                      <div style={{ fontSize: 10, color: C.t3, fontFamily: FONT.ui, marginTop: 1 }}>{s.sub}</div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              {/* ══ PROGRESS BAR ══ */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 16px', marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui }}>
-                    Staging DB — {(adStats?.stagingTotal || 0).toLocaleString()} of {TOTAL_EXPECTED_PRODUCTS.toLocaleString()} products
+                    Scraping progress — {totalParts.toLocaleString()} of {TOTAL_EXPECTED_PRODUCTS.toLocaleString()} estimated
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontFamily: FONT.ui }}>{overallPct}%</span>
                 </div>
-                <div style={{ height: 6, background: C.borderLight, borderRadius: 99, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${overallPct}%`, background: `linear-gradient(90deg, ${C.amber}, ${C.sky})`, borderRadius: 99, transition: 'width 0.6s ease' }} />
+                <div style={{ height: 8, background: C.borderLight, borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${overallPct}%`, background: `linear-gradient(90deg, ${C.amber}, ${C.sky})`, borderRadius: 99, transition: 'width 0.8s ease' }} />
+                </div>
+                <div style={{ marginTop: 8, fontSize: 10, color: C.t4, fontFamily: FONT.ui }}>
+                  To scrape: &nbsp;<code style={{ background: C.bg, borderRadius: 4, padding: '2px 6px', fontSize: 10 }}>python scrape_autodukan_local.py --resume --delay 10</code>
                 </div>
               </div>
+
+
+              {/* ══ CATEGORY SCRAPE STATUS GRID ══ */}
+              {adStats?.scrapeProgress?.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui, marginBottom: 8 }}>
+                    Category Scrape Status — {doneCats} / 25 done
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 7 }}>
+                    {ALL_AD_CATS.map((cat: string) => {
+                      const p = (adStats.scrapeProgress as any[]).find((r: any) => r.category === cat);
+                      return (
+                        <div key={cat} style={{ background: C.surface, border: `1.5px solid ${p?.fullyDone ? C.green : p ? C.border : C.borderLight}`, borderRadius: 8, padding: '8px 10px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 4, marginBottom: 4 }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, color: p?.fullyDone ? C.green : p ? C.t1 : C.t4, fontFamily: FONT.ui, lineHeight: 1.3, flex: 1 }}>{cat}</span>
+                            <span style={{ fontSize: 10, flexShrink: 0 }}>{p?.fullyDone ? '✓' : p ? '…' : '—'}</span>
+                          </div>
+                          {p ? (
+                            <div style={{ fontSize: 9, color: C.t3, fontFamily: FONT.ui }}>
+                              {(p.productsScraped || 0).toLocaleString()} parts · {p.pagesDone}pg
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 9, color: C.t4, fontFamily: FONT.ui }}>Not started</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* ══ IMPORT TO CATALOG ══ */}
               <div style={{ marginBottom: 20 }}>
