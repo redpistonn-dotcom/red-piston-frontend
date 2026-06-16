@@ -127,9 +127,23 @@ export function useStoreProvider(): StoreContextValue {
       }
 
       if (Array.isArray(apiMovements)) {
-        setM(apiMovements);
-        try { localStorage.setItem('vl_movements', JSON.stringify(apiMovements)); } catch {}
-        console.log(`[Store] Synced ${apiMovements.length} movements from API`);
+        // Merge rather than replace: preserve local-only movements that haven't
+        // been persisted to the DB yet (e.g. a custom-item sale whose syncInvoice
+        // was skipped). Local movements have string ids starting with "m"
+        // (generated as `"m${Date.now()}"` in handleSale); DB-backed ones are numeric.
+        let merged: Movement[] = apiMovements;
+        try {
+          const stored = localStorage.getItem('vl_movements');
+          if (stored) {
+            const local: Movement[] = JSON.parse(stored);
+            const apiIds = new Set(apiMovements.map((mv) => String(mv.id)));
+            const localOnly = local.filter((mv) => !apiIds.has(String(mv.id)) && String(mv.id).startsWith('m'));
+            if (localOnly.length) merged = [...apiMovements, ...localOnly];
+          }
+        } catch {}
+        setM(merged);
+        try { localStorage.setItem('vl_movements', JSON.stringify(merged)); } catch {}
+        console.log(`[Store] Synced ${apiMovements.length} movements from API (+ ${merged.length - apiMovements.length} local-only)`);
       }
 
       if (Array.isArray(apiVehicles)) {

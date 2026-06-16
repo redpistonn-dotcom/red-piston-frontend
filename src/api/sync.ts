@@ -337,11 +337,14 @@ interface SyncInvoiceParams {
 }
 
 export async function syncInvoice(params: SyncInvoiceParams): Promise<void> {
-  const hasRealIds = params.items?.every(item => isDbId(item.inventoryId));
-  if (!hasRealIds) return;
+  // Filter to real DB items only — custom items ("custom_${Date.now()}") fail isDbId.
+  // We sync whatever real items exist rather than bailing on the whole invoice,
+  // so a mixed cart (real part + custom labour charge) still decrements stock correctly.
+  const realItems = params.items?.filter(item => isDbId(item.inventoryId));
+  if (!realItems?.length) return;
   try {
     const res = await api.post<{ success: boolean; invoice?: { invoiceId: number; invoiceNumber: string } }>('/api/billing/invoice', {
-      items: params.items.map(item => ({
+      items: realItems.map(item => ({
         inventoryId: item.inventoryId,
         qty: item.qty,
         unitPrice: item.unitPrice,
