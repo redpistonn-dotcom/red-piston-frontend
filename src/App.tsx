@@ -593,7 +593,10 @@ function AppContent() {
     return shopSuffix + "-" + Date.now().toString(36).toUpperCase();
   }, [activeShopId]);
 
-  if (!loaded) {
+  // Block render until the access token is restored on page reload.
+  // Without this, shells fire API calls before silentRefresh() completes → 401 wave.
+  // Only gate when there IS a stored user but no token yet (not on public pages).
+  if (!loaded || (!tokenReady && !!currentUser)) {
     return (
       <div style={{ minHeight: "100vh", background: T.bg, fontFamily: FONT.ui }}>
         <style>{GLOBAL_CSS}</style>
