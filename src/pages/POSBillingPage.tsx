@@ -146,8 +146,14 @@ export function POSBillingPage() {
     const selectedParty = useMemo(() => (parties || []).find((p: any) => String(p.id) === String(partyId)), [parties, partyId]);
     const partyOutstanding = useMemo(() => {
       if (!selectedParty) return 0;
-      return (movements || []).filter((m: any) => String(m.partyId) === String(selectedParty.id) && m.paymentStatus === "pending")
-        .reduce((s: number, m: any) => s + (m.total || m.totalAmount || 0), 0);
+      const partyName = (selectedParty.name || "").toLowerCase();
+      return (movements || []).filter((m: any) => {
+        if (m.paymentStatus !== "pending") return false;
+        // Match by partyId (set on sales made after party-selector was added) OR
+        // by customer name for older/unlinked Udhaar sales.
+        return String(m.partyId) === String(selectedParty.id) ||
+          (!m.partyId && m.customerName && m.customerName.toLowerCase() === partyName);
+      }).reduce((s: number, m: any) => s + (m.total || m.totalAmount || 0), 0);
     }, [selectedParty, movements]);
     const creditLimit = selectedParty?.creditLimit || 0;
     const creditAfterSale = partyOutstanding + finalTotal;
@@ -157,6 +163,10 @@ export function POSBillingPage() {
     const handleSubmitRef = useRef<(() => void) | null>(null);
     const validate = () => {
         if (items.length === 0) { toast?.("Add at least one product", "warning"); return false; }
+        if (paymentMode === "Udhaar" && overLimit) {
+            toast?.(`Credit limit exceeded — ${selectedParty?.name || "party"}'s outstanding will reach ${fmt(creditAfterSale)} (limit ${fmt(creditLimit)}). Collect a payment first or reduce the sale.`, "error");
+            return false;
+        }
         for (const item of items) {
             if (item.qty <= 0) { toast?.(`Invalid qty for ${item.name}`, "warning"); return false; }
             if (billType === "Sale" && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
