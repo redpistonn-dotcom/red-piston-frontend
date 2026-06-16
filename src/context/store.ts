@@ -212,9 +212,17 @@ export function useStoreProvider(): StoreContextValue {
   const saveShops     = useCallback((d: Shop[])     => { setShops(d);    try { localStorage.setItem('vl_shops',     JSON.stringify(d)); } catch {} }, []);
   const saveProducts  = useCallback((d: Product[], skipApiSync = false)  => {
     setP(prev => {
-      if (!skipApiSync && d.length === prev?.length) {
-        const changed = d.find((p, i) => p !== prev?.[i]);
-        if (changed) syncProductSave(changed).catch(() => {});
+      if (!skipApiSync) {
+        if (d.length === prev?.length) {
+          // existing product edited — find the changed one
+          const changed = d.find((p, i) => p !== prev?.[i]);
+          if (changed) syncProductSave(changed).catch(() => {});
+        } else if (d.length > (prev?.length ?? 0)) {
+          // new product added — find the one not in prev
+          const prevIds = new Set((prev ?? []).map(p => p.id));
+          const added = d.find(p => !prevIds.has(p.id));
+          if (added) syncProductSave(added).catch(() => {});
+        }
       }
       return d;
     });

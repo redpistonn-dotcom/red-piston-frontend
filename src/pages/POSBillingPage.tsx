@@ -181,16 +181,17 @@ export function POSBillingPage() {
         return true;
     };
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (typeOverride?: "Sale" | "Quotation") => {
         if (!validate()) return;
+        const effectiveBillType = typeOverride ?? billType;
         setSaving(true);
         setSyncedInvoiceId(null); // new sale — previous backend invoice no longer applies
         await new Promise(r => setTimeout(r, 50));
         const ts = Date.now();
-        const inv = `${billType === "Sale" ? "INV" : "EST"}-${ts.toString(36).toUpperCase()}`;
+        const inv = `${effectiveBillType === "Sale" ? "INV" : "EST"}-${ts.toString(36).toUpperCase()}`;
         setInvoiceNo(inv); setInvoiceAt(ts);
         onMultiSale({
-            type: billType, invoiceNo: inv,
+            type: effectiveBillType, invoiceNo: inv,
             items: items.map((item, idx) => ({
                 productId: item.productId, name: item.name, qty: item.qty,
                 sellPrice: item.price, buyPrice: item.buyPrice,
@@ -203,6 +204,7 @@ export function POSBillingPage() {
             paymentMode, subtotal: grandSubtotal, discount: grandDiscount + additionalDisc,
             total: finalTotal, gstAmount: grandGst, profit: grandProfit, date: ts,
         });
+        if (typeOverride) setBillType(typeOverride);
         setSaving(false); setShowInvoice(true);
     };
 
@@ -645,7 +647,7 @@ export function POSBillingPage() {
 
                     {/* Quotation / Hold buttons */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: "0 16px 16px" }}>
-                        <button onClick={() => { setBillType("Quotation"); handleSubmit(); }}
+                        <button onClick={() => handleSubmit("Quotation")}
                             style={{ height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 9, fontSize: 13, fontWeight: 700, color: T.t2, cursor: "pointer", fontFamily: FONT.ui, letterSpacing: "0.03em", transition: "all 0.15s" }}
                             onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>

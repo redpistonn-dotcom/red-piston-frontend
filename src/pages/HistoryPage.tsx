@@ -267,8 +267,8 @@ const TABS = [
     { key: "ALL",         label: "All Transactions" },
     { key: "SALE",        label: "Sales"            },
     { key: "PURCHASE",    label: "Purchases"        },
-    { key: "ADJUSTMENTS", label: "Returns"          },
-    { key: "ESTIMATE",    label: "Adjustments"      },
+    { key: "ADJUSTMENTS", label: "Adjustments"      },
+    { key: "ESTIMATE",    label: "Estimates"        },
     { key: "JOBCARD",     label: "Job Cards"        },
 ] as const;
 
