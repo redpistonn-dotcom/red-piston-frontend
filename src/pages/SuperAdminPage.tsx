@@ -1064,6 +1064,16 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
 
   // (Scraper control removed — scraping runs locally via scrape_autodukan_local.py)
 
+  // Staging parts browser
+  const AD_PARTS_LIMIT = 50;
+  const [adParts, setAdParts]               = useState<any[]>([]);
+  const [adPartsTotal, setAdPartsTotal]     = useState(0);
+  const [adPartsSearch, setAdPartsSearch]   = useState("");
+  const [adPartsOffset, setAdPartsOffset]   = useState(0);
+  const [adPartsLoading, setAdPartsLoading] = useState(false);
+  const [adPartsCategory, setAdPartsCategory] = useState("");
+  const [adPartsBrand, setAdPartsBrand]     = useState("");
+
   const ALL_AD_CATS = [
     "AIR CONDITIONING","BELT & CHAIN DRIVE","BODY PARTS","BRAKE SYSTEM",
     "CAR ACCESSORIES","CAR CARE","CLUTCH SYSTEM","COOLING SYSTEM",
@@ -1086,6 +1096,23 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     setAdLoading(false);
   }, []);
 
+  const fetchAdParts = useCallback(async (search: string, offset: number, category: string, brand: string) => {
+    setAdPartsLoading(true);
+    try {
+      const params: Record<string, string> = {
+        limit: String(AD_PARTS_LIMIT),
+        offset: String(offset),
+      };
+      if (search)   params.q        = search;
+      if (category) params.category = category;
+      if (brand)    params.brand    = brand;
+      const res: any = await api.get("/api/admin/autodukan/parts", params);
+      setAdParts(res.data?.parts || []);
+      setAdPartsTotal(res.data?.total || 0);
+    } catch {}
+    setAdPartsLoading(false);
+  }, []);
+
   const handleAdImport = async () => {
     setAdError("");
     setAdResult(null);
@@ -1105,13 +1132,20 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     setAdImporting(false);
   };
 
-  // Load stats when tab becomes active; re-fetch every 30s
+  // Load stats + parts when tab becomes active; re-fetch stats every 30s
   useEffect(() => {
     if (activeTab !== "autodukan") return;
     fetchAdStats();
+    fetchAdParts(adPartsSearch, adPartsOffset, adPartsCategory, adPartsBrand);
     const t = setInterval(fetchAdStats, 30000);
     return () => clearInterval(t);
-  }, [activeTab, fetchAdStats]);
+  }, [activeTab, fetchAdStats, fetchAdParts]); // eslint-disable-line
+
+  // Re-fetch parts when search/filter/page changes
+  useEffect(() => {
+    if (activeTab !== "autodukan") return;
+    fetchAdParts(adPartsSearch, adPartsOffset, adPartsCategory, adPartsBrand);
+  }, [adPartsSearch, adPartsOffset, adPartsCategory, adPartsBrand, fetchAdParts]); // eslint-disable-line
 
   // Background import progress widget — reads from module store, survives tab switches
   const [bgImport, setBgImport] = useState(() => importStore.get());
@@ -2191,6 +2225,117 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                   </div>
                 </div>
               )}
+
+              {/* ══ STAGING PARTS BROWSER ══ */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+                {/* Header + controls */}
+                <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                  <div style={{ flex: 1, minWidth: 180 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
+                      Staging Parts
+                    </div>
+                    <div style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui, marginTop: 2 }}>
+                      {adPartsLoading ? 'Loading…' : `${adPartsTotal.toLocaleString()} parts ${adPartsSearch || adPartsCategory || adPartsBrand ? '(filtered)' : 'total'}`}
+                    </div>
+                  </div>
+                  {/* Search */}
+                  <input
+                    placeholder="Search name, part no, brand…"
+                    value={adPartsSearch}
+                    onChange={e => { setAdPartsSearch(e.target.value); setAdPartsOffset(0); }}
+                    style={{ flex: 2, minWidth: 200, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}
+                  />
+                  {/* Category filter */}
+                  <select
+                    value={adPartsCategory}
+                    onChange={e => { setAdPartsCategory(e.target.value); setAdPartsOffset(0); }}
+                    style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: adPartsCategory ? C.t1 : C.t3, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}
+                  >
+                    <option value=''>All Categories</option>
+                    {ALL_AD_CATS.map((c: string) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  {/* Brand filter from stats */}
+                  <select
+                    value={adPartsBrand}
+                    onChange={e => { setAdPartsBrand(e.target.value); setAdPartsOffset(0); }}
+                    style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: adPartsBrand ? C.t1 : C.t3, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}
+                  >
+                    <option value=''>All Brands</option>
+                    {(adStats?.brandStats || []).map((b: any) => <option key={b.brand} value={b.brand}>{b.brand} ({b.total})</option>)}
+                  </select>
+                  {(adPartsSearch || adPartsCategory || adPartsBrand) && (
+                    <button onClick={() => { setAdPartsSearch(''); setAdPartsCategory(''); setAdPartsBrand(''); setAdPartsOffset(0); }}
+                      style={{ background: C.borderLight, border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 11, color: C.t3, cursor: 'pointer', fontFamily: FONT.ui }}>
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {/* Table */}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+                    <thead>
+                      <tr>
+                        {['Part Number', 'Part Name', 'Brand', 'Category', 'Type', 'Price', 'MRP', 'Scraped'].map((h: string) => (
+                          <th key={h} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: 'left', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adPartsLoading && adParts.length === 0 ? (
+                        <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>Loading…</td></tr>
+                      ) : adParts.length === 0 ? (
+                        <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>
+                          {adPartsSearch || adPartsCategory || adPartsBrand ? 'No parts match the current filters.' : 'No parts scraped yet. Run the local scraper to populate staging.'}
+                        </td></tr>
+                      ) : adParts.map((p: any, i: number) => {
+                        const isOes = /oes/i.test(p.type || '');
+                        return (
+                          <tr key={p.id} style={{ background: i % 2 === 0 ? 'transparent' : `${C.bg}66` }}>
+                            <td style={{ padding: '9px 12px', fontSize: 11, color: C.t2, fontFamily: "'Fira Code','Consolas',monospace", borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.partNumber || '—'}</td>
+                            <td style={{ padding: '9px 12px', fontSize: 12, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || '—'}</td>
+                            <td style={{ padding: '9px 12px', fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.brand || '—'}</td>
+                            <td style={{ padding: '9px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.category || '—'}</td>
+                            <td style={{ padding: '9px 12px', borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>
+                              {p.type ? (
+                                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 7px', fontFamily: FONT.ui, background: isOes ? `${C.green}22` : `${C.sky}22`, color: isOes ? C.green : C.sky }}>
+                                  {isOes ? 'OES' : 'OEM'}
+                                </span>
+                              ) : <span style={{ color: C.t4, fontSize: 11 }}>—</span>}
+                            </td>
+                            <td style={{ padding: '9px 12px', fontSize: 12, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.price != null ? `₹${Number(p.price).toLocaleString('en-IN')}` : '—'}</td>
+                            <td style={{ padding: '9px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.mrp != null ? `₹${Number(p.mrp).toLocaleString('en-IN')}` : '—'}</td>
+                            <td style={{ padding: '9px 12px', fontSize: 10, color: C.t4, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>
+                              {p.scrapedAt ? new Date(p.scrapedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {adPartsTotal > AD_PARTS_LIMIT && (
+                  <div style={{ padding: '10px 16px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui }}>
+                      Showing {adPartsOffset + 1}–{Math.min(adPartsOffset + AD_PARTS_LIMIT, adPartsTotal)} of {adPartsTotal.toLocaleString()}
+                    </span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        disabled={adPartsOffset === 0}
+                        onClick={() => setAdPartsOffset(Math.max(0, adPartsOffset - AD_PARTS_LIMIT))}
+                        style={{ padding: '6px 14px', fontSize: 12, borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: adPartsOffset === 0 ? C.t4 : C.t1, cursor: adPartsOffset === 0 ? 'not-allowed' : 'pointer', fontFamily: FONT.ui }}
+                      >← Prev</button>
+                      <button
+                        disabled={adPartsOffset + AD_PARTS_LIMIT >= adPartsTotal}
+                        onClick={() => setAdPartsOffset(adPartsOffset + AD_PARTS_LIMIT)}
+                        style={{ padding: '6px 14px', fontSize: 12, borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: adPartsOffset + AD_PARTS_LIMIT >= adPartsTotal ? C.t4 : C.t1, cursor: adPartsOffset + AD_PARTS_LIMIT >= adPartsTotal ? 'not-allowed' : 'pointer', fontFamily: FONT.ui }}
+                      >Next →</button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
             </div>
           );
