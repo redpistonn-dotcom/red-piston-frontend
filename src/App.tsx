@@ -250,10 +250,10 @@ function AppContent() {
     }
   }, [location.pathname, location.search, currentUser]);
 
-  // After both auth + store are ready, navigate to the saved path (once per page load)
+  // After both token + store are ready, navigate to the saved path (once per page load)
   const [routeRestored, setRouteRestored] = useState(false);
   useEffect(() => {
-    if (!authReady || !loaded || routeRestored) return;
+    if (!tokenReady || !loaded || routeRestored) return;
     setRouteRestored(true);
     if (!currentUser) return;
     try {
@@ -264,7 +264,7 @@ function AppContent() {
       }
     } catch {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authReady, loaded]);
+  }, [tokenReady, loaded]);
 
   // ── Keyboard shortcuts ────────────────────────────────────────────────────────
   useEffect(() => {
