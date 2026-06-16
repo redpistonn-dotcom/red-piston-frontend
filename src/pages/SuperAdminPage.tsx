@@ -1062,14 +1062,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
   const [adError, setAdError]         = useState("");
   const [adJustImported, setAdJustImported] = useState<any[] | null>(null);
 
-  // Monitor state
-  const [adMonitor, setAdMonitor]     = useState<any>(null);
-  const [adStarting, setAdStarting]   = useState(false);
-  const [adStopping, setAdStopping]   = useState(false);
-  const [adCtrlError, setAdCtrlError] = useState("");
-  const [adStartCategory, setAdStartCategory] = useState("");
-  const [adStartDelay, setAdStartDelay]       = useState(10);
-  const [adLogExpanded, setAdLogExpanded]     = useState(false);
+  // (Scraper control removed — scraping runs locally via scrape_autodukan_local.py)
 
   const ALL_AD_CATS = [
     "AIR CONDITIONING","BELT & CHAIN DRIVE","BODY PARTS","BRAKE SYSTEM",
@@ -1093,13 +1086,6 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     setAdLoading(false);
   }, []);
 
-  const fetchAdMonitor = useCallback(async () => {
-    try {
-      const res: any = await api.get("/api/admin/autodukan/monitor");
-      setAdMonitor(res.data);
-    } catch {}
-  }, []);
-
   const handleAdImport = async () => {
     setAdError("");
     setAdResult(null);
@@ -1113,49 +1099,19 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
       setAdResult(res.data);
       if (res.data?.previewParts?.length) setAdJustImported(res.data.previewParts);
       fetchAdStats();
-      fetchAdMonitor();
     } catch (e: any) {
       setAdError(e.message || "Import failed");
     }
     setAdImporting(false);
   };
 
-  const handleAdStart = async () => {
-    setAdCtrlError("");
-    setAdStarting(true);
-    try {
-      await api.post("/api/admin/autodukan/scrape/start", {
-        category: adStartCategory || null,
-        delay: adStartDelay,
-        headless: true,
-      });
-      setTimeout(fetchAdMonitor, 1500);
-    } catch (e: any) {
-      setAdCtrlError(e.message || "Failed to start scraper");
-    }
-    setAdStarting(false);
-  };
-
-  const handleAdStop = async () => {
-    setAdCtrlError("");
-    setAdStopping(true);
-    try {
-      await api.post("/api/admin/autodukan/scrape/stop", {});
-      setTimeout(fetchAdMonitor, 1000);
-    } catch (e: any) {
-      setAdCtrlError(e.message || "Failed to stop scraper");
-    }
-    setAdStopping(false);
-  };
-
-  // Load + auto-refresh monitor every 15s while tab is active
+  // Load stats when tab becomes active; re-fetch every 30s
   useEffect(() => {
     if (activeTab !== "autodukan") return;
     fetchAdStats();
-    fetchAdMonitor();
-    const t = setInterval(fetchAdMonitor, 15000);
+    const t = setInterval(fetchAdStats, 30000);
     return () => clearInterval(t);
-  }, [activeTab, fetchAdStats, fetchAdMonitor]);
+  }, [activeTab, fetchAdStats]);
 
   // Background import progress widget — reads from module store, survives tab switches
   const [bgImport, setBgImport] = useState(() => importStore.get());
@@ -1905,13 +1861,8 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
           const waitMin = nextMs ? Math.ceil((nextMs - nowMs) / 60000) : 0;
           const waitHr  = nextMs ? (waitMin / 60).toFixed(1) : "0";
 
-          // Per-category completion map from monitor
-          const catMap: Record<string, { pages_done: number; products_scraped: number }> = {};
-          (adMonitor?.catProgress || []).forEach((r: any) => { catMap[r.category] = r; });
-          const rt = adMonitor?.runtime;
-          const scraperActive = rt?.active;
-          const overallPct = adMonitor
-            ? Math.min(100, Math.round((adMonitor.stagingTotal / TOTAL_EXPECTED_PRODUCTS) * 100))
+          const overallPct = adStats?.stagingTotal
+            ? Math.min(100, Math.round((adStats.stagingTotal / TOTAL_EXPECTED_PRODUCTS) * 100))
             : 0;
 
           return (
@@ -1931,9 +1882,9 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 14, overflowX: 'auto' }}>
                   {[
-                    { step: '1', label: 'Scrape', sub: 'autodukan.com', color: scraperActive ? C.green : C.t3, active: scraperActive },
+                    { step: '1', label: 'Scrape', sub: 'Local script', color: C.t3, active: false },
                     { step: '→', label: '', sub: '', color: C.t4, active: false },
-                    { step: '2', label: 'Staging DB', sub: (adMonitor?.stagingTotal || 0).toLocaleString() + ' parts', color: C.sky, active: false },
+                    { step: '2', label: 'Staging DB', sub: (adStats?.stagingTotal || 0).toLocaleString() + ' parts', color: C.sky, active: false },
                     { step: '→', label: '', sub: '', color: C.t4, active: false },
                     { step: '3', label: 'Import', sub: (adStats?.todayCount ?? '—') + '/' + (adStats?.maxPerDay ?? 3) + ' today', color: C.amber, active: adImporting },
                     { step: '→', label: '', sub: '', color: C.t4, active: false },
@@ -1950,7 +1901,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui }}>
-                    Scraping progress — {(adMonitor?.stagingTotal || 0).toLocaleString()} of {TOTAL_EXPECTED_PRODUCTS.toLocaleString()} products
+                    Staging DB — {(adStats?.stagingTotal || 0).toLocaleString()} of {TOTAL_EXPECTED_PRODUCTS.toLocaleString()} products
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontFamily: FONT.ui }}>{overallPct}%</span>
                 </div>
@@ -1959,71 +1910,8 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                 </div>
               </div>
 
-              {/* ══ TWO-COLUMN ROW: SCRAPER + IMPORT ══ */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-
-                {/* LEFT: Scraper Control */}
-                <div style={{ background: C.surface, border: `1.5px solid ${scraperActive ? C.green : C.border}`, borderRadius: 12, padding: '18px 18px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui, marginBottom: 12 }}>
-                    Scraper Control
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: scraperActive ? C.green : C.t4, flexShrink: 0, boxShadow: scraperActive ? `0 0 6px ${C.green}` : 'none' }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: scraperActive ? C.green : C.t2, fontFamily: FONT.ui }}>
-                      {scraperActive ? `Running — ${rt?.currentCategory || 'loading…'}` : rt?.exitCode != null ? `Stopped (exit ${rt.exitCode})` : 'Idle'}
-                    </span>
-                  </div>
-                  {scraperActive && rt?.currentPage && (
-                    <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui, marginBottom: 8 }}>
-                      Page {rt.currentPage.toLocaleString()} · started {rt.startedAt ? new Date(rt.startedAt).toLocaleTimeString('en-IN') : '—'}
-                    </div>
-                  )}
-                  {rt?.error && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT.ui, marginBottom: 8 }}>⚠ {rt.error}</div>}
-                  {adCtrlError && <div style={{ fontSize: 11, color: C.red, background: C.redBg, borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontFamily: FONT.ui }}>{adCtrlError}</div>}
-                  {!scraperActive ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <select value={adStartCategory} onChange={e => setAdStartCategory(e.target.value)}
-                        style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}>
-                        <option value=''>All categories (full run)</option>
-                        {ALL_AD_CATS.map((c: string) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <select value={adStartDelay} onChange={e => setAdStartDelay(Number(e.target.value))}
-                          style={{ flex: 1, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}>
-                          {[8,10,12,15,20].map((d: number) => <option key={d} value={d}>{d}s between pages</option>)}
-                        </select>
-                        <button onClick={handleAdStart} disabled={adStarting} style={{
-                          flex: 1, background: adStarting ? C.borderLight : C.green, color: adStarting ? C.t3 : '#fff',
-                          border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700,
-                          cursor: adStarting ? 'not-allowed' : 'pointer', fontFamily: FONT.ui,
-                        }}>
-                          {adStarting ? 'Starting…' : '▶ Start Scraper'}
-                        </button>
-                      </div>
-                      <div style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui }}>
-                        Resumes from where it stopped. Needs Python 3 + Playwright on the server.
-                      </div>
-                    </div>
-                  ) : (
-                    <button onClick={handleAdStop} disabled={adStopping} style={{
-                      width: '100%', background: C.redBg, color: C.red,
-                      border: `1.5px solid ${C.red}`, borderRadius: 8, padding: '10px 0', fontSize: 13, fontWeight: 700,
-                      cursor: adStopping ? 'not-allowed' : 'pointer', fontFamily: FONT.ui,
-                    }}>
-                      {adStopping ? 'Stopping…' : '■ Stop Scraper'}
-                    </button>
-                  )}
-                  {rt?.logs?.length > 0 && (
-                    <button onClick={() => setAdLogExpanded((x: boolean) => !x)} style={{
-                      marginTop: 10, background: 'none', border: `1px solid ${C.border}`, borderRadius: 6,
-                      padding: '5px 10px', fontSize: 10, color: C.t3, cursor: 'pointer', fontFamily: FONT.ui, width: '100%',
-                    }}>
-                      {adLogExpanded ? '▲ Hide live log' : `▼ Show live log (${rt.logs.length} lines)`}
-                    </button>
-                  )}
-                </div>
-
-                {/* RIGHT: Import to Catalog */}
+              {/* ══ IMPORT TO CATALOG ══ */}
+              <div style={{ marginBottom: 20 }}>
                 <div style={{ background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '18px 18px' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui, marginBottom: 12 }}>
                     Import to Master Catalog
@@ -2088,22 +1976,6 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                   {adError && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT.ui, marginTop: 8 }}>{adError}</div>}
                 </div>
               </div>
-
-              {/* ══ LIVE LOG (collapsible) ══ */}
-              {adLogExpanded && rt?.logs?.length > 0 && (
-                <div style={{ background: '#0d1117', borderRadius: 10, padding: '12px 14px', marginBottom: 20, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace", fontSize: 11, maxHeight: 240, overflowY: 'auto' }}>
-                  {rt.logs.slice(-30).map((entry: any, i: number) => {
-                    const isErr  = entry.line.startsWith('[ERR]');
-                    const isWarn = entry.line.includes('Waiting') || entry.line.includes('NEXT');
-                    return (
-                      <div key={i} style={{ color: isErr ? '#f87171' : isWarn ? '#fbbf24' : '#86efac', marginBottom: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                        <span style={{ color: '#4b5563', marginRight: 8 }}>{new Date(entry.ts).toLocaleTimeString('en-IN')}</span>
-                        {entry.line}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
 
               {/* ══ JUST IMPORTED PREVIEW ══ */}
               {adResult && (
@@ -2221,49 +2093,69 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                 </div>
               )}
 
-              {/* ══ CATEGORY PROGRESS GRID ══ */}
-              <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
-                Subcategory Scraping Progress ({Object.keys(catMap).length} / 25 started)
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8, marginBottom: 20 }}>
-                {ALL_AD_CATS.map((cat: string) => {
-                  const d = catMap[cat];
-                  const isActive = rt?.currentCategory === cat && scraperActive;
-                  const pct = d ? Math.min(100, Math.round((d.products_scraped / (TOTAL_EXPECTED_PRODUCTS / 25)) * 100)) : 0;
-                  return (
-                    <div key={cat} style={{ background: C.surface, border: `1.5px solid ${isActive ? C.green : d ? C.border : C.borderLight}`, borderRadius: 8, padding: '10px 12px', boxShadow: isActive ? `0 0 0 2px ${C.green}33` : 'none' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, gap: 6 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: isActive ? C.green : d ? C.t1 : C.t4, fontFamily: FONT.ui, flex: 1, lineHeight: 1.3 }}>
-                          {isActive && <span style={{ marginRight: 4 }}>●</span>}{cat}
-                        </span>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: d ? C.amber : C.t4, fontFamily: FONT.ui, flexShrink: 0 }}>{d ? `${pct}%` : '—'}</span>
-                      </div>
-                      <div style={{ height: 4, background: C.borderLight, borderRadius: 99, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: isActive ? C.green : C.amber, borderRadius: 99 }} />
-                      </div>
-                      {d && (
-                        <div style={{ fontSize: 9, color: C.t3, fontFamily: FONT.ui, marginTop: 4 }}>
-                          {d.products_scraped.toLocaleString()} products · {d.pages_done.toLocaleString()} pages
-                        </div>
-                      )}
+              {/* ══ OEM BRAND BREAKDOWN ══ */}
+              {adStats?.brandStats?.length > 0 && (
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+                  <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
+                      OEM Brand Breakdown — Staging
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* ══ TOP OEM BRANDS ══ */}
-              {adMonitor?.topBrands?.length > 0 && (
-                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui, marginBottom: 10 }}>
-                    Top OEM Brands in Staging
+                    <span style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui }}>{adStats.brandStats.length} brands</span>
                   </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {adMonitor.topBrands.map((b: any) => (
-                      <div key={b.brand} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 20, padding: '5px 12px', display: 'flex', gap: 7, alignItems: 'center' }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: C.t1, fontFamily: FONT.ui }}>{b.brand}</span>
-                        <span style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui, background: C.border, borderRadius: 10, padding: '1px 6px' }}>{Number(b.cnt).toLocaleString()}</span>
-                      </div>
-                    ))}
+                  <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          {['Brand', 'Total', 'OEM', 'OES', 'Categories'].map((h: string) => (
+                            <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: h === 'Brand' ? 'left' : 'right', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adStats.brandStats.map((b: any, i: number) => (
+                          <tr key={b.brand} style={{ background: i % 2 === 0 ? 'transparent' : `${C.bg}88` }}>
+                            <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{b.brand}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, textAlign: 'right' }}>{b.total.toLocaleString()}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: C.sky, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, textAlign: 'right' }}>{b.oemCount.toLocaleString()}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: C.green, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, textAlign: 'right' }}>{b.oesCount.toLocaleString()}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, textAlign: 'right' }}>{b.categoryCount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ══ CATEGORY BREAKDOWN ══ */}
+              {adStats?.categoryStats?.length > 0 && (
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+                  <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
+                      Category Breakdown — Staging
+                    </div>
+                    <span style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui }}>{adStats.categoryStats.length} categories</span>
+                  </div>
+                  <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                        <tr>
+                          {['Category', 'Total', 'OEM', 'OES'].map((h: string) => (
+                            <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: h === 'Category' ? 'left' : 'right', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adStats.categoryStats.map((c: any, i: number) => (
+                          <tr key={c.category} style={{ background: i % 2 === 0 ? 'transparent' : `${C.bg}88` }}>
+                            <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 600, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{c.category}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 800, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, textAlign: 'right' }}>{c.total.toLocaleString()}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: C.sky, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, textAlign: 'right' }}>{c.oemCount.toLocaleString()}</td>
+                            <td style={{ padding: '8px 12px', fontSize: 12, color: C.green, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, textAlign: 'right' }}>{c.oesCount.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}
