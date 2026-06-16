@@ -227,7 +227,7 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function OrdersPage() {
-    const { movements, products, orders: mktOrders, saveOrders, activeShopId, syncFromAPI, apiSynced } = useStore();
+    const { movements, products, orders: mktOrders, saveOrders, activeShopId } = useStore();
     const { toast } = useContext(AppCtx);
     const isMobile = useIsMobile();
 
@@ -263,9 +263,8 @@ export function OrdersPage() {
             await api.put(`/api/marketplace/orders/${backendId}/status`, { status: next });
             toast?.(`Order moved to ${next}.`, "success");
             await fetchShopOrders();
-            // Stock is restored on cancel / stamped on delivery server-side —
-            // re-sync inventory so quantities update dynamically.
-            syncFromAPI().catch(() => {});
+            // Stock is restored on cancel / stamped on delivery server-side;
+            // ERPShell's rp:data-changed listener will refresh the store.
         } catch (err) {
             console.error("[OrdersPage] Failed to update marketplace order status:", err);
             toast?.("Could not update order status. Please try again.", "error");
@@ -293,7 +292,6 @@ export function OrdersPage() {
             }
             saveOrders((mktOrders || []).map((o: any) => (o.id === row.localId ? { ...o, status: next } : o)));
             toast?.(`Order ${row.orderId} → ${next === "DELIVERED" ? "Delivered" : "Cancelled"}.`, "success");
-            syncFromAPI().catch(() => {});
         } catch (e: any) {
             console.error("[updateManualOrderStatus]", e);
             toast?.(e?.data?.error || "Could not update the order.", "error");
@@ -443,11 +441,6 @@ export function OrdersPage() {
             />
         </div>
     );
-
-    // First-load skeleton: show until the initial API sync brings orders in.
-    if (!apiSynced && allOrders.length === 0) {
-        return <Skeleton.Page kpis={4} cols={6} />;
-    }
 
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: isMobile ? 14 : 18 }}>

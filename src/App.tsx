@@ -220,7 +220,7 @@ function AppContent() {
     products, movements, orders, shops, parties, vehicles, jobCards,
     saveProducts, saveMovements, saveOrders, saveShops, saveParties, saveVehicles, saveJobCards,
     auditLog, receipts, saveReceipts,
-    loaded, activeShopId, setActiveShopId, persistShopId, logAudit, resetAll, clearStore, syncFromAPI,
+    loaded, activeShopId, setActiveShopId, persistShopId, logAudit, resetAll, clearStore,
   } = useStore();
 
   // ── UI state ─────────────────────────────────────────────────────────────────
@@ -306,17 +306,6 @@ function AppContent() {
     }
     navigate(getDefaultRoute(user), { replace: true });
   }, [navigate, setActiveShopId, clearStore]);
-
-  useEffect(() => {
-    if (!currentUser || !tokenReady) return;
-    // setTimeout(50) lets the first paint finish before hitting the network.
-    // Previously used requestIdleCallback({timeout:1200}) which could delay up to 1.2s.
-    const t = setTimeout(
-      () => syncFromAPI().catch((err) => console.warn("[App] Post-login sync failed:", err)),
-      50,
-    );
-    return () => clearTimeout(t);
-  }, [currentUser, tokenReady, syncFromAPI]);
 
   const handleLogout = useCallback(() => {
     const rt = localStorage.getItem("as_refresh_token");
@@ -425,7 +414,6 @@ function AppContent() {
 
   const handleSale = useCallback((data) => {
     if (!products) return;
-    const currentMovements = movements ?? [];
     const isQuote = data.type === "Quotation";
     if (!isQuote) {
       const productToSell = products.find(p => p.id === data.productId);
@@ -436,21 +424,6 @@ function AppContent() {
       saveProducts(products.map((p) => (p.id === data.productId ? { ...p, stock: Math.max(0, p.stock - data.qty) } : p)));
     }
     const sel = products.find((p) => p.id === data.productId);
-    const isCredit = data.paymentMode === "Udhaar" || (data.payments && data.payments.Credit > 0);
-    const paymentStr = data.payments
-      ? Object.entries(data.payments).filter(([_, a]) => a > 0).map(([k, a]) => `${k}:${a}`).join(", ")
-      : data.payment;
-    saveMovements([...currentMovements, {
-      id: "m" + uid(), shopId: activeShopId, productId: data.productId, productName: sel?.name || "",
-      type: isQuote ? "ESTIMATE" : "SALE", qty: data.qty, unitPrice: data.sellPrice, sellingPrice: data.sellPrice,
-      total: data.total, totalAmount: data.total, gstAmount: data.gstAmount, profit: isQuote ? 0 : data.profit,
-      discount: data.discount, customerName: data.customerName, customerPhone: data.customerPhone,
-      vehicleReg: data.vehicleReg, mechanic: data.mechanic, supplier: null, invoiceNo: data.invoiceNo,
-      partyId: data.partyId || null, payment: paymentStr, paymentMode: data.paymentMode || null, creditDays: 0,
-      paymentStatus: isCredit && !isQuote ? "pending" : "paid",
-      note: [data.customerName && `Customer: ${data.customerName}`, data.vehicleReg && `Vehicle: ${data.vehicleReg}`, data.notes].filter(Boolean).join(" · ") || (isQuote ? "Quotation generated" : "Walk-in sale"),
-      date: data.date, ...(data.priceOverride && { priceOverride: data.priceOverride }),
-    }]);
     logAudit(isQuote ? "QUOTATION_CREATED" : "SALE_RECORDED", "movement", data.invoiceNo, `${data.qty}×${sel?.name?.slice(0, 20)} · ${fmt(data.total)}`);
     if (data.priceOverride) logAudit("PRICE_OVERRIDE", "movement", data.invoiceNo, `${sel?.name?.slice(0, 20)}: ${fmt(data.priceOverride.originalPrice)} → ${fmt(data.priceOverride.overriddenPrice)} (${data.priceOverride.reason || "no reason"})`);
     toast(isQuote ? `Quotation Generated: ${data.invoiceNo}` : `Sale recorded: ${data.qty}×${sel?.name?.slice(0, 20) || "product"} · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : "Sale Complete");
@@ -465,16 +438,16 @@ function AppContent() {
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
       }).then(() => {
         window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
+        window.dispatchEvent(new CustomEvent("rp:data-changed"));
       }).catch((err) => {
         window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
         console.error("[Sync] Sale sync failed — saved locally, backend out of sync:", err?.message);
       });
     }
-  }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
+  }, [products, saveProducts, toast, activeShopId, logAudit]);
 
   const handleMultiItemSale = useCallback((data) => {
     if (!products) return;
-    const currentMovements = movements ?? [];
     const isQuote = data.type === "Quotation";
     if (!isQuote) {
       for (const item of data.items) {
@@ -485,31 +458,16 @@ function AppContent() {
         }
       }
     }
-    const newMovements = [];
     let updatedProducts = [...products];
     let hasOverrides = false;
     data.items.forEach((item) => {
       if (!isQuote) updatedProducts = updatedProducts.map((p) => (p.id === item.productId ? { ...p, stock: Math.max(0, p.stock - item.qty) } : p));
-      const isCredit = data.paymentMode === "Udhaar" || (data.payments && data.payments.Credit > 0);
-      const paymentStr = data.payments ? Object.entries(data.payments).filter(([_, a]) => a > 0).map(([k, a]) => `${k}:${a}`).join(", ") : "";
-      newMovements.push({
-        id: "m" + uid(), shopId: activeShopId, productId: item.productId, productName: item.name,
-        type: isQuote ? "ESTIMATE" : "SALE", qty: item.qty, unitPrice: item.sellPrice, sellingPrice: item.sellPrice,
-        total: item.total, totalAmount: item.total, gstAmount: item.gstAmount, profit: isQuote ? 0 : item.profit,
-        discount: item.discount, customerName: data.customerName, customerPhone: data.customerPhone,
-        vehicleReg: data.vehicleReg, mechanic: data.mechanic, supplier: null, invoiceNo: data.invoiceNo,
-        partyId: data.partyId || null, payment: paymentStr, paymentMode: data.paymentMode || null, creditDays: 0,
-        paymentStatus: isCredit && !isQuote ? "pending" : "paid",
-        note: [data.customerName && `Customer: ${data.customerName}`, data.vehicleReg && `Vehicle: ${data.vehicleReg}`, data.notes].filter(Boolean).join(" · ") || (isQuote ? "Quotation" : "POS Sale"),
-        date: data.date, multiItemInvoice: true, ...(item.priceOverride && { priceOverride: item.priceOverride }),
-      });
       if (item.priceOverride) {
         hasOverrides = true;
         logAudit("PRICE_OVERRIDE", "movement", data.invoiceNo, `${item.name?.slice(0, 20)}: ${fmt(item.priceOverride.originalPrice)} → ${fmt(item.priceOverride.overriddenPrice)} (${item.priceOverride.reason || "no reason"})`);
       }
     });
     saveProducts(updatedProducts);
-    saveMovements([...currentMovements, ...newMovements]);
     logAudit(isQuote ? "MULTI_QUOTATION_CREATED" : "MULTI_SALE_RECORDED", "movement", data.invoiceNo, `${data.items.length} items · ${fmt(data.total)}${hasOverrides ? " · price override(s)" : ""}`);
     toast(isQuote ? `Quotation: ${data.items.length} items · ${fmt(data.total)}` : `Sale recorded: ${data.items.length} items · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : `Invoice ${data.invoiceNo}`);
     if (!isQuote) {
@@ -523,29 +481,19 @@ function AppContent() {
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
       }).then(() => {
         window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
+        window.dispatchEvent(new CustomEvent("rp:data-changed"));
       }).catch((err) => {
         window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
         console.error("[Sync] Multi-sale sync failed — saved locally, backend out of sync:", err?.message);
       });
     }
-  }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
+  }, [products, saveProducts, toast, activeShopId, logAudit]);
 
   const handlePurchase = useCallback((data) => {
     if (!products) return;
-    const currentMovements = movements ?? [];
     const updated = products.map((p) => (p.id === data.productId ? { ...p, stock: p.stock + data.qty, buyPrice: data.buyPrice, sellPrice: data.newSellPrice || p.sellPrice, supplier: data.supplier || p.supplier } : p));
     saveProducts(updated);
     const sel = products.find((p) => p.id === data.productId);
-    saveMovements([...currentMovements, {
-      id: "m" + uid(), shopId: activeShopId, productId: data.productId, productName: sel?.name || "", type: "PURCHASE",
-      qty: data.qty, unitPrice: data.buyPrice, sellingPrice: data.newSellPrice || sel?.sellPrice,
-      total: data.total, gstAmount: data.gstAmount, profit: null,
-      supplier: data.supplier, supplierName: data.supplier, invoiceNo: data.invoiceNo,
-      payment: data.payment, paymentMode: data.payment, creditDays: data.creditDays,
-      paymentStatus: data.payment === "Credit" ? "pending" : "paid",
-      note: [data.supplier && `Supplier: ${data.supplier}`, data.payment === "Credit" && `Credit ${data.creditDays}d`, data.notes].filter(Boolean).join(" · ") || "Stock purchase",
-      date: data.date,
-    }]);
     logAudit("PURCHASE_RECORDED", "movement", data.invoiceNo, `+${data.qty} ${sel?.name?.slice(0, 20)} · ${fmt(data.total)}`);
     toast(`Stock added: +${data.qty} units · ${fmt(data.total)}`, "info", "Purchase Recorded");
     window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
@@ -555,30 +503,18 @@ function AppContent() {
       invoiceNo: data.invoiceNo, payment: data.payment, creditDays: data.creditDays, notes: data.notes,
     }).then(() => {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
+      window.dispatchEvent(new CustomEvent("rp:data-changed"));
     }).catch((err) => {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
       console.error("[Sync] Purchase sync failed — saved locally, backend out of sync:", err?.message);
     });
-  }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
+  }, [products, saveProducts, toast, activeShopId, logAudit]);
 
   const handleAdjustment = useCallback((data) => {
-    if (!products || !movements) return;
+    if (!products) return;
     const sel = products.find((p) => p.id === data.productId);
     const stockChange = data.stockDirection * data.qty;
     if (stockChange !== 0) saveProducts(products.map((p) => (p.id === data.productId ? { ...p, stock: Math.max(0, p.stock + stockChange) } : p)));
-    const lossAmount = (data.adjustType === "DAMAGE" || data.adjustType === "THEFT") ? (sel?.buyPrice || 0) * data.qty : 0;
-    saveMovements([...movements, {
-      id: "m" + uid(), shopId: activeShopId, productId: data.productId, productName: sel?.name || "",
-      type: data.adjustType, qty: data.qty, unitPrice: sel?.buyPrice || 0, sellingPrice: sel?.sellPrice || 0,
-      total: data.refundAmount || lossAmount || 0, gstAmount: 0,
-      profit: data.adjustType === "RETURN_IN" ? -(data.refundAmount || 0) : data.adjustType === "DAMAGE" || data.adjustType === "THEFT" ? -lossAmount : 0,
-      customerName: data.adjustType === "RETURN_IN" ? "Customer Return" : null,
-      supplier: data.supplierName || null, supplierName: data.supplierName || null,
-      invoiceNo: data.originalInvoice || null, payment: data.refundMethod || data.adjustType, paymentStatus: "completed",
-      note: [data.reason && `Reason: ${data.reason}`, data.reasonDetail, data.adjustType === "AUDIT" && `Audit: ${data.previousStock} → ${data.previousStock + stockChange}`, data.notes].filter(Boolean).join(" · ") || `Stock ${data.adjustType.toLowerCase()}`,
-      date: data.date,
-      adjustmentMeta: { type: data.adjustType, previousStock: data.previousStock, newStock: (data.previousStock || 0) + stockChange, reason: data.reason, refundMethod: data.refundMethod },
-    }]);
     const labels = { RETURN_IN: "Customer return processed", RETURN_OUT: "Returned to vendor", CREDIT_NOTE: "Credit note issued", DEBIT_NOTE: "Debit note issued", DAMAGE: "Damage recorded", THEFT: "Shrinkage recorded", AUDIT: "Audit correction applied", OPENING: "Opening stock set" };
     logAudit("ADJUSTMENT_" + data.adjustType, "movement", data.productId, `${labels[data.adjustType] || data.adjustType}: ${stockChange > 0 ? "+" : ""}${stockChange} units`);
     toast(`${labels[data.adjustType] || data.adjustType}: ${stockChange !== 0 ? (stockChange > 0 ? "+" : "") + stockChange + " units of " : ""}${sel?.name?.slice(0, 20) || "product"}${data.refundAmount ? " · " + fmt(data.refundAmount) : ""}`, data.adjustType === "RETURN_IN" || data.adjustType === "OPENING" ? "info" : data.adjustType === "CREDIT_NOTE" || data.adjustType === "DEBIT_NOTE" ? "success" : "warning", labels[data.adjustType] || data.adjustType);
@@ -590,11 +526,12 @@ function AppContent() {
       supplierName: data.supplierName, originalInvoice: data.originalInvoice, notes: data.notes,
     }).then(() => {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
+      window.dispatchEvent(new CustomEvent("rp:data-changed"));
     }).catch((err) => {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
       console.error("[Sync] Adjustment sync failed — saved locally, backend out of sync:", err?.message);
     });
-  }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
+  }, [products, saveProducts, toast, activeShopId, logAudit]);
 
   const handlePaymentReceipt = useCallback((data) => {
     if (!movements) return;

@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, pct, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV, inDateRange } from "../utils";
 import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 import { useJobCardHistory } from "../hooks/useJobCardHistory";
+import { fetchMovements } from "../api/sync";
 
 // ─── Group movements that share the same invoiceNo or batchId ─────────────────
 function groupMovements(filtered: any[]) {
@@ -274,7 +275,7 @@ const TABS = [
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export function HistoryPage() {
-    const { movements, orders, activeShopId, apiSynced } = useStore();
+    const { orders, activeShopId, apiSynced } = useStore();
     const isMobile = useIsMobile();
     const [tab, setTab]             = useState<string>("ALL");
     const [period, setPeriod]       = useState<Period>("7D");
@@ -283,6 +284,29 @@ export function HistoryPage() {
     const [dateFrom, setDateFrom]   = useState("");
     const [dateTo, setDateTo]       = useState("");
     const [visibleCount, setVisibleCount] = useState(50);
+
+    // Local movements fetched directly from the API (server-first).
+    const [apiMovements, setApiMovements] = useState<any[]>([]);
+    const [histLoading, setHistLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        const load = () => {
+            setHistLoading(true);
+            fetchMovements().then(data => {
+                if (!cancelled) {
+                    setApiMovements(data || []);
+                    setHistLoading(false);
+                }
+            }).catch(() => { if (!cancelled) setHistLoading(false); });
+        };
+        load();
+        window.addEventListener('rp:data-changed', load);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('rp:data-changed', load);
+        };
+    }, []);
 
     // Marketplace sales (non-cancelled orders) fold into the movement ledger so
     // they show in History alongside POS movements. Cancelled orders are excluded.
@@ -326,12 +350,14 @@ export function HistoryPage() {
         () => [
             // Hide the internal "[order]" stock adjustments — the manual order entry
             // below is the History record for a delivered order (avoids a double row).
-            ...(movements || []).filter(m => m.shopId === activeShopId && !String((m as any).note ?? (m as any).notes ?? "").includes("[order]")),
+            // apiMovements are already scoped to the shop by the API, but we still
+            // filter by shopId for safety in case the response includes other shops.
+            ...(apiMovements || []).filter(m => m.shopId === activeShopId && !String((m as any).note ?? (m as any).notes ?? "").includes("[order]")),
             ...mpSales,
             ...jobMovements,
             ...manualOrders,
         ],
-        [movements, activeShopId, mpSales, jobMovements, manualOrders],
+        [apiMovements, activeShopId, mpSales, jobMovements, manualOrders],
     );
 
     // Apply period quick-filter (overrides manual dates when set)
@@ -377,8 +403,9 @@ export function HistoryPage() {
 
     const VERSION = "V4.6.1-STABLE";
 
-    // First-load skeleton: show until the initial API sync brings movements in.
-    if (!apiSynced && shopMovements.length === 0) {
+    // First-load skeleton: show while the direct API fetch is in flight or until
+    // the initial API sync brings movements in.
+    if (histLoading || (!apiSynced && shopMovements.length === 0)) {
         return <Skeleton.Page kpis={4} cols={10} />;
     }
 

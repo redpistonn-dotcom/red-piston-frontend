@@ -28,16 +28,11 @@ export function InventoryPage() {
   const { products: storeProducts, movements, activeShopId, saveProducts, shops } = useStore();
   const { handleSale: onSale, handlePurchase: onPurchase, handleAdjustment: onAdjust, toast, setAddProdOpen, setPModal } = useContext(AppCtx);
 
-  // Use store data immediately (loaded from localStorage on startup).
-  // Only hit the API if the store is empty — first-ever load or cleared cache.
-  // syncFromAPI (fired post-login) keeps data fresh in the background.
   useEffect(() => {
-    if (storeProducts && storeProducts.length > 0) return;
     fetchInventory().then(data => {
       if (data?.length) saveProducts(data, true);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const products = storeProducts;
 
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });
@@ -114,7 +109,7 @@ export function InventoryPage() {
         return `${selBrand.name} ${selModel.name}`;
     }, [selBrand, selModel]);
 
-    const shopProducts = useMemo(() => (products ?? []).filter(p => p.shopId === activeShopId), [products, activeShopId]);
+    const shopProducts = useMemo(() => (storeProducts ?? []).filter(p => p.shopId === activeShopId), [storeProducts, activeShopId]);
 
     // Category pills derived from the products actually present, so a pill's value
     // always matches a real `p.category` and filtering can never silently return
@@ -207,7 +202,7 @@ export function InventoryPage() {
 
     // Block render until API responds — prevents stale localStorage flash.
     // Shimmer skeleton so the load is clearly visible.
-    if (products === null) {
+    if (storeProducts === null) {
       return <Skeleton.Page kpis={4} cols={6} rows={8} />;
     }
 
@@ -579,9 +574,9 @@ export function InventoryPage() {
                 </div>
             )}
 
-            <SaleModal open={!!saleP} product={saleP} products={products} onClose={() => setSaleP(null)} onSave={(data) => onSale(data)} toast={toast} />
-            <PurchaseModal open={!!purchP} product={purchP} products={products} onClose={() => setPurchP(null)} onSave={(data) => onPurchase(data)} toast={toast} />
-            <StockAdjustmentModal open={!!adjP} product={adjP} products={products} onClose={() => setAdjP(null)} onSave={(data) => onAdjust(data)} toast={toast} />
+            <SaleModal open={!!saleP} product={saleP} products={storeProducts} onClose={() => setSaleP(null)} onSave={(data) => onSale(data)} toast={toast} />
+            <PurchaseModal open={!!purchP} product={purchP} products={storeProducts} onClose={() => setPurchP(null)} onSave={(data) => onPurchase(data)} toast={toast} />
+            <StockAdjustmentModal open={!!adjP} product={adjP} products={storeProducts} onClose={() => setAdjP(null)} onSave={(data) => onAdjust(data)} toast={toast} />
             <PurchaseOrderModal
                 open={poModalOpen}
                 onClose={() => { setPoModalOpen(false); setSelectedIds([]); }}

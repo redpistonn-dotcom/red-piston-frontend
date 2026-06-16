@@ -16,6 +16,7 @@ import { fmt } from "../utils";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { api } from "../api/client.js";
+import { fetchInventory, fetchMovements, fetchParties } from '../api/sync.js';
 import { Toast } from "../components/ui";
 import { ProfileDropdown } from "../components/ProfileDropdown";
 import { ProductModal } from "../components/ProductModal";
@@ -145,7 +146,7 @@ export function ERPShell({ children }: ERPShellProps) {
     saveProduct, handleBulkStockIn,
   } = useContext(AppCtx);
 
-  const { products, movements, orders, shops, activeShopId, saveShops } = useStore();
+  const { products, movements, orders, shops, activeShopId, saveShops, saveProducts, saveMovements, saveParties } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -247,6 +248,33 @@ export function ERPShell({ children }: ERPShellProps) {
   // ── Mobile drawer state ───────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
   const touchStartX = useRef(0);
+
+  // ── Server-first data loader — fetch on mount and re-fetch on rp:data-changed ─
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [prods, movs, parts] = await Promise.all([
+          fetchInventory(),
+          fetchMovements(),
+          fetchParties(),
+        ]);
+        if (cancelled) return;
+        if (Array.isArray(prods)) saveProducts(prods, true);
+        if (Array.isArray(movs)) saveMovements(movs);
+        if (Array.isArray(parts)) saveParties(parts);
+      } catch (e) {
+        console.error('[ERPShell] initial data load failed:', e);
+      }
+    };
+    load();
+    const onChange = () => load();
+    window.addEventListener('rp:data-changed', onChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('rp:data-changed', onChange);
+    };
+  }, [saveProducts, saveMovements, saveParties]);
 
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false); }, [currentPath]);
