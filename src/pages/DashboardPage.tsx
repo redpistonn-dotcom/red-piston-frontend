@@ -24,12 +24,12 @@ export function DashboardPage() {
   const prevCut = now - days * 2 * 86400000;
 
   // 1. FILTER BY ACTIVE SHOP
-  const shopProducts = useMemo(() => products.filter(p => p.shopId === activeShopId), [products, activeShopId]);
+  const shopProducts = useMemo(() => (products || []).filter(p => p.shopId === activeShopId), [products, activeShopId]);
   // Fold marketplace sales (non-cancelled orders) into the movement ledger so
   // revenue/units reflect online orders as soon as they're placed.
   const { saleMovements: mpSales } = useShopMarketplaceSales(activeShopId);
   const shopMovements = useMemo(
-    () => [...movements.filter(m => m.shopId === activeShopId), ...mpSales],
+    () => [...(movements || []).filter(m => m.shopId === activeShopId), ...mpSales],
     [movements, activeShopId, mpSales],
   );
 
