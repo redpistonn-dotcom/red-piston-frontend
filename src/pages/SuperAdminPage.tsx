@@ -2115,7 +2115,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                         Import complete — {adResult.inserted.toLocaleString()} new parts added
                       </div>
                       <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui }}>
-                        {adResult.attempted.toLocaleString()} attempted · {adResult.attempted - adResult.inserted} already in master
+                        {(adResult.attempted ?? 0).toLocaleString()} attempted · {(adResult.attempted ?? 0) - adResult.inserted} already in master
                         {adCategory ? ` · category: ${adCategory}` : ''}
                       </div>
                     </div>
