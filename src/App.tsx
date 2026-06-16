@@ -424,7 +424,8 @@ function AppContent() {
   }, [products, movements, saveProducts, saveMovements, activeShopId, logAudit]);
 
   const handleSale = useCallback((data) => {
-    if (!products || !movements) return;
+    if (!products) return;
+    const currentMovements = movements ?? [];
     const isQuote = data.type === "Quotation";
     if (!isQuote) {
       const productToSell = products.find(p => p.id === data.productId);
@@ -439,7 +440,7 @@ function AppContent() {
     const paymentStr = data.payments
       ? Object.entries(data.payments).filter(([_, a]) => a > 0).map(([k, a]) => `${k}:${a}`).join(", ")
       : data.payment;
-    saveMovements([...movements, {
+    saveMovements([...currentMovements, {
       id: "m" + uid(), shopId: activeShopId, productId: data.productId, productName: sel?.name || "",
       type: isQuote ? "ESTIMATE" : "SALE", qty: data.qty, unitPrice: data.sellPrice, sellingPrice: data.sellPrice,
       total: data.total, totalAmount: data.total, gstAmount: data.gstAmount, profit: isQuote ? 0 : data.profit,
@@ -472,7 +473,8 @@ function AppContent() {
   }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
 
   const handleMultiItemSale = useCallback((data) => {
-    if (!products || !movements) return;
+    if (!products) return;
+    const currentMovements = movements ?? [];
     const isQuote = data.type === "Quotation";
     if (!isQuote) {
       for (const item of data.items) {
@@ -507,7 +509,7 @@ function AppContent() {
       }
     });
     saveProducts(updatedProducts);
-    saveMovements([...movements, ...newMovements]);
+    saveMovements([...currentMovements, ...newMovements]);
     logAudit(isQuote ? "MULTI_QUOTATION_CREATED" : "MULTI_SALE_RECORDED", "movement", data.invoiceNo, `${data.items.length} items · ${fmt(data.total)}${hasOverrides ? " · price override(s)" : ""}`);
     toast(isQuote ? `Quotation: ${data.items.length} items · ${fmt(data.total)}` : `Sale recorded: ${data.items.length} items · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : `Invoice ${data.invoiceNo}`);
     if (!isQuote) {
@@ -529,11 +531,12 @@ function AppContent() {
   }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
 
   const handlePurchase = useCallback((data) => {
-    if (!products || !movements) return;
+    if (!products) return;
+    const currentMovements = movements ?? [];
     const updated = products.map((p) => (p.id === data.productId ? { ...p, stock: p.stock + data.qty, buyPrice: data.buyPrice, sellPrice: data.newSellPrice || p.sellPrice, supplier: data.supplier || p.supplier } : p));
     saveProducts(updated);
     const sel = products.find((p) => p.id === data.productId);
-    saveMovements([...movements, {
+    saveMovements([...currentMovements, {
       id: "m" + uid(), shopId: activeShopId, productId: data.productId, productName: sel?.name || "", type: "PURCHASE",
       qty: data.qty, unitPrice: data.buyPrice, sellingPrice: data.newSellPrice || sel?.sellPrice,
       total: data.total, gstAmount: data.gstAmount, profit: null,
