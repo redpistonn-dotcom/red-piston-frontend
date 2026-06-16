@@ -26,7 +26,7 @@ function PayBtn({ label, icon, active, onClick }: { label: string; icon: string;
 }
 
 export function POSBillingPage() {
-    const { products, activeShopId, shops } = useStore();
+    const { products, activeShopId, shops, parties, movements } = useStore();
     const { handleMultiItemSale: onMultiSale, toast } = useContext(AppCtx);
     const shop = useMemo(() => (shops || []).find((s: any) => s.id === activeShopId) || null, [shops, activeShopId]);
     const shopProducts = useMemo(() => (products || []).filter((p: any) => p.shopId === activeShopId && p.isActive !== false), [products, activeShopId]);
@@ -46,6 +46,7 @@ export function POSBillingPage() {
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [vehicleReg, setVehicleReg]   = useState("");
+    const [partyId, setPartyId]     = useState<string | number | null>(null);
     const [showInvoice, setShowInvoice] = useState(false);
     const [saving, setSaving]       = useState(false);
     const [invoiceNo, setInvoiceNo] = useState("");
@@ -141,6 +142,17 @@ export function POSBillingPage() {
     const grandTotal    = lineCalcs.reduce((s, l) => s + l.afterDisc, 0);
     const finalTotal    = Math.max(0, grandTotal - additionalDisc);
 
+    // Credit limit check for Udhaar
+    const selectedParty = useMemo(() => (parties || []).find((p: any) => String(p.id) === String(partyId)), [parties, partyId]);
+    const partyOutstanding = useMemo(() => {
+      if (!selectedParty) return 0;
+      return (movements || []).filter((m: any) => String(m.partyId) === String(selectedParty.id) && m.paymentStatus === "pending")
+        .reduce((s: number, m: any) => s + (m.total || m.totalAmount || 0), 0);
+    }, [selectedParty, movements]);
+    const creditLimit = selectedParty?.creditLimit || 0;
+    const creditAfterSale = partyOutstanding + finalTotal;
+    const overLimit = creditLimit > 0 && creditAfterSale > creditLimit;
+
     // Submit
     const handleSubmitRef = useRef<(() => void) | null>(null);
     const validate = () => {
@@ -176,6 +188,7 @@ export function POSBillingPage() {
                 gstAmount: lineCalcs[idx].gstAmt, profit: lineCalcs[idx].profit, gstRate: item.gstRate,
             })),
             customerName, customerPhone, vehicleReg, notes,
+            partyId: partyId || undefined,
             payments: { [paymentMode === "Udhaar" ? "Credit" : paymentMode]: finalTotal },
             paymentMode, subtotal: grandSubtotal, discount: grandDiscount + additionalDisc,
             total: finalTotal, gstAmount: grandGst, profit: grandProfit, date: ts,
@@ -187,7 +200,7 @@ export function POSBillingPage() {
 
     const newBill = () => {
         setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setVehicleReg("");
-        setPaymentMode("Cash"); setAdditionalDisc(0); setShowInvoice(false); setSearch("");
+        setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
         setInvoiceAt(null); setTimeout(() => searchRef.current?.focus(), 50);
     };
 
@@ -684,8 +697,32 @@ export function POSBillingPage() {
                                 <PayBtn label="UDHAAR"   icon="📋" active={paymentMode === "Udhaar"}   onClick={() => setPaymentMode("Udhaar")} />
                             </div>
                             {paymentMode === "Udhaar" && (
-                                <div style={{ marginTop: 8, background: `${T.crimson}12`, border: `1px solid ${T.crimson}33`, borderRadius: 8, padding: "7px 12px", fontSize: 11, color: T.crimson, fontWeight: 600 }}>
-                                    ⚠ {fmt(finalTotal)} will be added to credit ledger
+                                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                                    {/* Party selector */}
+                                    <select
+                                        value={String(partyId ?? "")}
+                                        onChange={e => setPartyId(e.target.value || null)}
+                                        style={{ width: "100%", height: 34, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", fontSize: 12, fontFamily: FONT.ui, color: T.t1, background: "#FFF", outline: "none" }}
+                                    >
+                                        <option value="">— Link a party (optional) —</option>
+                                        {(parties || []).map((p: any) => (
+                                            <option key={p.id} value={String(p.id)}>{p.name}{p.creditLimit ? ` · Limit ₹${p.creditLimit}` : ""}</option>
+                                        ))}
+                                    </select>
+                                    {/* Credit limit warning */}
+                                    {overLimit ? (
+                                        <div style={{ background: `${T.crimson}12`, border: `1px solid ${T.crimson}44`, borderRadius: 8, padding: "7px 12px", fontSize: 11, color: T.crimson, fontWeight: 700 }}>
+                                            ⛔ Over credit limit! Outstanding {fmt(partyOutstanding)} + this sale {fmt(finalTotal)} = {fmt(creditAfterSale)} (limit {fmt(creditLimit)})
+                                        </div>
+                                    ) : selectedParty && creditLimit > 0 ? (
+                                        <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 8, padding: "7px 12px", fontSize: 11, color: T.amber, fontWeight: 600 }}>
+                                            ⚠ {fmt(finalTotal)} added to credit · Outstanding will be {fmt(creditAfterSale)} of {fmt(creditLimit)} limit
+                                        </div>
+                                    ) : (
+                                        <div style={{ background: `${T.crimson}12`, border: `1px solid ${T.crimson}33`, borderRadius: 8, padding: "7px 12px", fontSize: 11, color: T.crimson, fontWeight: 600 }}>
+                                            ⚠ {fmt(finalTotal)} will be added to credit ledger
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

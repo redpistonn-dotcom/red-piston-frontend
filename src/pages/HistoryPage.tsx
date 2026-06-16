@@ -193,6 +193,33 @@ function SingleRow({ m, isExpanded, onToggle, isLast }: any) {
                                     </div>
                                 ) : null)}
                             </div>
+                            {m.adjustmentMeta && (m.adjustmentMeta.previousStock != null || m.adjustmentMeta.newStock != null) && (
+                                <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 16px", display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+                                    <div>
+                                        <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Stock Before</div>
+                                        <div style={{ fontSize: 16, fontWeight: 800, color: T.t2, fontFamily: FONT.mono }}>{m.adjustmentMeta.previousStock ?? "—"}</div>
+                                    </div>
+                                    <span style={{ fontSize: 20, color: T.t3 }}>→</span>
+                                    <div>
+                                        <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Stock After</div>
+                                        <div style={{ fontSize: 16, fontWeight: 800, color: T.amber, fontFamily: FONT.mono }}>{m.adjustmentMeta.newStock ?? "—"}</div>
+                                    </div>
+                                    {m.adjustmentMeta.reason && (<>
+                                        <div style={{ width: 1, height: 32, background: T.border, flexShrink: 0 }} />
+                                        <div>
+                                            <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Reason</div>
+                                            <div style={{ fontSize: 12, color: T.t2 }}>{m.adjustmentMeta.reason}</div>
+                                        </div>
+                                    </>)}
+                                    {m.adjustmentMeta.refundMethod && (<>
+                                        <div style={{ width: 1, height: 32, background: T.border, flexShrink: 0 }} />
+                                        <div>
+                                            <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>Refund via</div>
+                                            <div style={{ fontSize: 12, color: T.emerald, fontWeight: 700 }}>{m.adjustmentMeta.refundMethod}</div>
+                                        </div>
+                                    </>)}
+                                </div>
+                            )}
                             {m.note && (
                                 <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 14px" }}>
                                     <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Notes</div>

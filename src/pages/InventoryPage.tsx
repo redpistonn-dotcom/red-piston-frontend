@@ -43,8 +43,16 @@ export function InventoryPage() {
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });
   const onDelete = async (p) => {
-    if (!window.confirm(`Delete "${p.name}" from inventory? This removes the product and its stock history.`)) return;
     const invId = p.inventoryId ?? p.id;
+    // Warn if this product has sales/purchase history that would be orphaned
+    const histCount = (movements || []).filter(m =>
+      ['SALE', 'PURCHASE', 'RETURN_IN', 'RETURN_OUT', 'DAMAGE', 'THEFT', 'AUDIT'].includes(m.type) &&
+      (String(m.productId) === String(invId) || String(m.productId) === String(p.id))
+    ).length;
+    const histLine = histCount > 0
+      ? `\n\n⚠ This product has ${histCount} history record${histCount !== 1 ? 's' : ''} (sales, purchases, adjustments). Those records stay in History but will no longer show a product name.`
+      : '';
+    if (!window.confirm(`Delete "${p.name}"?${histLine}\n\nThis cannot be undone.`)) return;
     // Local-only items (never synced to DB) have a "p" string id — just remove from local state.
     if (!p.inventoryId || !Number.isFinite(Number(invId))) {
       saveProducts((storeProducts || []).filter(x => (x.inventoryId ?? x.id) !== invId), true);

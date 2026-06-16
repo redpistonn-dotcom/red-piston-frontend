@@ -9,7 +9,7 @@
  *   Content  → ml-256px + pt-80px + px-24px + pb-24px
  *   Mobile   → bottom tab bar (CSS only via GLOBAL_CSS @media)
  */
-import { useState, useContext, useMemo, useEffect, useRef } from "react";
+import { useState, useContext, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { T, FONT, GLOBAL_CSS, SP, SHADOWS } from "../theme";
 import { fmt } from "../utils";
@@ -72,6 +72,63 @@ function MSIcon({ name, filled = false, size = 22 }: { name: string; filled?: bo
       }}
     >
       {name}
+    </span>
+  );
+}
+
+// ─── SyncIndicator ───────────────────────────────────────────────────────────
+// Listens for 'rp:sync' CustomEvents dispatched by App.tsx sync calls.
+// detail.delta: +1 = in-flight, -1 = done, error: true = failed.
+function SyncIndicator() {
+  const [inflight, setInflight] = useState(0);
+  const [hasError, setHasError] = useState(false);
+  const clearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { delta, error } = (e as CustomEvent).detail ?? {};
+      if (error) {
+        setHasError(true);
+        if (clearRef.current) clearTimeout(clearRef.current);
+        clearRef.current = setTimeout(() => setHasError(false), 5000);
+      }
+      if (typeof delta === "number") setInflight(prev => Math.max(0, prev + delta));
+    };
+    window.addEventListener("rp:sync", handler);
+    return () => window.removeEventListener("rp:sync", handler);
+  }, []);
+
+  if (hasError) return (
+    <span style={{
+      display: "flex", alignItems: "center", gap: 5,
+      background: "rgba(186,26,26,0.08)", border: "1px solid rgba(186,26,26,0.25)",
+      borderRadius: 99, padding: "3px 10px",
+      fontSize: 11, fontWeight: 600, color: T.crimson, fontFamily: FONT.ui, flexShrink: 0,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.crimson, display: "inline-block" }} />
+      Sync Error
+    </span>
+  );
+  if (inflight > 0) return (
+    <span style={{
+      display: "flex", alignItems: "center", gap: 5,
+      background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)",
+      borderRadius: 99, padding: "3px 10px",
+      fontSize: 11, fontWeight: 600, color: T.amber, fontFamily: FONT.ui, flexShrink: 0,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.amber, display: "inline-block", animation: "pulse 1s infinite" }} />
+      Saving…
+    </span>
+  );
+  return (
+    <span style={{
+      display: "flex", alignItems: "center", gap: 5,
+      background: T.emeraldBg, border: "1px solid rgba(22,163,74,0.2)",
+      borderRadius: 99, padding: "3px 10px",
+      fontSize: 11, fontWeight: 600, color: T.emerald, fontFamily: FONT.ui, flexShrink: 0,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.emerald, display: "inline-block" }} />
+      Synced
     </span>
   );
 }
@@ -546,20 +603,8 @@ export function ERPShell({ children }: ERPShellProps) {
                 maxWidth: 320,
               }}>{pageTitle}</h1>
 
-              {/* Sync Status badge — inventory only */}
-              {currentPath === "/inventory" && (
-                <span style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  background: T.emeraldBg,
-                  border: "1px solid rgba(22,163,74,0.2)",
-                  borderRadius: 99, padding: "3px 10px",
-                  fontSize: 11, fontWeight: 600, color: T.emerald,
-                  fontFamily: FONT.ui, flexShrink: 0,
-                }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.emerald, display: "inline-block" }} />
-                  Sync Status: Active
-                </span>
-              )}
+              {/* Live sync status pill */}
+              <SyncIndicator />
 
               {/* Low stock warning chip */}
               {lowCount > 0 && currentPath !== "/inventory" && (

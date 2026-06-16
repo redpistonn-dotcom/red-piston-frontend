@@ -449,16 +449,18 @@ function AppContent() {
     if (data.priceOverride) logAudit("PRICE_OVERRIDE", "movement", data.invoiceNo, `${sel?.name?.slice(0, 20)}: ${fmt(data.priceOverride.originalPrice)} → ${fmt(data.priceOverride.overriddenPrice)} (${data.priceOverride.reason || "no reason"})`);
     toast(isQuote ? `Quotation Generated: ${data.invoiceNo}` : `Sale recorded: ${data.qty}×${sel?.name?.slice(0, 20) || "product"} · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : "Sale Complete");
     if (!isQuote) {
+      window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
       syncInvoice({
         items: [{ inventoryId: data.productId, qty: data.qty, unitPrice: data.sellPrice, discount: data.discount || 0 }],
         partyName: data.customerName || undefined, partyPhone: data.customerPhone || undefined,
+        partyId: data.partyId || undefined,
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
+      }).then(() => {
+        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
       }).catch((err) => {
-        // WHY log instead of silently swallow: sale is already saved locally.
-        // This error tells us if the backend sync is broken — critical for debugging
-        // data-integrity issues (stock mismatch between local and server).
+        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
         console.error("[Sync] Sale sync failed — saved locally, backend out of sync:", err?.message);
       });
     }
@@ -504,13 +506,18 @@ function AppContent() {
     logAudit(isQuote ? "MULTI_QUOTATION_CREATED" : "MULTI_SALE_RECORDED", "movement", data.invoiceNo, `${data.items.length} items · ${fmt(data.total)}${hasOverrides ? " · price override(s)" : ""}`);
     toast(isQuote ? `Quotation: ${data.items.length} items · ${fmt(data.total)}` : `Sale recorded: ${data.items.length} items · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : `Invoice ${data.invoiceNo}`);
     if (!isQuote) {
+      window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
       syncInvoice({
         items: data.items.map(item => ({ inventoryId: item.productId, qty: item.qty, unitPrice: item.sellPrice, discount: item.discount || 0 })),
         partyName: data.customerName || undefined, partyPhone: data.customerPhone || undefined,
+        partyId: data.partyId || undefined,
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
+      }).then(() => {
+        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
       }).catch((err) => {
+        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
         console.error("[Sync] Multi-sale sync failed — saved locally, backend out of sync:", err?.message);
       });
     }
@@ -533,11 +540,15 @@ function AppContent() {
     }]);
     logAudit("PURCHASE_RECORDED", "movement", data.invoiceNo, `+${data.qty} ${sel?.name?.slice(0, 20)} · ${fmt(data.total)}`);
     toast(`Stock added: +${data.qty} units · ${fmt(data.total)}`, "info", "Purchase Recorded");
+    window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
     syncPurchase({
       inventoryId: data.productId, qty: data.qty, buyingPrice: data.buyPrice,
       newSellingPrice: data.newSellPrice, supplier: data.supplier,
       invoiceNo: data.invoiceNo, payment: data.payment, creditDays: data.creditDays, notes: data.notes,
+    }).then(() => {
+      window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
     }).catch((err) => {
+      window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
       console.error("[Sync] Purchase sync failed — saved locally, backend out of sync:", err?.message);
     });
   }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
@@ -563,12 +574,16 @@ function AppContent() {
     const labels = { RETURN_IN: "Customer return processed", RETURN_OUT: "Returned to vendor", CREDIT_NOTE: "Credit note issued", DEBIT_NOTE: "Debit note issued", DAMAGE: "Damage recorded", THEFT: "Shrinkage recorded", AUDIT: "Audit correction applied", OPENING: "Opening stock set" };
     logAudit("ADJUSTMENT_" + data.adjustType, "movement", data.productId, `${labels[data.adjustType] || data.adjustType}: ${stockChange > 0 ? "+" : ""}${stockChange} units`);
     toast(`${labels[data.adjustType] || data.adjustType}: ${stockChange !== 0 ? (stockChange > 0 ? "+" : "") + stockChange + " units of " : ""}${sel?.name?.slice(0, 20) || "product"}${data.refundAmount ? " · " + fmt(data.refundAmount) : ""}`, data.adjustType === "RETURN_IN" || data.adjustType === "OPENING" ? "info" : data.adjustType === "CREDIT_NOTE" || data.adjustType === "DEBIT_NOTE" ? "success" : "warning", labels[data.adjustType] || data.adjustType);
+    window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
     syncAdjustment({
       inventoryId: data.productId, type: data.adjustType,
       qty: data.adjustType === "AUDIT" ? stockChange : data.qty,
       reason: data.reason, refundMethod: data.refundMethod, refundAmount: data.refundAmount,
       supplierName: data.supplierName, originalInvoice: data.originalInvoice, notes: data.notes,
+    }).then(() => {
+      window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
     }).catch((err) => {
+      window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
       console.error("[Sync] Adjustment sync failed — saved locally, backend out of sync:", err?.message);
     });
   }, [products, movements, saveProducts, saveMovements, toast, activeShopId, logAudit]);
