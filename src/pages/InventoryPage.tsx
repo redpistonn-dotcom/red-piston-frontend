@@ -28,17 +28,16 @@ export function InventoryPage() {
   const { products: storeProducts, movements, activeShopId, saveProducts, shops } = useStore();
   const { handleSale: onSale, handlePurchase: onPurchase, handleAdjustment: onAdjust, toast, setAddProdOpen, setPModal } = useContext(AppCtx);
 
-  // Fetch inventory from API on mount, then use the store (reactive to ProductModal edits/purchases).
-  const [apiLoaded, setApiLoaded] = useState(false);
+  // Use store data immediately (loaded from localStorage on startup).
+  // Only hit the API if the store is empty — first-ever load or cleared cache.
+  // syncFromAPI (fired post-login) keeps data fresh in the background.
   useEffect(() => {
+    if (storeProducts && storeProducts.length > 0) return;
     fetchInventory().then(data => {
-      const result = data ?? [];
-      saveProducts(result, true); // initial fetch — skip API write-back (skipApiSync=true)
-      setApiLoaded(true);
+      if (data?.length) saveProducts(data, true);
     });
-  }, []);
-  // null while loading (shows skeleton); after load, store is the live source of truth
-  const products = apiLoaded ? storeProducts : null;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const products = storeProducts;
 
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });

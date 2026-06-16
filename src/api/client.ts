@@ -98,6 +98,12 @@ export async function silentRefresh(): Promise<string | null> {
   try { return await refreshAccessToken(); } catch { return null; }
 }
 
+// ─── GET request deduplication ───────────────────────────────────────────────
+// If InventoryPage mounts while syncFromAPI is already fetching /api/shop/inventory,
+// both would fire separately. This map collapses concurrent identical GETs into
+// one inflight promise — the second caller gets the same result, zero extra RTT.
+const _inflight = new Map<string, Promise<unknown>>();
+
 // ─── Core request function ────────────────────────────────────────────────────
 interface RequestOptions extends RequestInit {
   _isRetry?: boolean;
@@ -105,6 +111,20 @@ interface RequestOptions extends RequestInit {
 
 export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
   const url = `${BASE_URL}${path}`;
+  const method = (options.method || 'GET').toUpperCase();
+
+  if (method === 'GET' && !options._isRetry) {
+    const cached = _inflight.get(url);
+    if (cached) return cached as Promise<T>;
+    const promise = _doRequest<T>(url, options);
+    _inflight.set(url, promise);
+    promise.finally(() => _inflight.delete(url));
+    return promise;
+  }
+  return _doRequest<T>(url, options);
+}
+
+async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),

@@ -144,33 +144,38 @@ function AppContent() {
     return null;
   });
 
-  // authReady: false until we've confirmed a valid token or given up (6s timeout)
-  const [authReady, setAuthReady] = useState(() => {
-    try { return !localStorage.getItem("as_user"); } catch { return true; }
+  // tokenReady: true once silentRefresh has resolved (or is skipped).
+  // The UI no longer waits for this — localStorage data shows immediately.
+  // tokenReady gates syncFromAPI so we don't fire it before we have a token.
+  const [tokenReady, setTokenReady] = useState(() => {
+    // If there's already an access token in memory (e.g. login just happened)
+    // or no stored user at all, we're ready right away.
+    try { return !localStorage.getItem("as_user") || !!getAccessToken(); } catch { return true; }
   });
 
   // ── Startup: restore access token from refresh token (page reload) ───────────
   useEffect(() => {
     if (!localStorage.getItem("as_user")) return;
-    let settled = false;
-    const done = () => { if (!settled) { settled = true; setAuthReady(true); } };
+    if (getAccessToken()) { setTokenReady(true); return; } // already have token
     const restore = async () => {
       try {
-        if (getAccessToken()) return;
         const impToken = sessionStorage.getItem('as_imp_token');
         if (impToken) { setTokens(impToken, null); return; }
-        const token = await Promise.race([
+        // Race against 6s so a cold-start backend doesn't block sync forever.
+        // The first 401 from any API call will trigger a retry via the interceptor.
+        await Promise.race([
           silentRefresh(),
           new Promise(resolve => setTimeout(() => resolve(null), 6000)),
         ]);
-        if (!token) { /* keep user optimistically — first 401 will trigger logout */ }
       } catch (err) {
         if (err?.code === 'SESSION_EXPIRED') {
           clearTokens();
           try { localStorage.removeItem("as_user"); localStorage.removeItem("as_refresh_token"); } catch {}
           setCurrentUser(null);
         }
-      } finally { done(); }
+      } finally {
+        setTokenReady(true);
+      }
     };
     restore();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -303,15 +308,15 @@ function AppContent() {
   }, [navigate, setActiveShopId, clearStore]);
 
   useEffect(() => {
-    if (!currentUser || !authReady) return;
-    const run = () => syncFromAPI().catch((err) => console.warn("[App] Post-login sync failed:", err));
-    if (typeof requestIdleCallback !== "undefined") {
-      const id = requestIdleCallback(run, { timeout: 1200 });
-      return () => cancelIdleCallback(id);
-    }
-    const t = setTimeout(run, 0);
+    if (!currentUser || !tokenReady) return;
+    // setTimeout(50) lets the first paint finish before hitting the network.
+    // Previously used requestIdleCallback({timeout:1200}) which could delay up to 1.2s.
+    const t = setTimeout(
+      () => syncFromAPI().catch((err) => console.warn("[App] Post-login sync failed:", err)),
+      50,
+    );
     return () => clearTimeout(t);
-  }, [currentUser, authReady, syncFromAPI]);
+  }, [currentUser, tokenReady, syncFromAPI]);
 
   const handleLogout = useCallback(() => {
     const rt = localStorage.getItem("as_refresh_token");
@@ -645,28 +650,6 @@ function AppContent() {
     const shopSuffix = (activeShopId || "0000").slice(-4).toUpperCase();
     return shopSuffix + "-" + Date.now().toString(36).toUpperCase();
   }, [activeShopId]);
-
-  // ── Auth loading screen — brief, only on page reload with a stored user ───────
-  if (!authReady) {
-    return (
-      <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: FONT.ui }}>
-        <style>{GLOBAL_CSS}</style>
-        <style>{`@keyframes rp-spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
-          {/* CSS ring spinner — avoids the pulsing gear icon that looks like a "joystick" */}
-          <div style={{ width: 44, height: 44, borderRadius: "50%", border: `3px solid rgba(139,30,30,0.15)`, borderTopColor: "#8b1e1e", animation: "rp-spin 0.8s linear infinite" }} />
-          <div style={{ fontSize: 14, color: T.t2, fontWeight: 600 }}>RedPiston</div>
-          <div style={{ fontSize: 12, color: T.t4 }}>Restoring session…</div>
-          <button
-            onClick={() => { clearTokens(); try { localStorage.removeItem("as_user"); localStorage.removeItem("as_refresh_token"); } catch {} window.location.replace("/login"); }}
-            style={{ marginTop: 8, background: "transparent", border: `1px solid ${T.border}`, borderRadius: 8, padding: "7px 18px", fontSize: 12, color: T.t4, cursor: "pointer", fontFamily: FONT.ui, fontWeight: 600 }}
-          >
-            Taking too long? Click to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   if (!loaded) {
     return (
