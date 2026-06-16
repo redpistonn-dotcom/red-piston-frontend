@@ -606,7 +606,9 @@ function AppContent() {
     };
     let updatedMovements = movements.map((m) => {
       if (data.movementIds && data.movementIds.length > 0) {
-        if (data.movementIds.includes(m.id)) return { ...m, paymentStatus: "paid" };
+        // Only mark paid if the movement actually belongs to this party — prevents
+        // a stale/wrong movementId list from silently clearing another party's debt.
+        if (data.movementIds.includes(m.id) && m.customerName === data.partyName) return { ...m, paymentStatus: "paid" };
       } else if (m.customerName === data.partyName && m.paymentStatus === "pending") {
         return { ...m, paymentStatus: "paid" };
       }

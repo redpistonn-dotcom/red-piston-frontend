@@ -53,8 +53,8 @@ export function DashboardPage() {
   const profTrend = prevProf > 0 ? (((profit - prevProf) / prevProf) * 100).toFixed(0) : null;
 
   // inventory metrics
-  const invValue = useMemo(() => shopProducts.reduce((s, p) => s + (p.buyPrice * p.stock), 0), [shopProducts]);
-  const potProfit = useMemo(() => shopProducts.reduce((s, p) => s + ((p.sellPrice - p.buyPrice) * p.stock), 0), [shopProducts]);
+  const invValue = useMemo(() => shopProducts.reduce((s, p) => s + ((p.buyPrice || 0) * (p.stock || 0)), 0), [shopProducts]);
+  const potProfit = useMemo(() => shopProducts.reduce((s, p) => s + (((p.sellPrice || 0) - (p.buyPrice || 0)) * (p.stock || 0)), 0), [shopProducts]);
 
   // Accounts Receivable (Udhaar)
   const pendingReceivables = useMemo(() => shopMovements.filter(m => m.type === "SALE" && m.paymentStatus === "pending").reduce((s, m) => s + m.total, 0), [shopMovements]);
