@@ -1052,6 +1052,111 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
   // Add User modal
   const [showAddUser, setShowAddUser] = useState(false);
 
+  // ── Autodukan tab state ──────────────────────────────────────────────────
+  const [adStats, setAdStats]         = useState<any>(null);
+  const [adLoading, setAdLoading]     = useState(false);
+  const [adImporting, setAdImporting] = useState(false);
+  const [adBatchSize, setAdBatchSize] = useState(500);
+  const [adCategory, setAdCategory]   = useState("");
+  const [adResult, setAdResult]       = useState<{ inserted: number; attempted: number; message: string } | null>(null);
+  const [adError, setAdError]         = useState("");
+  const [adJustImported, setAdJustImported] = useState<any[] | null>(null);
+
+  // Monitor state
+  const [adMonitor, setAdMonitor]     = useState<any>(null);
+  const [adStarting, setAdStarting]   = useState(false);
+  const [adStopping, setAdStopping]   = useState(false);
+  const [adCtrlError, setAdCtrlError] = useState("");
+  const [adStartCategory, setAdStartCategory] = useState("");
+  const [adStartDelay, setAdStartDelay]       = useState(10);
+  const [adLogExpanded, setAdLogExpanded]     = useState(false);
+
+  const ALL_AD_CATS = [
+    "AIR CONDITIONING","BELT & CHAIN DRIVE","BODY PARTS","BRAKE SYSTEM",
+    "CAR ACCESSORIES","CAR CARE","CLUTCH SYSTEM","COOLING SYSTEM",
+    "ELECTRICAL","ENGINE PARTS","EXHAUST SYSTEM","FASTENERS",
+    "FILTERS","FUEL SYSTEM","GASKET & SEALS","HYBRID & ELECTRIC DRIVE",
+    "INTERIORS COMFORT & SAFETY","LIGHTING","OILS & FLUIDS","SERVICE KIT",
+    "STEERING","SUSPENSION","TRANSMISSION","WHEELS & TYRE",
+    "WINDSCREEN CLEANING SYSTEM",
+  ];
+  const TOTAL_EXPECTED_PRODUCTS = 1060600;
+
+  const fetchAdStats = useCallback(async () => {
+    setAdLoading(true);
+    try {
+      const res = await api.get("/api/admin/autodukan/stats");
+      setAdStats(res.data);
+    } catch (e: any) {
+      setAdError(e.message || "Failed to load autodukan stats");
+    }
+    setAdLoading(false);
+  }, []);
+
+  const fetchAdMonitor = useCallback(async () => {
+    try {
+      const res: any = await api.get("/api/admin/autodukan/monitor");
+      setAdMonitor(res.data);
+    } catch {}
+  }, []);
+
+  const handleAdImport = async () => {
+    setAdError("");
+    setAdResult(null);
+    setAdJustImported(null);
+    setAdImporting(true);
+    try {
+      const res: any = await api.post("/api/admin/autodukan/import", {
+        batchSize: adBatchSize,
+        categoryFilter: adCategory || null,
+      });
+      setAdResult(res.data);
+      if (res.data?.previewParts?.length) setAdJustImported(res.data.previewParts);
+      fetchAdStats();
+      fetchAdMonitor();
+    } catch (e: any) {
+      setAdError(e.message || "Import failed");
+    }
+    setAdImporting(false);
+  };
+
+  const handleAdStart = async () => {
+    setAdCtrlError("");
+    setAdStarting(true);
+    try {
+      await api.post("/api/admin/autodukan/scrape/start", {
+        category: adStartCategory || null,
+        delay: adStartDelay,
+        headless: true,
+      });
+      setTimeout(fetchAdMonitor, 1500);
+    } catch (e: any) {
+      setAdCtrlError(e.message || "Failed to start scraper");
+    }
+    setAdStarting(false);
+  };
+
+  const handleAdStop = async () => {
+    setAdCtrlError("");
+    setAdStopping(true);
+    try {
+      await api.post("/api/admin/autodukan/scrape/stop", {});
+      setTimeout(fetchAdMonitor, 1000);
+    } catch (e: any) {
+      setAdCtrlError(e.message || "Failed to stop scraper");
+    }
+    setAdStopping(false);
+  };
+
+  // Load + auto-refresh monitor every 15s while tab is active
+  useEffect(() => {
+    if (activeTab !== "autodukan") return;
+    fetchAdStats();
+    fetchAdMonitor();
+    const t = setInterval(fetchAdMonitor, 15000);
+    return () => clearInterval(t);
+  }, [activeTab, fetchAdStats, fetchAdMonitor]);
+
   // Background import progress widget — reads from module store, survives tab switches
   const [bgImport, setBgImport] = useState(() => importStore.get());
   useEffect(() => importStore.subscribe(setBgImport), []);
@@ -1421,6 +1526,9 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
             <button style={S.tab(activeTab === "catalog")} onClick={() => setActiveTab("catalog")}>
               Parts Catalog
             </button>
+            <button style={S.tab(activeTab === "autodukan")} onClick={() => setActiveTab("autodukan")}>
+              Autodukan Import
+            </button>
           </div>
         )}
 
@@ -1786,6 +1894,383 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
             </div>
           </>
         )}
+
+        {/* ─── AUTODUKAN TAB ─── */}
+        {activeTab === "autodukan" && (() => {
+          const canImport = adStats
+            ? adStats.importsLeft > 0 && !adStats.nextAvailableAt
+            : false;
+          const nowMs = Date.now();
+          const nextMs = adStats?.nextAvailableAt ? new Date(adStats.nextAvailableAt).getTime() : null;
+          const waitMin = nextMs ? Math.ceil((nextMs - nowMs) / 60000) : 0;
+          const waitHr  = nextMs ? (waitMin / 60).toFixed(1) : "0";
+
+          // Per-category completion map from monitor
+          const catMap: Record<string, { pages_done: number; products_scraped: number }> = {};
+          (adMonitor?.catProgress || []).forEach((r: any) => { catMap[r.category] = r; });
+          const rt = adMonitor?.runtime;
+          const scraperActive = rt?.active;
+          const overallPct = adMonitor
+            ? Math.min(100, Math.round((adMonitor.stagingTotal / TOTAL_EXPECTED_PRODUCTS) * 100))
+            : 0;
+
+          return (
+            <div style={{ maxWidth: 900 }}>
+              {/* ── Header ── */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 18, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>
+                  Autodukan Parts Pipeline
+                </div>
+                <div style={{ fontSize: 12, color: C.t3, fontFamily: FONT.ui, marginTop: 2 }}>
+                  Scrape from autodukan.com → Staging DB → Import to Master Catalog · Auto-refreshes every 15s
+                </div>
+              </div>
+
+
+              {/* ══ PIPELINE FLOW BAR ══ */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 14, overflowX: 'auto' }}>
+                  {[
+                    { step: '1', label: 'Scrape', sub: 'autodukan.com', color: scraperActive ? C.green : C.t3, active: scraperActive },
+                    { step: '→', label: '', sub: '', color: C.t4, active: false },
+                    { step: '2', label: 'Staging DB', sub: (adMonitor?.stagingTotal || 0).toLocaleString() + ' parts', color: C.sky, active: false },
+                    { step: '→', label: '', sub: '', color: C.t4, active: false },
+                    { step: '3', label: 'Import', sub: (adStats?.todayCount ?? '—') + '/' + (adStats?.maxPerDay ?? 3) + ' today', color: C.amber, active: adImporting },
+                    { step: '→', label: '', sub: '', color: C.t4, active: false },
+                    { step: '4', label: 'Master Catalog', sub: (adStats?.alreadyInMaster || 0).toLocaleString() + ' parts', color: C.green, active: false },
+                  ].map((s: any, i: number) => s.step === '→' ? (
+                    <div key={i} style={{ fontSize: 18, color: C.t4, padding: '0 6px' }}>→</div>
+                  ) : (
+                    <div key={i} style={{ background: s.active ? `${s.color}22` : C.bg, border: `1.5px solid ${s.active ? s.color : C.border}`, borderRadius: 8, padding: '9px 14px', textAlign: 'center', minWidth: 110 }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: s.color, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{s.step}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: s.active ? s.color : C.t1, fontFamily: FONT.ui, marginTop: 3 }}>{s.label}</div>
+                      <div style={{ fontSize: 10, color: C.t3, fontFamily: FONT.ui, marginTop: 1 }}>{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui }}>
+                    Scraping progress — {(adMonitor?.stagingTotal || 0).toLocaleString()} of {TOTAL_EXPECTED_PRODUCTS.toLocaleString()} products
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: C.amber, fontFamily: FONT.ui }}>{overallPct}%</span>
+                </div>
+                <div style={{ height: 6, background: C.borderLight, borderRadius: 99, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${overallPct}%`, background: `linear-gradient(90deg, ${C.amber}, ${C.sky})`, borderRadius: 99, transition: 'width 0.6s ease' }} />
+                </div>
+              </div>
+
+              {/* ══ TWO-COLUMN ROW: SCRAPER + IMPORT ══ */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+
+                {/* LEFT: Scraper Control */}
+                <div style={{ background: C.surface, border: `1.5px solid ${scraperActive ? C.green : C.border}`, borderRadius: 12, padding: '18px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui, marginBottom: 12 }}>
+                    Scraper Control
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: scraperActive ? C.green : C.t4, flexShrink: 0, boxShadow: scraperActive ? `0 0 6px ${C.green}` : 'none' }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: scraperActive ? C.green : C.t2, fontFamily: FONT.ui }}>
+                      {scraperActive ? `Running — ${rt?.currentCategory || 'loading…'}` : rt?.exitCode != null ? `Stopped (exit ${rt.exitCode})` : 'Idle'}
+                    </span>
+                  </div>
+                  {scraperActive && rt?.currentPage && (
+                    <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui, marginBottom: 8 }}>
+                      Page {rt.currentPage.toLocaleString()} · started {rt.startedAt ? new Date(rt.startedAt).toLocaleTimeString('en-IN') : '—'}
+                    </div>
+                  )}
+                  {rt?.error && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT.ui, marginBottom: 8 }}>⚠ {rt.error}</div>}
+                  {adCtrlError && <div style={{ fontSize: 11, color: C.red, background: C.redBg, borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontFamily: FONT.ui }}>{adCtrlError}</div>}
+                  {!scraperActive ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <select value={adStartCategory} onChange={e => setAdStartCategory(e.target.value)}
+                        style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}>
+                        <option value=''>All categories (full run)</option>
+                        {ALL_AD_CATS.map((c: string) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <select value={adStartDelay} onChange={e => setAdStartDelay(Number(e.target.value))}
+                          style={{ flex: 1, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}>
+                          {[8,10,12,15,20].map((d: number) => <option key={d} value={d}>{d}s between pages</option>)}
+                        </select>
+                        <button onClick={handleAdStart} disabled={adStarting} style={{
+                          flex: 1, background: adStarting ? C.borderLight : C.green, color: adStarting ? C.t3 : '#fff',
+                          border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700,
+                          cursor: adStarting ? 'not-allowed' : 'pointer', fontFamily: FONT.ui,
+                        }}>
+                          {adStarting ? 'Starting…' : '▶ Start Scraper'}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui }}>
+                        Resumes from where it stopped. Needs Python 3 + Playwright on the server.
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={handleAdStop} disabled={adStopping} style={{
+                      width: '100%', background: C.redBg, color: C.red,
+                      border: `1.5px solid ${C.red}`, borderRadius: 8, padding: '10px 0', fontSize: 13, fontWeight: 700,
+                      cursor: adStopping ? 'not-allowed' : 'pointer', fontFamily: FONT.ui,
+                    }}>
+                      {adStopping ? 'Stopping…' : '■ Stop Scraper'}
+                    </button>
+                  )}
+                  {rt?.logs?.length > 0 && (
+                    <button onClick={() => setAdLogExpanded((x: boolean) => !x)} style={{
+                      marginTop: 10, background: 'none', border: `1px solid ${C.border}`, borderRadius: 6,
+                      padding: '5px 10px', fontSize: 10, color: C.t3, cursor: 'pointer', fontFamily: FONT.ui, width: '100%',
+                    }}>
+                      {adLogExpanded ? '▲ Hide live log' : `▼ Show live log (${rt.logs.length} lines)`}
+                    </button>
+                  )}
+                </div>
+
+                {/* RIGHT: Import to Catalog */}
+                <div style={{ background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 12, padding: '18px 18px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui, marginBottom: 12 }}>
+                    Import to Master Catalog
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, color: C.t3, fontFamily: FONT.ui, marginBottom: 6 }}>
+                      Daily limit — {adStats?.todayCount ?? 0} of {adStats?.maxPerDay ?? 3} imports used today
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {Array.from({ length: adStats?.maxPerDay ?? 3 }).map((_: any, i: number) => (
+                        <div key={i} style={{ flex: 1, height: 8, borderRadius: 4, background: i < (adStats?.todayCount ?? 0) ? C.green : C.borderLight, transition: 'background 0.3s' }} />
+                      ))}
+                    </div>
+                    {adStats?.nextAvailableAt && (
+                      <div style={{ fontSize: 11, color: C.amber, fontFamily: FONT.ui, marginTop: 6 }}>
+                        ⏳ Cooldown — next import in {waitMin}m · {adStats.importsLeft} left today
+                      </div>
+                    )}
+                    {!adStats?.nextAvailableAt && adStats?.importsLeft === 0 && (
+                      <div style={{ fontSize: 11, color: C.red, fontFamily: FONT.ui, marginTop: 6 }}>Daily limit reached. Resets at UTC midnight.</div>
+                    )}
+                    {!adStats?.nextAvailableAt && (adStats?.importsLeft ?? 0) > 0 && (
+                      <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui, marginTop: 6 }}>
+                        {adStats?.importsLeft} import{adStats?.importsLeft !== 1 ? 's' : ''} remaining today · min 2h between imports
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+                    {[
+                      { label: 'In Staging',  val: (adStats?.stagingTotal ?? 0).toLocaleString(),    color: C.sky   },
+                      { label: 'In Master',   val: (adStats?.alreadyInMaster ?? 0).toLocaleString(), color: C.green },
+                      { label: 'To Import',   val: (adStats?.remaining ?? 0).toLocaleString(),       color: C.amber },
+                    ].map((s: any) => (
+                      <div key={s.label} style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: s.color, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>{s.val}</div>
+                        <div style={{ fontSize: 9, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT.ui, marginTop: 2 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                    <select value={adBatchSize} onChange={e => setAdBatchSize(Number(e.target.value))}
+                      style={{ flex: 1, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}>
+                      {[100, 250, 500, 1000, 2000].map((n: number) => <option key={n} value={n}>{n.toLocaleString()} parts</option>)}
+                    </select>
+                    <select value={adCategory} onChange={e => setAdCategory(e.target.value)}
+                      style={{ flex: 1, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}>
+                      <option value=''>All categories</option>
+                      {(adStats?.categories || ALL_AD_CATS).map((c: string) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={handleAdImport} disabled={adImporting || !canImport} style={{
+                    width: '100%', padding: '12px 0', fontSize: 14, fontWeight: 800, borderRadius: 9, border: 'none',
+                    background: adImporting ? C.borderLight : canImport ? C.red : C.borderLight,
+                    color: (adImporting || !canImport) ? C.t3 : '#fff',
+                    cursor: (adImporting || !canImport) ? 'not-allowed' : 'pointer',
+                    fontFamily: "'Plus Jakarta Sans','Inter',sans-serif",
+                    boxShadow: canImport && !adImporting ? `0 4px 20px ${C.red}55` : 'none',
+                    transition: 'all 0.15s',
+                  }}>
+                    {adImporting ? '⏳ Importing…' : canImport ? `Import ${adBatchSize.toLocaleString()} Parts to Master Catalog →` : adStats?.importsLeft === 0 ? 'Daily limit reached' : `Wait ${waitMin}m for cooldown`}
+                  </button>
+                  {adError && <div style={{ fontSize: 11, color: C.red, fontFamily: FONT.ui, marginTop: 8 }}>{adError}</div>}
+                </div>
+              </div>
+
+              {/* ══ LIVE LOG (collapsible) ══ */}
+              {adLogExpanded && rt?.logs?.length > 0 && (
+                <div style={{ background: '#0d1117', borderRadius: 10, padding: '12px 14px', marginBottom: 20, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace", fontSize: 11, maxHeight: 240, overflowY: 'auto' }}>
+                  {rt.logs.slice(-30).map((entry: any, i: number) => {
+                    const isErr  = entry.line.startsWith('[ERR]');
+                    const isWarn = entry.line.includes('Waiting') || entry.line.includes('NEXT');
+                    return (
+                      <div key={i} style={{ color: isErr ? '#f87171' : isWarn ? '#fbbf24' : '#86efac', marginBottom: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                        <span style={{ color: '#4b5563', marginRight: 8 }}>{new Date(entry.ts).toLocaleTimeString('en-IN')}</span>
+                        {entry.line}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* ══ JUST IMPORTED PREVIEW ══ */}
+              {adResult && (
+                <div style={{ background: `${C.green}11`, border: `1.5px solid ${C.green}`, borderRadius: 12, padding: '16px 18px', marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: adJustImported?.length ? 14 : 0 }}>
+                    <div style={{ fontSize: 20 }}>✅</div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: C.green, fontFamily: "'Plus Jakarta Sans',sans-serif" }}>
+                        Import complete — {adResult.inserted.toLocaleString()} new parts added
+                      </div>
+                      <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui }}>
+                        {adResult.attempted.toLocaleString()} attempted · {adResult.attempted - adResult.inserted} already in master
+                        {adCategory ? ` · category: ${adCategory}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  {adJustImported && adJustImported.length > 0 && (
+                    <div style={{ borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr>
+                            {['Part Name', 'OEM Number', 'Brand', 'Category', 'Type', 'Status'].map((h: string) => (
+                              <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: 'left', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {adJustImported.slice(0, 15).map((p: any) => (
+                            <tr key={p.id}>
+                              <td style={{ padding: '8px 12px', fontSize: 12, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.partName}</td>
+                              <td style={{ padding: '8px 12px', fontSize: 11, color: C.t2, fontFamily: "'Fira Code',monospace", borderBottom: `1px solid ${C.borderLight}` }}>{p.oemNumber}</td>
+                              <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{p.brand}</td>
+                              <td style={{ padding: '8px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{p.category}</td>
+                              <td style={{ padding: '8px 12px', fontSize: 11, color: C.sky, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{p.partType}</td>
+                              <td style={{ padding: '8px 12px', borderBottom: `1px solid ${C.borderLight}` }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: '#f59e0b22', borderRadius: 4, padding: '2px 7px', fontFamily: FONT.ui }}>{p.status}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {adJustImported.length > 15 && (
+                        <div style={{ padding: '8px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, background: C.bg, borderTop: `1px solid ${C.border}` }}>
+                          + {adJustImported.length - 15} more parts imported
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ══ RECENTLY ADDED TO MASTER CATALOG ══ */}
+              {adStats?.recentImports?.length > 0 && (
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+                  <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
+                      Recently Added to Master Catalog
+                    </div>
+                    <span style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui }}>last {adStats.recentImports.length} entries</span>
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {['Part Name', 'OEM Number', 'Brand', 'Category', 'Type', 'Added'].map((h: string) => (
+                          <th key={h} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: 'left', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adStats.recentImports.map((p: any) => (
+                        <tr key={p.id}>
+                          <td style={{ padding: '8px 12px', fontSize: 12, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.partName}</td>
+                          <td style={{ padding: '8px 12px', fontSize: 11, color: C.t2, fontFamily: "'Fira Code',monospace", borderBottom: `1px solid ${C.borderLight}` }}>{p.oemNumber}</td>
+                          <td style={{ padding: '8px 12px', fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{p.brand}</td>
+                          <td style={{ padding: '8px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{p.category}</td>
+                          <td style={{ padding: '8px 12px', fontSize: 11, color: C.sky, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{p.partType}</td>
+                          <td style={{ padding: '8px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>
+                            {new Date(p.addedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* ══ IMPORT HISTORY ══ */}
+              {adStats?.recentLogs?.length > 0 && (
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+                  <div style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
+                    Import History
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        {['When', 'By', 'Batch', 'Category', 'Inserted'].map((h: string) => (
+                          <th key={h} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: 'left', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adStats.recentLogs.map((log: any) => (
+                        <tr key={log.id}>
+                          <td style={{ padding: '9px 12px', fontSize: 12, color: C.t2, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>
+                            {new Date(log.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                          </td>
+                          <td style={{ padding: '9px 12px', fontSize: 12, color: C.t2, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{log.adminEmail || '—'}</td>
+                          <td style={{ padding: '9px 12px', fontSize: 12, color: C.t2, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{(log.batchSize || 0).toLocaleString()}</td>
+                          <td style={{ padding: '9px 12px', fontSize: 12, color: C.t2, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>{log.categoryFilter || <span style={{ color: C.t4 }}>All</span>}</td>
+                          <td style={{ padding: '9px 12px', fontSize: 13, fontWeight: 800, color: C.green, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}` }}>+{(log.insertedCount || 0).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* ══ CATEGORY PROGRESS GRID ══ */}
+              <div style={{ marginBottom: 8, fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
+                Subcategory Scraping Progress ({Object.keys(catMap).length} / 25 started)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8, marginBottom: 20 }}>
+                {ALL_AD_CATS.map((cat: string) => {
+                  const d = catMap[cat];
+                  const isActive = rt?.currentCategory === cat && scraperActive;
+                  const pct = d ? Math.min(100, Math.round((d.products_scraped / (TOTAL_EXPECTED_PRODUCTS / 25)) * 100)) : 0;
+                  return (
+                    <div key={cat} style={{ background: C.surface, border: `1.5px solid ${isActive ? C.green : d ? C.border : C.borderLight}`, borderRadius: 8, padding: '10px 12px', boxShadow: isActive ? `0 0 0 2px ${C.green}33` : 'none' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: isActive ? C.green : d ? C.t1 : C.t4, fontFamily: FONT.ui, flex: 1, lineHeight: 1.3 }}>
+                          {isActive && <span style={{ marginRight: 4 }}>●</span>}{cat}
+                        </span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: d ? C.amber : C.t4, fontFamily: FONT.ui, flexShrink: 0 }}>{d ? `${pct}%` : '—'}</span>
+                      </div>
+                      <div style={{ height: 4, background: C.borderLight, borderRadius: 99, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: isActive ? C.green : C.amber, borderRadius: 99 }} />
+                      </div>
+                      {d && (
+                        <div style={{ fontSize: 9, color: C.t3, fontFamily: FONT.ui, marginTop: 4 }}>
+                          {d.products_scraped.toLocaleString()} products · {d.pages_done.toLocaleString()} pages
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* ══ TOP OEM BRANDS ══ */}
+              {adMonitor?.topBrands?.length > 0 && (
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '14px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui, marginBottom: 10 }}>
+                    Top OEM Brands in Staging
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {adMonitor.topBrands.map((b: any) => (
+                      <div key={b.brand} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 20, padding: '5px 12px', display: 'flex', gap: 7, alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: C.t1, fontFamily: FONT.ui }}>{b.brand}</span>
+                        <span style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui, background: C.border, borderRadius: 10, padding: '1px 6px' }}>{Number(b.cnt).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          );
+        })()}
 
       {/* Add User Modal */}
       {showAddUser && (
