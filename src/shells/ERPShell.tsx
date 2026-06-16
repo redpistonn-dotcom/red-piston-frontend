@@ -251,6 +251,11 @@ export function ERPShell({ children }: ERPShellProps) {
 
   // ── Server-first data loader — fetch on mount and re-fetch on rp:data-changed ─
   useEffect(() => {
+    // Skip fetch for users without a real shop (admin impersonating a shop-less account,
+    // or admin navigating to ERP pages directly). Without a shopId the backend returns
+    // 500 (Prisma non-nullable Int field) — guard here before the request fires.
+    if (!currentUser?.shopId) return;
+
     let cancelled = false;
     const load = async () => {
       try {
