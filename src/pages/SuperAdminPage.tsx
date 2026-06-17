@@ -2251,132 +2251,223 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                 </div>
               )}
 
-              {/* ══ IMAGE MIGRATION PANEL ══ */}
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
-                      Image Migration — S3 → Cloudinary
-                    </div>
-                    <div style={{ fontSize: 12, color: C.t4, fontFamily: FONT.ui, marginTop: 3 }}>
-                      {imgMig
-                        ? imgMig.running
-                          ? `Migrating… ${imgMig.done} / ${imgMig.total} done${imgMig.failed ? `, ${imgMig.failed} failed` : ''}`
-                          : imgMig.total === 0
-                            ? 'All images already on Cloudinary.'
-                            : `Finished — ${imgMig.done} migrated, ${imgMig.failed} failed.${imgMig.lastError ? ` Last error: ${imgMig.lastError}` : ''}`
-                        : 'Moves S3 images to Cloudinary so they load without restrictions.'}
-                    </div>
-                    {imgMig?.running && imgMig.total > 0 && (
-                      <div style={{ marginTop: 8, height: 6, background: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${Math.round((imgMig.done / imgMig.total) * 100)}%`, background: C.accent, borderRadius: 3, transition: 'width 0.5s' }} />
-                      </div>
-                    )}
+              {/* ══ IMAGE MIGRATION BANNER ══ */}
+              <div style={{ background: imgMig?.running ? `${C.sky}0F` : C.surface, border: `1.5px solid ${imgMig?.running ? C.sky : C.border}`, borderRadius: 12, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: `${C.sky}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🖼️</div>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.t1, fontFamily: FONT.ui }}>
+                    Move Images to Cloudinary
                   </div>
-                  <button
-                    onClick={startImageMigration}
-                    disabled={imgMigRunning}
-                    style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: imgMigRunning ? C.borderLight : C.accent, color: imgMigRunning ? C.t4 : '#fff', fontWeight: 600, fontSize: 13, fontFamily: FONT.ui, cursor: imgMigRunning ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
-                  >
-                    {imgMigRunning ? 'Running…' : 'Start Migration'}
-                  </button>
+                  <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui, marginTop: 2 }}>
+                    {imgMig
+                      ? imgMig.running
+                        ? `Migrating… ${imgMig.done} of ${imgMig.total} images uploaded`
+                        : imgMig.total === 0
+                          ? '✓ All images already on Cloudinary — loading directly.'
+                          : `Done — ${imgMig.done} uploaded${imgMig.failed ? `, ${imgMig.failed} failed` : ''}.`
+                      : 'Autodukan S3 images are restricted. Run migration to copy them to Cloudinary so they load in the table.'}
+                  </div>
+                  {imgMig?.running && imgMig.total > 0 && (
+                    <div style={{ marginTop: 7, height: 4, background: C.borderLight, borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.round((imgMig.done / imgMig.total) * 100)}%`, background: C.sky, borderRadius: 2, transition: 'width 0.6s ease' }} />
+                    </div>
+                  )}
                 </div>
+                <button
+                  onClick={startImageMigration}
+                  disabled={imgMigRunning}
+                  style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: imgMigRunning ? C.borderLight : C.sky, color: imgMigRunning ? C.t4 : '#fff', fontWeight: 600, fontSize: 12, fontFamily: FONT.ui, cursor: imgMigRunning ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                >
+                  {imgMigRunning ? `${imgMig?.done ?? 0}/${imgMig?.total ?? '?'} …` : 'Start Migration'}
+                </button>
               </div>
 
               {/* ══ STAGING PARTS BROWSER ══ */}
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
-                {/* Header + controls */}
-                <div style={{ padding: '14px 16px', borderBottom: `1px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-                  <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
-                      Staging Parts
+
+                {/* Header row */}
+                <div style={{ padding: '14px 18px 10px', borderBottom: `1px solid ${C.border}`, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: C.t1, fontFamily: FONT.ui }}>Staging Parts</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, background: C.borderLight, color: C.t3, borderRadius: 20, padding: '1px 10px', fontFamily: FONT.ui }}>
+                        {adPartsTotal.toLocaleString()}
+                      </span>
+                      {(adPartsSearch || adPartsCategory || adPartsBrand) && (
+                        <span style={{ fontSize: 10, color: C.amber, fontFamily: FONT.ui, fontWeight: 600 }}>filtered</span>
+                      )}
                     </div>
-                    <div style={{ fontSize: 10, color: C.t4, fontFamily: FONT.ui, marginTop: 2 }}>
-                      {adPartsLoading ? 'Loading…' : `${adPartsTotal.toLocaleString()} parts ${adPartsSearch || adPartsCategory || adPartsBrand ? '(filtered)' : 'total'}`}
+                    <div style={{ fontSize: 11, color: C.t4, fontFamily: FONT.ui, marginTop: 2 }}>
+                      Scraped from autodukan.com — pending import to master catalog
                     </div>
                   </div>
-                  {/* Search */}
-                  <input
-                    placeholder="Search name, part no, brand…"
-                    value={adPartsSearch}
-                    onChange={e => { setAdPartsSearch(e.target.value); setAdPartsOffset(0); }}
-                    style={{ flex: 2, minWidth: 200, background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 12px', color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}
-                  />
-                  {/* Category filter */}
+                </div>
+
+                {/* Filter bar */}
+                <div style={{ padding: '10px 18px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', background: `${C.bg}88` }}>
+                  <div style={{ position: 'relative', flex: 2, minWidth: 200 }}>
+                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.t4, fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+                    <input
+                      placeholder="Search name, part number, brand…"
+                      value={adPartsSearch}
+                      onChange={e => { setAdPartsSearch(e.target.value); setAdPartsOffset(0); }}
+                      style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8, background: C.surface, border: `1.5px solid ${adPartsSearch ? C.sky : C.border}`, borderRadius: 8, color: C.t1, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}
+                    />
+                  </div>
                   <select
                     value={adPartsCategory}
                     onChange={e => { setAdPartsCategory(e.target.value); setAdPartsOffset(0); }}
-                    style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: adPartsCategory ? C.t1 : C.t3, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}
+                    style={{ background: C.surface, border: `1.5px solid ${adPartsCategory ? C.sky : C.border}`, borderRadius: 8, padding: '8px 10px', color: adPartsCategory ? C.t1 : C.t3, fontSize: 12, fontFamily: FONT.ui, outline: 'none', minWidth: 150 }}
                   >
                     <option value=''>All Categories</option>
                     {ALL_AD_CATS.map((c: string) => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  {/* Brand filter from stats */}
                   <select
                     value={adPartsBrand}
                     onChange={e => { setAdPartsBrand(e.target.value); setAdPartsOffset(0); }}
-                    style={{ background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, padding: '8px 10px', color: adPartsBrand ? C.t1 : C.t3, fontSize: 12, fontFamily: FONT.ui, outline: 'none' }}
+                    style={{ background: C.surface, border: `1.5px solid ${adPartsBrand ? C.sky : C.border}`, borderRadius: 8, padding: '8px 10px', color: adPartsBrand ? C.t1 : C.t3, fontSize: 12, fontFamily: FONT.ui, outline: 'none', minWidth: 130 }}
                   >
                     <option value=''>All Brands</option>
                     {(adStats?.brandStats || []).map((b: any) => <option key={b.brand} value={b.brand}>{b.brand} ({b.total})</option>)}
                   </select>
                   {(adPartsSearch || adPartsCategory || adPartsBrand) && (
                     <button onClick={() => { setAdPartsSearch(''); setAdPartsCategory(''); setAdPartsBrand(''); setAdPartsOffset(0); }}
-                      style={{ background: C.borderLight, border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 11, color: C.t3, cursor: 'pointer', fontFamily: FONT.ui }}>
-                      Clear
+                      style={{ background: C.borderLight, border: `1px solid ${C.border}`, borderRadius: 7, padding: '7px 14px', fontSize: 11, color: C.t3, cursor: 'pointer', fontFamily: FONT.ui, fontWeight: 600 }}>
+                      ✕ Clear
                     </button>
                   )}
+                  {adPartsLoading && <span style={{ fontSize: 11, color: C.t4, fontFamily: FONT.ui }}>Loading…</span>}
                 </div>
 
                 {/* Table */}
                 <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 780 }}>
                     <thead>
-                      <tr>
-                        {['', 'Part Number', 'Part Name', 'Brand', 'Category', 'Type', 'Price', 'MRP', 'Scraped'].map((h: string) => (
-                          <th key={h} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: 'left', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                      <tr style={{ background: C.bg }}>
+                        {[
+                          { label: 'Photo',       w: 64  },
+                          { label: 'Part Number', w: 130 },
+                          { label: 'Part Name',   w: undefined },
+                          { label: 'Brand',       w: 100 },
+                          { label: 'Category',    w: 160 },
+                          { label: 'Type',        w: 60  },
+                          { label: 'Price',       w: 110 },
+                          { label: 'MRP',         w: 100 },
+                          { label: 'Date',        w: 70  },
+                        ].map(col => (
+                          <th key={col.label} style={{ padding: '8px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: col.label === 'Price' || col.label === 'MRP' ? 'right' : 'left', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: FONT.ui, borderBottom: `1.5px solid ${C.border}`, whiteSpace: 'nowrap', width: col.w }}>
+                            {col.label}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {adPartsLoading && adParts.length === 0 ? (
-                        <tr><td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>Loading…</td></tr>
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : `${C.bg}80` }}>
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}` }}>
+                              <div style={{ width: 44, height: 44, borderRadius: 8, background: C.borderLight, animation: 'pulse 1.5s ease-in-out infinite' }} />
+                            </td>
+                            {[110, 180, 80, 120, 44, 80, 70, 50].map((w, j) => (
+                              <td key={j} style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}` }}>
+                                <div style={{ height: 12, width: w, borderRadius: 4, background: C.borderLight, opacity: 0.7 }} />
+                              </td>
+                            ))}
+                          </tr>
+                        ))
                       ) : adParts.length === 0 ? (
-                        <tr><td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>
-                          {adPartsSearch || adPartsCategory || adPartsBrand ? 'No parts match the current filters.' : 'No parts scraped yet. Run the local scraper to populate staging.'}
-                        </td></tr>
+                        <tr>
+                          <td colSpan={9} style={{ padding: '48px 24px', textAlign: 'center' }}>
+                            <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                            <div style={{ fontSize: 13, color: C.t3, fontFamily: FONT.ui, fontWeight: 600 }}>
+                              {adPartsSearch || adPartsCategory || adPartsBrand ? 'No parts match your filters.' : 'No parts scraped yet.'}
+                            </div>
+                            <div style={{ fontSize: 11, color: C.t4, fontFamily: FONT.ui, marginTop: 4 }}>
+                              {!(adPartsSearch || adPartsCategory || adPartsBrand) && 'Run the local scraper to populate staging.'}
+                            </div>
+                          </td>
+                        </tr>
                       ) : adParts.map((p: any, i: number) => {
                         const isOes = /oes/i.test(p.type || '');
+                        const isCloudinary = (p.imageUrl || '').includes('cloudinary.com');
+                        const imgSrc = p.imageUrl
+                          ? isCloudinary
+                            ? p.imageUrl
+                            : `${BASE_URL}/api/admin/autodukan/image-proxy?url=${encodeURIComponent(p.imageUrl)}`
+                          : null;
                         return (
-                          <tr key={p.id} style={{ background: i % 2 === 0 ? 'transparent' : `${C.bg}66` }}>
-                            {/* Thumbnail */}
-                            <td style={{ padding: '6px 10px', borderBottom: `1px solid ${C.borderLight}`, width: 52 }}>
-                              {p.imageUrl ? (
+                          <tr key={p.id} style={{ background: i % 2 === 0 ? C.surface : C.bg, transition: 'background 0.15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = `${C.sky}08`)}
+                            onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? C.surface : C.bg)}>
+
+                            {/* Photo */}
+                            <td style={{ padding: '8px 10px 8px 14px', borderBottom: `1px solid ${C.borderLight}`, width: 64 }}>
+                              {imgSrc ? (
                                 <img
-                                  src={`${BASE_URL}/api/admin/autodukan/image-proxy?url=${encodeURIComponent(p.imageUrl)}`}
-                                  alt={p.name || ''}
-                                  style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 6, background: '#fff', border: `1px solid ${C.borderLight}`, display: 'block' }}
-                                  onError={(e: any) => { e.target.style.display = 'none'; }}
+                                  src={imgSrc}
+                                  alt={p.name || p.partNumber || ''}
+                                  style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 8, background: '#FAFAFA', border: `1px solid ${C.borderLight}`, display: 'block' }}
+                                  onError={(e: any) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'flex';
+                                  }}
                                 />
-                              ) : (
-                                <div style={{ width: 40, height: 40, borderRadius: 6, background: C.borderLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📦</div>
-                              )}
+                              ) : null}
+                              <div style={{ width: 44, height: 44, borderRadius: 8, background: C.borderLight, display: imgSrc ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: C.t4 }}>📦</div>
                             </td>
-                            <td style={{ padding: '9px 12px', fontSize: 11, color: C.t2, fontFamily: "'Fira Code','Consolas',monospace", borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.partNumber || '—'}</td>
-                            <td style={{ padding: '9px 12px', fontSize: 12, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || '—'}</td>
-                            <td style={{ padding: '9px 12px', fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.brand || '—'}</td>
-                            <td style={{ padding: '9px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.category || '—'}</td>
-                            <td style={{ padding: '9px 12px', borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>
+
+                            {/* Part number */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}` }}>
+                              <span style={{ fontSize: 11, color: C.sky, fontFamily: "'Fira Code','Consolas',monospace", fontWeight: 600, background: `${C.sky}0D`, borderRadius: 4, padding: '2px 6px' }}>{p.partNumber || '—'}</span>
+                            </td>
+
+                            {/* Part name */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}`, maxWidth: 240 }}>
+                              <div style={{ fontSize: 13, color: p.name ? C.t1 : C.t4, fontFamily: FONT.ui, fontWeight: p.name ? 500 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {p.name || <em style={{ fontSize: 11 }}>No name</em>}
+                              </div>
+                            </td>
+
+                            {/* Brand */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>
+                              {p.brand ? (
+                                <span style={{ fontSize: 11, fontWeight: 700, color: C.amber, background: C.amberBg, borderRadius: 5, padding: '3px 8px', fontFamily: FONT.ui, letterSpacing: '0.03em' }}>{p.brand}</span>
+                              ) : <span style={{ color: C.t4, fontSize: 11 }}>—</span>}
+                            </td>
+
+                            {/* Category */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}`, maxWidth: 160 }}>
+                              <span style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>{p.category || '—'}</span>
+                            </td>
+
+                            {/* Type */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>
                               {p.type ? (
-                                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 4, padding: '2px 7px', fontFamily: FONT.ui, background: isOes ? `${C.green}22` : `${C.sky}22`, color: isOes ? C.green : C.sky }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 5, padding: '3px 8px', fontFamily: FONT.ui, background: isOes ? `${C.green}18` : `${C.sky}18`, color: isOes ? C.green : C.sky, border: `1px solid ${isOes ? C.green : C.sky}30` }}>
                                   {isOes ? 'OES' : 'OEM'}
                                 </span>
                               ) : <span style={{ color: C.t4, fontSize: 11 }}>—</span>}
                             </td>
-                            <td style={{ padding: '9px 12px', fontSize: 12, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.price != null ? `₹${Number(p.price).toLocaleString('en-IN')}` : '—'}</td>
-                            <td style={{ padding: '9px 12px', fontSize: 11, color: C.t3, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.mrp != null ? `₹${Number(p.mrp).toLocaleString('en-IN')}` : '—'}</td>
-                            <td style={{ padding: '9px 12px', fontSize: 10, color: C.t4, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>
-                              {p.scrapedAt ? new Date(p.scrapedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+
+                            {/* Price */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: C.t1, fontFamily: FONT.ui }}>
+                                {p.price != null ? `₹${Number(p.price).toLocaleString('en-IN')}` : '—'}
+                              </span>
+                            </td>
+
+                            {/* MRP */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                              <span style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui, textDecoration: p.mrp && p.price && p.mrp > p.price ? 'line-through' : 'none' }}>
+                                {p.mrp != null ? `₹${Number(p.mrp).toLocaleString('en-IN')}` : '—'}
+                              </span>
+                            </td>
+
+                            {/* Date */}
+                            <td style={{ padding: '10px 12px', borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>
+                              <span style={{ fontSize: 11, color: C.t4, fontFamily: FONT.ui }}>
+                                {p.scrapedAt ? new Date(p.scrapedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                              </span>
                             </td>
                           </tr>
                         );
