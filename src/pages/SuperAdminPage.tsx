@@ -2276,22 +2276,35 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                   <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
                     <thead>
                       <tr>
-                        {['Part Number', 'Part Name', 'Brand', 'Category', 'Type', 'Price', 'MRP', 'Scraped'].map((h: string) => (
+                        {['', 'Part Number', 'Part Name', 'Brand', 'Category', 'Type', 'Price', 'MRP', 'Scraped'].map((h: string) => (
                           <th key={h} style={{ padding: '9px 12px', fontSize: 10, fontWeight: 700, color: C.t3, textAlign: 'left', background: C.bg, textTransform: 'uppercase', letterSpacing: '0.07em', fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {adPartsLoading && adParts.length === 0 ? (
-                        <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>Loading…</td></tr>
+                        <tr><td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>Loading…</td></tr>
                       ) : adParts.length === 0 ? (
-                        <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>
+                        <tr><td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: C.t4, fontFamily: FONT.ui, fontSize: 12 }}>
                           {adPartsSearch || adPartsCategory || adPartsBrand ? 'No parts match the current filters.' : 'No parts scraped yet. Run the local scraper to populate staging.'}
                         </td></tr>
                       ) : adParts.map((p: any, i: number) => {
                         const isOes = /oes/i.test(p.type || '');
                         return (
                           <tr key={p.id} style={{ background: i % 2 === 0 ? 'transparent' : `${C.bg}66` }}>
+                            {/* Thumbnail */}
+                            <td style={{ padding: '6px 10px', borderBottom: `1px solid ${C.borderLight}`, width: 52 }}>
+                              {p.imageUrl ? (
+                                <img
+                                  src={encodeURI(p.imageUrl)}
+                                  alt={p.name || ''}
+                                  style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 6, background: '#fff', border: `1px solid ${C.borderLight}`, display: 'block' }}
+                                  onError={(e: any) => { e.target.style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div style={{ width: 40, height: 40, borderRadius: 6, background: C.borderLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>📦</div>
+                              )}
+                            </td>
                             <td style={{ padding: '9px 12px', fontSize: 11, color: C.t2, fontFamily: "'Fira Code','Consolas',monospace", borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.partNumber || '—'}</td>
                             <td style={{ padding: '9px 12px', fontSize: 12, color: C.t1, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name || '—'}</td>
                             <td style={{ padding: '9px 12px', fontSize: 12, fontWeight: 700, color: C.amber, fontFamily: FONT.ui, borderBottom: `1px solid ${C.borderLight}`, whiteSpace: 'nowrap' }}>{p.brand || '—'}</td>
