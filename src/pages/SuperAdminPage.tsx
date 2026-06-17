@@ -1064,6 +1064,31 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
 
   // (Scraper control removed — scraping runs locally via scrape_autodukan_local.py)
 
+  // Image migration state
+  const [imgMig, setImgMig] = useState<any>(null);
+  const [imgMigRunning, setImgMigRunning] = useState(false);
+
+  const startImageMigration = useCallback(async () => {
+    setImgMigRunning(true);
+    try {
+      const res: any = await api.get("/api/admin/autodukan/migrate-images");
+      setImgMig(res.data?.state || null);
+    } catch {}
+    // Kick off the migration
+    try {
+      await api.post("/api/admin/autodukan/migrate-images", {});
+    } catch {}
+    // Poll every 3s until done
+    const poll = setInterval(async () => {
+      try {
+        const r: any = await api.get("/api/admin/autodukan/migrate-images");
+        const state = r.data?.state;
+        setImgMig(state);
+        if (state && !state.running) { clearInterval(poll); setImgMigRunning(false); }
+      } catch { clearInterval(poll); setImgMigRunning(false); }
+    }, 3000);
+  }, []);
+
   // Staging parts browser
   const AD_PARTS_LIMIT = 50;
   const [adParts, setAdParts]               = useState<any[]>([]);
@@ -2225,6 +2250,38 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                   </div>
                 </div>
               )}
+
+              {/* ══ IMAGE MIGRATION PANEL ══ */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.t3, textTransform: 'uppercase', letterSpacing: '0.09em', fontFamily: FONT.ui }}>
+                      Image Migration — S3 → Cloudinary
+                    </div>
+                    <div style={{ fontSize: 12, color: C.t4, fontFamily: FONT.ui, marginTop: 3 }}>
+                      {imgMig
+                        ? imgMig.running
+                          ? `Migrating… ${imgMig.done} / ${imgMig.total} done${imgMig.failed ? `, ${imgMig.failed} failed` : ''}`
+                          : imgMig.total === 0
+                            ? 'All images already on Cloudinary.'
+                            : `Finished — ${imgMig.done} migrated, ${imgMig.failed} failed.${imgMig.lastError ? ` Last error: ${imgMig.lastError}` : ''}`
+                        : 'Moves S3 images to Cloudinary so they load without restrictions.'}
+                    </div>
+                    {imgMig?.running && imgMig.total > 0 && (
+                      <div style={{ marginTop: 8, height: 6, background: C.borderLight, borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.round((imgMig.done / imgMig.total) * 100)}%`, background: C.accent, borderRadius: 3, transition: 'width 0.5s' }} />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={startImageMigration}
+                    disabled={imgMigRunning}
+                    style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: imgMigRunning ? C.borderLight : C.accent, color: imgMigRunning ? C.t4 : '#fff', fontWeight: 600, fontSize: 13, fontFamily: FONT.ui, cursor: imgMigRunning ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    {imgMigRunning ? 'Running…' : 'Start Migration'}
+                  </button>
+                </div>
+              </div>
 
               {/* ══ STAGING PARTS BROWSER ══ */}
               <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
