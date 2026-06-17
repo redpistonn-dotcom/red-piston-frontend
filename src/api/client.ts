@@ -2,7 +2,7 @@
  * API client — thin wrapper around fetch with auth token handling.
  * Rule: access token in MEMORY only, refresh token in httpOnly cookie + localStorage fallback.
  */
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 let accessToken: string | null = null;
 

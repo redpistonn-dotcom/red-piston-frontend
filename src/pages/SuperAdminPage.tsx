@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { flushSync, createPortal } from "react-dom";
 import * as XLSX from "xlsx";
-import { api } from "../api/client.js";
+import { api, BASE_URL } from "../api/client.js";
 import { T, FONT } from "../theme.js"; // T kept for any remaining tokens
 import { Avatar } from "../components/Avatar.jsx";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace.js";
@@ -2296,7 +2296,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                             <td style={{ padding: '6px 10px', borderBottom: `1px solid ${C.borderLight}`, width: 52 }}>
                               {p.imageUrl ? (
                                 <img
-                                  src={encodeURI(p.imageUrl)}
+                                  src={`${BASE_URL}/api/admin/autodukan/image-proxy?url=${encodeURIComponent(p.imageUrl)}`}
                                   alt={p.name || ''}
                                   style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 6, background: '#fff', border: `1px solid ${C.borderLight}`, display: 'block' }}
                                   onError={(e: any) => { e.target.style.display = 'none'; }}
