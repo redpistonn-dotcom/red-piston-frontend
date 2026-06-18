@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { T, FONT } from "../theme";
 import { fmt } from "../utils";
-import { api } from "../api/client";
+import { api, BASE_URL } from "../api/client";
 
 interface ExtractedItem {
   serial: number;
@@ -309,14 +309,14 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
                     }}>{b.status === "IMPORTED" ? "✓ IMPORTED" : "PENDING REVIEW"}</span>
                   </td>
                   <td style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>
-                    {b.fileUrl && (() => {
-                      // Old bills were uploaded as resource_type:'image' which Cloudinary
-                      // blocks for PDF delivery. Convert to raw-type URL so the link opens.
-                      const pdfUrl = b.fileUrl.replace("/image/upload/", "/raw/upload/");
-                      return (
-                        <a href={pdfUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: T.amber, fontWeight: 700, textDecoration: "none" }}>View PDF ↗</a>
-                      );
-                    })()}
+                    {b.fileUrl && (
+                      <a
+                        href={`${BASE_URL}/api/shop/purchase-bills/pdf-proxy?url=${encodeURIComponent(b.fileUrl)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontSize: 12, color: T.amber, fontWeight: 700, textDecoration: "none" }}
+                      >View PDF ↗</a>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -91,7 +91,7 @@ export function POSBillingPage() {
         if (!search.trim()) return [];
         const q = search.toLowerCase();
         return shopProducts.filter((p: any) =>
-            [p.name, p.sku, p.brand, p.category, p.oemNumber].some(s => (s || "").toLowerCase().includes(q))
+            [p.name, p.sku, p.brand, p.category, p.oemNumber].some(s => String(s ?? "").toLowerCase().includes(q))
         ).slice(0, 8);
     }, [search, shopProducts]);
 

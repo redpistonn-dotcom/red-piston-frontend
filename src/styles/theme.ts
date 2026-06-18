@@ -550,8 +550,7 @@ export const GLOBAL_CSS = `
       transition: width var(--dur-normal) var(--ease-out), box-shadow var(--dur-normal) ease;
       will-change: width;
     }
-    .erp-sidebar:hover,
-    .erp-sidebar:focus-within {
+    .erp-sidebar:hover {
       width: 236px !important;
       box-shadow: 12px 0 40px rgba(28,27,27,0.16), 2px 0 16px rgba(28,27,27,0.06);
     }
@@ -566,8 +565,7 @@ export const GLOBAL_CSS = `
       pointer-events: none;
       transition: opacity var(--dur-fast) ease 60ms, transform var(--dur-fast) var(--ease-out) 60ms;
     }
-    .erp-sidebar:hover .sb-fade,
-    .erp-sidebar:focus-within .sb-fade {
+    .erp-sidebar:hover .sb-fade {
       opacity: 1;
       transform: none;
       pointer-events: auto;
@@ -575,8 +573,7 @@ export const GLOBAL_CSS = `
 
     /* Collapsed-state notification dot — hides once badges are visible */
     .erp-sidebar .sb-dot { transition: opacity var(--dur-fast) ease; }
-    .erp-sidebar:hover .sb-dot,
-    .erp-sidebar:focus-within .sb-dot { opacity: 0; }
+    .erp-sidebar:hover .sb-dot { opacity: 0; }
   }
 
   /* ── Large desktop enhancements ── */
