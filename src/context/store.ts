@@ -194,3 +194,11 @@ export function useStore(): StoreContextValue {
   if (!ctx) throw new Error('useStore must be used within a StoreProvider');
   return ctx;
 }
+
+// Force a full page reload when this module is hot-replaced in development.
+// Without this, Vite re-evaluates createContext() and creates a new StoreContext
+// object — the Provider in main.tsx still holds the old reference while consumers
+// get the new one, so useContext returns null → "must be used within StoreProvider".
+if (import.meta.hot) {
+  import.meta.hot.decline();
+}

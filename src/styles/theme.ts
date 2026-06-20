@@ -574,6 +574,17 @@ export const GLOBAL_CSS = `
     /* Collapsed-state notification dot — hides once badges are visible */
     .erp-sidebar .sb-dot { transition: opacity var(--dur-fast) ease; }
     .erp-sidebar:hover .sb-dot { opacity: 0; }
+
+    /* ── Content push — topbar, low-stock banner and main all slide right
+       in sync with the sidebar expanding so nothing gets overlapped.
+       !important overrides the inline marginLeft/left set in ERPShell.tsx. ── */
+    .erp-topbar  { transition: left         var(--dur-normal) var(--ease-out); }
+    .erp-banner  { transition: left         var(--dur-normal) var(--ease-out); }
+    .erp-content { transition: margin-left  var(--dur-normal) var(--ease-out); }
+
+    .erp-sidebar:hover ~ .erp-topbar  { left:         236px !important; }
+    .erp-sidebar:hover ~ .erp-banner  { left:         236px !important; }
+    .erp-sidebar:hover ~ .erp-content { margin-left:  236px !important; }
   }
 
   /* ── Large desktop enhancements ── */

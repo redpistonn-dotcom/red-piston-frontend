@@ -250,6 +250,9 @@ export function ERPShell({ children }: ERPShellProps) {
   const touchStartX = useRef(0);
 
   // ── Server-first data loader — fetch on mount and re-fetch on rp:data-changed ─
+  const [dataLoadError, setDataLoadError] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
+
   useEffect(() => {
     // Skip fetch for users without a real shop (admin impersonating a shop-less account,
     // or admin navigating to ERP pages directly). Without a shopId the backend returns
@@ -257,7 +260,10 @@ export function ERPShell({ children }: ERPShellProps) {
     if (!currentUser?.shopId) return;
 
     let cancelled = false;
-    const load = async () => {
+    const load = async (isRetry = false) => {
+      if (cancelled) return;
+      setDataLoading(true);
+      setDataLoadError(false);
       try {
         const [prods, movs, parts] = await Promise.all([
           fetchInventory(),
@@ -268,8 +274,17 @@ export function ERPShell({ children }: ERPShellProps) {
         if (Array.isArray(prods)) saveProducts(prods, true);
         if (Array.isArray(movs)) saveMovements(movs);
         if (Array.isArray(parts)) saveParties(parts);
+        setDataLoadError(false);
       } catch (e) {
-        console.error('[ERPShell] initial data load failed:', e);
+        console.error('[ERPShell] data load failed:', e);
+        if (!cancelled && !isRetry) {
+          // Backend may be cold-starting (Render free tier) — retry once after 8s
+          setTimeout(() => { if (!cancelled) load(true); }, 8000);
+        } else if (!cancelled) {
+          setDataLoadError(true);
+        }
+      } finally {
+        if (!cancelled) setDataLoading(false);
       }
     };
     load();
@@ -279,7 +294,7 @@ export function ERPShell({ children }: ERPShellProps) {
       cancelled = true;
       window.removeEventListener('rp:data-changed', onChange);
     };
-  }, [saveProducts, saveMovements, saveParties]);
+  }, [saveProducts, saveMovements, saveParties, currentUser?.shopId]);
 
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false); }, [currentPath]);
@@ -747,6 +762,28 @@ export function ERPShell({ children }: ERPShellProps) {
         }}
       >
         <ProfileNudge />
+        {dataLoadError && (
+          <div style={{
+            margin: "0 0 20px",
+            background: "rgba(190,43,26,0.06)",
+            border: "1px solid rgba(190,43,26,0.25)",
+            borderRadius: 10,
+            padding: "12px 16px",
+            display: "flex", alignItems: "center", gap: 12,
+          }}>
+            <span style={{ fontSize: 13, color: "#BE2B1A", fontWeight: 500, flex: 1 }}>
+              Could not load shop data — the server may be waking up.
+            </span>
+            <button
+              onClick={() => window.dispatchEvent(new Event('rp:data-changed'))}
+              style={{
+                background: "#BE2B1A", color: "#fff", border: "none",
+                borderRadius: 7, padding: "6px 14px", fontSize: 12,
+                fontWeight: 700, cursor: "pointer", flexShrink: 0,
+              }}
+            >Retry</button>
+          </div>
+        )}
         {children}
       </main>
 

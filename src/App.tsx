@@ -181,10 +181,38 @@ function AppContent() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Global session-expired event (fired by api/client.js) ────────────────────
+  // If the token that expired was an impersonation token, try to restore the admin's
+  // own session before falling back to a full logout — otherwise the admin loses their
+  // context and has to log in again from scratch.
   useEffect(() => {
-    const handler = () => {
+    const handler = async () => {
       clearTokens();
-      try { localStorage.removeItem("as_user"); localStorage.removeItem("as_refresh_token"); } catch {}
+      try { sessionStorage.removeItem('as_imp_token'); } catch {}
+
+      const impBackup = (() => {
+        try { const s = localStorage.getItem('as_impersonating'); return s ? JSON.parse(s) : null; } catch { return null; }
+      })();
+
+      if (impBackup?.user && impBackup?.refreshToken) {
+        localStorage.removeItem('as_impersonating');
+        try {
+          const res = await api.post('/api/auth/refresh', { refreshToken: impBackup.refreshToken });
+          const newAccess = res.accessToken || (res as any).data?.accessToken;
+          const newRefresh = (res as any).refreshToken || (res as any).data?.refreshToken;
+          if (newAccess) {
+            setTokens(newAccess, newRefresh ?? null);
+            setCurrentUser(impBackup.user);
+            localStorage.setItem('as_user', JSON.stringify(impBackup.user));
+            localStorage.setItem('as_refresh_token', newRefresh ?? impBackup.refreshToken);
+            window.location.replace('/admin');
+            return;
+          }
+        } catch {
+          // Admin token also expired — fall through to full logout
+        }
+      }
+
+      try { localStorage.removeItem("as_user"); localStorage.removeItem("as_refresh_token"); localStorage.removeItem("as_impersonating"); } catch {}
       setCurrentUser(null);
       window.location.replace("/login");
     };
@@ -343,18 +371,38 @@ function AppContent() {
 
   const handleExitImpersonation = useCallback(async () => {
     if (!impersonating) return;
+    const backup = impersonating;
     localStorage.removeItem('as_impersonating');
     try { sessionStorage.removeItem('as_imp_token'); } catch {}
+    clearTokens();
+    setImpersonating(null);
+
+    let restored = false;
     try {
-      if (impersonating.refreshToken) localStorage.setItem('as_refresh_token', impersonating.refreshToken);
-      const res = await api.post('/api/auth/refresh', { refreshToken: impersonating.refreshToken });
-      setTokens(res.accessToken || res.data?.accessToken, res.refreshToken);
+      if (backup.refreshToken) {
+        const res = await api.post('/api/auth/refresh', { refreshToken: backup.refreshToken });
+        const newAccess = (res as any).accessToken || (res as any).data?.accessToken;
+        const newRefresh = (res as any).refreshToken || (res as any).data?.refreshToken;
+        if (newAccess) {
+          setTokens(newAccess, newRefresh ?? backup.refreshToken);
+          restored = true;
+        }
+      }
     } catch (err) {
       console.warn("[Auth] Could not restore admin token after impersonation:", err?.message);
     }
-    setCurrentUser(impersonating.user);
-    localStorage.setItem('as_user', JSON.stringify(impersonating.user));
-    setImpersonating(null);
+
+    if (!restored) {
+      // Admin's refresh token expired — do a clean logout so they get a fresh login screen
+      // rather than landing on /admin with no token and hitting a messy 401 cascade.
+      try { localStorage.removeItem('as_user'); localStorage.removeItem('as_refresh_token'); } catch {}
+      setCurrentUser(null);
+      window.location.replace('/login');
+      return;
+    }
+
+    setCurrentUser(backup.user);
+    localStorage.setItem('as_user', JSON.stringify(backup.user));
     navigate('/admin', { replace: true });
   }, [impersonating, navigate]);
 
