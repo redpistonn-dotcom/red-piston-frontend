@@ -159,7 +159,7 @@ function getCategoryEmoji(category?: string | null): string {
 
 export function mapMovement(m: BackendMovement): Movement {
   const isSupply = ['PURCHASE', 'OPENING', 'RETURN_IN'].includes(m.type);
-  const partyName = m.party?.name || null;
+  const partyName = m.party?.name || m.partyName || null;
   const productName = m.inventory?.customPartName || m.inventory?.masterPart?.partName || m.productName || '';
   return {
     id: String(m.movementId || m.id),

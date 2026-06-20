@@ -75,13 +75,16 @@ const MKT_NEXT_STATUS: Record<string, { next: string; label: string }> = {
 
 // ─── Derive orders from movements ────────────────────────────────────────────
 function movementToOrder(m: any) {
-    const isSale = m.type === "SALE";
+    const isSale     = m.type === "SALE";
     const isPurchase = m.type === "PURCHASE";
-    if (!isSale && !isPurchase) return null;
+    const isOpening  = m.type === "OPENING";  // inventory addition by shop owner
+    if (!isSale && !isPurchase && !isOpening) return null;
 
-    // Derive status from paymentStatus / movement type
+    // Derive status
     let status: OrderStatus = "Pending";
-    if (m.paymentStatus === "paid" || m.paymentMode === "Cash" || m.paymentMode === "UPI" || m.paymentMode === "Card") {
+    if (isOpening) {
+        status = "Delivered"; // opening stock is already received
+    } else if (m.paymentStatus === "paid" || m.paymentMode === "Cash" || m.paymentMode === "UPI" || m.paymentMode === "Card") {
         status = isSale ? "Delivered" : "Shipped";
     } else if (m.paymentStatus === "cancelled") {
         status = "Cancelled";
@@ -91,9 +94,9 @@ function movementToOrder(m: any) {
         status = isSale ? "Shipped" : "Processing";
     }
 
-    // Generate order ID: SO-XXXXX for sales, PO-XXXXX for purchases
-    const numId = String(m.id || "").slice(-5).padStart(5, "0");
-    const orderId = isSale ? `#SO-${numId}` : `#PO-${numId}`;
+    // Generate order ID: SO-XXXXX for sales, PO-XXXXX / OS-XXXXX for purchases/opening
+    const numId   = String(m.id || "").slice(-5).padStart(5, "0");
+    const orderId = isSale ? `#SO-${numId}` : isOpening ? `#OS-${numId}` : `#PO-${numId}`;
     const partyId = isSale
         ? `PT-${String(m.id || "").slice(-5).padStart(5, "0")}`
         : `SP-${String(m.id || "").slice(-5).padStart(5, "0")}`;
@@ -102,7 +105,9 @@ function movementToOrder(m: any) {
         id: m.id,
         orderId,
         date: m.date,
-        partyName: isSale ? (m.customerName || "Walk-in Customer") : (m.supplierName || m.supplier || "Supplier"),
+        partyName: isSale
+            ? (m.customerName || "Walk-in Customer")
+            : (m.partyName || m.supplierName || m.supplier || "Supplier"),
         partyId,
         type: isSale ? "Sale" : "Purchase" as "Sale" | "Purchase",
         status,
