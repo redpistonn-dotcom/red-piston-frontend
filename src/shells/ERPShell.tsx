@@ -820,6 +820,7 @@ export function ERPShell({ children }: ERPShellProps) {
         open={addProdOpen}
         onClose={() => setAddProdOpen(false)}
         onSave={saveProduct}
+        onMovementSaved={() => fetchMovements().then(ms => { if (ms) saveMovements(ms); })}
         toast={toast}
         activeShopId={activeShopId}
         existingProducts={products || []}

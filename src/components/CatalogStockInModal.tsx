@@ -1072,7 +1072,7 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
 }
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
-export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId, existingProducts = [] }) {
+export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, toast, activeShopId, existingProducts = [] }) {
   const [step, setStep]               = useState("search"); // "search" | "configure" | "contribute"
   const [selected, setSelected]       = useState(null);
   const [manualQuery, setManualQuery] = useState("");
@@ -1350,6 +1350,8 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
         }
       }
 
+      // Refresh movements store so Orders page shows the new entries immediately
+      onMovementSaved?.();
       toast(
         `${savedCount} part${savedCount !== 1 ? "s" : ""} added to inventory!`,
         "success",

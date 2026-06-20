@@ -8,14 +8,15 @@ import { fmt, fmtDate, downloadCSV, generateCSV, uid } from "../utils";
 import { MobileCard, MobileCardList, useIsMobile, Skeleton } from "../components/ui";
 
 // ─── Status config ────────────────────────────────────────────────────────────
-type OrderStatus = "Shipped" | "Pending" | "Delivered" | "Cancelled" | "Processing";
+type OrderStatus = "Shipped" | "Pending" | "Delivered" | "Cancelled" | "Processing" | "Stock Added";
 
 const STATUS_CFG: Record<OrderStatus, { color: string; bg: string; dot?: string; solid?: boolean }> = {
-    Shipped:    { color: "#6B7280", bg: "transparent", dot: "#6B7280" },
-    Pending:    { color: "#FFFFFF", bg: T.amber,       solid: true },
-    Delivered:  { color: T.emerald, bg: "transparent", dot: T.emerald },
-    Cancelled:  { color: "#9CA3AF", bg: "transparent", dot: "#9CA3AF" },
-    Processing: { color: T.sky,     bg: "transparent", dot: T.sky },
+    Shipped:       { color: "#6B7280", bg: "transparent", dot: "#6B7280" },
+    Pending:       { color: "#FFFFFF", bg: T.amber,       solid: true },
+    Delivered:     { color: T.emerald, bg: "transparent", dot: T.emerald },
+    Cancelled:     { color: "#9CA3AF", bg: "transparent", dot: "#9CA3AF" },
+    Processing:    { color: T.sky,     bg: "transparent", dot: T.sky },
+    "Stock Added": { color: T.sky,     bg: "transparent", dot: T.sky },
 };
 
 function StatusBadge({ status }: { status: OrderStatus }) {
@@ -83,7 +84,7 @@ function movementToOrder(m: any) {
     // Derive status
     let status: OrderStatus = "Pending";
     if (isOpening) {
-        status = "Delivered"; // opening stock is already received
+        status = "Stock Added" as OrderStatus; // opening stock added directly to inventory
     } else if (m.paymentStatus === "paid" || m.paymentMode === "Cash" || m.paymentMode === "UPI" || m.paymentMode === "Card") {
         status = isSale ? "Delivered" : "Shipped";
     } else if (m.paymentStatus === "cancelled") {
