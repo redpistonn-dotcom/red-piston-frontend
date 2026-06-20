@@ -149,7 +149,17 @@ function BackButton({ onClick, label = "Back to search" }) {
 }
 
 // ─── sub-component: CartPanel ─────────────────────────────────────────────────
-function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving }) {
+function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSupplier }) {
+  const [triedSave, setTriedSave] = useState(false);
+  const nameErr    = triedSave && !supplier.name.trim();
+  const invoiceErr = triedSave && !supplier.invoiceNo.trim();
+
+  function handleSave() {
+    setTriedSave(true);
+    if (!supplier.name.trim() || !supplier.invoiceNo.trim()) return;
+    onSaveAll();
+  }
+
   return (
     <div className="csim-cart" style={{
       width: 268,
@@ -269,13 +279,61 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving }) {
         </div>
       )}
 
+      {/* Shared Supplier Details */}
+      {cart.length > 0 && (
+        <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+            Supplier Details <span style={{ color: T.crimson }}>*</span>
+          </div>
+          <div style={{ fontSize: 10, color: T.t4, marginBottom: 10 }}>
+            Applied to all {cart.length} item{cart.length !== 1 ? "s" : ""}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <div style={{ gridColumn: "span 2" }}>
+              <input
+                value={supplier.name}
+                onChange={e => setSupplier(s => ({ ...s, name: e.target.value }))}
+                placeholder="Supplier Name *"
+                maxLength={100}
+                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${nameErr ? T.crimson : T.border}`, borderRadius: 7, padding: "7px 9px", fontSize: 11, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+              />
+              {nameErr && <div style={{ fontSize: 10, color: T.crimson, marginTop: 2 }}>Supplier name is required</div>}
+            </div>
+            <div>
+              <input
+                value={supplier.invoiceNo}
+                onChange={e => setSupplier(s => ({ ...s, invoiceNo: e.target.value }))}
+                placeholder="Invoice No *"
+                maxLength={50}
+                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${invoiceErr ? T.crimson : T.border}`, borderRadius: 7, padding: "7px 9px", fontSize: 11, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+              />
+              {invoiceErr && <div style={{ fontSize: 10, color: T.crimson, marginTop: 2 }}>Required</div>}
+            </div>
+            <input
+              value={supplier.gstin}
+              onChange={e => setSupplier(s => ({ ...s, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15) }))}
+              placeholder="GSTIN (15 chars)"
+              maxLength={15}
+              style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 7, padding: "7px 9px", fontSize: 11, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+            />
+            <input
+              value={supplier.phone}
+              onChange={e => setSupplier(s => ({ ...s, phone: e.target.value.replace(/[^\d]/g, "").slice(0, 10) }))}
+              placeholder="Phone"
+              type="tel" maxLength={10} inputMode="numeric"
+              style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 7, padding: "7px 9px", fontSize: 11, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Save All CTA */}
       {cart.length > 0 && (
         <div style={{ paddingTop: 4 }}>
           <Btn
             variant="amber"
             loading={saving}
-            onClick={onSaveAll}
+            onClick={handleSave}
             style={{ width: "100%", justifyContent: "center" }}
           >
             💾 Save All ({cart.length} {cart.length === 1 ? "part" : "parts"})
@@ -645,8 +703,6 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
   const [f, setF] = useState(initialForm || {
     buyPrice: "", sellPrice: "", stockQty: "0",
     rackLocation: "", minStockAlert: "5",
-    // Supplier details — recorded on the opening-stock movement.
-    supplierName: "", supplierGstin: "", supplierPhone: "", supplierInvoiceNo: "",
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
   const [errors, setErrors] = useState({});
@@ -750,37 +806,22 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <Field label="Buying Price (₹)" required error={errors.buyPrice}>
-            <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" autoFocus />
+            <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" autoFocus min="0" max="10000000" step="0.01" />
           </Field>
           <Field label="Selling Price (₹)" required error={errors.sellPrice}>
-            <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" />
+            <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
           </Field>
           <Field label="Opening Stock" required error={errors.stockQty} hint="Units currently in hand">
-            <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" />
+            <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" />
           </Field>
           <Field label="Min Stock Alert" hint="Alert below this threshold">
-            <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" />
+            <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" min="0" max="10000" />
           </Field>
           <div style={{ gridColumn: "span 2" }}>
             <Field label="Rack / Storage Location" hint="e.g. Rack A-12, Shelf 3B">
-              <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" />
+              <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" maxLength={50} />
             </Field>
           </div>
-          <div style={{ gridColumn: "span 2", borderTop: `1px solid ${T.border}`, paddingTop: 10, marginTop: 2 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Supplier Details (optional)</div>
-          </div>
-          <Field label="Supplier Name">
-            <Input value={f.supplierName} onChange={set("supplierName")} placeholder="e.g. Industrial Gear Ltd." />
-          </Field>
-          <Field label="Supplier GSTIN">
-            <Input value={f.supplierGstin} onChange={set("supplierGstin")} placeholder="29ABCDE1234F1Z5" />
-          </Field>
-          <Field label="Supplier Phone">
-            <Input value={f.supplierPhone} onChange={set("supplierPhone")} placeholder="Contact number" />
-          </Field>
-          <Field label="Invoice Number">
-            <Input value={f.supplierInvoiceNo} onChange={set("supplierInvoiceNo")} placeholder="e.g. INV-2045" />
-          </Field>
         </div>
 
         {/* Profit preview — only shown once both prices are entered */}
@@ -900,12 +941,12 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <div style={{ gridColumn: "span 2" }}>
           <Field label="Part Name" required error={errors.partName}>
-            <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" />
+            <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" maxLength={200} />
           </Field>
         </div>
         {/* Photo is added later at marketplace "Go Live" — not required here. */}
         <Field label="Brand">
-          <Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK, Denso…" />
+          <Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK, Denso…" maxLength={80} />
         </Field>
         <Field label="Category" required error={errors.categoryL1}>
           <Select
@@ -931,11 +972,11 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
         </div>
         <div style={{ gridColumn: "span 2" }}>
           <Field label="OEM Part Number" hint="From the box / manufacturer website">
-            <Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="04465-02220" />
+            <Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="04465-02220" maxLength={50} />
           </Field>
         </div>
         <Field label="HSN Code">
-          <Input value={f.hsnCode} onChange={set("hsnCode")} placeholder="87083000" />
+          <Input value={f.hsnCode} onChange={e => set("hsnCode")(e.replace(/[^\d]/g, "").slice(0, 8))} placeholder="87083000" maxLength={8} inputMode="numeric" />
         </Field>
         <Field label="GST Rate">
           <Select value={f.gstRate} onChange={set("gstRate")} options={GST_RATES.map((r) => ({ value: r, label: r + "% GST" }))} />
@@ -944,16 +985,16 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
           <Select value={f.unitOfSale} onChange={set("unitOfSale")} options={UNIT_OPTIONS.map((u) => ({ value: u, label: u }))} />
         </Field>
         <Field label="Buying Price (₹)" required error={errors.buyPrice}>
-          <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" />
+          <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
         </Field>
         <Field label="Selling Price (₹)" required error={errors.sellPrice}>
-          <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" />
+          <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
         </Field>
         <Field label="Opening Stock" required error={errors.stockQty}>
-          <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" />
+          <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" />
         </Field>
         <Field label="Min Stock Alert">
-          <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" />
+          <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" min="0" max="10000" />
         </Field>
         <div style={{ gridColumn: "span 2" }}>
           <Field label="Rack / Storage Location">
@@ -1040,6 +1081,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
   const [cart, setCart]               = useState([]); // { cartId, type: 'catalog'|'contribution', part?, form }
   const [editingCartId, setEditingCartId] = useState(null); // cart item being re-edited
   const [editForm, setEditForm]       = useState(null);     // its saved form, prefilled into ConfigureStep
+  const [supplier, setSupplier]       = useState({ name: "", gstin: "", phone: "", invoiceNo: "" });
 
   // Reset on open / close
   useEffect(() => {
@@ -1052,6 +1094,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
       setCart([]);
       setEditingCartId(null);
       setEditForm(null);
+      setSupplier({ name: "", gstin: "", phone: "", invoiceNo: "" });
     }
   }, [open]);
 
@@ -1101,8 +1144,14 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
   // ── Save All: process every cart item and call the API ────────────────────
   const handleSaveAll = useCallback(async () => {
     if (cart.length === 0) return;
+    if (!supplier.name.trim() || !supplier.invoiceNo.trim()) return;
     setSaving(true);
     let savedCount = 0;
+    // All items in this batch share one reference so they group together in History.
+    // If the user entered a supplier invoice number, use that; otherwise generate a
+    // short batch token so items saved together stay linked without a real invoice.
+    const batchRef = `batch-${Date.now().toString(36)}`;
+    const sharedRef = supplier.invoiceNo || batchRef;
 
     try {
       for (const item of cart) {
@@ -1119,10 +1168,10 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
               stockQty:      parseInt(form.stockQty) || 0,
               rackLocation:  form.rackLocation || null,
               minStockAlert: parseInt(form.minStockAlert) || 5,
-              supplierName:  form.supplierName || undefined,
-              supplierGstin: form.supplierGstin || undefined,
-              supplierPhone: form.supplierPhone || undefined,
-              supplierInvoiceNo: form.supplierInvoiceNo || undefined,
+              supplierName:  supplier.name || undefined,
+              supplierGstin: supplier.gstin || undefined,
+              supplierPhone: supplier.phone || undefined,
+              supplierInvoiceNo: sharedRef,
               imageUrl:      resolvedImage || undefined,
             });
             const inv = res.item;
@@ -1234,6 +1283,10 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
                 stockQty:      parseInt(form.stockQty) || 0,
                 rackLocation:  form.rackLocation || null,
                 minStockAlert: parseInt(form.minStockAlert) || 5,
+                supplierName:  supplier.name || undefined,
+                supplierGstin: supplier.gstin || undefined,
+                supplierPhone: supplier.phone || undefined,
+                supplierInvoiceNo: sharedRef,
                 imageUrl:      contribImage || undefined,
               });
               product = {
@@ -1306,7 +1359,7 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
     } finally {
       setSaving(false);
     }
-  }, [cart, activeShopId, onSave, toast, onClose]);
+  }, [cart, supplier, activeShopId, onSave, toast, onClose]);
 
   // ── Titles ────────────────────────────────────────────────────────────────
   const titles = {
@@ -1370,6 +1423,8 @@ export function CatalogStockInModal({ open, onClose, onSave, toast, activeShopId
           onEdit={handleEditCart}
           onSaveAll={handleSaveAll}
           saving={saving}
+          supplier={supplier}
+          setSupplier={setSupplier}
         />
       </div>
     </Modal>

@@ -93,7 +93,7 @@ interface PartiesApiResponse {
 export function mapInventoryToProduct(inv: BackendInventory): Product {
   const mp = inv.masterPart;
   const imageVal = mp?.imageUrl || getCategoryEmoji(mp?.categoryL1);
-  const oemStr = mp?.oemNumbers || mp?.oemNumber || '';
+  const oemStr = (Array.isArray(mp?.oemNumbers) ? mp?.oemNumbers[0] : mp?.oemNumbers) || mp?.oemNumber || '';
   const barcodesArr = mp?.barcodes
     ? (Array.isArray(mp.barcodes) ? mp.barcodes : [mp.barcodes])
     : [];
@@ -178,7 +178,7 @@ export function mapMovement(m: BackendMovement): Movement {
     paymentStatus: 'paid',
     note: m.notes || '',
     date: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-    invoiceNo: m.invoiceId ? String(m.invoiceId) : null,
+    invoiceNo: m.referenceNumber || (m.invoiceId ? String(m.invoiceId) : null),
     partyId: m.partyId ? String(m.partyId) : null,
     supplierName: isSupply ? partyName : null,
     customerName: isSupply ? null : partyName,

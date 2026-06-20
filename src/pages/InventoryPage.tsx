@@ -28,11 +28,14 @@ export function InventoryPage() {
   const { products: storeProducts, movements, activeShopId, saveProducts, shops } = useStore();
   const { handleSale: onSale, handlePurchase: onPurchase, handleAdjustment: onAdjust, toast, setAddProdOpen, setPModal } = useContext(AppCtx);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   useEffect(() => {
-    fetchInventory().then(data => {
-      if (data?.length) saveProducts(data, true);
-    });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setLoadError(null);
+    fetchInventory()
+      .then(data => { if (data?.length) saveProducts(data, true); })
+      .catch(() => setLoadError("Failed to load inventory. Check your connection and try again."));
+  }, [retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });
@@ -208,6 +211,15 @@ export function InventoryPage() {
 
     return (
         <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
+
+            {/* ── LOAD ERROR BANNER ── */}
+            {loadError && (
+              <div style={{ background: "#FEF2F2", border: "1px solid rgba(220,38,38,0.2)", borderLeft: "4px solid #DC2626", borderRadius: "0 10px 10px 0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>⚠</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#991B1B" }}>{loadError}</span>
+                <button onClick={() => setRetryKey(k => k + 1)} style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>Retry</button>
+              </div>
+            )}
 
             {/* ── LOW STOCK ALERT BANNER — dismissed per session ── */}
             {(counts.low + counts.out) > 0 && !bannerDismissed && (

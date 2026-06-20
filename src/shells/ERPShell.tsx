@@ -296,6 +296,23 @@ export function ERPShell({ children }: ERPShellProps) {
     };
   }, [saveProducts, saveMovements, saveParties, currentUser?.shopId]);
 
+  // Keepalive ping — fires every 9 minutes while the tab is visible.
+  // Prevents the Render.com free-tier backend from going cold (sleeps after
+  // ~15 min idle). A cold start takes 30-60s; the refresh timeout is 65s so a
+  // near-miss makes the app look logged out. Pinging cheaply avoids that.
+  useEffect(() => {
+    if (!currentUser?.shopId) return;
+    const ping = () => {
+      if (document.visibilityState === 'visible') {
+        fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/health`, {
+          method: 'GET', credentials: 'include',
+        }).catch(() => {});
+      }
+    };
+    const id = setInterval(ping, 9 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [currentUser?.shopId]);
+
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false); }, [currentPath]);
 

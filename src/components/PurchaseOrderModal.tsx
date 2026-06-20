@@ -157,8 +157,8 @@ export function PurchaseOrderModal({ open, onClose, products, preselectedIds, sh
     // Pre-select: explicitly checked rows, else all low-stock items
     const init: Record<number, PoLine> = {};
     const wanted = preselectedIds.length > 0
-      ? products.filter(p => preselectedIds.includes(p.id))
-      : products.filter(p => p.stock < p.minStock);
+      ? (products || []).filter(p => preselectedIds.includes(p.id))
+      : (products || []).filter(p => p.stock < p.minStock);
     wanted.forEach(p => { init[p.id] = { selected: true, qty: suggestedQty(p), price: p.buyPrice || 0 }; });
     setLines(init);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -205,7 +205,7 @@ export function PurchaseOrderModal({ open, onClose, products, preselectedIds, sh
   }, [products, itemSearch, linkedIds, supplierId, showAll, lines]);
 
   const selected = useMemo(
-    () => products.filter(p => lines[p.id]?.selected),
+    () => (products || []).filter(p => lines[p.id]?.selected),
     [products, lines]
   );
   const totals = useMemo(() => {

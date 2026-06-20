@@ -139,12 +139,15 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
     // Pull this shop's job cards fresh on mount so they survive logout (the
     // backend scopes to req.shopId). Mirrors how Inventory/Parties load.
     const [jobsLoaded, setJobsLoaded] = useState(false);
+    const [jobsError, setJobsError] = useState<string | null>(null);
+    const [jobsRetry, setJobsRetry] = useState(0);
     useEffect(() => {
+        setJobsError(null);
         fetchJobCards()
             .then(data => { if (Array.isArray(data)) saveJobCards(data); })
-            .catch(() => {})
+            .catch(() => { setJobsError("Failed to load job cards. Check your connection."); })
             .finally(() => setJobsLoaded(true));
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [jobsRetry]); // eslint-disable-line react-hooks/exhaustive-deps
     void jobsLoaded;
 
     const refreshJobs = useCallback(async () => {
@@ -540,6 +543,15 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
 
     return (
         <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
+
+            {/* ── LOAD ERROR BANNER ── */}
+            {jobsError && (
+              <div style={{ background: "#FEF2F2", border: "1px solid rgba(220,38,38,0.2)", borderLeft: "4px solid #DC2626", borderRadius: "0 10px 10px 0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>⚠</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#991B1B" }}>{jobsError}</span>
+                <button onClick={() => setJobsRetry(k => k + 1)} style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>Retry</button>
+              </div>
+            )}
 
             {/* ── PARTS MARKETPLACE TAB ── */}
             {workshopTab === "marketplace" && (
@@ -1387,7 +1399,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
     const handleAddPart = (pId: string) => {
         // The <Select> hands back a STRING; inventory ids are numbers, so a strict
         // `p.id === pId` never matched and nothing was added. Compare as strings.
-        const prod = products.find((p: any) => String(p.id) === String(pId));
+        const prod = (products || []).find((p: any) => String(p.id) === String(pId));
         if (prod && !selectedParts.find(sp => String(sp.itemId) === String(prod.id))) {
             setSelectedParts(prev => [...prev, { itemId: prod.id, name: prod.name, qty: 1, price: prod.sellPrice }]);
         }
@@ -1425,7 +1437,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
         setVehicleId(""); setCustomerId(""); setComplaints(""); setDiagnosis(""); setAssignedTo(""); setSelectedParts([]); setLabourDesc(""); setLabourAmt("");
     };
 
-    const customers = parties.filter((p: any) => p.type === "customer" || p.type === "both");
+    const customers = (parties || []).filter((p: any) => p.type === "customer" || p.type === "both");
 
     return (
         <Modal open={open} onClose={onClose} title="🔧 New Job Card" subtitle="Create a workshop job card" width={640}>
@@ -1458,7 +1470,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
                 <Divider label="Parts" />
                 <div style={{ gridColumn: "span 2" }}>
                     <Select value="" onChange={handleAddPart}
-                        options={[{ value: "", label: "Add part…" }, ...products.filter((p: any) => p.stock > 0).map((p: any) => ({ value: p.id, label: `${p.name} (${p.stock} in stock) — ${fmt(p.sellPrice)}` }))]} />
+                        options={[{ value: "", label: "Add part…" }, ...(products || []).filter((p: any) => p.stock > 0).map((p: any) => ({ value: p.id, label: `${p.name} (${p.stock} in stock) — ${fmt(p.sellPrice)}` }))]} />
                     {selectedParts.length > 0 && (
                         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
                             {selectedParts.map((sp, i) => (

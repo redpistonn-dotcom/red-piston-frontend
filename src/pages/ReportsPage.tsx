@@ -80,7 +80,7 @@ export function ReportsPage() {
     // cancelled orders are surfaced separately in the cancellation analysis.
     const { saleMovements: mpSales, cancelled, refresh: refreshMpSales } = useShopMarketplaceSales(activeShopId);
     const shopMovements = useMemo(
-        () => [...movements.filter(m => m.shopId === activeShopId), ...mpSales],
+        () => [...(movements || []).filter(m => m.shopId === activeShopId), ...(mpSales || [])],
         [movements, activeShopId, mpSales],
     );
     const shopProducts = useMemo(

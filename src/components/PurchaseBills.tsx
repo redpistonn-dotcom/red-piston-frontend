@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { T, FONT } from "../theme";
 import { fmt } from "../utils";
-import { api, BASE_URL } from "../api/client";
+import { api, BASE_URL, getAccessToken } from "../api/client";
 
 interface ExtractedItem {
   serial: number;
@@ -73,13 +73,42 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
   const loadBills = useCallback(async () => {
     try {
       const res = await api.get<{ success: boolean; bills: BillRow[] }>("/api/shop/purchase-bills");
-      setBills(res.bills || []);
+      const raw = res.bills || [];
+      // Deduplicate: per invoiceNumber keep the IMPORTED row; if none, keep the most recent
+      const seen = new Map<string, BillRow>();
+      for (const b of raw) {
+        const key = b.invoiceNumber ? `${b.supplierName || ""}__${b.invoiceNumber}` : `id_${b.billId}`;
+        const existing = seen.get(key);
+        if (!existing || b.status === "IMPORTED" || b.billId > existing.billId) {
+          seen.set(key, b);
+        }
+      }
+      setBills(Array.from(seen.values()).sort((a, c) => c.billId - a.billId));
     } catch (err) {
       console.error("[PurchaseBills] list failed", err);
     } finally {
       setLoadingBills(false);
     }
   }, []);
+
+  // Fetch PDF server-side with auth token, open as blob so browser shows the PDF viewer
+  const openPdf = useCallback(async (fileUrl: string) => {
+    try {
+      const token = getAccessToken();
+      const proxyUrl = `${BASE_URL}/api/shop/purchase-bills/pdf-proxy?url=${encodeURIComponent(fileUrl)}`;
+      const res = await fetch(proxyUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    } catch (err) {
+      console.error("[openPdf]", err);
+      toast?.("Could not open PDF — try again", "error");
+    }
+  }, [toast]);
   useEffect(() => { loadBills(); }, [loadBills]);
 
   // ── Upload + extract ───────────────────────────────────────────────────────
@@ -201,20 +230,20 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
                   </td>
                   <td style={{ padding: "7px 10px", fontSize: 12, color: T.t3, borderBottom: `1px solid ${T.border}` }}>{r.serial}</td>
                   <td style={{ padding: "7px 10px", borderBottom: `1px solid ${T.border}`, minWidth: 220 }}>
-                    <input style={inp} value={r.partName} onChange={(e) => setRow(i, { partName: e.target.value })} />
+                    <input style={inp} value={r.partName} onChange={(e) => setRow(i, { partName: e.target.value })} maxLength={200} />
                   </td>
                   <td style={{ padding: "7px 10px", fontSize: 12, fontFamily: FONT.mono, color: T.t2, borderBottom: `1px solid ${T.border}` }}>{r.hsnCode || "—"}</td>
                   <td style={{ padding: "7px 10px", borderBottom: `1px solid ${T.border}`, width: 70 }}>
-                    <input style={inp} type="number" min={1} value={r.qty} onChange={(e) => setRow(i, { qty: Math.max(1, parseInt(e.target.value) || 1) })} />
+                    <input style={inp} type="number" min={1} max={100000} value={r.qty} onChange={(e) => setRow(i, { qty: Math.min(100000, Math.max(1, parseInt(e.target.value) || 1)) })} />
                   </td>
                   <td style={{ padding: "7px 10px", borderBottom: `1px solid ${T.border}`, width: 110 }}>
-                    <input style={inp} type="number" min={0} step="0.01" value={r.rateExclGst} onChange={(e) => setRow(i, { rateExclGst: Math.max(0, parseFloat(e.target.value) || 0) })} />
+                    <input style={inp} type="number" min={0} max={10000000} step="0.01" value={r.rateExclGst} onChange={(e) => setRow(i, { rateExclGst: Math.min(10000000, Math.max(0, parseFloat(e.target.value) || 0)) })} />
                   </td>
                   <td style={{ padding: "7px 10px", fontSize: 12, fontFamily: FONT.mono, color: T.t2, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>
                     {r.rateInclGst != null ? fmt(r.rateInclGst) : "—"}
                   </td>
                   <td style={{ padding: "7px 10px", borderBottom: `1px solid ${T.border}`, width: 110 }}>
-                    <input style={inp} type="number" min={0} step="0.01" value={r.sellingPrice} onChange={(e) => setRow(i, { sellingPrice: Math.max(0, parseFloat(e.target.value) || 0) })} />
+                    <input style={inp} type="number" min={0} max={10000000} step="0.01" value={r.sellingPrice} onChange={(e) => setRow(i, { sellingPrice: Math.min(10000000, Math.max(0, parseFloat(e.target.value) || 0)) })} />
                   </td>
                   <td style={{ padding: "7px 10px", fontSize: 12, fontFamily: FONT.mono, fontWeight: 600, color: T.t1, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{fmt(r.rateExclGst * r.qty)}</td>
                 </tr>
@@ -310,12 +339,10 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
                   </td>
                   <td style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>
                     {b.fileUrl && (
-                      <a
-                        href={`${BASE_URL}/api/shop/purchase-bills/pdf-proxy?url=${encodeURIComponent(b.fileUrl)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ fontSize: 12, color: T.amber, fontWeight: 700, textDecoration: "none" }}
-                      >View PDF ↗</a>
+                      <button
+                        onClick={() => openPdf(b.fileUrl!)}
+                        style={{ fontSize: 12, color: T.amber, fontWeight: 700, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT.ui }}
+                      >View PDF ↗</button>
                     )}
                   </td>
                 </tr>

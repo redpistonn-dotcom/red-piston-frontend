@@ -123,24 +123,35 @@ export function POSBillingPage() {
     }, [shopProducts, addProduct, toast]);
 
     const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
-    const updateItem = (idx: number, field: string, val: any) => setItems(prev => prev.map((item, i) => i === idx ? { ...item, [field]: val } : item));
+    const updateItem = (idx: number, field: string, val: any) => setItems(prev => prev.map((item, i) => {
+        if (i !== idx) return item;
+        if (field === "discount") {
+            const maxDiscount = item.discountType === "%" ? 80 : item.price * 0.8;
+            val = Math.min(maxDiscount, Math.max(0, parseFloat(val) || 0));
+        }
+        return { ...item, [field]: val };
+    }));
 
-    // Line calculations
-    const lineCalcs = items.map(item => {
-        const subtotal = item.price * item.qty;
-        const discAmt = item.discountType === "%" ? subtotal * item.discount / 100 : item.discount;
-        const afterDisc = subtotal - discAmt;
-        const gstAmt = (afterDisc * item.gstRate) / (100 + item.gstRate);
-        const profit = (item.price - item.buyPrice) * item.qty - discAmt;
-        return { subtotal, discAmt, afterDisc, gstAmt, profit };
-    });
-
-    const grandSubtotal = lineCalcs.reduce((s, l) => s + l.subtotal, 0);
-    const grandDiscount = lineCalcs.reduce((s, l) => s + l.discAmt, 0);
-    const grandGst      = lineCalcs.reduce((s, l) => s + l.gstAmt, 0);
-    const grandProfit   = lineCalcs.reduce((s, l) => s + l.profit, 0);
-    const grandTotal    = lineCalcs.reduce((s, l) => s + l.afterDisc, 0);
-    const finalTotal    = Math.max(0, grandTotal - additionalDisc);
+    // Line calculations — memoized so they don't recompute on every render
+    const { lineCalcs, grandSubtotal, grandDiscount, grandGst, grandProfit, grandTotal } = useMemo(() => {
+        const calcs = items.map(item => {
+            const subtotal = item.price * item.qty;
+            const discAmt = item.discountType === "%" ? subtotal * item.discount / 100 : item.discount;
+            const afterDisc = subtotal - discAmt;
+            const gstAmt = (afterDisc * item.gstRate) / (100 + item.gstRate);
+            const profit = (item.price - item.buyPrice) * item.qty - discAmt;
+            return { subtotal, discAmt, afterDisc, gstAmt, profit };
+        });
+        return {
+            lineCalcs: calcs,
+            grandSubtotal: calcs.reduce((s, l) => s + l.subtotal, 0),
+            grandDiscount: calcs.reduce((s, l) => s + l.discAmt, 0),
+            grandGst:      calcs.reduce((s, l) => s + l.gstAmt, 0),
+            grandProfit:   calcs.reduce((s, l) => s + l.profit, 0),
+            grandTotal:    calcs.reduce((s, l) => s + l.afterDisc, 0),
+        };
+    }, [items]);
+    const finalTotal = Math.max(0, grandTotal - additionalDisc);
 
     // Credit limit check for Udhaar
     const selectedParty = useMemo(() => (parties || []).find((p: any) => String(p.id) === String(partyId)), [parties, partyId]);
@@ -544,6 +555,7 @@ export function POSBillingPage() {
                                                     <div>
                                                         {String(item.productId || "").startsWith("custom_") ? (
                                                             <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Item name…"
+                                                                maxLength={100}
                                                                 style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name && item.name !== "Custom Item" ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
                                                         ) : (
                                                             <div style={{ fontWeight: 700, color: T.t1, fontSize: 13, whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
@@ -559,8 +571,8 @@ export function POSBillingPage() {
                                                     style={{ width: 54, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, padding: "0 8px", color: T.t1, fontFamily: FONT.mono, fontSize: 14, fontWeight: 800, textAlign: "center", outline: "none" }} />
                                             </td>
                                             <td style={{ padding: "12px 10px", textAlign: "right" }}>
-                                                <input type="number" value={item.price}
-                                                    onChange={e => updateItem(idx, "price", +e.target.value)}
+                                                <input type="number" value={item.price} min="0" max="10000000" step="0.01"
+                                                    onChange={e => updateItem(idx, "price", Math.max(0, +e.target.value))}
                                                     style={{ width: 82, height: 34, background: T.bg, border: `1px solid ${item.price !== item.originalPrice ? T.amber : T.border}`, borderRadius: 7, padding: "0 8px", color: T.t1, fontFamily: FONT.mono, fontSize: 13, textAlign: "right", outline: "none" }} />
                                             </td>
                                             <td style={{ padding: "12px 10px", textAlign: "right" }}>
@@ -619,24 +631,35 @@ export function POSBillingPage() {
 
                     {/* Customer fields */}
                     <div style={{ padding: "12px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, borderBottom: `1px solid ${T.border}` }}>
-                        {[
-                            { label: "Customer Name", val: customerName, set: setCustomerName, placeholder: "Name or garage" },
-                            { label: "WhatsApp No.", val: customerPhone, set: (v: string) => setCustomerPhone(v.replace(/[^\d]/g, "").slice(0, 10)), placeholder: "For invoice sharing" },
-                            { label: "Vehicle Reg.", val: vehicleReg, set: setVehicleReg, placeholder: "MH 02 AB 1234" },
-                        ].map(f => (
-                            <div key={f.label}>
-                                <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>{f.label}</label>
-                                <input value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.placeholder}
-                                    style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box" }}
-                                    onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
-                                    onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
-                            </div>
-                        ))}
+                        <div>
+                            <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>Customer Name</label>
+                            <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name or garage"
+                                maxLength={80}
+                                style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box" }}
+                                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>WhatsApp No.</label>
+                            <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
+                                placeholder="For invoice sharing" type="tel" maxLength={10} inputMode="numeric"
+                                style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box" }}
+                                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>Vehicle Reg.</label>
+                            <input value={vehicleReg} onChange={e => setVehicleReg(e.target.value.toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, 15))}
+                                placeholder="MH 02 AB 1234" maxLength={15}
+                                style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box" }}
+                                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
+                        </div>
                     </div>
 
                     {/* Notes textarea */}
                     <div style={{ padding: "12px 16px" }}>
-                        <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                        <textarea value={notes} onChange={e => setNotes(e.target.value)} maxLength={500}
                             placeholder="Special instructions for shipping or installation..."
                             rows={5}
                             style={{ width: "100%", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 12px", color: T.t1, fontSize: 13, fontFamily: FONT.ui, outline: "none", resize: "vertical", boxSizing: "border-box", lineHeight: 1.6 }}

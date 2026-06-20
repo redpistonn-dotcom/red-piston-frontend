@@ -288,17 +288,25 @@ export function HistoryPage() {
     // Local movements fetched directly from the API (server-first).
     const [apiMovements, setApiMovements] = useState<any[]>([]);
     const [histLoading, setHistLoading] = useState(true);
+    const [histError, setHistError] = useState<string | null>(null);
+    const [histRetry, setHistRetry] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
         const load = () => {
             setHistLoading(true);
+            setHistError(null);
             fetchMovements().then(data => {
                 if (!cancelled) {
                     setApiMovements(data || []);
                     setHistLoading(false);
                 }
-            }).catch(() => { if (!cancelled) setHistLoading(false); });
+            }).catch(() => {
+                if (!cancelled) {
+                    setHistLoading(false);
+                    setHistError("Failed to load transaction history. Check your connection.");
+                }
+            });
         };
         load();
         window.addEventListener('rp:data-changed', load);
@@ -306,7 +314,7 @@ export function HistoryPage() {
             cancelled = true;
             window.removeEventListener('rp:data-changed', load);
         };
-    }, []);
+    }, [histRetry]);
 
     // Marketplace sales (non-cancelled orders) fold into the movement ledger so
     // they show in History alongside POS movements. Cancelled orders are excluded.
@@ -411,6 +419,15 @@ export function HistoryPage() {
 
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 16, minHeight: "calc(100vh - 80px)" }}>
+
+            {/* ── LOAD ERROR BANNER ── */}
+            {histError && (
+              <div style={{ background: "#FEF2F2", border: "1px solid rgba(220,38,38,0.2)", borderLeft: "4px solid #DC2626", borderRadius: "0 10px 10px 0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 18, flexShrink: 0 }}>⚠</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#991B1B" }}>{histError}</span>
+                <button onClick={() => setHistRetry(k => k + 1)} style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>Retry</button>
+              </div>
+            )}
 
             {/* ── 4 KPI CARDS ── */}
             <div className="kpi-grid-4" style={{ display: "grid", gap: 14 }}>

@@ -17,28 +17,41 @@ export default defineConfig({
     },
   },
   build: {
+    // 900 kB limit: the core vendor chunk is ~813 kB of unavoidable framework
+    // runtime (react-dom + react-router v7). Feature libs (xlsx, zxing, pdf…)
+    // are already split into their own lazy-loaded chunks.
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         // Group chunks by feature area so the browser can cache them independently.
         // ERP chunks never re-download when only the marketplace changes, and vice versa.
         manualChunks(id) {
-          // Keep core node_modules together to avoid React internals circular warnings.
-          if (id.includes('node_modules/recharts'))  return 'vendor-recharts';
-          // Firebase Auth (large) — only needed on the login/landing flow. Match the
-          // internal @firebase/* packages too, else it leaks into the main vendor chunk.
+          // ── Heavy feature-specific libraries ──────────────────────────────────
+          // xlsx (~500 kB) — only used for Excel exports; never needed on first load
+          if (id.includes('node_modules/xlsx'))                               return 'vendor-xlsx';
+          // Barcode scanner (~300 kB) — only used inside POSBillingPage
+          if (id.includes('node_modules/@zxing'))                             return 'vendor-zxing';
+          // Charts — lazy-loaded with dashboard/reports pages
+          if (id.includes('node_modules/recharts'))                           return 'vendor-recharts';
+          // Firebase Auth — only needed on login/landing flow
           if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase'))
-            return 'vendor-firebase';
-          // jsPDF is only used by the invoice modal — keep it in its own chunk so it
-          // lazy-loads on "Download PDF" instead of bloating the main vendor bundle.
-          if (id.includes('node_modules/jspdf'))     return 'vendor-pdf';
-          if (id.includes('node_modules'))           return 'vendor';
+                                                                               return 'vendor-firebase';
+          // jsPDF — only used by invoice download modal
+          if (id.includes('node_modules/jspdf'))                              return 'vendor-pdf';
+          // Framer Motion — transitive dep; split so it's cached separately
+          if (id.includes('framer-motion'))                                    return 'vendor-motion';
+          // TanStack Query — data-fetching layer used by ERP pages
+          if (id.includes('@tanstack'))                                        return 'vendor-tanstack';
+
+          // Everything else in node_modules goes into the general vendor chunk
+          // Note: do NOT split react/react-dom — they have circular peer-dep imports
+          // with other packages in vendor and Rollup warns + degrades perf.
+          if (id.includes('node_modules'))                                    return 'vendor';
 
           // Page components are React.lazy()-loaded (see src/App.tsx). Do NOT group
           // them into one chunk — let Rollup auto-split each lazy import into its own
           // per-route chunk so the first paint only downloads the entry route, not all
-          // 16 pages. (They were previously collapsed into one ~931KB 'erp-pages' chunk
-          // that index.html then modulepreloaded on every load, fully defeating the
-          // lazy boundaries and forcing ~2.9MB of JS before anything rendered.)
+          // 16 pages.
         },
       },
     },

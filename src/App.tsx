@@ -83,7 +83,7 @@ const PageLoader = () => (
   </div>
 );
 
-// ── Error boundary — catches render errors in the subtree ─────────────────────
+// ── Top-level error boundary — full-screen fallback for catastrophic failures ──
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
@@ -101,6 +101,35 @@ class ErrorBoundary extends Component {
               style={{ background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
             >
               Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ── Page-level error boundary — renders error INSIDE the shell so sidebar/header survive ──
+// Wraps each individual route's page component. If the page crashes, the user can
+// still navigate to another section using the sidebar instead of losing the whole app.
+class PageErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error("[PageErrorBoundary]", error, info); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "48px 32px", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh", fontFamily: FONT.ui }}>
+          <div style={{ textAlign: "center", maxWidth: 400 }}>
+            <div style={{ fontSize: 40, marginBottom: 14 }}>⚠️</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: T.t1, marginBottom: 8 }}>This section failed to load</div>
+            <div style={{ fontSize: 13, color: T.t3, marginBottom: 20, lineHeight: 1.6 }}>{this.state.error?.message || "An unexpected error occurred on this page."}</div>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{ background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
+            >
+              Try Again
             </button>
           </div>
         </div>
@@ -724,15 +753,15 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* ERP routes — pages pull data via useStore(), handlers via useContext(AppCtx) */}
-          <Route path="/dashboard" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><DashboardPage /></ERPShell>)} />
-          <Route path="/inventory"  element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><InventoryPage /></ERPShell>)} />
-          <Route path="/billing"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><POSBillingPage /></ERPShell>)} />
-          <Route path="/parties"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PartiesPage /></ERPShell>)} />
-          <Route path="/workshop"             element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><WorkshopPage section="jobs" /></ERPShell>)} />
-          <Route path="/workshop/marketplace" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><WorkshopPage section="marketplace" /></ERPShell>)} />
-          <Route path="/history"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><HistoryPage /></ERPShell>)} />
-          <Route path="/reports"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><ReportsPage /></ERPShell>)} />
-          <Route path="/orders"     element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><OrdersPage /></ERPShell>)} />
+          <Route path="/dashboard" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><DashboardPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/inventory"  element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><InventoryPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/billing"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><POSBillingPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/parties"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><PartiesPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/workshop"             element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><WorkshopPage section="jobs" /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/workshop/marketplace" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><WorkshopPage section="marketplace" /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/history"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><HistoryPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/reports"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ReportsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/orders"     element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><OrdersPage /></PageErrorBoundary></ERPShell>)} />
 
           {/* Marketplace routes */}
           {/* New marketplace — Stitch design (browse without login, cart requires login) */}
@@ -743,16 +772,16 @@ function AppContent() {
           {/* /oem-parts removed — redirect to marketplace */}
           <Route path="/oem-parts"            element={<Navigate to="/marketplace" replace />} />
           <Route path="/marketplace/legacy"   element={<MarketplaceHome />} />
-          <Route path="/marketplace/orders"   element={currentUser ? <MPShell><OrderTrackingPage /></MPShell> : <Navigate to="/login" replace />} />
-          <Route path="/marketplace/pricing"  element={currentUser ? <MPShell><PricingPage /></MPShell>        : <Navigate to="/login" replace />} />
-          <Route path="/marketplace/checkout" element={currentUser ? <MPShell><CheckoutPage /></MPShell>       : <Navigate to="/login" replace />} />
+          <Route path="/marketplace/orders"   element={currentUser ? <MPShell><PageErrorBoundary><OrderTrackingPage /></PageErrorBoundary></MPShell> : <Navigate to="/login" replace />} />
+          <Route path="/marketplace/pricing"  element={currentUser ? <MPShell><PageErrorBoundary><PricingPage /></PageErrorBoundary></MPShell>        : <Navigate to="/login" replace />} />
+          <Route path="/marketplace/checkout" element={currentUser ? <MPShell><PageErrorBoundary><CheckoutPage /></PageErrorBoundary></MPShell>       : <Navigate to="/login" replace />} />
 
           {/* Shared pages — shell matches role */}
           <Route path="/profile"  element={<AuthenticatedShell user={currentUser}><ProfilePage user={currentUser} onUserUpdate={(u) => setCurrentUser(u)} onLogout={handleLogout} /></AuthenticatedShell>} />
           <Route path="/settings" element={<AuthenticatedShell user={currentUser}><SettingsPage onLogout={handleLogout} /></AuthenticatedShell>} />
 
           {/* Admin */}
-          <Route path="/admin" element={requireRole(currentUser, "PLATFORM_ADMIN", <AdminShell><SuperAdminPage onImpersonate={handleImpersonate} /></AdminShell>)} />
+          <Route path="/admin" element={requireRole(currentUser, "PLATFORM_ADMIN", <AdminShell><PageErrorBoundary><SuperAdminPage onImpersonate={handleImpersonate} /></PageErrorBoundary></AdminShell>)} />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to={currentUser ? getDefaultRoute(currentUser) : "/"} replace />} />
