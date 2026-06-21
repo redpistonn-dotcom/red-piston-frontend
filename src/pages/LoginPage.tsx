@@ -434,6 +434,12 @@ export default function LoginPage({ onLogin, isModal = false }) {
     if (!pin || pin.length !== 6)      { setError("Enter a valid 6-digit pincode"); return; }
     const ph = shopDetails.contactPhone.replace(/\D/g, "");
     if (ph.length !== 10) { setError("Enter a valid 10-digit contact number"); return; }
+    const wa = shopDetails.whatsappNumber.replace(/\D/g, "");
+    if (wa.length !== 10) { setError("Enter a valid 10-digit WhatsApp number"); return; }
+    if (!shopDetails.email.trim()) { setError("Enter your shop email address"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shopDetails.email.trim())) { setError("Enter a valid email address"); return; }
+    if (shopDetails.gstin.length !== 15) { setError("Enter a valid 15-character GSTIN"); return; }
+    if (!shopDetails.photoUrl) { setError("Upload a shop photo to continue"); return; }
     setError(""); setLoading(true);
     try {
       await api.post("/api/auth/shop-setup", {
@@ -987,27 +993,27 @@ export default function LoginPage({ onLogin, isModal = false }) {
               <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" value={shopDetails.contactPhone} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, contactPhone: e.target.value.replace(/\D/g, "") }))} />
             </div>
 
-            <label style={S.label}>WhatsApp Number <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — for order alerts)</span></label>
+            <label style={S.label}>WhatsApp Number <span style={{ color: "#DC2626" }}>*</span></label>
             <div style={{ ...S.phoneRow, marginBottom: 14 }}>
               <div style={S.phoneFlag}>IN +91</div>
-              <input className="auth-input" style={S.phoneInput} placeholder="Same as above or different" value={shopDetails.whatsappNumber} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, whatsappNumber: e.target.value.replace(/\D/g, "") }))} />
+              <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" value={shopDetails.whatsappNumber} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, whatsappNumber: e.target.value.replace(/\D/g, "") }))} />
             </div>
 
-            <label style={S.label}>Shop Email <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — for billing notifications)</span></label>
+            <label style={S.label}>Shop Email <span style={{ color: "#DC2626" }}>*</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} type="email" placeholder="shop@example.com" value={shopDetails.email} onChange={e => setShopDetails(d => ({ ...d, email: e.target.value }))} />
 
-            <label style={S.label}>GSTIN <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — for GST billing)</span></label>
+            <label style={S.label}>GSTIN <span style={{ color: "#DC2626" }}>*</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 14, fontFamily: FONT.mono, letterSpacing: "1px" }} placeholder="22AAAAA0000A1Z5" value={shopDetails.gstin} maxLength={15} onChange={e => setShopDetails(d => ({ ...d, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") }))} />
 
-            <label style={{ ...S.label, marginBottom: 6 }}>Shop Photo <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — helps customers recognise your shop)</span></label>
+            <label style={{ ...S.label, marginBottom: 6 }}>Shop Photo <span style={{ color: "#DC2626" }}>*</span></label>
             <ShopPhotoUploader photoUrl={shopDetails.photoUrl} onUploaded={url => setShopDetails(d => ({ ...d, photoUrl: url }))} />
 
             {/* Repeat the error near the button — on mobile the top-of-form error is off-screen */}
             {error && (
               <div style={{ ...S.error, marginTop: 16, marginBottom: 0 }}>{error}</div>
             )}
-            <button className="btn-primary" style={{ ...S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory), marginTop: 12 }}
-              disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory}
+            <button className="btn-primary" style={{ ...S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory || shopDetails.whatsappNumber.length !== 10 || !shopDetails.email.trim() || shopDetails.gstin.length !== 15 || !shopDetails.photoUrl), marginTop: 12 }}
+              disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory || shopDetails.whatsappNumber.length !== 10 || !shopDetails.email.trim() || shopDetails.gstin.length !== 15 || !shopDetails.photoUrl}
               onClick={submitShopDetails}>
               {loading ? "Submitting…" : "Submit for Verification →"}
             </button>
