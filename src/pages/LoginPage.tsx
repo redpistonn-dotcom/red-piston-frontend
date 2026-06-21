@@ -998,7 +998,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <label style={{ ...S.label, marginBottom: 6 }}>Shop Photo <span style={{ color: "#BFB0A0", fontWeight: 400, textTransform: "none" }}>(optional — helps customers recognise your shop)</span></label>
             <ShopPhotoUploader photoUrl={shopDetails.photoUrl} onUploaded={url => setShopDetails(d => ({ ...d, photoUrl: url }))} />
 
-            <button className="btn-primary" style={{ ...S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory), marginTop: 24 }}
+            {/* Repeat the error near the button — on mobile the top-of-form error is off-screen */}
+            {error && (
+              <div style={{ ...S.error, marginTop: 16, marginBottom: 0 }}>{error}</div>
+            )}
+            <button className="btn-primary" style={{ ...S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory), marginTop: 12 }}
               disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory}
               onClick={submitShopDetails}>
               {loading ? "Submitting…" : "Submit for Verification →"}
