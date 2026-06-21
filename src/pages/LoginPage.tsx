@@ -177,6 +177,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [linkConfirmResult, setLinkConfirmResult] = useState(null);
   const [resendTimer, setResendTimer]     = useState(0);
   const [loading, setLoading]     = useState(false);
+  const [settingUp, setSettingUp] = useState(false); // overlay while transitioning to shop-details
   const [error, setError]         = useState("");
   const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "", shopCategory: "", whatsappNumber: "", photoUrl: "" });
   const [vehicle, setVehicle] = useState({ make: "", model: "", year: "", fuelType: "", registrationNo: "" });
@@ -400,7 +401,10 @@ export default function LoginPage({ onLogin, isModal = false }) {
       const vehiclePayload = vehicle.make && vehicle.model && vehicle.year ? vehicle : undefined;
       const data = await api.post("/api/auth/register", { email, password, role, name: profile.name || undefined, vehicle: vehiclePayload });
       if (data?.needsShopDetails) {
+        setLoading(false);
+        setSettingUp(true);
         handleAuthResponse(data); // stores tokens + prefills + goes to SHOP_DETAILS
+        setTimeout(() => setSettingUp(false), 500);
         return;
       }
       const userData = data?.user;
@@ -1324,7 +1328,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
         backgroundImage: "radial-gradient(rgba(190,43,26,0.06) 1px, transparent 1px)",
         backgroundSize: "24px 24px",
         display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
+        alignItems: "center",
+        /* No justifyContent:center — it clips the top of tall forms (SHOP_DETAILS).
+           The inner form container uses margin:auto to stay centered on short steps. */
         padding: isModal ? "20px 32px" : "32px 48px",
         position: "relative", overflowY: "auto",
       }}>
@@ -1342,10 +1348,22 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         </div>
 
-        {/* Form container */}
-        <div style={{ width: "100%", maxWidth: 400 }}>
+        {/* Form container — margin:auto centers it vertically on short steps;
+            on tall steps (SHOP_DETAILS) it scrolls normally from the top */}
+        <div style={{ width: "100%", maxWidth: 400, marginTop: "auto", marginBottom: "auto", paddingTop: 24, paddingBottom: 24 }}>
           {renderStep()}
         </div>
+
+        {/* Transition overlay — shown briefly while navigating from email form to shop details */}
+        {settingUp && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 20, backdropFilter: "blur(3px)" }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 36, marginBottom: 14, animation: "auth-pulse 1s infinite" }}>⚙️</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#BE2B1A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Setting up your shop…</div>
+              <div style={{ fontSize: 12, color: "#9C8C7C", marginTop: 6 }}>Just a moment</div>
+            </div>
+          </div>
+        )}
 
         {/* Footer links — only on main auth steps, not in modal */}
         {!isModal && (step === STEPS.LANDING || step === STEPS.SIGNIN) && (
