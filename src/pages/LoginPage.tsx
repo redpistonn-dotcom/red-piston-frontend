@@ -312,7 +312,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
         email:        data.email || email || d.email,
       }));
       setResumeNotice(data.resume
-        ? "Welcome back! Your account is verified — just finish your shop details below to complete registration."
+        ? "Welcome back! Your phone is confirmed — fill in your shop details below to submit for review."
         : "");
       go(STEPS.SHOP_DETAILS);
       return;
@@ -556,6 +556,27 @@ export default function LoginPage({ onLogin, isModal = false }) {
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────
   const renderStep = () => {
+    // Full-panel loader for async ops on registration steps (OTP send / verify / email register).
+    // Replaces the whole form so the user sees clear activity instead of a grayed-out button.
+    if (loading && (step === STEPS.REG_AUTH || step === STEPS.REG_OTP)) {
+      const msg = step === STEPS.REG_OTP ? "Verifying your identity…" : "Sending OTP…";
+      const sub = "This may take a moment — our server may be waking up";
+      return (
+        <div className="auth-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, gap: 18, textAlign: "center" }}>
+          <div style={{ fontSize: 48, animation: "auth-pulse 1.1s ease-in-out infinite" }}>⚙️</div>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#BE2B1A", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 6 }}>{msg}</div>
+            <div style={{ fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, maxWidth: 280 }}>{sub}</div>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#BE2B1A", opacity: 0.3, animation: `auth-pulse 1.1s ease-in-out ${i * 0.22}s infinite` }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     switch (step) {
 
       // ══════════════════════════════════════════════════════════════════════
