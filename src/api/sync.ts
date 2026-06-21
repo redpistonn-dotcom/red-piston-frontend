@@ -315,6 +315,8 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
         isMarketplaceListed: product.isMarketplaceListed,
         // Cloudinary photo from the ProductModal uploader — emoji placeholders stay local-only
         ...(typeof product.image === 'string' && product.image.startsWith('http') && { imageUrl: product.image }),
+        // stock qty — included so the backend can create an AUDIT movement when it changes
+        ...(product.stock !== undefined && { stockQty: product.stock }),
       });
     }
   } catch (err: unknown) {
@@ -336,12 +338,13 @@ interface SyncInvoiceParams {
   notes?: string;
 }
 
-export async function syncInvoice(params: SyncInvoiceParams): Promise<void> {
+// Returns true on success, false on failure. Never throws.
+export async function syncInvoice(params: SyncInvoiceParams): Promise<boolean> {
   // Filter to real DB items only — custom items ("custom_${Date.now()}") fail isDbId.
   // We sync whatever real items exist rather than bailing on the whole invoice,
   // so a mixed cart (real part + custom labour charge) still decrements stock correctly.
   const realItems = params.items?.filter(item => isDbId(item.inventoryId));
-  if (!realItems?.length) return;
+  if (!realItems?.length) return false;
   try {
     const res = await api.post<{ success: boolean; invoice?: { invoiceId: number; invoiceNumber: string } }>('/api/billing/invoice', {
       items: realItems.map(item => ({
@@ -354,8 +357,11 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<void> {
       partyName: params.partyName || undefined,
       partyPhone: params.partyPhone || undefined,
       paymentMode: params.paymentMode || 'CASH',
-      cashAmount: params.cashAmount || undefined,
-      upiAmount: params.upiAmount || undefined,
+      // Do not forward cashAmount/upiAmount — the frontend uses GST-inclusive totals
+      // while the backend recomputes GST-exclusive, so the amounts never match and
+      // the backend's payment-breakdown check returns 400. paymentMode is sufficient
+      // for the backend to record how the customer paid. creditAmount IS needed so
+      // the backend can write the party-ledger debit on credit (Udhaar) sales.
       creditAmount: params.creditAmount || undefined,
       notes: params.notes || undefined,
     });
@@ -366,8 +372,10 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<void> {
         detail: { invoiceId: res.invoice.invoiceId, invoiceNumber: res.invoice.invoiceNumber },
       }));
     }
+    return true;
   } catch (err: unknown) {
-    console.error('[Sync] Invoice sync failed — saved locally, backend out of sync:', (err as Error).message);
+    console.error('[Sync] Invoice sync failed:', (err as Error).message);
+    return false;
   }
 }
 

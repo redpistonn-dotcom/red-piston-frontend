@@ -566,9 +566,15 @@ export function POSBillingPage() {
                                             </td>
                                             <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>{item.sku || "—"}</td>
                                             <td style={{ padding: "12px 10px" }}>
-                                                <input type="number" value={item.qty} min="1" max={billType === "Sale" ? item.maxStock : 999}
-                                                    onChange={e => updateItem(idx, "qty", Math.max(1, +e.target.value))}
-                                                    style={{ width: 54, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, padding: "0 8px", color: T.t1, fontFamily: FONT.mono, fontSize: 14, fontWeight: 800, textAlign: "center", outline: "none" }} />
+                                                <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                                                    <button onClick={() => updateItem(idx, "qty", Math.max(1, item.qty - 1))}
+                                                        style={{ width: 26, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: "7px 0 0 7px", color: T.t1, fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>−</button>
+                                                    <input type="number" value={item.qty} min="1" max={billType === "Sale" ? item.maxStock : 999}
+                                                        onChange={e => updateItem(idx, "qty", Math.max(1, +e.target.value))}
+                                                        style={{ width: 44, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderLeft: "none", borderRight: "none", padding: "0 4px", color: T.t1, fontFamily: FONT.mono, fontSize: 14, fontWeight: 800, textAlign: "center", outline: "none" }} />
+                                                    <button onClick={() => updateItem(idx, "qty", Math.min(billType === "Sale" ? item.maxStock : 999, item.qty + 1))}
+                                                        style={{ width: 26, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: "0 7px 7px 0", color: T.t1, fontSize: 16, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>+</button>
+                                                </div>
                                             </td>
                                             <td style={{ padding: "12px 10px", textAlign: "right" }}>
                                                 <input type="number" value={item.price} min="0" max="10000000" step="0.01"
