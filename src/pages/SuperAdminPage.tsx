@@ -543,7 +543,7 @@ function CatalogTab() {
       const params = { limit: DB_LIMIT, offset: off };
       if (q) params.q = q;
       const res = await api.get('/api/admin/catalog/parts', params);
-      setDbParts(res.data || []);
+      setDbParts(res.parts || []);
       setDbTotal(res.total || 0);
     } catch { setDbParts([]); }
     setDbLoading(false);
