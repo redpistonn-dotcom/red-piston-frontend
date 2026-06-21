@@ -176,7 +176,8 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [confirmResult, setConfirmResult] = useState(null);
   const [linkConfirmResult, setLinkConfirmResult] = useState(null);
   const [resendTimer, setResendTimer]     = useState(0);
-  const [loading, setLoading]     = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false); // full-panel overlay after Google popup closes
   const [settingUp, setSettingUp] = useState(false); // overlay while transitioning to shop-details
   const [error, setError]         = useState("");
   const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "", shopCategory: "", whatsappNumber: "", photoUrl: "" });
@@ -256,9 +257,12 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
   // ── Google sign-in → call backend ─────────────────────────────────────────
   const googleAuth = async (mode) => {
+    if (googleLoading || loading) return;
     setError(""); setLoading(true);
     try {
       const { token } = await signInWithGoogle();
+      // Popup closed — show full-panel loader while backend verifies the token
+      setGoogleLoading(true);
       await callBackendFirebase(token, mode);
     } catch (e) {
       if (e.message?.includes("popup-closed") || e.message?.includes("popup_closed")) {
@@ -269,6 +273,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
         setError(e.message || "Google sign-in failed. Try again.");
       }
     }
+    setGoogleLoading(false);
     setLoading(false);
   };
 
@@ -554,6 +559,24 @@ export default function LoginPage({ onLogin, isModal = false }) {
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────
   const renderStep = () => {
+    // Full-panel loader while Google is authenticating (popup closed, backend verifying token).
+    if (googleLoading) {
+      return (
+        <div className="auth-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, gap: 18, textAlign: "center" }}>
+          <div style={{ fontSize: 48, animation: "auth-pulse 1.1s ease-in-out infinite" }}>🔐</div>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#BE2B1A", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 6 }}>Signing you in…</div>
+            <div style={{ fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, maxWidth: 280 }}>Verifying your Google account — just a moment</div>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#BE2B1A", opacity: 0.3, animation: `auth-pulse 1.1s ease-in-out ${i * 0.22}s infinite` }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     // Full-panel loader for async ops on registration steps (OTP send / verify / email register).
     // Replaces the whole form so the user sees clear activity instead of a grayed-out button.
     if (loading && (step === STEPS.REG_AUTH || step === STEPS.REG_OTP)) {
@@ -690,7 +713,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
                   {loading ? "Sending…" : "Send OTP →"}
                 </button>
                 <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                <button className="btn-google" style={S.btnGoogle} onClick={() => googleAuth("signin")}>
+                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("signin")}>
                   <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                   Continue with Google
                 </button>
@@ -715,7 +738,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
                   {loading ? "Signing in…" : "Sign In →"}
                 </button>
                 <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                <button className="btn-google" style={S.btnGoogle} onClick={() => googleAuth("signin")}>
+                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("signin")}>
                   <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                   Continue with Google
                 </button>
@@ -868,7 +891,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 </button>
                 <>
                   <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                  <button className="btn-google" style={S.btnGoogle} onClick={() => googleAuth("register")}>
+                  <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("register")}>
                     <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                     Continue with Google
                   </button>
@@ -900,7 +923,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
                   {loading ? "Creating account…" : "Create Account →"}
                 </button>
                 <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                <button className="btn-google" style={S.btnGoogle} onClick={() => googleAuth("register")}>
+                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("register")}>
                   <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                   Continue with Google
                 </button>
