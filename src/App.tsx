@@ -16,7 +16,7 @@
  * that had nothing to do with auth or routing. Splitting them makes each file
  * single-purpose and independently navigable.
  */
-import { useState, useCallback, useEffect, Component, useMemo, lazy, Suspense } from "react";
+import { useState, useCallback, useEffect, Component, useMemo, lazy, Suspense, cloneElement, isValidElement } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { LoadingBar } from "./components/LoadingBar";
 import { T, FONT, GLOBAL_CSS } from "./theme";
@@ -135,7 +135,12 @@ class PageErrorBoundary extends Component {
         </div>
       );
     }
-    return this.props.children;
+    // Forward extra props (e.g. activeTab/setActiveTab from AdminShell) to the child
+    const { children, ...extra } = this.props;
+    if (Object.keys(extra).length > 0 && isValidElement(children)) {
+      return cloneElement(children, extra);
+    }
+    return children;
   }
 }
 
@@ -492,13 +497,14 @@ function AppContent() {
   const handleSale = useCallback((data) => {
     if (!products) return;
     const isQuote = data.type === "Quotation";
+    const prevProducts = products;
     if (!isQuote) {
       const productToSell = products.find(p => p.id === data.productId);
       if (productToSell && data.qty > productToSell.stock) {
         toast(`Not enough stock for ${productToSell.name}. Only ${productToSell.stock} available.`, "error");
         return;
       }
-      saveProducts(products.map((p) => (p.id === data.productId ? { ...p, stock: Math.max(0, p.stock - data.qty) } : p)));
+      saveProducts(products.map((p) => (p.id === data.productId ? { ...p, stock: Math.max(0, p.stock - data.qty) } : p)), true);
     }
     const sel = products.find((p) => p.id === data.productId);
     logAudit(isQuote ? "QUOTATION_CREATED" : "SALE_RECORDED", "movement", data.invoiceNo, `${data.qty}×${sel?.name?.slice(0, 20)} · ${fmt(data.total)}`);
@@ -513,12 +519,15 @@ function AppContent() {
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
-      }).then(() => {
-        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
-        window.dispatchEvent(new CustomEvent("rp:data-changed"));
-      }).catch((err) => {
-        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
-        console.error("[Sync] Sale sync failed — saved locally, backend out of sync:", err?.message);
+      }).then((ok) => {
+        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: !ok } }));
+        if (ok) {
+          window.dispatchEvent(new CustomEvent("rp:data-changed"));
+        } else {
+          saveProducts(prevProducts, true);
+          toast("Sale couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
+          window.dispatchEvent(new CustomEvent("rp:data-changed"));
+        }
       });
     }
   }, [products, saveProducts, toast, activeShopId, logAudit]);
@@ -526,6 +535,7 @@ function AppContent() {
   const handleMultiItemSale = useCallback((data) => {
     if (!products) return;
     const isQuote = data.type === "Quotation";
+    const prevProducts = products;
     if (!isQuote) {
       for (const item of data.items) {
         const prod = products.find(p => p.id === item.productId);
@@ -544,7 +554,7 @@ function AppContent() {
         logAudit("PRICE_OVERRIDE", "movement", data.invoiceNo, `${item.name?.slice(0, 20)}: ${fmt(item.priceOverride.originalPrice)} → ${fmt(item.priceOverride.overriddenPrice)} (${item.priceOverride.reason || "no reason"})`);
       }
     });
-    saveProducts(updatedProducts);
+    saveProducts(updatedProducts, true);
     logAudit(isQuote ? "MULTI_QUOTATION_CREATED" : "MULTI_SALE_RECORDED", "movement", data.invoiceNo, `${data.items.length} items · ${fmt(data.total)}${hasOverrides ? " · price override(s)" : ""}`);
     toast(isQuote ? `Quotation: ${data.items.length} items · ${fmt(data.total)}` : `Sale recorded: ${data.items.length} items · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : `Invoice ${data.invoiceNo}`);
     if (!isQuote) {
@@ -556,20 +566,25 @@ function AppContent() {
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
-      }).then(() => {
-        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1 } }));
-        window.dispatchEvent(new CustomEvent("rp:data-changed"));
-      }).catch((err) => {
-        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
-        console.error("[Sync] Multi-sale sync failed — saved locally, backend out of sync:", err?.message);
+      }).then((ok) => {
+        window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: !ok } }));
+        if (ok) {
+          window.dispatchEvent(new CustomEvent("rp:data-changed"));
+        } else {
+          // Restore optimistic stock update so the display is correct while re-fetch loads
+          saveProducts(prevProducts, true);
+          toast("Sale couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
+          window.dispatchEvent(new CustomEvent("rp:data-changed"));
+        }
       });
     }
   }, [products, saveProducts, toast, activeShopId, logAudit]);
 
   const handlePurchase = useCallback((data) => {
     if (!products) return;
+    const prevProducts = products;
     const updated = products.map((p) => (p.id === data.productId ? { ...p, stock: p.stock + data.qty, buyPrice: data.buyPrice, sellPrice: data.newSellPrice || p.sellPrice, supplier: data.supplier || p.supplier } : p));
-    saveProducts(updated);
+    saveProducts(updated, true);
     const sel = products.find((p) => p.id === data.productId);
     logAudit("PURCHASE_RECORDED", "movement", data.invoiceNo, `+${data.qty} ${sel?.name?.slice(0, 20)} · ${fmt(data.total)}`);
     toast(`Stock added: +${data.qty} units · ${fmt(data.total)}`, "info", "Purchase Recorded");
@@ -583,15 +598,19 @@ function AppContent() {
       window.dispatchEvent(new CustomEvent("rp:data-changed"));
     }).catch((err) => {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
-      console.error("[Sync] Purchase sync failed — saved locally, backend out of sync:", err?.message);
+      console.error("[Sync] Purchase sync failed:", err?.message);
+      saveProducts(prevProducts, true);
+      toast("Purchase couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
+      window.dispatchEvent(new CustomEvent("rp:data-changed"));
     });
   }, [products, saveProducts, toast, activeShopId, logAudit]);
 
   const handleAdjustment = useCallback((data) => {
     if (!products) return;
+    const prevProducts = products;
     const sel = products.find((p) => p.id === data.productId);
     const stockChange = data.stockDirection * data.qty;
-    if (stockChange !== 0) saveProducts(products.map((p) => (p.id === data.productId ? { ...p, stock: Math.max(0, p.stock + stockChange) } : p)));
+    if (stockChange !== 0) saveProducts(products.map((p) => (p.id === data.productId ? { ...p, stock: Math.max(0, p.stock + stockChange) } : p)), true);
     const labels = { RETURN_IN: "Customer return processed", RETURN_OUT: "Returned to vendor", CREDIT_NOTE: "Credit note issued", DEBIT_NOTE: "Debit note issued", DAMAGE: "Damage recorded", THEFT: "Shrinkage recorded", AUDIT: "Audit correction applied", OPENING: "Opening stock set" };
     logAudit("ADJUSTMENT_" + data.adjustType, "movement", data.productId, `${labels[data.adjustType] || data.adjustType}: ${stockChange > 0 ? "+" : ""}${stockChange} units`);
     toast(`${labels[data.adjustType] || data.adjustType}: ${stockChange !== 0 ? (stockChange > 0 ? "+" : "") + stockChange + " units of " : ""}${sel?.name?.slice(0, 20) || "product"}${data.refundAmount ? " · " + fmt(data.refundAmount) : ""}`, data.adjustType === "RETURN_IN" || data.adjustType === "OPENING" ? "info" : data.adjustType === "CREDIT_NOTE" || data.adjustType === "DEBIT_NOTE" ? "success" : "warning", labels[data.adjustType] || data.adjustType);
@@ -606,7 +625,10 @@ function AppContent() {
       window.dispatchEvent(new CustomEvent("rp:data-changed"));
     }).catch((err) => {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: true } }));
-      console.error("[Sync] Adjustment sync failed — saved locally, backend out of sync:", err?.message);
+      console.error("[Sync] Adjustment sync failed:", err?.message);
+      saveProducts(prevProducts, true);
+      toast("Adjustment couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
+      window.dispatchEvent(new CustomEvent("rp:data-changed"));
     });
   }, [products, saveProducts, toast, activeShopId, logAudit]);
 
