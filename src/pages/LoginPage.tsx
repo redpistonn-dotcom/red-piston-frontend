@@ -311,9 +311,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
         contactPhone: data.phone || phone || d.contactPhone,
         email:        data.email || email || d.email,
       }));
-      setResumeNotice(data.resume
-        ? "Welcome back! Your phone is confirmed — fill in your shop details below to submit for review."
-        : "");
+      setResumeNotice("");
       go(STEPS.SHOP_DETAILS);
       return;
     }
