@@ -91,7 +91,16 @@ export function AuditLogPage() {
       if (entityType) params.entityType = entityType;
 
       const res: any = await api.get("/api/audit/shop", params);
-      const data: AuditEntry[] = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      const raw: any[] = Array.isArray(res?.logs) ? res.logs : [];
+      const data: AuditEntry[] = raw.map((l: any) => ({
+        id:         l.auditId,
+        timestamp:  l.createdAt,
+        action:     l.action,
+        entityType: l.entityType,
+        entityId:   l.entityId ?? "—",
+        userName:   l.userId ? `User #${l.userId}` : "—",
+        ipAddress:  l.ipAddress ?? "—",
+      }));
 
       if (newOffset === 0) {
         setRows(data);
