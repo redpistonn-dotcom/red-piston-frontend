@@ -23,6 +23,9 @@ interface BackendInventory {
   minStockAlert?: number;
   rackLocation?: string | null;
   isMarketplaceListed?: boolean;
+  imageUrl?: string | null;
+  customCategoryL1?: string | null;
+  customIcon?: string | null;
   masterPart?: BackendMasterPart | null;
   partName?: string;
   movements?: BackendMovement[];
@@ -92,7 +95,8 @@ interface PartiesApiResponse {
 
 export function mapInventoryToProduct(inv: BackendInventory): Product {
   const mp = inv.masterPart;
-  const imageVal = mp?.imageUrl || getCategoryEmoji(mp?.categoryL1);
+  // Priority: shop's Cloudinary photo → shop's emoji override → master part image → category emoji
+  const imageVal = inv.imageUrl || inv.customIcon || mp?.imageUrl || getCategoryEmoji(inv.customCategoryL1 || mp?.categoryL1);
   const oemStr = (Array.isArray(mp?.oemNumbers) ? mp?.oemNumbers[0] : mp?.oemNumbers) || mp?.oemNumber || '';
   const barcodesArr = mp?.barcodes
     ? (Array.isArray(mp.barcodes) ? mp.barcodes : [mp.barcodes])
@@ -107,7 +111,7 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     oemNumber: oemStr || null,
     barcodes: barcodesArr as string[],
     brand: mp?.brand || null,
-    category: normalizeCategory(mp?.categoryL1),
+    category: normalizeCategory(inv.customCategoryL1 || mp?.categoryL1),
     hsnCode: mp?.hsnCode || null,
     gstRate: parseFloat(String(mp?.gstRate ?? 18)),
     unitOfSale: mp?.unitOfSale || null,
@@ -121,7 +125,7 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     isMarketplaceListed: inv.isMarketplaceListed ?? false,
     shopId: inv.shopId,
     image: imageVal,
-    imageEmoji: getCategoryEmoji(mp?.categoryL1),
+    imageEmoji: getCategoryEmoji(inv.customCategoryL1 || mp?.categoryL1),
     sku: oemStr || String(inv.inventoryId).slice(0, 8),
   };
 }
@@ -313,8 +317,11 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
         customPartName: product.name ?? undefined,
         shopSpecificNotes: product.notes ?? undefined,
         isMarketplaceListed: product.isMarketplaceListed,
-        // Cloudinary photo from the ProductModal uploader — emoji placeholders stay local-only
+        // Cloudinary photo — save as imageUrl; emoji icons save separately as customIcon
         ...(typeof product.image === 'string' && product.image.startsWith('http') && { imageUrl: product.image }),
+        ...(typeof product.image === 'string' && !product.image.startsWith('http') && product.image && { customIcon: product.image }),
+        // Category override — lets the shop assign a different category than the master catalog
+        ...(product.category !== undefined && { customCategoryL1: product.category }),
         // stock qty — included so the backend can create an AUDIT movement when it changes
         ...(product.stock !== undefined && { stockQty: product.stock }),
       });
