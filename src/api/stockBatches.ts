@@ -39,4 +39,4 @@ export const addBatch = (inventoryId: number, data: CreateBatchInput): Promise<S
 
 /** Search across all batches by batch number or serial number. */
 export const searchBatches = (search: string): Promise<(StockBatch & { productName?: string; sku?: string })[]> =>
-  api.get(`/api/shop/batches`, { search });
+  api.get(`/api/shop/inventory/batches`, { search });
