@@ -521,13 +521,13 @@ function AppContent() {
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
-      }).then((ok) => {
+      }).then(({ ok, error }) => {
         window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: !ok } }));
         if (ok) {
           window.dispatchEvent(new CustomEvent("rp:data-changed"));
         } else {
           saveProducts(prevProducts, true);
-          toast("Sale couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
+          toast(error ? `Sync failed: ${error}` : "Sale couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
           window.dispatchEvent(new CustomEvent("rp:data-changed"));
         }
       });
@@ -568,14 +568,14 @@ function AppContent() {
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
-      }).then((ok) => {
+      }).then(({ ok, error }) => {
         window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: !ok } }));
         if (ok) {
           window.dispatchEvent(new CustomEvent("rp:data-changed"));
         } else {
           // Restore optimistic stock update so the display is correct while re-fetch loads
           saveProducts(prevProducts, true);
-          toast("Sale couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
+          toast(error ? `Sync failed: ${error}` : "Sale couldn't be saved — stock restored. Please retry.", "error", "Sync Failed");
           window.dispatchEvent(new CustomEvent("rp:data-changed"));
         }
       });

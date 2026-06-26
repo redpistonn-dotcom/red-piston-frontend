@@ -224,7 +224,8 @@ export function POSBillingPage() {
     const newBill = () => {
         setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setVehicleReg("");
         setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
-        setInvoiceAt(null); setTimeout(() => searchRef.current?.focus(), 50);
+        setInvoiceAt(null); setBillType("Sale");
+        setTimeout(() => searchRef.current?.focus(), 50);
     };
 
     const handleSuspend = () => {
@@ -377,7 +378,67 @@ export function POSBillingPage() {
                 </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-                <button onClick={() => window.print()} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
+                <button onClick={() => {
+                    const rows = items.map((item, idx) => {
+                        const lc = lineCalcs[idx];
+                        return `<tr style="border-bottom:1px solid #e5e0d8">
+                            <td style="padding:7px 5px;color:#999;font-family:monospace">${idx + 1}</td>
+                            <td style="padding:7px 5px;font-weight:600">${item.name}</td>
+                            <td style="padding:7px 5px;font-family:monospace;font-size:10px;color:#999">${item.sku || "—"}</td>
+                            <td style="padding:7px 5px;font-family:monospace;text-align:right">${item.qty}</td>
+                            <td style="padding:7px 5px;font-family:monospace;text-align:right">₹${item.price}</td>
+                            <td style="padding:7px 5px;font-family:monospace;text-align:right;color:#dc2626">${lc.discAmt > 0 ? `-₹${lc.discAmt.toFixed(2)}` : "—"}</td>
+                            <td style="padding:7px 5px;font-family:monospace;text-align:right;color:#999">₹${lc.gstAmt.toFixed(2)}</td>
+                            <td style="padding:7px 5px;font-family:monospace;font-weight:700;text-align:right">₹${lc.afterDisc.toFixed(2)}</td>
+                        </tr>`;
+                    }).join("");
+                    const isInvoice = billType === "Sale";
+                    const w = window.open("", "_blank", "width=700,height=900");
+                    if (!w) return;
+                    w.document.write(`<!DOCTYPE html><html><head><title>${invoiceNo}</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1b1b;padding:32px;font-size:13px}
+  table{width:100%;border-collapse:collapse}
+  th{padding:7px 5px;text-align:right;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #f3f0eb}
+  th:nth-child(1),th:nth-child(2),th:nth-child(3){text-align:left}
+  .total-row{border-top:1px solid #e5e0d8;padding:8px 5px;font-size:11px;color:#888;display:flex;justify-content:space-between}
+  .grand{font-size:17px;font-weight:900;padding-top:8px;border-top:1px solid #e5e0d8;display:flex;justify-content:space-between}
+  @media print{button{display:none}@page{margin:12mm}}
+</style></head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #d97706;margin-bottom:16px">
+  <div>
+    <div style="font-size:10px;font-weight:800;letter-spacing:.12em;color:#f87171">RED PISTON</div>
+    <div style="font-size:18px;font-weight:900;margin:2px 0">${shopName}</div>
+    <div style="font-size:10px;color:#888;margin-top:4px">${shopAddress}</div>
+  </div>
+  <div style="text-align:right">
+    <div style="font-size:10px;font-weight:800;letter-spacing:.12em;color:#d97706">${isInvoice ? "TAX INVOICE" : "ESTIMATE / QUOTATION"}</div>
+    <div style="font-family:monospace;font-weight:700;margin-top:5px">${invoiceNo}</div>
+    <div style="font-size:11px;color:#888;margin-top:3px">${invoiceAt ? fmtDateTime(invoiceAt) : ""}</div>
+    <div style="font-size:10px;color:#888;margin-top:5px">GSTIN: <b>${shopGst}</b></div>
+  </div>
+</div>
+${customerName ? `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#888">Customer</span><b>${customerName}</b></div>` : ""}
+${vehicleReg ? `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px"><span style="color:#888">Vehicle</span><b style="color:#d97706;font-family:monospace">${vehicleReg}</b></div>` : ""}
+<table style="margin-top:8px">
+  <thead><tr>
+    ${["#","Item","SKU","Qty","Rate","Disc","GST","Amount"].map(h => `<th>${h}</th>`).join("")}
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<div style="margin-top:12px">
+  ${grandDiscount > 0 ? `<div class="total-row"><span>Item Discounts</span><span style="color:#dc2626">−₹${grandDiscount.toFixed(2)}</span></div>` : ""}
+  ${additionalDisc > 0 ? `<div class="total-row"><span>Additional Discount</span><span style="color:#dc2626">−₹${additionalDisc.toFixed(2)}</span></div>` : ""}
+  <div class="total-row"><span>GST (Inclusive)</span><span>₹${grandGst.toFixed(2)}</span></div>
+  <div class="grand"><span>TOTAL</span><span style="color:#d97706;font-family:monospace">₹${finalTotal.toFixed(2)}</span></div>
+</div>
+<div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e0d8;font-size:10px;color:#aaa;text-align:center;line-height:1.6">
+  Paid via ${paymentMode} · Computer-generated ${isInvoice ? "tax invoice" : "quotation"}.<br>Powered by RED PISTON · Thank you for your business.
+</div>
+<br><button onclick="window.print()" style="padding:8px 20px;background:#d97706;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
+</body></html>`);
+                    w.document.close();
+                }} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
                 <button
                     onClick={async () => {
                         // Prefer the server-rendered invoice PDF once the sale has synced.
@@ -551,7 +612,10 @@ export function POSBillingPage() {
                                             <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 12, color: T.t4, fontWeight: 700 }}>{idx + 1}</td>
                                             <td style={{ padding: "12px 14px" }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                    <span style={{ fontSize: 18, flexShrink: 0 }}>{item.image}</span>
+                                                    {typeof item.image === "string" && item.image.startsWith("http")
+                                                        ? <img src={item.image} alt={item.name} style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 4, flexShrink: 0 }} />
+                                                        : <span style={{ fontSize: 18, flexShrink: 0 }}>{item.image || "📦"}</span>
+                                                    }
                                                     <div>
                                                         {String(item.productId || "").startsWith("custom_") ? (
                                                             <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Item name…"

@@ -345,13 +345,13 @@ interface SyncInvoiceParams {
   notes?: string;
 }
 
-// Returns true on success, false on failure. Never throws.
-export async function syncInvoice(params: SyncInvoiceParams): Promise<boolean> {
+// Returns { ok, error? } — never throws.
+export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: boolean; error?: string }> {
   // Filter to real DB items only — custom items ("custom_${Date.now()}") fail isDbId.
   // We sync whatever real items exist rather than bailing on the whole invoice,
   // so a mixed cart (real part + custom labour charge) still decrements stock correctly.
   const realItems = params.items?.filter(item => isDbId(item.inventoryId));
-  if (!realItems?.length) return false;
+  if (!realItems?.length) return { ok: false, error: 'No valid items to sync' };
   try {
     const res = await api.post<{ success: boolean; invoice?: { invoiceId: number; invoiceNumber: string } }>('/api/billing/invoice', {
       items: realItems.map(item => ({
@@ -379,10 +379,11 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<boolean> {
         detail: { invoiceId: res.invoice.invoiceId, invoiceNumber: res.invoice.invoiceNumber },
       }));
     }
-    return true;
+    return { ok: true };
   } catch (err: unknown) {
-    console.error('[Sync] Invoice sync failed:', (err as Error).message);
-    return false;
+    const msg = (err as Error).message;
+    console.error('[Sync] Invoice sync failed:', msg);
+    return { ok: false, error: msg };
   }
 }
 
