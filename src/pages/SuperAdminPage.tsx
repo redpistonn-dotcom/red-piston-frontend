@@ -1023,6 +1023,232 @@ function CatalogTab() {
 }
 
 
+// ─── Audit Logs Tab ──────────────────────────────────────────────────────────
+const ENTITY_TYPES = ["", "PRODUCT", "INVOICE", "PURCHASE_BILL", "PURCHASE_ORDER", "PARTY", "STOCK_BATCH", "USER", "SHOP"];
+const ACTIONS      = ["", "CREATE", "UPDATE", "DELETE", "STOCK_IN", "STOCK_OUT", "ADJUSTMENT"];
+
+const ACTION_COLORS: Record<string, { bg: string; text: string }> = {
+  CREATE:     { bg: "rgba(22,163,74,0.10)",   text: "#16A34A" },
+  UPDATE:     { bg: "rgba(2,132,199,0.10)",    text: "#0284C7" },
+  DELETE:     { bg: "rgba(190,43,26,0.10)",    text: "#BE2B1A" },
+  STOCK_IN:   { bg: "rgba(124,58,237,0.10)",   text: "#7C3AED" },
+  STOCK_OUT:  { bg: "rgba(217,119,6,0.10)",    text: "#D97706" },
+  ADJUSTMENT: { bg: "rgba(15,118,110,0.10)",   text: "#0F766E" },
+};
+
+function AuditActionBadge({ action }: { action: string }) {
+  const c = ACTION_COLORS[action] || { bg: "#F0E8DF", text: "#9C8C7C" };
+  return (
+    <span style={{ background: c.bg, color: c.text, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700, fontFamily: FONT.ui, whiteSpace: "nowrap" }}>
+      {action}
+    </span>
+  );
+}
+
+function JsonDiff({ label, value }: { label: string; value: any }) {
+  if (!value) return null;
+  const str = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.t3, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FONT.ui, marginBottom: 3 }}>{label}</div>
+      <pre style={{ margin: 0, fontSize: 11, fontFamily: "monospace", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 10px", overflowX: "auto", maxHeight: 200, color: C.t1, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+        {str}
+      </pre>
+    </div>
+  );
+}
+
+function AuditTab() {
+  const [logs, setLogs]         = useState<any[]>([]);
+  const [total, setTotal]       = useState(0);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  // Filters
+  const [search, setSearch]         = useState("");
+  const [entityType, setEntityType] = useState("");
+  const [action, setAction]         = useState("");
+  const [shopId, setShopId]         = useState("");
+  const [from, setFrom]             = useState("");
+  const [to, setTo]                 = useState("");
+  const [page, setPage]             = useState(0);
+  const LIMIT = 50;
+
+  const fetchLogs = useCallback(async (pg = 0) => {
+    setLoading(true);
+    setError("");
+    try {
+      const params: Record<string, any> = { limit: LIMIT, offset: pg * LIMIT };
+      if (search)     params.search     = search;
+      if (entityType) params.entityType = entityType;
+      if (action)     params.action     = action;
+      if (shopId)     params.shopId     = shopId;
+      if (from)       params.from       = from;
+      if (to)         params.to         = to;
+      const res: any = await api.get("/api/audit/admin", params);
+      setLogs(res.logs || []);
+      setTotal(res.total || 0);
+      setPage(pg);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load audit logs");
+    } finally {
+      setLoading(false);
+    }
+  }, [search, entityType, action, shopId, from, to]);
+
+  useEffect(() => { fetchLogs(0); }, []); // eslint-disable-line
+
+  const handleSearch = () => fetchLogs(0);
+  const handleReset  = () => {
+    setSearch(""); setEntityType(""); setAction(""); setShopId(""); setFrom(""); setTo("");
+    setTimeout(() => fetchLogs(0), 0);
+  };
+
+  const totalPages = Math.ceil(total / LIMIT);
+
+  const selStyle = {
+    height: 34, border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface,
+    color: C.t1, fontSize: 12, fontFamily: FONT.ui, padding: "0 10px", cursor: "pointer",
+  } as const;
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>Audit Logs</div>
+          <div style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui, marginTop: 2 }}>All create / update / delete activity across every shop</div>
+        </div>
+        <div style={{ fontSize: 11, color: C.t4, fontFamily: FONT.ui }}>{total.toLocaleString("en-IN")} entries</div>
+      </div>
+
+      {/* Filter bar */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        {/* Search */}
+        <div style={{ position: "relative", flex: "2 1 180px" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.t4, fontSize: 13, pointerEvents: "none" }}>🔍</span>
+          <input
+            style={{ width: "100%", height: 34, paddingLeft: 32, border: `1px solid ${C.border}`, borderRadius: 8, background: C.bg, fontSize: 12, fontFamily: FONT.ui, color: C.t1, boxSizing: "border-box" }}
+            placeholder="Search entity ID or metadata…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleSearch()}
+          />
+        </div>
+        {/* Entity type */}
+        <select style={{ ...selStyle, flex: "1 1 130px" }} value={entityType} onChange={e => setEntityType(e.target.value)}>
+          <option value="">All entities</option>
+          {ENTITY_TYPES.filter(Boolean).map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {/* Action */}
+        <select style={{ ...selStyle, flex: "1 1 110px" }} value={action} onChange={e => setAction(e.target.value)}>
+          <option value="">All actions</option>
+          {ACTIONS.filter(Boolean).map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        {/* Shop ID */}
+        <input
+          style={{ ...selStyle, flex: "1 1 100px", padding: "0 10px" }}
+          placeholder="Shop ID"
+          value={shopId}
+          onChange={e => setShopId(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleSearch()}
+        />
+        {/* Date range */}
+        <input type="date" style={{ ...selStyle, flex: "1 1 130px", padding: "0 8px" }} value={from} onChange={e => setFrom(e.target.value)} />
+        <span style={{ color: C.t4, fontSize: 11, fontFamily: FONT.ui }}>→</span>
+        <input type="date" style={{ ...selStyle, flex: "1 1 130px", padding: "0 8px" }} value={to} onChange={e => setTo(e.target.value)} />
+        {/* Buttons */}
+        <button onClick={handleSearch} style={{ height: 34, padding: "0 16px", background: C.t1, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: FONT.ui, cursor: "pointer" }}>
+          Apply
+        </button>
+        <button onClick={handleReset} style={{ height: 34, padding: "0 14px", background: "transparent", color: C.t3, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, fontFamily: FONT.ui, cursor: "pointer" }}>
+          Reset
+        </button>
+      </div>
+
+      {/* Error */}
+      {error && <div style={{ color: C.red, fontSize: 12, fontFamily: FONT.ui, marginBottom: 12 }}>{error}</div>}
+
+      {/* Table */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 820 }}>
+            <thead>
+              <tr>
+                {["When", "Shop", "User", "Action", "Entity", "Entity ID", "IP"].map(h => (
+                  <th key={h} style={{ padding: "9px 12px", fontSize: 10, fontWeight: 700, color: C.t3, textAlign: "left", background: C.bg, textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: FONT.ui, borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr><td colSpan={7} style={{ padding: "32px 12px", textAlign: "center", color: C.t4, fontSize: 12, fontFamily: FONT.ui }}>Loading…</td></tr>
+              )}
+              {!loading && logs.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: "32px 12px", textAlign: "center", color: C.t4, fontSize: 12, fontFamily: FONT.ui }}>No audit logs found for the selected filters.</td></tr>
+              )}
+              {!loading && logs.map((log: any) => {
+                const isOpen = expanded === log.auditId;
+                const hasDetail = log.oldValue || log.newValue || log.metadata;
+                return (
+                  <>
+                    <tr
+                      key={log.auditId}
+                      onClick={() => hasDetail && setExpanded(isOpen ? null : log.auditId)}
+                      style={{ borderBottom: `1px solid ${C.borderLight}`, cursor: hasDetail ? "pointer" : "default", background: isOpen ? `${C.bg}CC` : "transparent" }}
+                      className="admin-table-row"
+                    >
+                      <td style={{ padding: "9px 12px", fontSize: 11, color: C.t3, fontFamily: FONT.ui, whiteSpace: "nowrap" }}>
+                        {new Date(log.createdAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}
+                      </td>
+                      <td style={{ padding: "9px 12px", fontSize: 11, color: C.t2, fontFamily: FONT.ui }}>{log.shopId ?? "—"}</td>
+                      <td style={{ padding: "9px 12px", fontSize: 11, color: C.t2, fontFamily: FONT.ui }}>{log.userId ?? "—"}</td>
+                      <td style={{ padding: "9px 12px" }}><AuditActionBadge action={log.action} /></td>
+                      <td style={{ padding: "9px 12px", fontSize: 12, fontWeight: 600, color: C.t1, fontFamily: FONT.ui }}>{log.entityType}</td>
+                      <td style={{ padding: "9px 12px", fontSize: 11, color: C.sky, fontFamily: FONT.ui }}>{log.entityId}</td>
+                      <td style={{ padding: "9px 12px", fontSize: 11, color: C.t4, fontFamily: FONT.ui }}>{log.ipAddress || "—"}</td>
+                    </tr>
+                    {isOpen && hasDetail && (
+                      <tr key={`${log.auditId}-detail`} style={{ background: `${C.bg}99`, borderBottom: `1px solid ${C.border}` }}>
+                        <td colSpan={7} style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                            <JsonDiff label="Before" value={log.oldValue} />
+                            <JsonDiff label="After"  value={log.newValue} />
+                          </div>
+                          {log.metadata && <JsonDiff label="Metadata" value={log.metadata} />}
+                          {log.deviceInfo && (
+                            <div style={{ marginTop: 6, fontSize: 10, color: C.t4, fontFamily: FONT.ui }}>
+                              Device: {log.deviceInfo}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: C.t3, fontFamily: FONT.ui }}>
+              {page * LIMIT + 1}–{Math.min((page + 1) * LIMIT, total)} of {total.toLocaleString("en-IN")}
+            </span>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button disabled={page === 0} onClick={() => fetchLogs(page - 1)} style={{ height: 30, padding: "0 12px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.t2, fontSize: 12, fontFamily: FONT.ui, cursor: page === 0 ? "not-allowed" : "pointer", opacity: page === 0 ? 0.4 : 1 }}>← Prev</button>
+              <button disabled={page >= totalPages - 1} onClick={() => fetchLogs(page + 1)} style={{ height: 30, padding: "0 12px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.surface, color: C.t2, fontSize: 12, fontFamily: FONT.ui, cursor: page >= totalPages - 1 ? "not-allowed" : "pointer", opacity: page >= totalPages - 1 ? 0.4 : 1 }}>Next →</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab, setActiveTab: propSetTab }) {
   const [localTab, setLocalTab] = useState("users"); // "users" | "verifications"
@@ -1543,6 +1769,9 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
             </button>
             <button style={S.tab(activeTab === "autodukan")} onClick={() => setActiveTab("autodukan")}>
               Autodukan Import
+            </button>
+            <button style={S.tab(activeTab === "audit")} onClick={() => setActiveTab("audit")}>
+              Audit Logs
             </button>
           </div>
         )}
@@ -2501,6 +2730,9 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
             </div>
           );
         })()}
+
+        {/* ─── AUDIT LOGS TAB ─── */}
+        {activeTab === "audit" && <AuditTab />}
 
       {/* Add User Modal */}
       {showAddUser && (
