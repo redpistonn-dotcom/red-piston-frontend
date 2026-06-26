@@ -913,7 +913,12 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
             <div className="settings-grid" style={S.row}>
               <div style={S.field}>
                 <label style={S.label}>Shop Name</label>
-                <input style={S.input} value={shopData.name || ""} onChange={e => setShopData(p => ({ ...p, name: e.target.value }))} />
+                <input
+                  style={S.input}
+                  value={shopData.name || ""}
+                  onChange={e => setShopData(p => ({ ...p, name: e.target.value }))}
+                  onKeyDown={e => { if (e.key === "Enter") handleSaveShop(); }}
+                />
               </div>
               <div style={S.field}>
                 <label style={S.label}>Owner Name</label>
@@ -946,6 +951,16 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
               <div style={S.field}>
                 <label style={S.label}>Pincode</label>
                 <input style={S.input} value={shopData.pincode || ""} onChange={e => setShopData(p => ({ ...p, pincode: e.target.value }))} placeholder="6-digit pincode" maxLength={6} />
+              </div>
+            </div>
+            <div className="settings-grid" style={S.row}>
+              <div style={S.field}>
+                <label style={S.label}>Contact Number (WhatsApp)</label>
+                <input style={S.input} value={shopData.whatsappNumber || ""} onChange={e => setShopData(p => ({ ...p, whatsappNumber: e.target.value }))} placeholder="+91 9876543210" />
+              </div>
+              <div style={S.field}>
+                <label style={S.label}>Primary Phone</label>
+                <input style={{ ...S.input, ...S.inputDisabled }} value={shopData.phone || "Not set"} disabled title="Primary login phone — contact support to change" />
               </div>
             </div>
             <div style={S.field}>

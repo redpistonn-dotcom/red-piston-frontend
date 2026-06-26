@@ -253,7 +253,8 @@ export function PartiesPage() {
             return matchesParty(m, party) && (m.paymentStatus === "pending" || m.paymentMode === "Credit") && (m.type === "SALE" || m.type === "PURCHASE");
         }).sort((a: any, b: any) => a.date - b.date);
         if (!moves.length) return 0;
-        return Math.floor((Date.now() - moves[moves.length - 1].date) / 86400000);
+        // Use the OLDEST unpaid credit movement — that's when the debt started
+        return Math.floor((Date.now() - moves[0].date) / 86400000);
     };
 
     const typeFilter = view === "customers" ? "customer" : "supplier";
@@ -709,8 +710,9 @@ export function PartiesPage() {
                                                                     <button onClick={e => {
                                                                         e.stopPropagation();
                                                                         const digits = (p.phone || "").replace(/\D/g, "");
-                                                                        if (digits.length !== 10) { toast?.("Party phone number must be 10 digits to send WhatsApp", "warning"); return; }
-                                                                        window.open(`https://wa.me/91${digits}?text=${encodeURIComponent(`Namaste ${p.name}, aapka hamare shop mein ${fmt(bal)} ka baki hai. Kripya jald payment karein.`)}`, "_blank");
+                                                                        if (digits.length < 10 || digits.length > 15) { toast?.("Party phone number must be 10–15 digits to send WhatsApp", "warning"); return; }
+                                                                        const waNum = digits.length === 10 ? `91${digits}` : digits;
+                                                                        window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(`Namaste ${p.name}, aapka hamare shop mein ${fmt(bal)} ka baki hai. Kripya jald payment karein.`)}`, "_blank");
                                                                         toast?.("WhatsApp reminder opened", "success");
                                                                     }} style={{ height: 28, padding: "0 10px", borderRadius: 6, border: `1px solid ${T.emerald}55`, background: `${T.emerald}10`, color: T.emerald, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>WA</button>
                                                                 )}

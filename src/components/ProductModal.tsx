@@ -55,6 +55,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
         else if (+f.sellPrice <= 0) e.sellPrice = "Must be greater than 0";
         else if (+f.sellPrice < +f.buyPrice) e.sellPrice = "Sell price below buy price — margin will be negative";
         if (f.stock === "" || isNaN(+f.stock)) e.stock = "Required";
+        else if (+f.stock < 0) e.stock = "Stock cannot be negative";
         setErrors(e);
         return !Object.keys(e).length;
     };
