@@ -58,6 +58,18 @@ export function PartiesPage() {
         try {
             if (exists && isDbId) {
                 await api.put(`/api/shop/parties/${p.id}`, body);
+                // Sync outstanding via ledger adjustment when it changed
+                const prevOutstanding = Number(exists.outstanding || 0);
+                const newOutstanding = Number(p.outstanding || 0);
+                const diff = Math.round((newOutstanding - prevOutstanding) * 100) / 100;
+                if (Math.abs(diff) > 0.009) {
+                    await api.post(`/api/shop/parties/${p.id}/ledger`, {
+                        entryType: "ADJUSTMENT",
+                        debitAmount:  diff > 0 ? diff : 0,
+                        creditAmount: diff < 0 ? Math.abs(diff) : 0,
+                        notes: "Manual outstanding adjustment",
+                    });
+                }
             } else {
                 await createParty(body);
             }
@@ -792,11 +804,11 @@ export function PartiesPage() {
 // ── Party Form Modal ─────────────────────────────────────────────────────────
 function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: any) {
     const isEdit = !!party;
-    const blank = { name: "", phone: "", email: "", gstin: "", address: "", city: "", creditLimit: "0", creditDays: "30", loyaltyPoints: "0", openingBalance: "0", tags: "", notes: "" };
+    const blank = { name: "", phone: "", email: "", gstin: "", address: "", city: "", creditLimit: "0", creditDays: "30", loyaltyPoints: "0", openingBalance: "0", outstanding: "0", tags: "", notes: "" };
     const [f, setF] = useState(blank);
 
     useEffect(() => {
-        if (party) setF({ ...party, creditLimit: String(party.creditLimit || 0), creditDays: String(party.creditDays || 30), loyaltyPoints: String(party.loyaltyPoints || 0), openingBalance: String(party.openingBalance || 0), tags: (party.tags || []).join(", ") });
+        if (party) setF({ ...party, creditLimit: String(party.creditLimit || 0), creditDays: String(party.creditDays || 30), loyaltyPoints: String(party.loyaltyPoints || 0), openingBalance: String(party.openingBalance || 0), outstanding: String(party.outstanding || 0), tags: (party.tags || []).join(", ") });
         else setF(blank);
     }, [party, open]);
 
@@ -809,6 +821,7 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
             shopId: party?.shopId || activeShopId, type: party?.type || type,
             creditLimit: +f.creditLimit || 0, creditDays: +f.creditDays || 30,
             loyaltyPoints: +f.loyaltyPoints || 0, openingBalance: +f.openingBalance || 0,
+            outstanding: +f.outstanding || 0,
             tags: f.tags ? f.tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [],
             vehicles: party?.vehicles || [], isActive: true, createdAt: party?.createdAt || Date.now(),
         });
@@ -828,6 +841,7 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
                 <Field label="Credit Limit (₹)"><Input type="number" value={f.creditLimit} onChange={set("creditLimit")} prefix="₹" /></Field>
                 <Field label="Credit Days"><Input type="number" value={f.creditDays} onChange={set("creditDays")} suffix="days" /></Field>
                 <Field label="Opening Balance (₹)"><Input type="number" value={f.openingBalance} onChange={set("openingBalance")} prefix="₹" /></Field>
+                {isEdit && type === "customer" && <Field label="Outstanding / Udhaar (₹)"><Input type="number" value={f.outstanding} onChange={set("outstanding")} prefix="₹" /></Field>}
                 {type === "customer" && <Field label="Loyalty Points"><Input type="number" value={f.loyaltyPoints} onChange={set("loyaltyPoints")} /></Field>}
                 <div style={{ gridColumn: "span 2" }}><Field label="Tags (comma-separated)"><Input value={f.tags} onChange={set("tags")} placeholder="regular, mechanic, credit" /></Field></div>
                 <div style={{ gridColumn: "span 2" }}><Field label="Notes"><Input value={f.notes} onChange={set("notes")} placeholder="Internal notes" /></Field></div>

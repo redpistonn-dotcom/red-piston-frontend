@@ -112,10 +112,13 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
   useEffect(() => { loadBills(); }, [loadBills]);
 
   // ── Upload + extract ───────────────────────────────────────────────────────
+  const ACCEPTED_TYPES = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"];
   const handleFile = async (file: File) => {
     setError("");
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setError("Please upload a PDF invoice (photos/scans support is coming soon)");
+    const ext = file.name.toLowerCase().split(".").pop() || "";
+    const isAccepted = ACCEPTED_TYPES.includes(file.type) || ["pdf", "jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext);
+    if (!isAccepted) {
+      setError("Unsupported file type. Please upload a PDF or a clear photo (JPG, PNG, WEBP) of the invoice.");
       return;
     }
     if (file.size > 12 * 1024 * 1024) { setError("Max 12 MB"); return; }
@@ -296,7 +299,7 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
             </div>
           </>
         )}
-        <input ref={fileRef} type="file" accept="application/pdf,.pdf" style={{ display: "none" }}
+        <input ref={fileRef} type="file" accept="application/pdf,.pdf,image/*" style={{ display: "none" }}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
       </div>
       {error && <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "9px 12px", color: T.crimson, fontSize: 13, marginBottom: 14 }}>{error}</div>}

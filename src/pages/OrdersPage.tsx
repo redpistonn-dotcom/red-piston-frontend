@@ -144,8 +144,10 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
         setForm(f => ({ ...f, qty: String(q), amount: selectedProd ? String((Number(selectedProd.sellPrice) || 0) * q) : f.amount }));
     };
 
+    const { toast } = useContext(AppCtx);
     const handleSubmit = () => {
-        if (!form.party || !selectedProd) return;   // require a party + an inventory product
+        if (!form.party) { toast?.("Enter a party name to create this order", "warning"); return; }
+        if (!selectedProd) { toast?.("Select a product from your inventory", "warning"); return; }
         const numId = Math.floor(Math.random() * 90000) + 10000;
         const newId = `#${form.type === "Sale" ? "SO" : "PO"}-${numId}`;
         const qty = Math.max(1, parseInt(form.qty) || 1);
@@ -244,6 +246,32 @@ export function OrdersPage() {
     const [visibleCount, setVisibleCount] = useState(25);
     const [shopApiOrders, setShopApiOrders] = useState<any[]>([]);
     const [viewOrder, setViewOrder] = useState<any>(null);
+    const [dropdownOrder, setDropdownOrder] = useState<string | null>(null);
+
+    const printOrder = (order: any) => {
+        const w = window.open("", "_blank", "width=480,height=600");
+        if (!w) return;
+        w.document.write(`<!DOCTYPE html><html><head><title>Order ${order.orderId}</title>
+<style>body{font-family:sans-serif;padding:24px;font-size:13px;color:#1c1b1b}h2{margin:0 0 16px;font-size:17px}table{width:100%;border-collapse:collapse}td{padding:8px 0;border-bottom:1px solid #e5e0d8}td:first-child{color:#6b7280;width:110px}@media print{button{display:none}}</style></head><body>
+<h2>${order.orderId}</h2>
+<table>
+<tr><td>Type</td><td>${order.type}</td></tr>
+<tr><td>Party</td><td>${order.partyName || "—"}</td></tr>
+<tr><td>Amount</td><td>${fmt(order.amount)}</td></tr>
+<tr><td>Status</td><td>${order.status}</td></tr>
+<tr><td>Date</td><td>${new Date(order.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td></tr>
+${order.product ? `<tr><td>Product</td><td>${order.product}</td></tr>` : ""}
+</table>
+<br/><button onclick="window.print()">🖨 Print</button></body></html>`);
+        w.document.close();
+    };
+
+    useEffect(() => {
+        if (!dropdownOrder) return;
+        const close = () => setDropdownOrder(null);
+        document.addEventListener("click", close);
+        return () => document.removeEventListener("click", close);
+    }, [dropdownOrder]);
 
     const STATUS_CYCLE = ["All", "Pending", "Processing", "Shipped", "Delivered", "Cancelled"] as const;
     const cycleStatusFilter = () => {
@@ -597,8 +625,10 @@ export function OrdersPage() {
                                                 </>
                                             )}
                                             <button title="View" onClick={() => setViewOrder(order)} style={iconBtnStyle}>👁</button>
-                                            <button title={isCancelled ? "Restore" : "Print"} onClick={() => { if (!isCancelled) window.print(); }} style={iconBtnStyle}>{isCancelled ? "↺" : "🖨"}</button>
-                                            <button title="More options" style={iconBtnStyle}>⋯</button>
+                                            <button title={isCancelled ? "Restore" : "Print"} onClick={() => { if (!isCancelled) printOrder(order); }} style={iconBtnStyle}>{isCancelled ? "↺" : "🖨"}</button>
+                                            <div style={{ position: "relative" }}>
+                                                <button title="More options" style={iconBtnStyle} onClick={e => { e.stopPropagation(); setDropdownOrder(dropdownOrder === (order as any).id ? null : (order as any).id); }}>⋯</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </MobileCard>
@@ -689,16 +719,34 @@ export function OrdersPage() {
                                                         👁
                                                     </button>
                                                     <button title={isCancelled ? "Restore" : "Print"} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
-                                                        onClick={() => { if (!isCancelled) window.print(); }}
+                                                        onClick={() => { if (!isCancelled) printOrder(order); }}
                                                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
                                                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
                                                         {isCancelled ? "↺" : "🖨"}
                                                     </button>
-                                                    <button title="More options" style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: T.t2, letterSpacing: "0.05em" }}
-                                                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
-                                                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
-                                                        ⋯
-                                                    </button>
+                                                    <div style={{ position: "relative" }}>
+                                                        <button title="More options" style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: T.t2, letterSpacing: "0.05em" }}
+                                                            onClick={e => { e.stopPropagation(); setDropdownOrder(dropdownOrder === (order as any).id ? null : (order as any).id); }}
+                                                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
+                                                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
+                                                            ⋯
+                                                        </button>
+                                                        {dropdownOrder === (order as any).id && (
+                                                            <div style={{ position: "absolute", right: 0, top: 34, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 140, overflow: "hidden" }}>
+                                                                {[
+                                                                    { label: "👁 View Details", action: () => { setViewOrder(order); setDropdownOrder(null); } },
+                                                                    { label: "🖨 Print", action: () => { printOrder(order); setDropdownOrder(null); }, disabled: isCancelled },
+                                                                ].map(item => (
+                                                                    <button key={item.label} disabled={item.disabled} onClick={item.action}
+                                                                        style={{ display: "block", width: "100%", padding: "10px 14px", textAlign: "left", background: "transparent", border: "none", fontSize: 13, fontFamily: FONT.ui, color: item.disabled ? T.t4 : T.t1, cursor: item.disabled ? "default" : "pointer" }}
+                                                                        onMouseEnter={e => { if (!item.disabled) (e.currentTarget as HTMLButtonElement).style.background = T.bg; }}
+                                                                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}>
+                                                                        {item.label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>

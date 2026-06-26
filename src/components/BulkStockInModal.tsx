@@ -165,9 +165,14 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
     const errs = validate();
     if (Object.keys(errs).length) { setFormErr(errs); return; }
 
+    // For manual items, merge the (possibly edited) part name back into the part object
+    const updatedPart = selected._manual
+      ? { ...selected, partName: (form.partName || '').trim() || selected.partName }
+      : selected;
+
     const cartItem = {
-      part:     selected,
-      masterPartId: selected.masterPartId,
+      part:         updatedPart,
+      masterPartId: updatedPart.masterPartId,
       buyPrice:  form.buyPrice  ? parseFloat(form.buyPrice)  : null,
       sellPrice: parseFloat(form.sellPrice),
       qty:       parseInt(form.qty),
@@ -179,8 +184,11 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
     if (editIdx !== null) {
       setCart(prev => prev.map((c, i) => i === editIdx ? cartItem : c));
     } else {
-      // Check if already in cart
-      const existing = cart.findIndex(c => c.masterPartId === selected.masterPartId);
+      // Manual items always add new entries (null masterPartId would wrongly
+      // match every other manual item and replace it instead).
+      const existing = selected._manual
+        ? -1
+        : cart.findIndex(c => c.masterPartId === selected.masterPartId);
       if (existing >= 0) {
         setCart(prev => prev.map((c, i) => i === existing ? cartItem : c));
       } else {
