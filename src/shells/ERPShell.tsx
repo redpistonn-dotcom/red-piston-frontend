@@ -43,6 +43,8 @@ const NAV_ITEMS = [
   { key: "history",     path: "/history",            icon: "history",        label: "History"        },
   { key: "reports",     path: "/reports",            icon: "analytics",      label: "Reports"        },
   { key: "orders",      path: "/orders",             icon: "shopping_cart",  label: "Orders"         },
+  { key: "gstr",        path: "/gstr",               icon: "receipt_long",   label: "GSTR-1 Export"  },
+  { key: "audit",       path: "/audit",              icon: "manage_search",  label: "Audit Log"      },
 ] as const;
 
 // Resolve a single active nav key: the item whose path is the LONGEST match for
@@ -641,6 +643,8 @@ export function ERPShell({ children }: ERPShellProps) {
             "/history":    "History",
             "/reports":    "Reports Dashboard",
             "/orders":     "Orders Pipeline",
+            "/gstr":       "GSTR-1 Export",
+            "/audit":      "Audit Log",
             "/settings":   "Settings",
           };
           const baseRoute = "/" + (currentPath.split("/")[1] || "dashboard");
@@ -820,7 +824,7 @@ export function ERPShell({ children }: ERPShellProps) {
         open={addProdOpen}
         onClose={() => setAddProdOpen(false)}
         onSave={saveProduct}
-        onMovementSaved={() => fetchMovements().then(ms => { if (ms) saveMovements(ms); })}
+        onMovementSaved={() => window.dispatchEvent(new Event('rp:data-changed'))}
         toast={toast}
         activeShopId={activeShopId}
         existingProducts={products || []}

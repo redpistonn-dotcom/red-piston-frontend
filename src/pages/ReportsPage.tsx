@@ -246,8 +246,8 @@ export function ReportsPage() {
     };
 
     // ─────────────────────────────────────────────────────────────────────
-    // First-load skeleton: show until the initial API sync brings data in.
-    if (!apiSynced && shopMovements.length === 0 && shopProducts.length === 0) {
+    // First-load skeleton: products === null means the API fetch hasn't completed yet.
+    if (products === null) {
         return <Skeleton.Page kpis={4} chart cols={6} />;
     }
 

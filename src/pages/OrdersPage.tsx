@@ -596,7 +596,7 @@ export function OrdersPage() {
                                                         style={{ height: 30, padding: "0 11px", borderRadius: 20, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.crimson, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>Cancel</button>
                                                 </>
                                             )}
-                                            <button title="View" style={iconBtnStyle}>👁</button>
+                                            <button title="View" onClick={() => setViewOrder(order)} style={iconBtnStyle}>👁</button>
                                             <button title={isCancelled ? "Restore" : "Print"} onClick={() => { if (!isCancelled) window.print(); }} style={iconBtnStyle}>{isCancelled ? "↺" : "🖨"}</button>
                                             <button title="More options" style={iconBtnStyle}>⋯</button>
                                         </div>

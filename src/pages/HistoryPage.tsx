@@ -411,9 +411,9 @@ export function HistoryPage() {
 
     const VERSION = "V4.6.1-STABLE";
 
-    // First-load skeleton: show while the direct API fetch is in flight or until
-    // the initial API sync brings movements in.
-    if (histLoading || (!apiSynced && shopMovements.length === 0)) {
+    // First-load skeleton: show while the direct API fetch is in flight.
+    // histLoading starts as true, flips to false once fetchMovements() resolves.
+    if (histLoading) {
         return <Skeleton.Page kpis={4} cols={10} />;
     }
 

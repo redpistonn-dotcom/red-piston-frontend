@@ -12,6 +12,8 @@ import { AppCtx } from "../AppCtx";
 import { useVehicleManufacturers, useVehicleModels } from "../hooks/queries";
 import { fetchInventory } from "../api/sync.js";
 import { deleteInventory } from "../api/inventory.js";
+import { BatchesSlideOver } from "../components/BatchesSlideOver";
+import { searchBatches } from "../api/stockBatches.js";
 
 // Pure helper — no fitment data = show universally (don't hide DB-backed parts)
 function isProductCompatible(product, matchStr) {
@@ -30,12 +32,6 @@ export function InventoryPage() {
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
-  useEffect(() => {
-    setLoadError(null);
-    fetchInventory()
-      .then(data => { if (data?.length) saveProducts(data, true); })
-      .catch(() => setLoadError("Failed to load inventory. Check your connection and try again."));
-  }, [retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onAdd = () => setAddProdOpen(true);
   const onEdit = (p) => setPModal({ open: true, product: p });
@@ -57,17 +53,21 @@ export function InventoryPage() {
       return;
     }
     try {
+      setDeletingId(invId);
       await deleteInventory(invId);
       saveProducts((storeProducts || []).filter(x => Number(x.inventoryId ?? x.id) !== Number(invId)), true);
       toast?.("Product deleted", "success");
     } catch (e) {
       toast?.(e?.data?.error || e?.message || "Could not delete product", "warning");
+    } finally {
+      setDeletingId(null);
     }
   };
     const [search, setSearch] = useState("");
     const [cat, setCat] = useState("All");
     const [statusF, setStatusF] = useState("All");
     const [sortBy, setSortBy] = useState("name");
+    const [deletingId, setDeletingId] = useState<string | number | null>(null);
     const [saleP, setSaleP] = useState(null);
     const [purchP, setPurchP] = useState(null);
     const [adjP, setAdjP] = useState(null);
@@ -80,6 +80,14 @@ export function InventoryPage() {
     const [selYear, setSelYear] = useState("");
     const [selectedIds, setSelectedIds] = useState([]);
     const [poModalOpen, setPoModalOpen] = useState(false);
+    const [batchP, setBatchP] = useState(null);
+
+    // Batch search state
+    const [batchSearch, setBatchSearch] = useState("");
+    const [batchResults, setBatchResults] = useState<any[]>([]);
+    const [batchSearching, setBatchSearching] = useState(false);
+    const [showBatchSearch, setShowBatchSearch] = useState(false);
+    const debouncedBatchSearch = useDebounce(batchSearch, 400);
 
     const debouncedSearch = useDebounce(search, 300);
 
@@ -88,6 +96,21 @@ export function InventoryPage() {
     useEffect(() => {
         setVisibleCount(50);
     }, [debouncedSearch, cat, statusF, selBrand, selModel, selYear]);
+
+    // Batch search — fires when user types in the batch search bar
+    useEffect(() => {
+      if (!debouncedBatchSearch.trim()) {
+        setBatchResults([]);
+        return;
+      }
+      let cancelled = false;
+      setBatchSearching(true);
+      searchBatches(debouncedBatchSearch.trim())
+        .then(data => { if (!cancelled) setBatchResults(Array.isArray(data) ? data : []); })
+        .catch(() => { if (!cancelled) setBatchResults([]); })
+        .finally(() => { if (!cancelled) setBatchSearching(false); });
+      return () => { cancelled = true; };
+    }, [debouncedBatchSearch]);
 
     // Vehicle data via TanStack Query — auto-cached, no manual useEffect needed
     const { data: mfgData } = useVehicleManufacturers();
@@ -301,6 +324,93 @@ export function InventoryPage() {
               >+ Add Product</button>
             </div>
 
+            {/* ── BATCH / SERIAL SEARCH BAR ── */}
+            <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  onClick={() => { setShowBatchSearch(v => !v); if (showBatchSearch) { setBatchSearch(""); setBatchResults([]); } }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "5px 12px", borderRadius: 20,
+                    border: `1px solid ${showBatchSearch ? T.amber : T.border}`,
+                    background: showBatchSearch ? T.amberGlow : "transparent",
+                    color: showBatchSearch ? T.amber : T.t2,
+                    fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui,
+                    flexShrink: 0,
+                  }}
+                >
+                  🔢 Search by Batch / Serial {showBatchSearch ? "▲" : "▼"}
+                </button>
+                {showBatchSearch && (
+                  <div style={{ flex: 1, position: "relative" }}>
+                    <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: T.t3, pointerEvents: "none" }}>🔍</span>
+                    <input
+                      autoFocus
+                      value={batchSearch}
+                      onChange={e => setBatchSearch(e.target.value)}
+                      placeholder="Enter batch #, LOT-…, S/N:…"
+                      style={{
+                        width: "100%", height: 36,
+                        background: "#FFFFFF",
+                        border: `1px solid ${T.border}`,
+                        borderRadius: 8, padding: "0 32px 0 32px",
+                        fontSize: 13, color: T.t1,
+                        fontFamily: FONT.ui, outline: "none", boxSizing: "border-box",
+                      }}
+                      onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                      onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }}
+                    />
+                    {batchSearch && (
+                      <button onClick={() => { setBatchSearch(""); setBatchResults([]); }} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: T.t3, fontSize: 14, padding: 2 }}>×</button>
+                    )}
+                  </div>
+                )}
+                {!showBatchSearch && <span style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>Find a product by its batch number, lot code, or serial number</span>}
+              </div>
+
+              {/* Batch search results */}
+              {showBatchSearch && batchSearch.trim() && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                  {batchSearching && (
+                    <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui, padding: "4px 2px" }}>Searching…</div>
+                  )}
+                  {!batchSearching && batchResults.length === 0 && (
+                    <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui, padding: "4px 2px" }}>No batches found for "{batchSearch}"</div>
+                  )}
+                  {!batchSearching && batchResults.length > 0 && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ fontSize: 11, color: T.t3, fontWeight: 600, fontFamily: FONT.ui }}>{batchResults.length} batch{batchResults.length !== 1 ? "es" : ""} found</div>
+                      {batchResults.map((b, i) => (
+                        <div key={b.id ?? i} style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          background: T.surfaceContainerLow,
+                          border: `1px solid ${T.border}`,
+                          borderRadius: 8, padding: "9px 14px",
+                          flexWrap: "wrap",
+                        }}>
+                          <div style={{ flex: 1, minWidth: 140 }}>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: T.t1, fontFamily: FONT.ui }}>{b.productName || "—"}</div>
+                            {b.sku && <div style={{ fontSize: 10, color: T.t3, fontFamily: FONT.mono, marginTop: 1 }}>{b.sku}</div>}
+                          </div>
+                          {b.batchNumber && (
+                            <span style={{ fontSize: 11, fontFamily: FONT.mono, color: T.amber, background: T.amberGlow, padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>📦 {b.batchNumber}</span>
+                          )}
+                          {b.serialNumber && (
+                            <span style={{ fontSize: 11, fontFamily: FONT.mono, color: T.sky, background: T.skyBg, padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>S/N {b.serialNumber}</span>
+                          )}
+                          <div style={{ fontSize: 11, color: T.t2, fontFamily: FONT.ui }}>
+                            Rcvd: <span style={{ fontWeight: 700, fontFamily: FONT.mono }}>{b.qtyReceived}</span>
+                            {" · "}Rem: <span style={{ fontWeight: 700, fontFamily: FONT.mono, color: b.qtyRemaining === 0 ? T.t4 : T.emerald }}>{b.qtyRemaining}</span>
+                          </div>
+                          {b.supplierName && <div style={{ fontSize: 11, color: T.t3 }}>{b.supplierName}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* ── CATEGORY TABS (design: pill tabs; mobile = one scrollable row) ── */}
             <div className="inv-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {["All", ...availableCats].map(c => {
@@ -480,8 +590,10 @@ export function InventoryPage() {
                                                 <button title="Edit" onClick={() => onEdit(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}>✎</button>
                                                 {/* Adjust stock icon button */}
                                                 <button title="Adjust Stock" onClick={() => setAdjP(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}>⚖</button>
+                                                {/* Batches icon button */}
+                                                <button title="Batch / Lot Tracking" onClick={() => setBatchP(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.sky, transition: "all 0.12s" }}>📦</button>
                                                 {/* Delete icon button */}
-                                                <button title="Delete" onClick={() => onDelete(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.crimson, transition: "all 0.12s" }}>🗑</button>
+                                                <button title="Delete" onClick={() => onDelete(p)} disabled={deletingId === (p.inventoryId ?? p.id)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: deletingId === (p.inventoryId ?? p.id) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.crimson, transition: "all 0.12s", opacity: deletingId === (p.inventoryId ?? p.id) ? 0.5 : 1 }}>{deletingId === (p.inventoryId ?? p.id) ? "⏳" : "🗑"}</button>
                                                 {/* REORDER — only for low/out stock */}
                                                 {(st === "low" || st === "out") && (
                                                     <button onClick={(e) => { e.stopPropagation(); setPurchP(p); }} style={{ height: 30, padding: "0 10px", borderRadius: 8, border: "none", background: T.amber, color: "#FFFFFF", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>REORDER</button>
@@ -586,6 +698,7 @@ export function InventoryPage() {
                 </div>
             )}
 
+            <BatchesSlideOver open={!!batchP} product={batchP} onClose={() => setBatchP(null)} toast={toast} />
             <SaleModal open={!!saleP} product={saleP} products={storeProducts} onClose={() => setSaleP(null)} onSave={(data) => onSale(data)} toast={toast} />
             <PurchaseModal open={!!purchP} product={purchP} products={storeProducts} onClose={() => setPurchP(null)} onSave={(data) => onPurchase(data)} toast={toast} />
             <StockAdjustmentModal open={!!adjP} product={adjP} products={storeProducts} onClose={() => setAdjP(null)} onSave={(data) => onAdjust(data)} toast={toast} />
