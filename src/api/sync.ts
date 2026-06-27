@@ -29,6 +29,7 @@ interface BackendInventory {
   masterPart?: BackendMasterPart | null;
   partName?: string;
   movements?: BackendMovement[];
+  createdAt?: string | null;
 }
 
 interface BackendMasterPart {
@@ -127,6 +128,7 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     image: imageVal,
     imageEmoji: getCategoryEmoji(inv.customCategoryL1 || mp?.categoryL1),
     sku: oemStr || String(inv.inventoryId).slice(0, 8),
+    createdAt: inv.createdAt ? new Date(inv.createdAt).getTime() : undefined,
   };
 }
 

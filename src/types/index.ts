@@ -83,6 +83,7 @@ export interface Product {
   compatibleVehicles?: string[];
   isActive?: boolean;
   supplier?: string | null;
+  createdAt?: number;
 }
 
 // ─── Movements / Transactions ─────────────────────────────────────────────────

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-06-28] — Inventory newest-first sort; Quotation custom-item fix; PO draft done view
+
+### New Features / Fixes
+- **Inventory — default sort is now Newest first** (`src/pages/InventoryPage.tsx`, `src/api/sync.ts`, `src/types/index.ts`): added `createdAt` to `BackendInventory`, mapped it in `mapInventoryToProduct`, added `newest`/`oldest` sort options to the sort cycle button (Newest → Oldest → Name → Stock → Margin → back to Newest). The sort button now shows a readable label instead of `≡`.
+- **Quotation with custom/overstock items — stock gate no longer blocks quotations** (`src/pages/POSBillingPage.tsx`): `validate()` was checking `billType` state for the stock limit — meaning clicking the "Quotation" button while `billType === "Sale"` would still run the stock check and block items with qty > stock. Passing `typeOverride` into `validate()` fixes this: quotations now skip the stock check regardless of the header toggle state.
+- **PO Save Draft — clearer success feedback** (`src/components/PurchaseOrderModal.tsx`): replaced the plain done view with a prominent green success banner showing PO number, supplier, item count, and total. Added a **Continue Editing** button (returns to create form with current supplier/items intact) alongside the existing **View All POs** and **+ New PO** actions. "New PO" now correctly resets the form state (lines, supplier, remarks).
+
 ## [2026-06-26] — Bug Fixes: POS print, cart image, sync error surfacing + inventory category persistence
 
 ### Fixes

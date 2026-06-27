@@ -438,20 +438,32 @@ export function PurchaseOrderModal({ open, onClose, products, preselectedIds, sh
 
         {/* ── DONE VIEW ── */}
         {view === "done" && createdPo && (
-          <div style={{ padding: 32, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, overflowY: "auto" }}>
-            <div style={{ fontSize: 44 }}>✅</div>
-            <div style={{ fontSize: 19, fontWeight: 800, color: T.t1 }}>{createdPo.poNumber} saved as Draft</div>
-            <div style={{ fontSize: 13.5, color: T.t2 }}>
-              {createdPo.party?.name || createdPo.supplierName} · {(createdPo.items || []).length} items · {fmt(Number(createdPo.totalAmount))}
+          <div style={{ padding: "28px 24px 32px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0, overflowY: "auto" }}>
+            {/* Success banner */}
+            <div style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", borderRadius: 14, padding: "20px 28px", width: "100%", maxWidth: 400, textAlign: "center", marginBottom: 20 }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#059669", marginBottom: 4 }}>Draft saved successfully!</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: T.t1, fontFamily: FONT.mono, letterSpacing: "0.04em", marginBottom: 6 }}>{createdPo.poNumber}</div>
+              <div style={{ fontSize: 13, color: T.t2 }}>
+                {createdPo.party?.name || createdPo.supplierName}
+              </div>
+              <div style={{ fontSize: 13, color: T.t3, marginTop: 2 }}>
+                {(createdPo.items || []).length} items &nbsp;·&nbsp; {fmt(Number(createdPo.totalAmount))}
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap", justifyContent: "center" }}>
-              <button style={{ ...actBtn, height: 42, padding: "0 18px", fontSize: 13 }} onClick={() => downloadPoExcel(createdPo, shopName)}>📊 Download Excel</button>
-              <button style={{ ...actBtn, height: 42, padding: "0 18px", fontSize: 13 }} onClick={() => downloadPoPdf(createdPo, toast)}>📄 Download PDF</button>
-              <button style={{ ...actBtn, height: 42, padding: "0 18px", fontSize: 13, background: "#25D366", color: "#fff", border: "none", fontWeight: 700 }} onClick={() => sharePoWhatsApp(createdPo, shopName)}>💬 Share WhatsApp</button>
+
+            {/* Share / download row */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 14 }}>
+              <button style={{ ...actBtn, height: 38, padding: "0 14px", fontSize: 12.5 }} onClick={() => downloadPoExcel(createdPo, shopName)}>📊 Excel</button>
+              <button style={{ ...actBtn, height: 38, padding: "0 14px", fontSize: 12.5 }} onClick={() => downloadPoPdf(createdPo, toast)}>📄 PDF</button>
+              <button style={{ ...actBtn, height: 38, padding: "0 14px", fontSize: 12.5, background: "#25D366", color: "#fff", border: "none", fontWeight: 700 }} onClick={() => sharePoWhatsApp(createdPo, shopName)}>💬 WhatsApp</button>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-              <button style={actBtn} onClick={() => setView("list")}>View All POs</button>
-              <button style={actBtn} onClick={() => { setView("create"); setCreatedPo(null); }}>+ New PO</button>
+
+            {/* Navigation row */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+              <button style={{ ...actBtn, height: 38, padding: "0 16px", fontSize: 12.5 }} onClick={() => { setView("create"); setCreatedPo(null); setSupplierId(""); setLines({}); setLinkedIds(null); setRemarks(""); }}>+ New PO</button>
+              <button style={{ ...actBtn, height: 38, padding: "0 16px", fontSize: 12.5 }} onClick={() => setView("list")}>View All POs</button>
+              <button style={{ ...actBtn, height: 38, padding: "0 16px", fontSize: 12.5 }} onClick={() => setView("create")}>Continue Editing</button>
             </div>
           </div>
         )}

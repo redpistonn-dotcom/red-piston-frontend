@@ -172,7 +172,8 @@ export function POSBillingPage() {
 
     // Submit
     const handleSubmitRef = useRef<(() => void) | null>(null);
-    const validate = () => {
+    const validate = (effectiveType?: "Sale" | "Quotation") => {
+        const checkType = effectiveType ?? billType;
         if (items.length === 0) { toast?.("Add at least one product", "warning"); return false; }
         if (paymentMode === "Udhaar" && overLimit) {
             toast?.(`Credit limit exceeded — ${selectedParty?.name || "party"}'s outstanding will reach ${fmt(creditAfterSale)} (limit ${fmt(creditLimit)}). Collect a payment first or reduce the sale.`, "error");
@@ -180,7 +181,7 @@ export function POSBillingPage() {
         }
         for (const item of items) {
             if (item.qty <= 0) { toast?.(`Invalid qty for ${item.name}`, "warning"); return false; }
-            if (billType === "Sale" && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
+            if (checkType === "Sale" && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
             const isCustom = String(item.productId || "").startsWith("custom_");
             if (isCustom && (!item.name || item.name === "Custom Item")) {
                 toast?.("Enter a name for the custom item before submitting", "warning"); return false;
@@ -193,7 +194,7 @@ export function POSBillingPage() {
     };
 
     const handleSubmit = async (typeOverride?: "Sale" | "Quotation") => {
-        if (!validate()) return;
+        if (!validate(typeOverride)) return;
         const effectiveBillType = typeOverride ?? billType;
         setSaving(true);
         setSyncedInvoiceId(null); // new sale — previous backend invoice no longer applies

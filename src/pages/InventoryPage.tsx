@@ -66,7 +66,7 @@ export function InventoryPage() {
     const [search, setSearch] = useState("");
     const [cat, setCat] = useState("All");
     const [statusF, setStatusF] = useState("All");
-    const [sortBy, setSortBy] = useState("name");
+    const [sortBy, setSortBy] = useState("newest");
     const [deletingId, setDeletingId] = useState<string | number | null>(null);
     const [saleP, setSaleP] = useState(null);
     const [purchP, setPurchP] = useState(null);
@@ -170,6 +170,8 @@ export function InventoryPage() {
                 if (ca === "compatible" && cb !== "compatible") return -1;
                 if (cb === "compatible" && ca !== "compatible") return 1;
             }
+            if (sortBy === "newest") return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+            if (sortBy === "oldest") return (a.createdAt ?? 0) - (b.createdAt ?? 0);
             if (sortBy === "profit") return (b.sellPrice - b.buyPrice) - (a.sellPrice - a.buyPrice);
             if (sortBy === "margin") return +margin(b.buyPrice, b.sellPrice) - +margin(a.buyPrice, a.sellPrice);
             if (sortBy === "stock") return a.stock - b.stock;
@@ -301,13 +303,33 @@ export function InventoryPage() {
                 )}
               </div>
 
-              {/* Sort cycle button — name → stock → margin → name */}
+              {/* Sort cycle button — newest → oldest → name → stock → margin → newest */}
               <button
                 className="inv-filter-btn"
-                title={`Sort: ${sortBy === "name" ? "Name ↑ (click for Stock)" : sortBy === "stock" ? "Stock ↑ (click for Margin)" : "Margin ↑ (click for Name)"}`}
-                onClick={() => setSortBy(sortBy === "name" ? "stock" : sortBy === "stock" ? "margin" : "name")}
-                style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 16 }}
-              >≡</button>
+                title={{
+                  newest: "Newest first (click for Oldest)",
+                  oldest: "Oldest first (click for Name A–Z)",
+                  name:   "Name A–Z (click for Stock)",
+                  stock:  "Stock ↑ (click for Margin)",
+                  margin: "Margin ↑ (click for Newest)",
+                }[sortBy] ?? "Sort"}
+                onClick={() => setSortBy(
+                  sortBy === "newest" ? "oldest"
+                  : sortBy === "oldest" ? "name"
+                  : sortBy === "name"   ? "stock"
+                  : sortBy === "stock"  ? "margin"
+                  : "newest"
+                )}
+                style={{ height: 40, padding: "0 12px", borderRadius: 10, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, flexShrink: 0, fontSize: 12, fontWeight: 600, fontFamily: FONT.ui, whiteSpace: "nowrap" }}
+              >
+                {{
+                  newest: "🕐 Newest",
+                  oldest: "🕐 Oldest",
+                  name:   "A–Z",
+                  stock:  "Stock",
+                  margin: "Margin",
+                }[sortBy] ?? "Sort"}
+              </button>
 
               {/* Generate Draft PO */}
               <button
