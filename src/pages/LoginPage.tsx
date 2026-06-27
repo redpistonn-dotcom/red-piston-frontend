@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { sendPhoneOtp, verifyPhoneOtp, signInWithGoogle } from "../firebase.js";
 import { api, setTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
 import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
@@ -43,35 +42,30 @@ function ShopPhotoUploader({ photoUrl, onUploaded }: { photoUrl: string; onUploa
 }
 
 /**
- * AUTH FLOW — two clearly separated paths:
+ * AUTH FLOW — email + password only:
  *
  * SIGN IN (existing users)
- *   → Phone OTP  → verify → login
  *   → Email + Password → login
- *   → Google → login
+ *   → Forgot password → reset link
  *   → If shop owner PENDING/REJECTED → show status screen
  *
  * CREATE ACCOUNT (new users)
  *   → Pick role (Shop Owner / Customer)
- *   → Phone OTP or Email or Google
+ *   → Email + Password
  *   → Shop Owner: Shop Details form → PENDING screen
  *   → Customer: Name → Marketplace
  */
 
 const STEPS = {
   LANDING:      "landing",      // Sign In / Create Account choice
-  SIGNIN:       "signin",       // Sign-in form (phone/email/google)
-  SIGNIN_OTP:   "signin_otp",   // OTP boxes for sign-in
+  SIGNIN:       "signin",       // Sign-in form (email + password)
   REG_ROLE:     "reg_role",     // Role selection for new users
-  REG_AUTH:     "reg_auth",     // Auth method for new users
-  REG_OTP:      "reg_otp",      // OTP boxes for registration
+  REG_AUTH:     "reg_auth",     // Email registration form
   SHOP_DETAILS: "shop_details", // Shop info form (new shop owners)
   PROFILE:      "profile",      // Name setup (new customers)
   PENDING:      "pending",      // Shop owner awaiting approval
   REJECTED:     "rejected",     // Shop owner rejected
   ADMIN_AUTH:   "admin_auth",   // Admin email+password login
-  LINK_PHONE:   "link_phone",   // Collect mobile after email login (no phone on account)
-  LINK_OTP:     "link_otp",     // Verify OTP to link phone to email account
 };
 
 // ─── Error message helper ─────────────────────────────────────────────────────
@@ -90,10 +84,8 @@ const css = `
   .auth-card { animation: fadeUp 0.28s cubic-bezier(0.16,1,0.3,1); }
   .auth-input:focus { border-color: #be2b1a !important; box-shadow: 0 0 0 2px rgba(190,43,26,0.18) !important; outline: none !important; }
   .admin-input:focus { border-color: #7C3AED !important; box-shadow: 0 0 0 2px rgba(124,58,237,0.2) !important; }
-  .otp-box:focus { border-color: #be2b1a !important; box-shadow: 0 0 0 2px rgba(190,43,26,0.18); outline: none !important; }
   .btn-primary:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 10px 30px rgba(190,43,26,0.4) !important; }
   .btn-primary:active:not(:disabled) { transform: translateY(0); }
-  .btn-google:hover { background: #f0f0f0 !important; }
   .role-card:hover { border-color: rgba(190,43,26,0.5) !important; background: rgba(190,43,26,0.06) !important; }
   .role-card.selected { border-color: #be2b1a !important; background: rgba(190,43,26,0.08) !important; box-shadow: 0 0 0 2px rgba(190,43,26,0.18) !important; }
   .tab-btn { transition: all 0.18s; }
@@ -112,11 +104,9 @@ const css = `
   }
   @media (max-width: 540px) {
     .auth-form-right { padding: 32px 20px 40px !important; }
-    .otp-box { width: 38px !important; height: 46px !important; font-size: 18px !important; }
   }
   @media (max-width: 380px) {
     .auth-form-right { padding: 28px 16px 36px !important; }
-    .otp-box { width: 34px !important; height: 42px !important; }
   }
 `;
 
@@ -165,19 +155,12 @@ const FEATURES = [
 export default function LoginPage({ onLogin, isModal = false }) {
   const [step, setStep]           = useState(STEPS.LANDING);
   const [role, setRole]           = useState("");         // "shop" | "customer" | "admin"
-  const [authTab, setAuthTab]     = useState("phone");    // "phone" | "email"
-  const [phone, setPhone]         = useState("");
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
   const [showPwd, setShowPwd]     = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
-  const [otp, setOtp]             = useState(["","","","","",""]);
-  const [confirmResult, setConfirmResult] = useState(null);
-  const [linkConfirmResult, setLinkConfirmResult] = useState(null);
-  const [resendTimer, setResendTimer]     = useState(0);
   const [loading, setLoading]       = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false); // full-panel overlay after Google popup closes
   const [settingUp, setSettingUp] = useState(false); // overlay while transitioning to shop-details
   const [error, setError]         = useState("");
   const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "", shopCategory: "", whatsappNumber: "", photoUrl: "" });
@@ -200,8 +183,6 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [forgotSent, setForgotSent]       = useState(false);
   const [landingTab, setLandingTab]       = useState("owner"); // "owner" | "customer"
 
-  const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
-
   // Modal-responsive style tokens — shadow module-level BASE_S
   const S = isModal ? {
     ...BASE_S,
@@ -222,86 +203,8 @@ export default function LoginPage({ onLogin, isModal = false }) {
     divider:   { ...BASE_S.divider, margin: "10px 0" },
   } : BASE_S;
 
-  const startResendTimer = () => {
-    setResendTimer(60);
-    const iv = setInterval(() => setResendTimer(t => { if (t <= 1) { clearInterval(iv); return 0; } return t - 1; }), 1000);
-  };
-
   const go = (s) => { setStep(s); setError(""); };
-  const back = (s) => { setStep(s); setError(""); setOtp(["","","","","",""]); };
-
-  // ── Send Firebase OTP ──────────────────────────────────────────────────────
-  const sendOtp = async (nextStep) => {
-    if (!phone || phone.length !== 10) { setError("Enter a valid 10-digit number"); return; }
-    setError(""); setLoading(true);
-    try {
-      const result = await sendPhoneOtp(phone, "recaptcha-container");
-      setConfirmResult(result);
-      startResendTimer();
-      go(nextStep);
-    } catch (e) { setError(e.message || "Could not send OTP. Try again."); }
-    setLoading(false);
-  };
-
-  // ── Verify OTP → call backend ──────────────────────────────────────────────
-  const verifyAndAuth = async (mode) => {
-    const code = otp.join("");
-    if (code.length !== 6) { setError("Enter the 6-digit OTP"); return; }
-    setError(""); setLoading(true);
-    try {
-      const { token } = await verifyPhoneOtp(confirmResult, code);
-      await callBackendFirebase(token, mode);
-    } catch (e) { setError(e.message || "Invalid OTP. Try again."); }
-    setLoading(false);
-  };
-
-  // ── Google sign-in → call backend ─────────────────────────────────────────
-  const googleAuth = async (mode) => {
-    if (googleLoading || loading) return;
-    setError(""); setLoading(true);
-    try {
-      const { token } = await signInWithGoogle();
-      // Popup closed — show full-panel loader while backend verifies the token
-      setGoogleLoading(true);
-      await callBackendFirebase(token, mode);
-    } catch (e) {
-      if (e.message?.includes("popup-closed") || e.message?.includes("popup_closed")) {
-        setError("Sign-in popup was closed. Try again.");
-      } else if (e.message?.includes("network") || e.message?.includes("Failed to fetch")) {
-        setError("Network error — check your connection and that the backend is running.");
-      } else {
-        setError(e.message || "Google sign-in failed. Try again.");
-      }
-    }
-    setGoogleLoading(false);
-    setLoading(false);
-  };
-
-  // ── Core Firebase backend call ─────────────────────────────────────────────
-  // mode = "signin" → never create user
-  // mode = "register" → create user with `role`
-  const callBackendFirebase = async (firebaseToken, mode) => {
-    let data;
-    try {
-      const vehiclePayload = vehicle.make && vehicle.model && vehicle.year ? vehicle : undefined;
-      data = await api.post("/api/auth/firebase", {
-        firebaseToken,
-        mode: mode === "signin" ? "signin" : undefined,
-        role: mode === "register" ? role : undefined,
-        name: mode === "register" ? (profile.name || undefined) : undefined,
-        vehicle: mode === "register" ? vehiclePayload : undefined,
-      });
-    } catch (e) {
-      const code = e.data?.error?.code;
-      if (code === "NO_ACCOUNT") {
-        setError("No account found with this phone / Google account. Please create one.");
-        return;
-      }
-      throw new Error(e.data?.error?.message || e.message || "Authentication failed.");
-    }
-
-    handleAuthResponse(data);
-  };
+  const back = (s) => { setStep(s); setError(""); };
 
   // ── Handle backend response (shared across all auth methods) ──────────────
   const handleAuthResponse = (data) => {
@@ -313,7 +216,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
       setShopDetails(d => ({
         ...d,
         ownerName:    data.userName || d.ownerName,
-        contactPhone: data.phone || phone || d.contactPhone,
+        contactPhone: data.phone || d.contactPhone,
         email:        data.email || email || d.email,
       }));
       setResumeNotice("");
@@ -372,15 +275,6 @@ export default function LoginPage({ onLogin, isModal = false }) {
         return;
       }
 
-      // If user has no phone number, collect and link it before entering the app
-      if (!userData.phone) {
-        setPendingUser(userData);
-        setPhone("");
-        setOtp(["","","","","",""]);
-        go(STEPS.LINK_PHONE);
-        setLoading(false);
-        return;
-      }
       localStorage.setItem("as_user", JSON.stringify(userData));
       onLogin(userData);
     } catch (e) {
@@ -515,89 +409,10 @@ export default function LoginPage({ onLogin, isModal = false }) {
     setLoading(false);
   };
 
-  // ── Send OTP to link phone to existing email account ─────────────────────
-  const sendLinkOtp = async () => {
-    if (!phone || phone.length !== 10) { setError("Enter a valid 10-digit number"); return; }
-    setError(""); setLoading(true);
-    try {
-      const result = await sendPhoneOtp(phone, "recaptcha-container");
-      setLinkConfirmResult(result);
-      startResendTimer();
-      go(STEPS.LINK_OTP);
-    } catch (e) { setError(e.message || "Could not send OTP. Try again."); }
-    setLoading(false);
-  };
-
-  // ── Verify OTP and link phone to account, then complete login ────────────
-  const linkPhoneVerify = async () => {
-    const code = otp.join("");
-    if (code.length !== 6) { setError("Enter the 6-digit OTP"); return; }
-    setError(""); setLoading(true);
-    try {
-      const { token } = await verifyPhoneOtp(linkConfirmResult, code);
-      const res = await api.post("/api/auth/link-phone", { firebaseToken: token });
-      const updatedUser = { ...pendingUser, ...res.user };
-      localStorage.setItem("as_user", JSON.stringify(updatedUser));
-      onLogin(updatedUser);
-    } catch (e) { setError(e.message || "Invalid OTP. Try again."); }
-    setLoading(false);
-  };
-
-  // ── OTP box helpers ────────────────────────────────────────────────────────
-  const handleOtpChange = (i, v) => {
-    if (!/^\d*$/.test(v)) return;
-    const n = [...otp]; n[i] = v.slice(-1); setOtp(n);
-    if (v && i < 5) otpRefs[i + 1].current?.focus();
-    if (!v && i > 0) otpRefs[i - 1].current?.focus();
-  };
-  const handleOtpKey = (i, e, onDone) => {
-    if (e.key === "Backspace" && !otp[i] && i > 0) otpRefs[i - 1].current?.focus();
-    if (e.key === "Enter") onDone();
-  };
-
   // ─────────────────────────────────────────────────────────────────────────
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────
   const renderStep = () => {
-    // Full-panel loader while Google is authenticating (popup closed, backend verifying token).
-    if (googleLoading) {
-      return (
-        <div className="auth-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, gap: 18, textAlign: "center" }}>
-          <div style={{ fontSize: 48, animation: "auth-pulse 1.1s ease-in-out infinite" }}>🔐</div>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: "#BE2B1A", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 6 }}>Signing you in…</div>
-            <div style={{ fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, maxWidth: 280 }}>Verifying your Google account — just a moment</div>
-          </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-            {[0,1,2].map(i => (
-              <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#BE2B1A", opacity: 0.3, animation: `auth-pulse 1.1s ease-in-out ${i * 0.22}s infinite` }} />
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // Full-panel loader for async ops on registration steps (OTP send / verify / email register).
-    // Replaces the whole form so the user sees clear activity instead of a grayed-out button.
-    if (loading && (step === STEPS.REG_AUTH || step === STEPS.REG_OTP)) {
-      const msg = step === STEPS.REG_OTP ? "Verifying your identity…" : "Sending OTP…";
-      const sub = "This may take a moment — our server may be waking up";
-      return (
-        <div className="auth-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, gap: 18, textAlign: "center" }}>
-          <div style={{ fontSize: 48, animation: "auth-pulse 1.1s ease-in-out infinite" }}>⚙️</div>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: "#BE2B1A", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 6 }}>{msg}</div>
-            <div style={{ fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, maxWidth: 280 }}>{sub}</div>
-          </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-            {[0,1,2].map(i => (
-              <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#BE2B1A", opacity: 0.3, animation: `auth-pulse 1.1s ease-in-out ${i * 0.22}s infinite` }} />
-            ))}
-          </div>
-        </div>
-      );
-    }
-
     switch (step) {
 
       // ══════════════════════════════════════════════════════════════════════
@@ -623,7 +438,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
                   Sign In →
                 </button>
                 <button className="btn-outline-stitch" style={{ ...S.btnOutline, fontSize: 11, padding: "8px 12px" }}
-                  onClick={() => { setRole("customer"); setLandingTab("customer"); setPhone(""); go(STEPS.REG_AUTH); }}>
+                  onClick={() => { setRole("customer"); setLandingTab("customer"); go(STEPS.REG_AUTH); }}>
                   Create Account
                 </button>
               </div>
@@ -638,7 +453,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
                   Sign In →
                 </button>
                 <button className="btn-outline-stitch" style={{ ...S.btnOutline, fontSize: 11, padding: "8px 12px" }}
-                  onClick={() => { setRole("shop"); setLandingTab("owner"); setPhone(""); go(STEPS.REG_AUTH); }}>
+                  onClick={() => { setRole("shop"); setLandingTab("owner"); go(STEPS.REG_AUTH); }}>
                   Register Shop
                 </button>
               </div>
@@ -659,7 +474,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
         );
 
       // ══════════════════════════════════════════════════════════════════════
-      // SIGN IN — existing users
+      // SIGN IN — existing users (email + password only)
       // ══════════════════════════════════════════════════════════════════════
       case STEPS.SIGNIN:
         return (
@@ -669,59 +484,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={S.heading}>Welcome back</div>
             <div style={S.sub}>{landingTab === "owner" ? "Sign in to your shop dashboard." : "Sign in to browse parts & track orders."}</div>
 
-            {/* Tabs */}
-            <div style={{ display: "flex", borderBottom: `1px solid #E0D5C8`, marginBottom: isModal ? 14 : 24 }}>
-              {["phone", "email"].map(t => (
-                <button
-                  key={t}
-                  className={`tab-btn ${authTab === t ? "active" : ""}`}
-                  onClick={() => { setAuthTab(t); setError(""); setForgotMode(false); }}
-                  style={{ flex: 1, padding: isModal ? "7px 0" : "10px 0", background: "none", border: "none", borderBottom: "2px solid transparent", color: authTab === t ? "#BE2B1A" : "#9C8C7C", fontSize: isModal ? 11 : 13, fontWeight: 700, cursor: "pointer", textTransform: "capitalize", fontFamily: FONT.ui }}
-                >
-                  {t === "phone" ? "📱 Phone OTP" : "✉️ Email"}
-                </button>
-              ))}
-            </div>
-
             {error && <div style={S.error}>{error}</div>}
 
-            {/* Phone OTP tab */}
-            {authTab === "phone" && (
-              <>
-                <label style={S.label}>Mobile Number</label>
-                <div style={{ ...S.phoneRow, marginBottom: 8 }}>
-                  <div style={S.phoneFlag}>IN +91</div>
-                  <input
-                    className="auth-input"
-                    style={S.phoneInput}
-                    placeholder="98765 43210"
-                    value={phone}
-                    maxLength={10}
-                    inputMode="numeric"
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
-                    onKeyDown={e => e.key === "Enter" && sendOtp(STEPS.SIGNIN_OTP)}
-                    autoFocus
-                  />
-                </div>
-                <div style={{ ...S.hint, marginBottom: isModal ? 10 : 18 }}>We'll send a 6-digit OTP via SMS.</div>
-                <button
-                  className="btn-primary"
-                  style={{ ...S.btnPrimary(loading || phone.length !== 10), marginBottom: isModal ? 10 : 16 }}
-                  disabled={loading || phone.length !== 10}
-                  onClick={() => sendOtp(STEPS.SIGNIN_OTP)}
-                >
-                  {loading ? "Sending…" : "Send OTP →"}
-                </button>
-                <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("signin")}>
-                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                  Continue with Google
-                </button>
-              </>
-            )}
-
-            {/* Email tab */}
-            {authTab === "email" && !forgotMode && (
+            {!forgotMode && (
               <>
                 <label style={S.label}>Email Address</label>
                 <input className="auth-input" style={{ ...S.input, marginBottom: isModal ? 8 : 14 }} type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
@@ -737,16 +502,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 <button className="btn-primary" style={{ ...S.btnPrimary(loading), marginBottom: isModal ? 10 : 16 }} disabled={loading} onClick={emailSignIn}>
                   {loading ? "Signing in…" : "Sign In →"}
                 </button>
-                <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("signin")}>
-                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                  Continue with Google
-                </button>
               </>
             )}
 
             {/* Forgot password inline */}
-            {authTab === "email" && forgotMode && (
+            {forgotMode && (
               <>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1205", marginBottom: 6 }}>Reset Password</div>
                 <div style={{ fontSize: 13, color: "#9C8C7C", marginBottom: 18 }}>Enter your email and we'll send a reset link.</div>
@@ -776,39 +536,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
               {landingTab === "owner" ? "New shop? " : "No account? "}
               <button onClick={() => {
                 setRole(landingTab === "owner" ? "shop" : "customer");
-                setPhone(""); setEmail(""); setPassword("");
+                setEmail(""); setPassword("");
                 go(STEPS.REG_AUTH);
               }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>
                 {landingTab === "owner" ? "Register your shop →" : "Create account →"}
               </button>
-            </div>
-          </div>
-        );
-
-      // ── Sign-in OTP verify ────────────────────────────────────────────────
-      case STEPS.SIGNIN_OTP:
-        return (
-          <div className="auth-card">
-            <button style={S.btnBack} onClick={() => back(STEPS.LANDING)}>← Back</button>
-            <div style={S.chip}>Sign In · OTP Verification</div>
-            <div style={S.heading}>Enter OTP</div>
-            <div style={S.sub}>Sent to +91 {phone}. Check your SMS.</div>
-            {error && <div style={S.error}>{error}</div>}
-            <div style={S.otpRow}>
-              {otp.map((v, i) => (
-                <input key={i} ref={otpRefs[i]} className="otp-box" style={S.otpBox} maxLength={1} inputMode="numeric" value={v}
-                  onChange={e => handleOtpChange(i, e.target.value)}
-                  onKeyDown={e => handleOtpKey(i, e, () => verifyAndAuth("signin"))}
-                  autoFocus={i === 0}
-                />
-              ))}
-            </div>
-            <button className="btn-primary" style={{ ...S.btnPrimary(loading || otp.join("").length !== 6), marginBottom: 12 }}
-              disabled={loading || otp.join("").length !== 6} onClick={() => verifyAndAuth("signin")}>
-              {loading ? "Verifying…" : "Sign In →"}
-            </button>
-            <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C" }}>
-              {resendTimer > 0 ? `Resend in ${resendTimer}s` : <button style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: FONT.ui }} onClick={() => sendOtp(STEPS.SIGNIN_OTP)}>Resend OTP</button>}
             </div>
           </div>
         );
@@ -850,117 +582,36 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         );
 
-      // ── Auth method for registration ──────────────────────────────────────
+      // ── Auth method for registration (email only) ─────────────────────────
       case STEPS.REG_AUTH:
         return (
           <div className="auth-card">
             <button style={S.btnBack} onClick={() => back(STEPS.LANDING)}>← Back</button>
             <div style={S.chip}>{role === "shop" ? "🏪 Register Shop" : "🚗 Customer"} · Step 1 of 3</div>
-            <div style={S.heading}>{role === "shop" ? "Verify Your Identity" : "Create Account"}</div>
-            <div style={S.sub}>{role === "shop" ? "We verify every shop owner to keep the platform trustworthy." : "Quick setup — takes under a minute."}</div>
-
-            {/* Tabs — email tab only for customers (shop owners prefer phone for KYC) */}
-            <div style={{ display: "flex", borderBottom: `1px solid #E0D5C8`, marginBottom: 24 }}>
-              {(role === "shop" ? ["phone"] : ["phone", "email"]).map(t => (
-                <button key={t} className={`tab-btn ${authTab === t ? "active" : ""}`}
-                  onClick={() => { setAuthTab(t); setError(""); }}
-                  style={{ flex: 1, padding: "10px 0", background: "none", border: "none", borderBottom: "2px solid transparent", color: authTab === t ? "#BE2B1A" : "#9C8C7C", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>
-                  {t === "phone" ? "📱 Phone OTP" : "✉️ Email"}
-                </button>
-              ))}
-            </div>
+            <div style={S.heading}>{role === "shop" ? "Create Shop Account" : "Create Account"}</div>
+            <div style={S.sub}>{role === "shop" ? "Set up your credentials — shop details come next." : "Quick setup — takes under a minute."}</div>
 
             {error && <div style={S.error}>{error}</div>}
 
-            {/* Phone OTP */}
-            {authTab === "phone" && (
-              <>
-                <label style={S.label}>Mobile Number</label>
-                <div style={{ ...S.phoneRow, marginBottom: 8 }}>
-                  <div style={S.phoneFlag}>IN +91</div>
-                  <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" value={phone} maxLength={10} inputMode="numeric"
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ""))}
-                    onKeyDown={e => e.key === "Enter" && sendOtp(STEPS.REG_OTP)}
-                    autoFocus
-                  />
-                </div>
-                <div style={{ ...S.hint }}>We'll send a 6-digit OTP. Used for identity verification.</div>
-                <button className="btn-primary" style={{ ...S.btnPrimary(loading || phone.length !== 10), marginBottom: 16 }}
-                  disabled={loading || phone.length !== 10} onClick={() => sendOtp(STEPS.REG_OTP)}>
-                  {loading ? "Sending…" : "Send OTP →"}
-                </button>
-                <>
-                  <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                  <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("register")}>
-                    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                    Continue with Google
-                  </button>
-                  {role === "shop" && (
-                    <div style={{ fontSize: 11, color: "#BFB0A0", textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>
-                      Google will pre-fill your name & email in the shop registration form
-                    </div>
-                  )}
-                </>
-              </>
-            )}
-
-            {/* Email (customers only) */}
-            {authTab === "email" && role === "customer" && (
-              <>
-                <label style={S.label}>Email Address</label>
-                <input className="auth-input" style={{ ...S.input, marginBottom: 12 }} type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
-                <label style={S.label}>Password</label>
-                <div style={{ position: "relative", marginBottom: 12 }}>
-                  <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showPwd ? "text" : "password"} placeholder="Min. 8 characters" value={password} onChange={e => setPassword(e.target.value)} />
-                  <button onClick={() => setShowPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showPwd ? "🙈" : "👁"}</button>
-                </div>
-                <label style={S.label}>Confirm Password</label>
-                <div style={{ position: "relative", marginBottom: 20 }}>
-                  <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showConfirmPwd ? "text" : "password"} placeholder="Repeat password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && emailRegister()} />
-                  <button onClick={() => setShowConfirmPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showConfirmPwd ? "🙈" : "👁"}</button>
-                </div>
-                <button className="btn-primary" style={{ ...S.btnPrimary(loading), marginBottom: 14 }} disabled={loading} onClick={emailRegister}>
-                  {loading ? "Creating account…" : "Create Account →"}
-                </button>
-                <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("register")}>
-                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                  Continue with Google
-                </button>
-              </>
-            )}
-
-            <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 22, paddingTop: 16, borderTop: `1px solid #E0D5C8` }}>
-              Already have an account?{" "}
-              <button onClick={() => { setPhone(""); go(STEPS.SIGNIN); }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>Sign in →</button>
+            <label style={S.label}>Email Address</label>
+            <input className="auth-input" style={{ ...S.input, marginBottom: 12 }} type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
+            <label style={S.label}>Password</label>
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showPwd ? "text" : "password"} placeholder="Min. 8 characters" value={password} onChange={e => setPassword(e.target.value)} />
+              <button onClick={() => setShowPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showPwd ? "🙈" : "👁"}</button>
             </div>
-          </div>
-        );
-
-      // ── Registration OTP verify ───────────────────────────────────────────
-      case STEPS.REG_OTP:
-        return (
-          <div className="auth-card">
-            <button style={S.btnBack} onClick={() => back(STEPS.REG_AUTH)}>← Back</button>
-            <div style={S.chip}>{role === "shop" ? "Shop Owner" : "Customer"} · Verify Phone</div>
-            <div style={S.heading}>Enter OTP</div>
-            <div style={S.sub}>Sent to +91 {phone}. Check your SMS.</div>
-            {error && <div style={S.error}>{error}</div>}
-            <div style={S.otpRow}>
-              {otp.map((v, i) => (
-                <input key={i} ref={otpRefs[i]} className="otp-box" style={S.otpBox} maxLength={1} inputMode="numeric" value={v}
-                  onChange={e => handleOtpChange(i, e.target.value)}
-                  onKeyDown={e => handleOtpKey(i, e, () => verifyAndAuth("register"))}
-                  autoFocus={i === 0}
-                />
-              ))}
+            <label style={S.label}>Confirm Password</label>
+            <div style={{ position: "relative", marginBottom: 20 }}>
+              <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showConfirmPwd ? "text" : "password"} placeholder="Repeat password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && emailRegister()} />
+              <button onClick={() => setShowConfirmPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showConfirmPwd ? "🙈" : "👁"}</button>
             </div>
-            <button className="btn-primary" style={{ ...S.btnPrimary(loading || otp.join("").length !== 6), marginBottom: 12 }}
-              disabled={loading || otp.join("").length !== 6} onClick={() => verifyAndAuth("register")}>
-              {loading ? "Verifying…" : (role === "shop" ? "Verify & Continue →" : "Create Account →")}
+            <button className="btn-primary" style={{ ...S.btnPrimary(loading), marginBottom: 14 }} disabled={loading} onClick={emailRegister}>
+              {loading ? "Creating account…" : (role === "shop" ? "Continue to Shop Details →" : "Create Account →")}
             </button>
-            <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C" }}>
-              {resendTimer > 0 ? `Resend in ${resendTimer}s` : <button style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: FONT.ui }} onClick={() => sendOtp(STEPS.REG_OTP)}>Resend OTP</button>}
+
+            <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 6, paddingTop: 16, borderTop: `1px solid #E0D5C8` }}>
+              Already have an account?{" "}
+              <button onClick={() => go(STEPS.SIGNIN)} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>Sign in →</button>
             </div>
           </div>
         );
@@ -1149,7 +800,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={{ background: "#FAF6F0", border: `1px solid #E0D5C8`, borderRadius: 12, padding: "18px 20px", marginBottom: 24, textAlign: "left" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#BE2B1A", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>What happens next</div>
               {[
-                { icon: "✅", label: "Phone verified & shop details submitted", done: true },
+                { icon: "✅", label: "Account created & shop details submitted", done: true },
                 { icon: "🔍", label: "Our team reviews your application (24–48 hrs)", done: false },
                 { icon: "📧", label: "You receive an approval email with login link", done: false },
                 { icon: "🏪", label: "Log in and start managing your shop!", done: false },
@@ -1216,92 +867,6 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         );
 
-      // ══════════════════════════════════════════════════════════════════════
-      // LINK_PHONE — collect mobile number after email login
-      // ══════════════════════════════════════════════════════════════════════
-      case STEPS.LINK_PHONE:
-        return (
-          <div className="auth-card">
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>📱</div>
-              <div style={S.heading}>Add your mobile number</div>
-              <div style={{ fontSize: 13, color: "#af8785", marginTop: 6, lineHeight: 1.6 }}>
-                We need your mobile number to keep your account secure.<br />
-                You can also use it to log in later.
-              </div>
-            </div>
-            {error && <div style={S.error}>{error}</div>}
-            <label style={S.label}>Mobile Number</label>
-            <div style={{ ...S.phoneRow, marginBottom: 20 }}>
-              <div style={S.phoneFlag}>🇮🇳 +91</div>
-              <input
-                className="auth-input"
-                style={S.phoneInput}
-                type="tel" inputMode="numeric" maxLength={10}
-                placeholder="10-digit mobile number"
-                value={phone}
-                onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                onKeyDown={e => e.key === "Enter" && sendLinkOtp()}
-                autoFocus
-              />
-            </div>
-            <button
-              className="btn-primary"
-              style={S.btnPrimary(loading || phone.length !== 10)}
-              disabled={loading || phone.length !== 10}
-              onClick={sendLinkOtp}>
-              {loading ? "Sending OTP…" : "Send OTP →"}
-            </button>
-            <button
-              style={{ ...S.btnOutline, marginTop: 10, fontSize: 12 }}
-              onClick={() => { localStorage.setItem("as_user", JSON.stringify(pendingUser)); onLogin(pendingUser); }}>
-              Skip for now
-            </button>
-          </div>
-        );
-
-      // ══════════════════════════════════════════════════════════════════════
-      // LINK_OTP — verify OTP to link phone to account
-      // ══════════════════════════════════════════════════════════════════════
-      case STEPS.LINK_OTP:
-        return (
-          <div className="auth-card">
-            <button style={S.btnBack} onClick={() => go(STEPS.LINK_PHONE)}>← Change number</button>
-            <div style={{ textAlign: "center", marginBottom: 24 }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>🔐</div>
-              <div style={S.heading}>Verify your number</div>
-              <div style={{ fontSize: 13, color: "#af8785", marginTop: 6, lineHeight: 1.6 }}>
-                Enter the 6-digit OTP sent to<br />
-                <span style={{ color: "#e3e1ec", fontWeight: 700 }}>+91 {phone}</span>
-              </div>
-            </div>
-            {error && <div style={S.error}>{error}</div>}
-            <div style={S.otpRow}>
-              {otp.map((v, i) => (
-                <input key={i} ref={otpRefs[i]} className="otp-box" style={S.otpBox}
-                  type="text" inputMode="numeric" maxLength={1} value={v}
-                  onChange={e => handleOtpChange(i, e.target.value)}
-                  onKeyDown={e => handleOtpKey(i, e, linkPhoneVerify)}
-                  autoFocus={i === 0} />
-              ))}
-            </div>
-            <button
-              className="btn-primary"
-              style={S.btnPrimary(loading || otp.join("").length !== 6)}
-              disabled={loading || otp.join("").length !== 6}
-              onClick={linkPhoneVerify}>
-              {loading ? "Verifying…" : "Verify & Continue →"}
-            </button>
-            <div style={{ textAlign: "center", marginTop: 16 }}>
-              {resendTimer > 0
-                ? <span style={{ fontSize: 13, color: "#6B7280" }}>Resend in {resendTimer}s</span>
-                : <button style={{ background: "none", border: "none", color: "#FF1F3A", cursor: "pointer", fontSize: 13, fontFamily: "'Inter', sans-serif" }}
-                    onClick={sendLinkOtp}>Resend OTP</button>
-              }
-            </div>
-          </div>
-        );
-
       default:
         return null;
     }
@@ -1311,7 +876,6 @@ export default function LoginPage({ onLogin, isModal = false }) {
   return (
     <div style={{ display: "flex", height: isModal ? "100%" : undefined, minHeight: isModal ? 0 : "100vh", background: "#FAF6F0", fontFamily: "'Inter', sans-serif" }}>
       <style>{css}</style>
-      <div id="recaptcha-container" />
 
       {/* ── Left: Engine photo + branding ── */}
       <div className="auth-hero-left" style={{ width: isModal ? "45%" : "58%", position: "relative", overflow: "hidden", flexShrink: 0 }}>

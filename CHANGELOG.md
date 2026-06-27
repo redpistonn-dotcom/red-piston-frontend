@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-28] — Remove phone/OTP/Google auth — email-only login and registration
+
+### Refactor
+- **LoginPage — email-only auth** (`src/pages/LoginPage.tsx`): removed all phone OTP, Firebase, and Google OAuth flows. Sign-in and account creation both use email + password only. Removed state (`authTab`, `phone`, `otp`, `confirmResult`, `linkConfirmResult`, `resendTimer`, `googleLoading`, OTP refs), removed functions (`startResendTimer`, `sendOtp`, `verifyAndAuth`, `googleAuth`, `callBackendFirebase`, `sendLinkOtp`, `linkPhoneVerify`, `handleOtpChange`, `handleOtpKey`), removed Firebase import, removed STEPS (`SIGNIN_OTP`, `REG_OTP`, `LINK_PHONE`, `LINK_OTP`), removed recaptcha container div, and removed OTP-specific CSS. SIGNIN now shows email+password directly (no tabs). REG_AUTH now shows the same email+password form for both shop owners and customers. PENDING step text updated from "Phone verified" to "Account created".
+
 ## [2026-06-28] — Favicon + email branding; inventory sort; quotation fix; PO draft done view
 
 ### New Features / Fixes
