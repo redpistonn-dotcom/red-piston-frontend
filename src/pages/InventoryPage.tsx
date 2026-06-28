@@ -11,7 +11,7 @@ import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { useVehicleManufacturers, useVehicleModels } from "../hooks/queries";
 import { fetchInventory } from "../api/sync.js";
-import { deleteInventory } from "../api/inventory.js";
+import { deleteInventory, toggleMarketplace, contributePart } from "../api/inventory.js";
 import { BatchesSlideOver } from "../components/BatchesSlideOver";
 import { searchBatches } from "../api/stockBatches.js";
 
@@ -734,6 +734,37 @@ export function InventoryPage() {
                                                                     </span>
                                                                 </div>
                                                             </>
+                                                        )}
+                                                    </div>
+                                                    {/* Marketplace + Catalog contribute actions */}
+                                                    <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await toggleMarketplace(p.inventoryId ?? p.id, !p.isMarketplaceListed);
+                                                                    toast?.(`${p.isMarketplaceListed ? "Unlisted" : "Listed on Marketplace"}`, "success");
+                                                                } catch (e) {
+                                                                    toast?.("Failed", "error");
+                                                                }
+                                                            }}
+                                                            style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", fontFamily: "inherit" }}
+                                                        >
+                                                            {p.isMarketplaceListed ? "Unlist" : "List on Marketplace"}
+                                                        </button>
+                                                        {!p.masterPartId && (
+                                                            <button
+                                                                onClick={async () => {
+                                                                    try {
+                                                                        await contributePart({ inventoryId: p.inventoryId ?? p.id });
+                                                                        toast?.("Contributed to catalog!", "success");
+                                                                    } catch (e) {
+                                                                        toast?.("Failed", "error");
+                                                                    }
+                                                                }}
+                                                                style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "1px solid #e0e7ff", background: "#fff", cursor: "pointer", color: "#4f46e5", fontFamily: "inherit" }}
+                                                            >
+                                                                Contribute to Catalog
+                                                            </button>
                                                         )}
                                                     </div>
                                                     {/* Multi-photo gallery — show all images[] if more than the primary image */}

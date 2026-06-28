@@ -4,7 +4,7 @@ import { fmt, fmtDate, uid, downloadCSV, generateCSV } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
 import { fetchPartyLedger, fetchParties, type LedgerEntry } from "../api/sync";
-import { createParty, getOverdueParties } from "../api/parties";
+import { createParty, getOverdueParties, deleteParty } from "../api/parties";
 import { fetchShopVehicles, createShopVehicle, updateShopVehicle } from "../api/shopVehicles";
 import { api } from "../api/client";
 import { useStore } from "../store";
@@ -104,6 +104,22 @@ export function PartiesPage() {
             console.error("[onSaveVehicle] DB sync failed — kept locally:", err);
         }
     }, [vehicles, saveVehicles]);
+
+    const handleDeleteParty = useCallback(async (party: any) => {
+        if (!window.confirm(`Delete ${party.name}? This cannot be undone.`)) return;
+        const isDbId = typeof party.id === "number" || /^\d+$/.test(String(party.id));
+        if (isDbId) {
+            try {
+                await deleteParty(party.id);
+            } catch (err) {
+                console.error("[deleteParty]", err);
+                toast?.("Failed to delete party", "error"); return;
+            }
+        }
+        saveParties((parties || []).filter((p: any) => p.id !== party.id));
+        logAudit("PARTY_DELETED", "party", party.id, party.name);
+        toast?.(`${party.name} deleted`, "success");
+    }, [parties, saveParties, logAudit, toast]);
 
     // Always pull this shop's parties fresh on mount (resilient to a missed
     // initial store sync) — mirrors how Inventory loads. The backend scopes
@@ -677,6 +693,12 @@ export function PartiesPage() {
                                                     style={{ flex: 1, height: 38, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFF", cursor: "pointer", fontSize: 13, fontWeight: 600, color: T.t2, fontFamily: FONT.ui }}>
                                                     Edit
                                                 </button>
+                                                <button
+                                                    onClick={() => handleDeleteParty(p)}
+                                                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "1px solid #fee2e2", background: "#fff", cursor: "pointer", color: "#dc2626", fontFamily: "inherit" }}
+                                                >
+                                                    Delete
+                                                </button>
                                             </CardActions>
                                         </MobileCard>
                                     );
@@ -757,6 +779,12 @@ export function PartiesPage() {
                                                             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                                                                 <button onClick={e => { e.stopPropagation(); setEditParty(p); setShowAddModal(true); }}
                                                                     style={{ height: 28, padding: "0 10px", borderRadius: 6, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}>Edit</button>
+                                                                <button
+                                                                    onClick={e => { e.stopPropagation(); handleDeleteParty(p); }}
+                                                                    style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "1px solid #fee2e2", background: "#fff", cursor: "pointer", color: "#dc2626", fontFamily: "inherit" }}
+                                                                >
+                                                                    Delete
+                                                                </button>
                                                                 {bal > 0 && p.phone && (
                                                                     <button onClick={e => {
                                                                         e.stopPropagation();

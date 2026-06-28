@@ -54,6 +54,13 @@ function mapJob(j: any) {
     })),
     checklist: [],
     estimatedAmount: Number(j.labourCharge || 0),
+    priority: j.priority || "NORMAL",
+    diagnosis: j.diagnosis || "",
+    odometerIn: j.odometerIn ?? null,
+    odometerOut: j.odometerOut ?? null,
+    paymentMode: j.paymentMode || null,
+    paymentStatus: j.paymentStatus || "PENDING",
+    notes: j.notes || "",
     createdAt: j.createdAt ? new Date(j.createdAt).getTime() : Date.now(),
     startedAt: j.startedAt ? new Date(j.startedAt).getTime() : null,
     completedAt: j.completedAt ? new Date(j.completedAt).getTime() : null,
@@ -90,4 +97,13 @@ export async function addJobCardItem(
 
 export async function removeJobCardItem(jobId: number, itemId: number | string): Promise<any> {
   return api.delete(`/api/shop/workshop/jobs/${jobId}/items/${itemId}`);
+}
+
+export async function getJobCard(jobId: number | string): Promise<any> {
+  const res: any = await api.get(`/api/shop/workshop/jobs/${jobId}`);
+  return res?.data ? mapJob(res.data) : res?.job ? mapJob(res.job) : null;
+}
+
+export async function updateJobCard(jobId: number | string, fields: Record<string, any>): Promise<any> {
+  return api.patch(`/api/shop/workshop/jobs/${jobId}`, fields);
 }

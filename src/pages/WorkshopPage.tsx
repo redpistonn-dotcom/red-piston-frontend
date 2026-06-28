@@ -7,7 +7,7 @@ import { ImageUploader } from "../components/ImageUploader";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { api } from "../api/client";
-import { fetchJobCards, createJobCard, updateJobCardStatus, addJobCardItem, removeJobCardItem } from "../api/jobcards";
+import { fetchJobCards, createJobCard, updateJobCard, updateJobCardStatus, addJobCardItem, removeJobCardItem } from "../api/jobcards";
 import InvoiceModal from "../components/InvoiceModal";
 
 // ─── Status config for table ──────────────────────────────────────────────────
@@ -112,6 +112,7 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                     complaint: jc.complaints || undefined,
                     assignedTo: jc.assignedTo || undefined,   // technician name (String? on the model)
                     labourCharge,
+                    priority: jc.priority || "NORMAL",
                     notes: jc.notes || undefined,
                 });
                 // Persist any parts added at creation as job-card items (backend
@@ -1049,6 +1050,22 @@ export function WorkshopPage({ section = "jobs" }: { section?: "jobs" | "marketp
                                                                         {STATUS_DISPLAY[next]?.label || next} →
                                                                     </button>
                                                                 ))}
+                                                                {(job.status === "completed" || job.status === "invoiced") && job.paymentStatus !== "PAID" && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                await updateJobCard(job.jobId, { paymentStatus: 'PAID' });
+                                                                                saveJobCards((jobCards || []).map((c: any) => c.jobId === job.jobId ? { ...c, paymentStatus: 'PAID' } : c));
+                                                                                toast?.("Marked as paid", "success");
+                                                                            } catch (e) {
+                                                                                toast?.("Failed", "error");
+                                                                            }
+                                                                        }}
+                                                                        style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "1px solid #d1fae5", background: "#fff", cursor: "pointer", color: "#059669", fontFamily: "inherit" }}
+                                                                    >
+                                                                        Mark Paid
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </td>
@@ -1392,6 +1409,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
     const [complaints, setComplaints]     = useState("");
     const [diagnosis, setDiagnosis]       = useState("");
     const [assignedTo, setAssignedTo]     = useState("");
+    const [priority, setPriority]         = useState("NORMAL");
     const [selectedParts, setSelectedParts] = useState<any[]>([]);
     const [labourDesc, setLabourDesc]     = useState("");
     const [labourAmt, setLabourAmt]       = useState("");
@@ -1416,6 +1434,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
             vehicleId,
             customerId: customerId || vehicles.find((v: any) => String(v.id) === String(vehicleId))?.ownerId || "",
             status: "draft",
+            priority: priority || "NORMAL",
             assignedTo: assignedTo || null,
             estimatedAmount: estimated,
             actualAmount: null,
@@ -1434,7 +1453,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
             completedAt: null,
             createdAt: Date.now(),
         });
-        setVehicleId(""); setCustomerId(""); setComplaints(""); setDiagnosis(""); setAssignedTo(""); setSelectedParts([]); setLabourDesc(""); setLabourAmt("");
+        setVehicleId(""); setCustomerId(""); setComplaints(""); setDiagnosis(""); setAssignedTo(""); setPriority("NORMAL"); setSelectedParts([]); setLabourDesc(""); setLabourAmt("");
     };
 
     const customers = (parties || []).filter((p: any) => p.type === "customer" || p.type === "both");
@@ -1452,6 +1471,18 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
                 </Field>
                 <Field label="Technician">
                     <Input value={assignedTo} onChange={setAssignedTo} placeholder="e.g. David K." />
+                </Field>
+                <Field label="Priority">
+                    <Select
+                        value={priority || "NORMAL"}
+                        onChange={(v: string) => setPriority(v)}
+                        options={[
+                            { value: "LOW",    label: "Low"    },
+                            { value: "NORMAL", label: "Normal" },
+                            { value: "HIGH",   label: "High"   },
+                            { value: "URGENT", label: "Urgent" },
+                        ]}
+                    />
                 </Field>
                 <div style={{ display: "flex", alignItems: "flex-end" }}>
                     <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>Job # auto-assigned as <span style={{ fontFamily: FONT.mono, color: T.amber }}>#RP-{9001 + existingCount}</span></div>

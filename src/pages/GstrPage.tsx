@@ -73,6 +73,17 @@ interface HsnRow {
   sgst?: number;
 }
 
+interface B2CSRow {
+  supplyType: string;
+  eCommerceGstin?: string;
+  rate: number;
+  taxableAmount: number;
+  igst?: number;
+  cgst?: number;
+  sgst?: number;
+  cesAmount?: number;
+}
+
 // ── PERIOD PRESETS ────────────────────────────────────────────────────────────
 
 const PRESETS = [
@@ -88,7 +99,7 @@ export function GstrPage() {
   const [customFrom, setCustomFrom] = useState(firstOfMonth);
   const [customTo,   setCustomTo]   = useState(lastOfMonth);
 
-  const [previewMode, setPreviewMode]   = useState<"b2b" | "hsn" | null>(null);
+  const [previewMode, setPreviewMode]   = useState<"b2b" | "hsn" | "b2cs" | null>(null);
   const [previewData, setPreviewData]   = useState<B2BRow[] | HsnRow[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError]   = useState("");
@@ -103,7 +114,7 @@ export function GstrPage() {
 
   // ── Preview ──────────────────────────────────────────────────────────────────
 
-  const fetchPreview = useCallback(async (mode: "b2b" | "hsn") => {
+  const fetchPreview = useCallback(async (mode: "b2b" | "hsn" | "b2cs") => {
     setPreviewMode(mode);
     setPreviewData(null);
     setPreviewError("");
@@ -128,6 +139,15 @@ export function GstrPage() {
           sgst:          r.sgst,
           igst:          r.igst ?? 0,
           totalAmount:   r.invoiceValue,
+        }));
+      } else if (mode === "b2cs") {
+        rows = (res?.b2cs || []).map((r: any) => ({
+          supplyType: r.supplyType || "OE",
+          rate: r.rate ?? 0,
+          taxableAmount: r.taxableValue ?? r.taxableAmount ?? 0,
+          igst: r.igst,
+          cgst: r.cgst,
+          sgst: r.sgst,
         }));
       } else {
         rows = (res?.hsn || []).map((r: any) => ({
@@ -269,6 +289,33 @@ export function GstrPage() {
     </div>
   );
 
+  const renderB2CS = (rows: B2CSRow[]) => (
+    <div style={{ overflowX: "auto", marginTop: 16 }}>
+      <div style={{ fontSize: 12, color: T.t3, marginBottom: 8 }}>{rows.length} B2C entr{rows.length !== 1 ? "ies" : "y"} (unregistered buyers)</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: T.surfaceContainerLow }}>
+            {["Supply Type", "GST Rate", "Taxable", "CGST", "SGST", "IGST"].map(h => (
+              <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: T.t2, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} style={{ borderBottom: `1px solid ${T.border}` }}>
+              <td style={{ padding: "8px 12px", fontWeight: 600 }}>{r.supplyType}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{r.rate}%</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{fmt(r.taxableAmount)}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{r.cgst != null ? fmt(r.cgst) : "—"}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{r.sgst != null ? fmt(r.sgst) : "—"}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{r.igst != null ? fmt(r.igst) : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   // ── JSX ───────────────────────────────────────────────────────────────────────
 
   return (
@@ -341,6 +388,15 @@ export function GstrPage() {
             Preview HSN Summary
           </button>
 
+          <button
+            onClick={() => fetchPreview("b2cs")}
+            style={{ ...btnBase, background: T.amber, color: "#fff" }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
+            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+          >
+            Preview B2CS
+          </button>
+
           <div style={{ width: 1, height: 28, background: T.border, margin: "0 4px" }} />
 
           <button
@@ -375,7 +431,7 @@ export function GstrPage() {
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.xs }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, fontFamily: FONT.display }}>
-              {previewMode === "b2b" ? "B2B Invoice Preview" : "HSN Summary Preview"}
+              {previewMode === "b2b" ? "B2B Invoice Preview" : previewMode === "b2cs" ? "B2CS Preview" : "HSN Summary Preview"}
             </div>
             <button
               onClick={() => { setPreviewMode(null); setPreviewData(null); setPreviewError(""); }}
@@ -406,8 +462,11 @@ export function GstrPage() {
           {!previewLoading && !previewError && previewData && previewData.length > 0 && (
             previewMode === "b2b"
               ? renderB2B(previewData as B2BRow[])
-              : renderHsn(previewData as HsnRow[])
+              : previewMode === "hsn"
+              ? renderHsn(previewData as HsnRow[])
+              : null
           )}
+          {previewMode === "b2cs" && Array.isArray(previewData) && renderB2CS(previewData as B2CSRow[])}
         </div>
       )}
     </div>

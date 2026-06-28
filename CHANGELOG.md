@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-06-28] — Implement all audit gaps: API coverage, new pages, sort fixes
+
+### New Features
+- **API coverage — 8 new/extended files** (`src/api/`): `parties.ts` gets `updateParty`, `deleteParty`, `addLedgerEntry`; `billing.ts` gets `getInvoice`, `recordInvoicePayment`; `jobcards.ts` gets `updateJobCard`, `getJobCard` + `mapJob` now maps `priority/diagnosis/odometerIn/Out/paymentMode/paymentStatus`; `shopVehicles.ts` gets `deleteShopVehicle`; new files: `staff.ts` (invite/role/deactivate/remove), `shop.ts` (profile + bank), `audit.ts` (paginated log + stats), `purchaseBills.ts` (AI bill extract + import).
+- **Staff Management page** (`src/pages/StaffPage.tsx`): table of team members with invite modal, activate/deactivate toggle, and remove button. Route: `/staff`.
+- **Shop Settings page** (`src/pages/ShopSettingsPage.tsx`): shop profile form (name, GSTIN, PAN, address, WhatsApp, description) + bank details section (account number, IFSC, holder name). Saves via `PUT /api/shop/profile` and `PUT /api/shop/profile/bank`. Route: `/shop-settings`.
+- **GSTR — B2CS preview tab** (`src/pages/GstrPage.tsx`): new "Preview B2CS" button (amber) fetches `res.b2cs` from the JSON endpoint and renders unregistered-buyer supply rows (supply type, GST rate, taxable, CGST/SGST/IGST). `previewMode` type extended to include `"b2cs"`.
+- **Inventory — Marketplace & Catalog actions** (`src/pages/InventoryPage.tsx`): expanded product row now shows a "List / Unlist on Marketplace" toggle calling `toggleMarketplace(id, listed)` and, for locally-created parts without a `masterPartId`, a "Contribute to Catalog" button calling `contributePart()`.
+- **Parties — delete button** (`src/pages/PartiesPage.tsx`): each party row in both desktop table and mobile card view has a 🗑 delete button. Calls `DELETE /api/shop/parties/:id` then removes the party from local store.
+- **Job cards — priority + Mark Paid** (`src/pages/WorkshopPage.tsx`): create form has a Priority dropdown (LOW / NORMAL / HIGH / URGENT); "Mark Paid" button appears on completed/invoiced cards and calls `PATCH /api/shop/workshop/jobs/:id` with `{ paymentStatus: 'PAID' }`.
+- **Sort: newest first** (`WorkshopPage.tsx`): job card list is sorted by `createdAt` descending so the most recently created card appears first.
+
+### Type Updates
+- `JobCard` interface (`src/types/index.ts`) extended with `priority`, `diagnosis`, `odometerIn`, `odometerOut`, `paymentMode`, `paymentStatus`, `notes`.
+
 ## [2026-06-28] — Implement audit gaps: inventory stats, overdue parties, GSTR preview, image gallery
 
 ### New Features

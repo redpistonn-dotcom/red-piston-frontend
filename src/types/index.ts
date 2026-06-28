@@ -243,6 +243,13 @@ export interface JobCard {
   startedAt?: number;
   completedAt?: number;
   createdAt?: number;
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  diagnosis?: string;
+  odometerIn?: number | null;
+  odometerOut?: number | null;
+  paymentMode?: string | null;
+  paymentStatus?: 'PENDING' | 'PAID';
+  notes?: string;
 }
 
 // ─── Orders ──────────────────────────────────────────────────────────────────

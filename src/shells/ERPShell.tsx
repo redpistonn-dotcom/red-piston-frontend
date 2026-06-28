@@ -45,6 +45,8 @@ const NAV_ITEMS = [
   { key: "orders",      path: "/orders",             icon: "shopping_cart",  label: "Orders"         },
   { key: "gstr",        path: "/gstr",               icon: "receipt_long",   label: "GSTR-1 Export"  },
   { key: "audit",       path: "/audit",              icon: "manage_search",  label: "Audit Log"      },
+  { key: "staff",       path: "/staff",              icon: "group",          label: "Staff"          },
+  { key: "shop-settings", path: "/shop-settings",   icon: "store",          label: "Shop Settings"  },
 ] as const;
 
 // Resolve a single active nav key: the item whose path is the LONGEST match for

@@ -44,3 +44,7 @@ export async function updateShopVehicle(id: number | string, body: Record<string
   const res: any = await api.put(`/api/shop/vehicles/${id}`, body);
   return res?.vehicle || res;
 }
+
+export async function deleteShopVehicle(id: number | string): Promise<any> {
+  return api.delete(`/api/shop/vehicles/${id}`);
+}

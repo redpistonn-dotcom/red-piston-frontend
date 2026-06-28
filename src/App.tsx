@@ -66,6 +66,8 @@ const AdminPage          = lazy(() => import("./marketplace/pages/AdminPage").th
 const SuperAdminPage     = lazy(() => import("./pages/SuperAdminPage").then(m => ({ default: m.SuperAdminPage })));
 const GstrPage           = lazy(() => import("./pages/GstrPage").then(m => ({ default: m.GstrPage })));
 const AuditLogPage       = lazy(() => import("./pages/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
+const StaffPage          = lazy(() => import("./pages/StaffPage").then(m => ({ default: m.StaffPage })));
+const ShopSettingsPage   = lazy(() => import("./pages/ShopSettingsPage").then(m => ({ default: m.ShopSettingsPage })));
 
 // ── Page skeleton shown while a lazy chunk downloads ──────────────────────────
 const PageLoader = () => (
@@ -818,6 +820,8 @@ function AppContent() {
           <Route path="/orders"     element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><OrdersPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/gstr"       element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><GstrPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/audit"      element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><AuditLogPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/staff"      element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><StaffPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/shop-settings" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ShopSettingsPage /></PageErrorBoundary></ERPShell>)} />
 
           {/* Marketplace routes */}
           {/* New marketplace — Stitch design (browse without login, cart requires login) */}
