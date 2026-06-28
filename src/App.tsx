@@ -580,8 +580,19 @@ function AppContent() {
     toast(isQuote ? `Quotation: ${data.items.length} items · ${fmt(data.total)}` : `Sale recorded: ${data.items.length} items · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : `Invoice ${data.invoiceNo}`);
     if (!isQuote) {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
+      const customItemsForSync = data.items
+        .filter(item => String(item.productId || '').startsWith('custom_'))
+        .map(item => ({
+          name: String(item.name || 'Custom Item'),
+          qty: item.qty,
+          unitPrice: item.sellPrice,
+          discount: item.discount || 0,
+          gstRate: item.gstRate || 0,
+          buyingPrice: item.buyPrice || 0,
+        }));
       syncInvoice({
         items: data.items.map(item => ({ inventoryId: item.productId, qty: item.qty, unitPrice: item.sellPrice, discount: item.discount || 0 })),
+        customItems: customItemsForSync.length > 0 ? customItemsForSync : undefined,
         partyName: data.customerName || undefined, partyPhone: data.customerPhone || undefined,
         partyId: data.partyId || undefined,
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),

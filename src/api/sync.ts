@@ -335,8 +335,18 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
 
 // ─── Fire-and-forget sync helpers ─────────────────────────────────────────────
 
+interface SyncInvoiceCustomItem {
+  name: string;
+  qty: number;
+  unitPrice: number;
+  discount?: number;
+  gstRate?: number;
+  buyingPrice?: number;
+}
+
 interface SyncInvoiceParams {
   items: { inventoryId: string | number; qty: number; unitPrice: number; discount?: number }[];
+  customItems?: SyncInvoiceCustomItem[];
   partyId?: string;
   partyName?: string;
   partyPhone?: string;
@@ -350,18 +360,19 @@ interface SyncInvoiceParams {
 // Returns { ok, error? } — never throws.
 export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: boolean; error?: string }> {
   // Filter to real DB items only — custom items ("custom_${Date.now()}") fail isDbId.
-  // We sync whatever real items exist rather than bailing on the whole invoice,
-  // so a mixed cart (real part + custom labour charge) still decrements stock correctly.
   const realItems = params.items?.filter(item => isDbId(item.inventoryId));
-  if (!realItems?.length) return { ok: false, error: 'No valid items to sync' };
+  const hasCustom = (params.customItems?.length ?? 0) > 0;
+  // Bail only when there is truly nothing to sync (no real inventory items AND no custom items).
+  if (!realItems?.length && !hasCustom) return { ok: false, error: 'No valid items to sync' };
   try {
     const res = await api.post<{ success: boolean; invoice?: { invoiceId: number; invoiceNumber: string } }>('/api/billing/invoice', {
-      items: realItems.map(item => ({
+      items: (realItems ?? []).map(item => ({
         inventoryId: item.inventoryId,
         qty: item.qty,
         unitPrice: item.unitPrice,
         discount: item.discount || 0,
       })),
+      customItems: hasCustom ? params.customItems : undefined,
       partyId: params.partyId || undefined,
       partyName: params.partyName || undefined,
       partyPhone: params.partyPhone || undefined,

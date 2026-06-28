@@ -736,12 +736,7 @@ ${vehicleReg ? `<div style="display:flex;justify-content:space-between;font-size
                     </div>
                 )}
 
-                {/* Custom item sync warning */}
-                {items.some(i => String(i.productId || "").startsWith("custom_")) && (
-                    <div style={{ margin: "0 14px 10px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "7px 12px", fontSize: 11, color: "#92400e", lineHeight: 1.5 }}>
-                        ⚠ Custom items are not tracked in revenue/profit reports. Enter a cost price per row above to get accurate profit figures.
-                    </div>
-                )}
+                {/* Custom items are now synced to the backend — no warning needed */}
 
                 {/* Below table row: actions */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: items.length > 0 ? `1px solid ${T.border}` : "none" }}>

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-06-28] — Custom items: full backend sync (revenue + profit tracking)
+
+### New Features
+- **Backend sync for custom items** (`billing.js`, `sync.ts`, `App.tsx`): custom line items (services, labour, ad-hoc parts not in inventory) are now synced to the backend and tracked in revenue/profit reports.
+  - **DB**: `customItemsMeta JSONB` column added to the `invoices` table (migration: `prisma/migrations/add_invoice_custom_items.sql`). Stores a JSON snapshot of every custom line item (name, qty, price, GST, cost) per invoice.
+  - **Backend** (`billing.js`): accepts a new `customItems` array in the POST body alongside `items`. Custom items are validated and their totals (subtotal, CGST, SGST) are added to the invoice grand total — they appear in the invoice total correctly. A `Movement` record (type `SALE`, `inventoryId = null`) is created for each custom item so revenue and profit land in the movements table and show up in Reports / History.
+  - **Frontend sync** (`sync.ts`): `SyncInvoiceParams` now has a `customItems` field. The "no valid items" guard was updated — an invoice with only custom items (no inventory parts) is now synced successfully instead of being silently dropped. `syncInvoice` passes `customItems` to the API.
+  - **POS handler** (`App.tsx`): `handleMultiItemSale` now extracts custom items from `data.items` (by `productId.startsWith("custom_")`) and passes them as `customItems` to `syncInvoice`, carrying name, qty, unit price, discount, GST rate, and cost price.
+  - **Stock**: inventory items still get stock decremented atomically; custom items never touch stock (no `inventoryId`, no `shopInventory.updateMany`).
+  - The yellow warning banner ("custom items not tracked") is now removed by this fix — custom items ARE tracked from this point forward.
+
 ## [2026-06-28] — Custom items: cost price field + sync warning
 
 ### Improvements
