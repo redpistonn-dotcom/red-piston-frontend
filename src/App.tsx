@@ -189,6 +189,14 @@ function AppContent() {
     try { return !localStorage.getItem("as_user") || !!getAccessToken(); } catch { return true; }
   });
 
+  // ── Startup: wake the Render backend immediately on every page load ──────────
+  // Fired unconditionally so logged-in users don't sit on skeletons while the
+  // backend cold-starts. Fire-and-forget — never blocks the UI.
+  useEffect(() => {
+    const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    fetch(`${BASE_URL}/health`, { method: 'GET' }).catch(() => {});
+  }, []);
+
   // ── Startup: restore access token from refresh token (page reload) ───────────
   useEffect(() => {
     if (!localStorage.getItem("as_user")) return;

@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-28] — Fix cold-start skeleton hang for returning logged-in users
+
+### Fix
+- **Backend warmup ping moved to `App.tsx`** (`src/App.tsx`): the `/health` ping now fires unconditionally on every page load (fire-and-forget `useEffect`), so returning users who are already logged in trigger the Render cold-start wake-up immediately — not just when the login page is shown. Previously, logged-in users would see dashboard skeletons for 30–60s while the backend spun up from sleep. Removed the now-duplicate ping from `LoginPage.tsx`.
+
 ## [2026-06-28] — Remove phone/OTP/Google auth — email-only login and registration
 
 ### Refactor
