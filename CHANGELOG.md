@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-28] — Dual-printer support: Thermal (80mm) + A4; shop branding on all bills
+
+### New Features
+- **Two print formats** (`src/lib/printInvoice.ts`): `printInvoice()` utility replaces the inline `window.open` template in POSBillingPage. Supports `"a4"` (standard wide invoice) and `"thermal"` (80mm receipt, monospace layout matching thermal receipt printers like Dmart/Walmart billing machines). Format is saved per-device in localStorage via `src/lib/printSettings.ts`.
+- **Format toggle in POS** (`src/pages/POSBillingPage.tsx`): "📄 A4 / 🧾 Thermal" toggle appears above the Print button on the invoice preview. Selection is remembered for next time.
+- **Printer Settings in Settings page** (`src/pages/SettingsPage.tsx`): new "🖨 Printer & Print Format" section with visual card selector for A4 vs Thermal. Includes a help note explaining how to select the physical printer via the browser's print dialog (Ctrl+P), and how to set it as the default Windows printer to skip the dialog.
+- **Shop branding on all bills** (`src/pages/POSBillingPage.tsx`, `src/lib/printInvoice.ts`): "RED PISTON" branding removed from the invoice preview panel and both print templates. Bills now show the shop's own name, address, GSTIN, phone, and logo (if `shop.logoUrl` is set). The in-app preview uses the shop's first initial as a monogram when no logo is present.
+
 ## [2026-06-28] — Custom items: full backend sync (revenue + profit tracking)
 
 ### New Features

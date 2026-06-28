@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, clearTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
+import { getPrintFormat, setPrintFormat, type PrintFormat } from "../lib/printSettings";
 
 const S = {
   page: { minHeight: "100vh", background: T.bg, fontFamily: FONT.ui, color: T.t1 },
@@ -92,6 +93,13 @@ export function SettingsPage({ onLogout }) {
     smsNotifications: true,
     darkMode: true,
   });
+
+  const [printFormat, setPrintFormatState] = useState<PrintFormat>(getPrintFormat);
+  const handlePrintFormat = (fmt: PrintFormat) => {
+    setPrintFormat(fmt);
+    setPrintFormatState(fmt);
+    showToast(`Print format set to ${fmt === "a4" ? "A4" : "Thermal (80mm)"}`);
+  };
 
   // Change password
   const [currentPassword, setCurrentPassword] = useState("");
@@ -186,6 +194,49 @@ export function SettingsPage({ onLogout }) {
               <span>🏪 My Shop (dashboard)</span>
               <span style={{ color: T.t3 }}>→</span>
             </button>
+          </div>
+        </div>
+
+        {/* ─── Printer Settings ─── */}
+        <div style={S.section}>
+          <div style={S.sectionTitle}>🖨 Printer &amp; Print Format</div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={S.label}>Default print format</label>
+            <div style={{ display: "flex", gap: 10 }}>
+              {([
+                { fmt: "a4"      as PrintFormat, icon: "📄", title: "A4 Paper", desc: "Standard A4 sheet — use for professional invoices and quotations." },
+                { fmt: "thermal" as PrintFormat, icon: "🧾", title: "Thermal Receipt", desc: "80mm thermal roll — use for the small receipt printer (like Dmart/Walmart billing)." },
+              ]).map(({ fmt, icon, title, desc }) => (
+                <button
+                  key={fmt}
+                  type="button"
+                  onClick={() => handlePrintFormat(fmt)}
+                  style={{
+                    flex: 1, padding: "14px 12px", borderRadius: 12, cursor: "pointer", textAlign: "left",
+                    border: `2px solid ${printFormat === fmt ? T.amber : T.border}`,
+                    background: printFormat === fmt ? "rgba(217,119,6,0.06)" : T.bg,
+                    fontFamily: FONT.ui, transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ fontSize: 22, marginBottom: 6 }}>{icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>{title}</div>
+                  <div style={{ fontSize: 11, color: T.t3, marginTop: 3, lineHeight: 1.5 }}>{desc}</div>
+                  {printFormat === fmt && (
+                    <div style={{ marginTop: 8, fontSize: 10, fontWeight: 700, color: T.amber, letterSpacing: "0.06em" }}>✓ SELECTED</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px", fontSize: 12, color: T.t3, lineHeight: 1.6 }}>
+            <b style={{ color: T.t2 }}>How to select your physical printer:</b><br />
+            When you click <b>Print</b> on a bill, a new window opens with a <b>Print button</b> inside it.
+            Clicking that opens your browser's print dialog (or press <b>Ctrl+P / Cmd+P</b>).
+            From there, choose your printer — your thermal receipt printer will appear here
+            once its driver is installed on this computer. Set it as your default Windows printer
+            to skip the dialog every time.
           </div>
         </div>
 

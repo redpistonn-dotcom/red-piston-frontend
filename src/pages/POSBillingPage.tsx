@@ -10,6 +10,8 @@ import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { getAccessToken } from "../api/client";
 import { getInvoicePdfUrl } from "../api/billing";
+import { printInvoice } from "../lib/printInvoice";
+import { getPrintFormat, setPrintFormat, type PrintFormat } from "../lib/printSettings";
 
 // ─── Payment mode button ───────────────────────────────────────────────────────
 function PayBtn({ label, icon, active, onClick }: { label: string; icon: string; active: boolean; onClick: () => void }) {
@@ -58,6 +60,13 @@ export function POSBillingPage() {
     const [search, setSearch]       = useState("");
     const [outOfStockItem, setOutOfStockItem] = useState<{ id: string; name: string; sku: string } | null>(null);
     const [posTab, setPosTab]       = useState<"pos" | "bills">("pos");
+    const [printFormat, setPrintFormatState] = useState<PrintFormat>(getPrintFormat);
+
+    const handleSetPrintFormat = useCallback((fmt: PrintFormat) => {
+        setPrintFormat(fmt);
+        setPrintFormatState(fmt);
+    }, []);
+
     // Backend invoice id once the sale syncs — enables PDF download + WhatsApp share
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
     const [suspendedBill, setSuspendedBill] = useState(() => {
@@ -341,11 +350,14 @@ export function POSBillingPage() {
             <div data-print-area className="invoice-print-root" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, padding: "22px 26px", fontFamily: FONT.ui }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, paddingBottom: 16, borderBottom: `2px solid ${T.amber}`, marginBottom: 16 }}>
                     <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                        <div style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(145deg,#DC2626,#7F1D1D)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, fontWeight: 900 }}>RP</div>
+                        {(shop as any)?.logoUrl
+                            ? <img src={(shop as any).logoUrl} alt={shopName} style={{ width: 52, height: 52, borderRadius: 10, objectFit: "contain", border: `1px solid ${T.border}` }} />
+                            : <div style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(145deg,#1e3a5f,#0f2040)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, fontWeight: 900 }}>{shopName.charAt(0).toUpperCase()}</div>
+                        }
                         <div>
-                            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#F87171", marginBottom: 2 }}>RED PISTON</div>
                             <div style={{ fontSize: 17, fontWeight: 900, color: T.t1, letterSpacing: "-0.02em" }}>{shopName}</div>
                             <div style={{ fontSize: 11, color: T.t3, marginTop: 4, lineHeight: 1.45 }}>{shopAddress}</div>
+                            {shopPhone && <div style={{ fontSize: 11, color: T.t3 }}>{shopPhone}</div>}
                         </div>
                     </div>
                     <div style={{ textAlign: "right", minWidth: 160 }}>
@@ -393,70 +405,44 @@ export function POSBillingPage() {
                 </div>
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}`, fontSize: 10, color: T.t4, textAlign: "center", lineHeight: 1.5 }}>
                     Paid via {paymentMode} · Computer-generated {billType === "Sale" ? "tax invoice" : "quotation"}.
-                    <br />Powered by RED PISTON · Thank you for your business.
+                    <br />Thank you for your business!
                 </div>
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+            {/* ── Print format toggle ─────────────────────────────────────────── */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 2 }}>
+                <span style={{ fontSize: 11, color: T.t3, fontWeight: 600 }}>Print format:</span>
+                {(["a4", "thermal"] as PrintFormat[]).map(fmt => (
+                    <button key={fmt} onClick={() => handleSetPrintFormat(fmt)} style={{
+                        padding: "3px 11px", borderRadius: 7, border: `1.5px solid ${printFormat === fmt ? T.amber : T.border}`,
+                        background: printFormat === fmt ? T.amber : "transparent",
+                        color: printFormat === fmt ? "#fff" : T.t2,
+                        fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui,
+                    }}>
+                        {fmt === "a4" ? "📄 A4" : "🧾 Thermal"}
+                    </button>
+                ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
                 <button onClick={() => {
-                    const rows = items.map((item, idx) => {
-                        const lc = lineCalcs[idx];
-                        return `<tr style="border-bottom:1px solid #e5e0d8">
-                            <td style="padding:7px 5px;color:#999;font-family:monospace">${idx + 1}</td>
-                            <td style="padding:7px 5px;font-weight:600">${item.name}</td>
-                            <td style="padding:7px 5px;font-family:monospace;font-size:10px;color:#999">${item.sku || "—"}</td>
-                            <td style="padding:7px 5px;font-family:monospace;text-align:right">${item.qty}</td>
-                            <td style="padding:7px 5px;font-family:monospace;text-align:right">₹${item.price}</td>
-                            <td style="padding:7px 5px;font-family:monospace;text-align:right;color:#dc2626">${lc.discAmt > 0 ? `-₹${lc.discAmt.toFixed(2)}` : "—"}</td>
-                            <td style="padding:7px 5px;font-family:monospace;text-align:right;color:#999">₹${lc.gstAmt.toFixed(2)}</td>
-                            <td style="padding:7px 5px;font-family:monospace;font-weight:700;text-align:right">₹${lc.afterDisc.toFixed(2)}</td>
-                        </tr>`;
-                    }).join("");
-                    const isInvoice = billType === "Sale";
-                    const w = window.open("", "_blank", "width=700,height=900");
-                    if (!w) return;
-                    w.document.write(`<!DOCTYPE html><html><head><title>${invoiceNo}</title>
-<style>
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1b1b;padding:32px;font-size:13px}
-  table{width:100%;border-collapse:collapse}
-  th{padding:7px 5px;text-align:right;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #f3f0eb}
-  th:nth-child(1),th:nth-child(2),th:nth-child(3){text-align:left}
-  .total-row{border-top:1px solid #e5e0d8;padding:8px 5px;font-size:11px;color:#888;display:flex;justify-content:space-between}
-  .grand{font-size:17px;font-weight:900;padding-top:8px;border-top:1px solid #e5e0d8;display:flex;justify-content:space-between}
-  @media print{button{display:none}@page{margin:12mm}}
-</style></head><body>
-<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid #d97706;margin-bottom:16px">
-  <div>
-    <div style="font-size:10px;font-weight:800;letter-spacing:.12em;color:#f87171">RED PISTON</div>
-    <div style="font-size:18px;font-weight:900;margin:2px 0">${shopName}</div>
-    <div style="font-size:10px;color:#888;margin-top:4px">${shopAddress}</div>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:10px;font-weight:800;letter-spacing:.12em;color:#d97706">${isInvoice ? "TAX INVOICE" : "ESTIMATE / QUOTATION"}</div>
-    <div style="font-family:monospace;font-weight:700;margin-top:5px">${invoiceNo}</div>
-    <div style="font-size:11px;color:#888;margin-top:3px">${invoiceAt ? fmtDateTime(invoiceAt) : ""}</div>
-    <div style="font-size:10px;color:#888;margin-top:5px">GSTIN: <b>${shopGst}</b></div>
-  </div>
-</div>
-${customerName ? `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#888">Customer</span><b>${customerName}</b></div>` : ""}
-${vehicleReg ? `<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px"><span style="color:#888">Vehicle</span><b style="color:#d97706;font-family:monospace">${vehicleReg}</b></div>` : ""}
-<table style="margin-top:8px">
-  <thead><tr>
-    ${["#","Item","SKU","Qty","Rate","Disc","GST","Amount"].map(h => `<th>${h}</th>`).join("")}
-  </tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div style="margin-top:12px">
-  ${grandDiscount > 0 ? `<div class="total-row"><span>Item Discounts</span><span style="color:#dc2626">−₹${grandDiscount.toFixed(2)}</span></div>` : ""}
-  ${additionalDisc > 0 ? `<div class="total-row"><span>Additional Discount</span><span style="color:#dc2626">−₹${additionalDisc.toFixed(2)}</span></div>` : ""}
-  <div class="total-row"><span>GST (Inclusive)</span><span>₹${grandGst.toFixed(2)}</span></div>
-  <div class="grand"><span>TOTAL</span><span style="color:#d97706;font-family:monospace">₹${finalTotal.toFixed(2)}</span></div>
-</div>
-<div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e0d8;font-size:10px;color:#aaa;text-align:center;line-height:1.6">
-  Paid via ${paymentMode} · Computer-generated ${isInvoice ? "tax invoice" : "quotation"}.<br>Powered by RED PISTON · Thank you for your business.
-</div>
-<br><button onclick="window.print()" style="padding:8px 20px;background:#d97706;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px">🖨 Print</button>
-</body></html>`);
-                    w.document.close();
+                    printInvoice({
+                        format: printFormat,
+                        shop: { name: shopName, address: shopAddress, gstin: shopGst, phone: shopPhone, logoUrl: shop?.logoUrl || undefined },
+                        invoice: {
+                            invoiceNo,
+                            invoiceAt: invoiceAt ? fmtDateTime(invoiceAt) : undefined,
+                            isInvoice: billType === "Sale",
+                            customerName: customerName || undefined,
+                            vehicleReg: vehicleReg || undefined,
+                            paymentMode: paymentMode || undefined,
+                            notes: notes || undefined,
+                        },
+                        items: items.map((item, idx) => {
+                            const lc = lineCalcs[idx];
+                            return { name: item.name, sku: item.sku, qty: item.qty, price: item.price, discAmt: lc.discAmt, gstAmt: lc.gstAmt, afterDisc: lc.afterDisc };
+                        }),
+                        totals: { grandDiscount, additionalDisc, grandGst, finalTotal },
+                    });
                 }} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
                 <button
                     onClick={async () => {
