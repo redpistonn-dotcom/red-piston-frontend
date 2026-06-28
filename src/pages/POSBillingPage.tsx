@@ -181,8 +181,9 @@ export function POSBillingPage() {
         }
         for (const item of items) {
             if (item.qty <= 0) { toast?.(`Invalid qty for ${item.name}`, "warning"); return false; }
-            if (checkType === "Sale" && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
             const isCustom = String(item.productId || "").startsWith("custom_");
+            if (!isCustom && item.maxStock <= 0) { toast?.(`"${item.name}" is out of stock (0 available)`, "error"); return false; }
+            if (checkType === "Sale" && !isCustom && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
             if (isCustom && (!item.name || item.name === "Custom Item")) {
                 toast?.("Enter a name for the custom item before submitting", "warning"); return false;
             }

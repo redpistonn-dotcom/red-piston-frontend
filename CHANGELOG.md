@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-28] — Block 0-stock items from both invoice and quotation; inventory newest-first from backend
+
+### Fixes
+- **POS — 0-stock items now block Quotation too** (`src/pages/POSBillingPage.tsx`): `validate()` had a `checkType === "Sale"` guard that let Quotations bypass the stock check entirely — so a product with 0 stock would generate a quotation (and trigger a backend error toast after). Added a separate `maxStock <= 0` check (skips custom items) that fires for ALL bill types before the sale-specific over-quantity check.
+- **Backend inventory — newest items first** (`RED-PISTON-BACKEND/src/routes/inventory.js`): changed `orderBy` from `masterPart.partName asc` to `createdAt desc` so newly added inventory entries appear at the top of the list, matching the frontend's default "Newest" sort.
+
 ## [2026-06-28] — Fix cold-start skeleton hang for returning logged-in users
 
 ### Fix
