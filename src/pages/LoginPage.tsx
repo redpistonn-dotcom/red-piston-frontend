@@ -405,8 +405,8 @@ export default function LoginPage({ onLogin, isModal = false }) {
   };
 
   // ── Google Sign-In ─────────────────────────────────────────────────────────
-  const callBackendFirebase = async (token: string) => {
-    const data = await api.post("/api/auth/firebase", { token, role });
+  const callBackendFirebase = async (firebaseToken: string) => {
+    const data = await api.post("/api/auth/firebase", { firebaseToken, role });
     handleAuthResponse(data);
   };
 
