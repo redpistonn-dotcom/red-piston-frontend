@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-28] — Fix: Sale always generated as "Quotation" / EST- prefix
+
+### Fix
+- **POS — FINALIZE & PRINT button passed MouseEvent as `typeOverride`** (`src/pages/POSBillingPage.tsx`): `onClick={handleSubmit}` passes the click event as the first argument. Since a MouseEvent is truthy and not `"Sale"`, `effectiveBillType === "Sale"` evaluated to false, making every sale generate an `EST-` invoice number and show "Quotation Generated!" / "ESTIMATE / QUOTATION". Fixed by narrowing `typeOverride` to only accept the two valid string values at the top of `handleSubmit` — a MouseEvent or any other unexpected arg is treated as `undefined`, falling back to `billType` state. Also switched `setBillType` from the raw `typeOverride` to the guarded `safeOverride` for consistency.
+
 ## [2026-06-28] — Out-of-stock popup in POS with Reorder shortcut; inventory deep-link from POS
 
 ### New Features

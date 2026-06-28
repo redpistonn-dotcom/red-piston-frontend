@@ -203,8 +203,10 @@ export function POSBillingPage() {
     };
 
     const handleSubmit = async (typeOverride?: "Sale" | "Quotation") => {
-        if (!validate(typeOverride)) return;
-        const effectiveBillType = typeOverride ?? billType;
+        // Guard: onClick={handleSubmit} passes a MouseEvent as the first arg; ignore it.
+        const safeOverride = (typeOverride === "Sale" || typeOverride === "Quotation") ? typeOverride : undefined;
+        if (!validate(safeOverride)) return;
+        const effectiveBillType = safeOverride ?? billType;
         setSaving(true);
         setSyncedInvoiceId(null); // new sale — previous backend invoice no longer applies
         await new Promise(r => setTimeout(r, 50));
@@ -225,7 +227,7 @@ export function POSBillingPage() {
             paymentMode, subtotal: grandSubtotal, discount: grandDiscount + additionalDisc,
             total: finalTotal, gstAmount: grandGst, profit: grandProfit, date: ts,
         });
-        if (typeOverride) setBillType(typeOverride);
+        if (safeOverride) setBillType(safeOverride);
         setSaving(false); setShowInvoice(true);
     };
 
