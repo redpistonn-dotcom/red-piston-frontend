@@ -352,6 +352,8 @@ export function POSBillingPage() {
                     <div style={{ fontSize: 13, color: T.t3, marginTop: 2 }}>{items.length} item{items.length > 1 ? "s" : ""} · {invoiceNo}</div>
                 </div>
             </div>
+            {/* ── A4 Preview ─────────────────────────────────────────────────── */}
+            {printFormat === "a4" && (
             <div data-print-area className="invoice-print-root" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, padding: "22px 26px", fontFamily: FONT.ui }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, paddingBottom: 16, borderBottom: `2px solid ${T.amber}`, marginBottom: 16 }}>
                     <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
@@ -369,7 +371,7 @@ export function POSBillingPage() {
                         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: T.amber }}>{billType === "Sale" ? "TAX INVOICE" : "ESTIMATE / QUOTATION"}</div>
                         <div style={{ fontSize: 12, fontFamily: FONT.mono, fontWeight: 700, color: T.t1, marginTop: 6 }}>{invoiceNo}</div>
                         <div style={{ fontSize: 11, color: T.t3, marginTop: 4 }}>{invoiceAt ? fmtDateTime(invoiceAt) : "—"}</div>
-                        <div style={{ fontSize: 10, color: T.t3, marginTop: 6 }}>GSTIN: <span style={{ fontFamily: FONT.mono, color: T.t1, fontWeight: 700 }}>{shopGst}</span></div>
+                        {shopGst && <div style={{ fontSize: 10, color: T.t3, marginTop: 6 }}>GSTIN: <span style={{ fontFamily: FONT.mono, color: T.t1, fontWeight: 700 }}>{shopGst}</span></div>}
                     </div>
                 </div>
                 {customerName && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}><span style={{ color: T.t3 }}>Customer</span><span style={{ fontWeight: 600 }}>{customerName}</span></div>}
@@ -413,6 +415,78 @@ export function POSBillingPage() {
                     <br />Thank you for your business!
                 </div>
             </div>
+            )}
+
+            {/* ── Thermal Receipt Preview ─────────────────────────────────────── */}
+            {printFormat === "thermal" && (() => {
+                const dashes = "--------------------------------";
+                return (
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                <div data-print-area className="invoice-print-root" style={{
+                    background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10,
+                    padding: "14px 16px", width: 320, fontFamily: "'Courier New', Courier, monospace",
+                    fontSize: 12, color: "#000",
+                }}>
+                    {/* Shop header */}
+                    {(shop as any)?.logoUrl
+                        ? <div style={{ textAlign: "center", marginBottom: 4 }}><img src={(shop as any).logoUrl} alt={shopName} style={{ height: 44, maxWidth: 200, objectFit: "contain" }} /></div>
+                        : <div style={{ textAlign: "center", fontSize: 26, fontWeight: 900, marginBottom: 2 }}>{shopName.charAt(0).toUpperCase()}</div>
+                    }
+                    <div style={{ textAlign: "center", fontWeight: 900, fontSize: 14, letterSpacing: "0.04em", marginBottom: 2 }}>{shopName}</div>
+                    {shopAddress && <div style={{ textAlign: "center", fontSize: 10, color: "#555", lineHeight: 1.5 }}>{shopAddress}</div>}
+                    {shopGst && <div style={{ textAlign: "center", fontSize: 10, color: "#555" }}>GSTIN: {shopGst}</div>}
+                    {shopPhone && <div style={{ textAlign: "center", fontSize: 10, color: "#555" }}>Ph: {shopPhone}</div>}
+
+                    <div style={{ color: "#999", margin: "6px 0", fontSize: 10 }}>{dashes}</div>
+
+                    <div style={{ textAlign: "center", fontWeight: 700, fontSize: 11, letterSpacing: "0.1em" }}>{billType === "Sale" ? "TAX INVOICE" : "QUOTATION"}</div>
+                    <div style={{ textAlign: "center", fontWeight: 700, fontSize: 12 }}>{invoiceNo}</div>
+                    {invoiceAt && <div style={{ textAlign: "center", fontSize: 10, color: "#555" }}>{fmtDateTime(invoiceAt)}</div>}
+
+                    <div style={{ color: "#999", margin: "6px 0", fontSize: 10 }}>{dashes}</div>
+
+                    {customerName && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginBottom: 2 }}><span style={{ color: "#555" }}>Customer</span><span>{customerName}</span></div>}
+                    {vehicleReg && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginBottom: 2 }}><span style={{ color: "#555" }}>Vehicle</span><span style={{ fontWeight: 700 }}>{vehicleReg}</span></div>}
+                    {paymentMode && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginBottom: 2 }}><span style={{ color: "#555" }}>Payment</span><span>{paymentMode}</span></div>}
+
+                    <div style={{ color: "#999", margin: "6px 0", fontSize: 10 }}>{dashes}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 11, marginBottom: 4 }}><span>Item</span><span>Amt</span></div>
+                    <div style={{ color: "#999", margin: "4px 0 6px", fontSize: 10 }}>{dashes}</div>
+
+                    {items.map((item, idx) => {
+                        const lc = lineCalcs[idx];
+                        return (
+                            <div key={idx} style={{ marginBottom: 6 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, fontSize: 12 }}>
+                                    <span style={{ flex: 1, paddingRight: 8, wordBreak: "break-word" }}>{item.qty} × {item.name}</span>
+                                    <span style={{ whiteSpace: "nowrap", fontWeight: 700 }}>{fmt(lc.afterDisc)}</span>
+                                </div>
+                                <div style={{ fontSize: 10, color: "#666" }}>
+                                    {fmt(item.price)}{lc.discAmt > 0 ? ` − ${fmt(lc.discAmt)} disc` : ""}
+                                    {item.sku ? ` | ${item.sku}` : ""}
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    <div style={{ color: "#999", margin: "6px 0", fontSize: 10 }}>{dashes}</div>
+
+                    {grandDiscount > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginBottom: 2 }}><span>Discounts</span><span>−{fmt(grandDiscount)}</span></div>}
+                    {additionalDisc > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginBottom: 2 }}><span>Extra Disc</span><span>−{fmt(additionalDisc)}</span></div>}
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginBottom: 4 }}><span>GST (Incl.)</span><span>{fmt(grandGst)}</span></div>
+
+                    <div style={{ color: "#999", margin: "4px 0", fontSize: 10 }}>{dashes}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, fontSize: 15 }}><span>TOTAL</span><span>{fmt(finalTotal)}</span></div>
+                    <div style={{ color: "#999", margin: "4px 0 8px", fontSize: 10 }}>{dashes}</div>
+
+                    <div style={{ textAlign: "center", fontSize: 10, color: "#888", lineHeight: 1.6 }}>
+                        Computer-generated {billType === "Sale" ? "tax invoice" : "quotation"}.<br />
+                        Thank you for your business!
+                    </div>
+                </div>
+                </div>
+                );
+            })()}
             {/* ── Print format toggle ─────────────────────────────────────────── */}
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 12, marginBottom: 2 }}>
                 <span style={{ fontSize: 11, color: T.t3, fontWeight: 600 }}>Print format:</span>

@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-28] — Fix: thermal preview now looks like a receipt, not a wide A4 invoice
+
+### Fix
+- **In-app invoice preview now switches layout when Thermal is selected** (`src/pages/POSBillingPage.tsx`): previously both A4 and Thermal showed the same wide card — the user couldn't tell them apart. Now selecting Thermal renders a narrow 320px receipt-style preview (monospace font, dashes as separators, centered shop header, compact item rows) so the user can clearly see what the thermal print will look like before hitting Print. Selecting A4 shows the wide professional invoice card as before.
+
 ## [2026-06-28] — Fix: invoice/print always showed "RED PISTON — Shop" instead of real shop name
 
 ### Fix
