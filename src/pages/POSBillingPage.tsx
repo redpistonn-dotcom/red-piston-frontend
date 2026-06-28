@@ -457,13 +457,18 @@ export function POSBillingPage() {
                         const lc = lineCalcs[idx];
                         return (
                             <div key={idx} style={{ marginBottom: 6 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600, fontSize: 12 }}>
-                                    <span style={{ flex: 1, paddingRight: 8, wordBreak: "break-word" }}>{item.qty} × {item.name}</span>
-                                    <span style={{ whiteSpace: "nowrap", fontWeight: 700 }}>{fmt(lc.afterDisc)}</span>
+                                <div style={{ fontWeight: 600, fontSize: 12, wordBreak: "break-word" }}>
+                                    {item.qty} × {item.name}
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 1 }}>
+                                    <span style={{ color: "#666" }}>
+                                        {fmt(item.price)}{lc.discAmt > 0 ? ` − ${fmt(lc.discAmt)} disc` : ""}
+                                        {item.sku ? ` | ${item.sku}` : ""}
+                                    </span>
+                                    <span style={{ fontWeight: 700, whiteSpace: "nowrap", paddingLeft: 8 }}>{fmt(lc.afterDisc)}</span>
                                 </div>
                                 <div style={{ fontSize: 10, color: "#666" }}>
-                                    {fmt(item.price)}{lc.discAmt > 0 ? ` − ${fmt(lc.discAmt)} disc` : ""}
-                                    {item.sku ? ` | ${item.sku}` : ""}
+                                    {/* spacer kept for sub-line extras if needed */}
                                 </div>
                             </div>
                         );
