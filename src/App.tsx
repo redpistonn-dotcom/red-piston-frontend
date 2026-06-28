@@ -118,7 +118,18 @@ class ErrorBoundary extends Component {
 class PageErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, info) { console.error("[PageErrorBoundary]", error, info); }
+  componentDidCatch(error, info) {
+    console.error("[PageErrorBoundary]", error, info);
+    // After a new deploy, stale chunk URLs (hashed filenames) 404. Auto-reload once to
+    // fetch fresh HTML and correct chunk URLs so the user never sees the broken screen.
+    const isChunkError = /Failed to fetch dynamically imported module|Loading chunk|ChunkLoad/i.test(
+      (error?.message || "") + (error?.name || "")
+    );
+    if (isChunkError && !sessionStorage.getItem("rp_chunk_reload")) {
+      sessionStorage.setItem("rp_chunk_reload", "1");
+      window.location.reload();
+    }
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -128,7 +139,7 @@ class PageErrorBoundary extends Component {
             <div style={{ fontSize: 18, fontWeight: 700, color: T.t1, marginBottom: 8 }}>This section failed to load</div>
             <div style={{ fontSize: 13, color: T.t3, marginBottom: 20, lineHeight: 1.6 }}>{this.state.error?.message || "An unexpected error occurred on this page."}</div>
             <button
-              onClick={() => this.setState({ hasError: false, error: null })}
+              onClick={() => { sessionStorage.removeItem("rp_chunk_reload"); this.setState({ hasError: false, error: null }); }}
               style={{ background: T.amber, color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}
             >
               Try Again

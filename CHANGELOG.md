@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-28] — Fix: chunk-load errors after deploy auto-reload instead of breaking
+
+### Fix
+- **PageErrorBoundary — auto-reload on stale chunk URLs** (`src/App.tsx`): after a new Vercel deploy, Vite renames hashed JS chunks. Users who have the app open and navigate to a new route get "Failed to fetch dynamically imported module". The boundary now detects chunk-load errors (`ChunkLoadError` / "Failed to fetch dynamically imported module") and calls `window.location.reload()` once (guarded by `sessionStorage` to prevent reload loops), fetching the new HTML with correct chunk URLs.
+- **`vercel.json` — never cache `index.html`**: added `Cache-Control: no-cache, no-store` header for `/index.html` so browsers always fetch fresh HTML after a deploy. Hashed `/assets/*` files keep the 1-year immutable cache for performance.
+
 ## [2026-06-28] — Fix: Sale always generated as "Quotation" / EST- prefix
 
 ### Fix
