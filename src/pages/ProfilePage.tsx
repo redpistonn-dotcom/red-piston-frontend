@@ -563,6 +563,13 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
           <div style={S.field}>
             <label style={S.label}>Phone</label>
             <input style={{ ...S.input, ...S.inputDisabled }} value={userData?.phone || "Not set"} disabled />
+            {!userData?.phone && (
+              <div style={{ fontSize: 11, color: T.t3, marginTop: 4, lineHeight: 1.5 }}>
+                Phone is set when you log in via OTP. Since you registered with email, it's not linked yet.
+                To add a phone, log in with your phone number once — it will auto-link to this account.
+                Other staff members need a phone on their account so you can invite them by number.
+              </div>
+            )}
           </div>
           <button style={S.btn("primary")} onClick={handleSaveBasic} disabled={saving}>
             {saving ? "Saving..." : "Save Changes"}
