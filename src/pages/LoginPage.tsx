@@ -429,6 +429,44 @@ export default function LoginPage({ onLogin, isModal = false }) {
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────
   const renderStep = () => {
+    // Full-panel loader while Google popup is verifying
+    if (googleLoading) {
+      return (
+        <div className="auth-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, gap: 18, textAlign: "center" }}>
+          <div style={{ fontSize: 48, animation: "auth-pulse 1.1s ease-in-out infinite" }}>🔐</div>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#BE2B1A", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 6 }}>Signing you in…</div>
+            <div style={{ fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, maxWidth: 280 }}>Verifying your Google account — just a moment</div>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#BE2B1A", opacity: 0.3, animation: `auth-pulse 1.1s ease-in-out ${i * 0.22}s infinite` }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // Full-panel loader while email sign-in / register is waiting on the backend
+    if (loading && (step === STEPS.SIGNIN || step === STEPS.REG_AUTH || step === STEPS.ADMIN_AUTH)) {
+      return (
+        <div className="auth-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, gap: 18, textAlign: "center" }}>
+          <div style={{ fontSize: 48, animation: "auth-pulse 1.1s ease-in-out infinite" }}>⚙️</div>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#BE2B1A", fontFamily: "'Plus Jakarta Sans', sans-serif", marginBottom: 6 }}>
+              {step === STEPS.REG_AUTH ? "Creating your account…" : "Signing you in…"}
+            </div>
+            <div style={{ fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, maxWidth: 280 }}>This may take a moment — our server may be waking up</div>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#BE2B1A", opacity: 0.3, animation: `auth-pulse 1.1s ease-in-out ${i * 0.22}s infinite` }} />
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     switch (step) {
 
       // ══════════════════════════════════════════════════════════════════════
