@@ -63,7 +63,7 @@ export function InventoryPage() {
       setDeletingId(null);
     }
   };
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("q") || "");
     const [cat, setCat] = useState("All");
     const [statusF, setStatusF] = useState("All");
     const [sortBy, setSortBy] = useState("newest");

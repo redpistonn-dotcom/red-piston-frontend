@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect, useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { fmt, fmtDateTime, margin } from "../utils";
 import { Modal } from "../components/ui";
@@ -28,6 +29,7 @@ function PayBtn({ label, icon, active, onClick }: { label: string; icon: string;
 export function POSBillingPage() {
     const { products, activeShopId, shops, parties, movements } = useStore();
     const { handleMultiItemSale: onMultiSale, toast } = useContext(AppCtx);
+    const navigate = useNavigate();
     const shop = useMemo(() => (shops || []).find((s: any) => s.id === activeShopId) || null, [shops, activeShopId]);
     const shopProducts = useMemo(() => (products || []).filter((p: any) => p.shopId === activeShopId && p.isActive !== false), [products, activeShopId]);
 
@@ -53,6 +55,7 @@ export function POSBillingPage() {
     const [invoiceAt, setInvoiceAt] = useState<number | null>(null);
     const [scanOpen, setScanOpen]   = useState(false);
     const [search, setSearch]       = useState("");
+    const [outOfStockItem, setOutOfStockItem] = useState<{ id: string; name: string; sku: string } | null>(null);
     const [posTab, setPosTab]       = useState<"pos" | "bills">("pos");
     // Backend invoice id once the sale syncs — enables PDF download + WhatsApp share
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
@@ -97,6 +100,11 @@ export function POSBillingPage() {
 
     // Add product
     const addProduct = useCallback((p: any) => {
+        if ((p.stock ?? 0) <= 0) {
+            setOutOfStockItem({ id: p.id, name: p.name, sku: p.sku || "" });
+            setSearch("");
+            return;
+        }
         setItems(prev => {
             const existing = prev.find(i => i.productId === p.id);
             if (existing) return prev.map(i => i.productId === p.id ? { ...i, qty: Math.min(i.qty + 1, i.maxStock) } : i);
@@ -519,6 +527,36 @@ ${vehicleReg ? `<div style="display:flex;justify-content:space-between;font-size
             <>
             {/* Barcode Scanner */}
             <BarcodeScanner open={scanOpen} onScan={handlePosScan} onClose={() => setScanOpen(false)} hint="Scan product barcode to add to bill" />
+
+            {/* Out of Stock popup */}
+            {outOfStockItem && (
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setOutOfStockItem(null)}>
+                    <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px 24px", maxWidth: 380, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.22)", textAlign: "center" }} onClick={e => e.stopPropagation()}>
+                        <div style={{ fontSize: 38, marginBottom: 8 }}>📦</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: T.t1, fontFamily: FONT.display, marginBottom: 6 }}>Out of Stock</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: T.amber, fontFamily: FONT.ui, marginBottom: 4 }}>{outOfStockItem.name}</div>
+                        {outOfStockItem.sku && <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono, marginBottom: 16 }}>SKU: {outOfStockItem.sku}</div>}
+                        <div style={{ fontSize: 13, color: T.t2, marginBottom: 22, lineHeight: 1.5 }}>
+                            This product has <b>0 units</b> in stock. Reorder to add stock before billing.
+                        </div>
+                        <div style={{ display: "flex", gap: 10 }}>
+                            <button onClick={() => setOutOfStockItem(null)} style={{ flex: 1, height: 42, background: "#f5f5f5", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setOutOfStockItem(null);
+                                    const q = outOfStockItem.sku || outOfStockItem.name;
+                                    navigate(`/inventory?q=${encodeURIComponent(q)}`);
+                                }}
+                                style={{ flex: 2, height: 42, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                            >
+                                🔄 Reorder / Add Stock
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Suspended bill banner */}
             {suspendedBill && (

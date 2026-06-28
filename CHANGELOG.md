@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-06-28] — Out-of-stock popup in POS with Reorder shortcut; inventory deep-link from POS
+
+### New Features
+- **POS — out-of-stock popup on cart-add** (`src/pages/POSBillingPage.tsx`): when a product with 0 stock is selected from search results, it is now blocked from entering the cart. A popup appears immediately with the product name, a "Cancel" button to stay on the POS, and a "Reorder / Add Stock" button that navigates to `/inventory?q=<sku>` so the user can add stock without manually navigating and searching.
+- **Inventory — pre-filled search from URL `?q=` param** (`src/pages/InventoryPage.tsx`): the search state is now lazy-initialized from the `?q=` URL query parameter. Any `navigate('/inventory?q=TERM')` call (from the POS popup or anywhere else) automatically focuses the matching product on page load.
+
 ## [2026-06-28] — Block 0-stock items from both invoice and quotation; inventory newest-first from backend
 
 ### Fixes
