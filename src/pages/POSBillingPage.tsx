@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect, useContext } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { fmt, fmtDateTime, margin } from "../utils";
@@ -60,7 +61,14 @@ export function POSBillingPage() {
     // Backend invoice id once the sale syncs — enables PDF download + WhatsApp share
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
     const [suspendedBill, setSuspendedBill] = useState(() => {
-        try { return JSON.parse(localStorage.getItem("vl_suspended_bill") || "null"); } catch { return null; }
+        try {
+            const raw = JSON.parse(localStorage.getItem("vl_suspended_bill") || "null");
+            if (raw?.expiresAt && Date.now() > raw.expiresAt) {
+                localStorage.removeItem("vl_suspended_bill");
+                return null;
+            }
+            return raw;
+        } catch { return null; }
     });
 
     const searchRef = useRef<HTMLInputElement>(null);
@@ -240,14 +248,13 @@ export function POSBillingPage() {
         setTimeout(() => searchRef.current?.focus(), 50);
     };
 
+    const SUSPEND_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
     const handleSuspend = () => {
         if (items.length === 0) return;
-        // Persist the FULL bill state — additionalDisc + paymentMode were missing,
-        // so the extra discount was lost on resume.
-        const draft = { items, customerName, customerPhone, vehicleReg, notes, billType, additionalDisc, paymentMode, timestamp: Date.now() };
+        const draft = { items, customerName, customerPhone, vehicleReg, notes, billType, additionalDisc, paymentMode, timestamp: Date.now(), expiresAt: Date.now() + SUSPEND_TTL_MS };
         localStorage.setItem("vl_suspended_bill", JSON.stringify(draft));
         setSuspendedBill(draft); newBill();
-        toast?.("Bill suspended.", "info");
+        toast?.("Bill suspended — resume from the POS banner.", "info");
     };
 
     const handleResume = () => {
@@ -530,34 +537,42 @@ ${vehicleReg ? `<div style="display:flex;justify-content:space-between;font-size
             {/* Barcode Scanner */}
             <BarcodeScanner open={scanOpen} onScan={handlePosScan} onClose={() => setScanOpen(false)} hint="Scan product barcode to add to bill" />
 
-            {/* Out of Stock popup */}
-            {outOfStockItem && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setOutOfStockItem(null)}>
-                    <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px 24px", maxWidth: 380, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.22)", textAlign: "center" }} onClick={e => e.stopPropagation()}>
-                        <div style={{ fontSize: 38, marginBottom: 8 }}>📦</div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: T.t1, fontFamily: FONT.display, marginBottom: 6 }}>Out of Stock</div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: T.amber, fontFamily: FONT.ui, marginBottom: 4 }}>{outOfStockItem.name}</div>
-                        {outOfStockItem.sku && <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono, marginBottom: 16 }}>SKU: {outOfStockItem.sku}</div>}
-                        <div style={{ fontSize: 13, color: T.t2, marginBottom: 22, lineHeight: 1.5 }}>
-                            This product has <b>0 units</b> in stock. Reorder to add stock before billing.
+            {/* Out of Stock popup — portalled to body so it covers sidebar + header */}
+            {outOfStockItem && createPortal(
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2147483647, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => setOutOfStockItem(null)}>
+                    <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px 24px", maxWidth: 400, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.28)", textAlign: "center" }} onClick={e => e.stopPropagation()}>
+                        <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
+                        <div style={{ fontSize: 17, fontWeight: 800, color: T.t1, fontFamily: FONT.display, marginBottom: 6 }}>Out of Stock</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: T.amber, fontFamily: FONT.ui, marginBottom: 4 }}>{outOfStockItem.name}</div>
+                        {outOfStockItem.sku && <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono, marginBottom: 14 }}>SKU: {outOfStockItem.sku}</div>}
+                        <div style={{ fontSize: 13, color: T.t2, marginBottom: 8, lineHeight: 1.6 }}>
+                            This product has <b>0 units</b> in stock.
                         </div>
+                        {items.length > 0 && (
+                            <div style={{ fontSize: 12, color: T.t3, background: "#f9f9f9", borderRadius: 8, padding: "8px 12px", marginBottom: 20, lineHeight: 1.5 }}>
+                                Your current bill ({items.length} item{items.length > 1 ? "s" : ""}) will be <b>suspended</b> and can be resumed when you return.
+                            </div>
+                        )}
+                        {items.length === 0 && <div style={{ marginBottom: 20 }} />}
                         <div style={{ display: "flex", gap: 10 }}>
-                            <button onClick={() => setOutOfStockItem(null)} style={{ flex: 1, height: 42, background: "#f5f5f5", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
+                            <button onClick={() => setOutOfStockItem(null)} style={{ flex: 1, height: 44, background: "#f5f5f5", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>
                                 Cancel
                             </button>
                             <button
                                 onClick={() => {
-                                    setOutOfStockItem(null);
                                     const q = outOfStockItem.sku || outOfStockItem.name;
+                                    setOutOfStockItem(null);
+                                    if (items.length > 0) handleSuspend();
                                     navigate(`/inventory?q=${encodeURIComponent(q)}`);
                                 }}
-                                style={{ flex: 2, height: 42, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                                style={{ flex: 2, height: 44, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
                             >
                                 🔄 Reorder / Add Stock
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Suspended bill banner */}

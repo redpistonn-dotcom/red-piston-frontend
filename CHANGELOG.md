@@ -11,6 +11,13 @@
 ### Fix
 - **POS — FINALIZE & PRINT button passed MouseEvent as `typeOverride`** (`src/pages/POSBillingPage.tsx`): `onClick={handleSubmit}` passes the click event as the first argument. Since a MouseEvent is truthy and not `"Sale"`, `effectiveBillType === "Sale"` evaluated to false, making every sale generate an `EST-` invoice number and show "Quotation Generated!" / "ESTIMATE / QUOTATION". Fixed by narrowing `typeOverride` to only accept the two valid string values at the top of `handleSubmit` — a MouseEvent or any other unexpected arg is treated as `undefined`, falling back to `billType` state. Also switched `setBillType` from the raw `typeOverride` to the guarded `safeOverride` for consistency.
 
+## [2026-06-28] — Out-of-stock popup: full-screen overlay, auto-suspend cart, 8h expiry
+
+### Improvements
+- **Out-of-stock popup covers full screen** (`src/pages/POSBillingPage.tsx`): popup now uses `createPortal(…, document.body)` with `zIndex: 2147483647` so it renders above the sidebar and header, not trapped inside the main content stacking context.
+- **Auto-suspend current cart on Reorder** (`src/pages/POSBillingPage.tsx`): if the user has items in the cart when "Reorder / Add Stock" is clicked, the bill is automatically suspended (saved to `localStorage`) before navigating to inventory. A note inside the popup explains this. On returning to POS, the resume banner appears.
+- **Suspended bill expires after 8 hours** (`src/pages/POSBillingPage.tsx`): draft saves an `expiresAt = now + 8h` timestamp. On mount, expired drafts are silently discarded — prevents stale bills from yesterday surfacing at the start of a new business day.
+
 ## [2026-06-28] — Out-of-stock popup in POS with Reorder shortcut; inventory deep-link from POS
 
 ### New Features
