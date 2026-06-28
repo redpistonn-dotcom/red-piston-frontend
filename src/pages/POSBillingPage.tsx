@@ -675,13 +675,25 @@ ${vehicleReg ? `<div style="display:flex;justify-content:space-between;font-size
                                                     }
                                                     <div>
                                                         {String(item.productId || "").startsWith("custom_") ? (
-                                                            <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Item name…"
-                                                                maxLength={100}
-                                                                style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name && item.name !== "Custom Item" ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
+                                                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                                                <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Item name…"
+                                                                    maxLength={100}
+                                                                    style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name && item.name !== "Custom Item" ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
+                                                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                                                    <span style={{ fontSize: 10, color: T.t3 }}>Cost ₹</span>
+                                                                    <input type="number" value={item.buyPrice || ""} min="0" placeholder="0"
+                                                                        onChange={e => updateItem(idx, "buyPrice", Math.max(0, +e.target.value))}
+                                                                        style={{ width: 64, height: 22, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", color: T.t3, fontFamily: FONT.mono, fontSize: 11, outline: "none" }} />
+                                                                    <span style={{ fontSize: 9, color: T.t3 }}>(for profit)</span>
+                                                                </div>
+                                                            </div>
                                                         ) : (
                                                             <div style={{ fontWeight: 700, color: T.t1, fontSize: 13, whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
                                                         )}
-                                                        <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>Stock: {item.maxStock} · GST {item.gstRate}%</div>
+                                                        {String(item.productId || "").startsWith("custom_")
+                                                            ? <div style={{ fontSize: 10, color: T.amber, marginTop: 1, fontWeight: 600 }}>Custom · GST {item.gstRate}%</div>
+                                                            : <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>Stock: {item.maxStock} · GST {item.gstRate}%</div>
+                                                        }
                                                     </div>
                                                 </div>
                                             </td>
@@ -721,6 +733,13 @@ ${vehicleReg ? `<div style="display:flex;justify-content:space-between;font-size
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                )}
+
+                {/* Custom item sync warning */}
+                {items.some(i => String(i.productId || "").startsWith("custom_")) && (
+                    <div style={{ margin: "0 14px 10px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "7px 12px", fontSize: 11, color: "#92400e", lineHeight: 1.5 }}>
+                        ⚠ Custom items are not tracked in revenue/profit reports. Enter a cost price per row above to get accurate profit figures.
                     </div>
                 )}
 

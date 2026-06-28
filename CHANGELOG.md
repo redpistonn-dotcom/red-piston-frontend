@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-06-28] — Custom items: cost price field + sync warning
+
+### Improvements
+- **Custom item cost price** (`src/pages/POSBillingPage.tsx`): each custom item row now shows a small "Cost ₹ ___ (for profit)" input below the name. Entering a cost price makes the line-level profit calculation accurate (previously `buyPrice = 0` so custom items always showed 100% margin). Optional — leave blank for pure services where cost is zero.
+- **Custom item sync warning** (`src/pages/POSBillingPage.tsx`): a yellow info banner appears below the cart whenever at least one custom item is present, explaining that custom items are not tracked in backend revenue/profit reports. This is transparent about the current sync limitation (custom items are filtered out of `syncInvoice` by `isDbId`).
+- **Custom item row label**: subtitle now shows "Custom · GST X%" instead of "Stock: 999 · GST X%" to make the row type obvious.
+
 ## [2026-06-28] — Fix: chunk-load errors after deploy auto-reload instead of breaking
 
 ### Fix
