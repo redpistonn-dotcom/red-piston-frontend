@@ -109,13 +109,37 @@ export function GstrPage() {
     setPreviewError("");
     setPreviewLoading(true);
     try {
+      // Backend returns { success, period, invoiceCount, b2b, b2cs, hsn } for format=json.
+      // "preview" is not a recognised format value — use json and extract the relevant section.
       const res: any = await api.get("/api/billing/gstr1", {
         from: dateRange.from,
         to: dateRange.to,
-        format: "preview",
-        section: mode,
+        format: "json",
       });
-      const rows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      let rows: any[];
+      if (mode === "b2b") {
+        rows = (res?.b2b || []).map((r: any) => ({
+          invoiceNo:     r.invoiceNumber,
+          invoiceDate:   r.date,
+          partyName:     r.partyName || r.gstin || "—",
+          gstin:         r.gstin,
+          taxableAmount: r.taxableValue,
+          cgst:          r.cgst,
+          sgst:          r.sgst,
+          igst:          r.igst ?? 0,
+          totalAmount:   r.invoiceValue,
+        }));
+      } else {
+        rows = (res?.hsn || []).map((r: any) => ({
+          hsnCode:       r.hsnCode,
+          description:   r.description,
+          uom:           r.uqc || "NOS",
+          qty:           r.qty,
+          taxableAmount: r.taxableValue,
+          cgst:          r.cgst,
+          sgst:          r.sgst,
+        }));
+      }
       setPreviewData(rows);
     } catch (e: any) {
       setPreviewError(e?.message || "Failed to load preview. Please try again.");

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-06-28] — Implement audit gaps: inventory stats, overdue parties, GSTR preview, image gallery
+
+### New Features
+- **Inventory — Last Sold / Last Purchased / Overstock badge** (`src/pages/InventoryPage.tsx`, `src/api/sync.ts`, `src/types/index.ts`): the expanded detail strip now shows "Last Sold: Xd ago" and "Last Purchased: Xd ago" derived from the backend's `lastSoldAt`/`lastPurchasedAt` DB columns (already maintained by every sale/purchase movement). When `maxStockLevel` is set and `stock > maxStockLevel`, a blue **OVERSTOCK** badge appears next to the stock count. Fields are now mapped from `BackendInventory` → `Product` in `mapInventoryToProduct`; `Product` type extended with `lastSoldAt`, `lastPurchasedAt`, `maxStock`, `images`.
+- **Inventory — multi-photo gallery** (`src/pages/InventoryPage.tsx`): the expanded detail panel shows all photos from the `images[]` array (up to 3, per the Prisma schema). Each thumbnail is a link that opens the full image in a new tab. Previously only the primary `imageUrl`/`image` was displayed in the row icon; the extra gallery photos were silently ignored.
+- **Parties — overdue accounts banner** (`src/pages/PartiesPage.tsx`, `src/api/parties.ts`): the Customers tab now shows a red banner listing accounts whose oldest credit invoice has passed their `creditDays` limit. Data comes from the backend's `GET /api/shop/parties/summary/overdue` endpoint (a 2-query non-N+1 implementation that was already built but never called). Added `getOverdueParties()` to `api/parties.ts`.
+- **GSTR — preview now returns real data** (`src/pages/GstrPage.tsx`): the `fetchPreview` call was sending `format: "preview"` which the backend doesn't recognise (it only supports `excel`/`json`). The backend fell through to JSON but returned `{ b2b, hsn, … }` — the frontend then tried to read `res.data` as an array and got `[]` every time. Fixed: changed to `format: "json"` and explicitly extracts `res.b2b` / `res.hsn`, mapping backend field names (`invoiceNumber → invoiceNo`, `date → invoiceDate`, `taxableValue → taxableAmount`, `invoiceValue → totalAmount`, `uqc → uom`) to the interface the render functions expect.
+
 ## [2026-06-28] — Fix: thermal preview now looks like a receipt, not a wide A4 invoice
 
 ### Fix

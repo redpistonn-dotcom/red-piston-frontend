@@ -4,7 +4,7 @@ import { fmt, fmtDate, uid, downloadCSV, generateCSV } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
 import { fetchPartyLedger, fetchParties, type LedgerEntry } from "../api/sync";
-import { createParty } from "../api/parties";
+import { createParty, getOverdueParties } from "../api/parties";
 import { fetchShopVehicles, createShopVehicle, updateShopVehicle } from "../api/shopVehicles";
 import { api } from "../api/client";
 import { useStore } from "../store";
@@ -129,6 +129,9 @@ export function PartiesPage() {
     const [sortAsc, setSortAsc]          = useState(true);
     const [ledgerCache, setLedgerCache]  = useState<Record<string, LedgerEntry[]>>({});
     const [ledgerLoading, setLedgerLoading] = useState<string | null>(null);
+    const [overdueParties, setOverdueParties] = useState<any[]>([]);
+    const [overdueAtRisk, setOverdueAtRisk] = useState<any[]>([]);
+    const [overdueLoaded, setOverdueLoaded] = useState(false);
 
     // Vehicle form state
     const [showVehForm, setShowVehForm] = useState(false);
@@ -193,6 +196,17 @@ export function PartiesPage() {
         toast?.(`Vehicle ${vehForm.registrationNumber.toUpperCase()} ${editVehId ? "updated" : "added"}!`, "success", "🚗");
         resetVehForm();
     };
+
+    // Fetch overdue summary once on mount — shows accounts past their credit days.
+    useEffect(() => {
+        getOverdueParties()
+            .then((res: any) => {
+                setOverdueParties(res?.overdue || []);
+                setOverdueAtRisk(res?.atRisk || []);
+            })
+            .catch(() => {})
+            .finally(() => setOverdueLoaded(true));
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Tolerant shopId match — activeShopId can be a number (from products) or a
     // string (cookie/impersonation), and party.shopId comes from the DB as a
@@ -524,6 +538,43 @@ export function PartiesPage() {
                                     <div style={{ fontSize: 10, color: T.t3, marginTop: 2 }}>{b.note}</div>
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {/* Overdue accounts banner — only shows for Customers tab when data loaded */}
+                    {overdueLoaded && view === "customers" && overdueParties.length > 0 && (
+                        <div style={{
+                            background: "#FEF2F2", border: "1px solid rgba(220,38,38,0.2)",
+                            borderLeft: `4px solid ${T.crimson}`, borderRadius: "0 10px 10px 0",
+                            padding: "12px 16px",
+                        }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                                <span style={{ fontSize: 16 }}>⚠️</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: "#991B1B" }}>
+                                    {overdueParties.length} overdue account{overdueParties.length !== 1 ? "s" : ""} — past credit days
+                                </span>
+                                {overdueAtRisk.length > 0 && (
+                                    <span style={{ fontSize: 11, color: "#92400E", background: "#FEF3C7", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>
+                                        +{overdueAtRisk.length} at risk
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {overdueParties.slice(0, 5).map((p: any) => (
+                                    <div key={p.partyId} style={{
+                                        background: "#fff", border: "1px solid rgba(220,38,38,0.2)",
+                                        borderRadius: 8, padding: "5px 10px",
+                                        fontSize: 11, color: "#991B1B",
+                                    }}>
+                                        <span style={{ fontWeight: 700 }}>{p.name}</span>
+                                        <span style={{ color: T.t3, marginLeft: 6 }}>₹{fmt(p.outstanding)}</span>
+                                        <span style={{ color: T.crimson, marginLeft: 6, fontSize: 10 }}>{p.daysSince}d overdue</span>
+                                    </div>
+                                ))}
+                                {overdueParties.length > 5 && (
+                                    <div style={{ fontSize: 11, color: T.t3, padding: "5px 6px" }}>+{overdueParties.length - 5} more</div>
+                                )}
+                            </div>
                         </div>
                     )}
 

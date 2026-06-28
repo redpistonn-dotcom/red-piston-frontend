@@ -84,6 +84,10 @@ export interface Product {
   isActive?: boolean;
   supplier?: string | null;
   createdAt?: number;
+  lastSoldAt?: number;
+  lastPurchasedAt?: number;
+  maxStock?: number;
+  images?: string[];
 }
 
 // ─── Movements / Transactions ─────────────────────────────────────────────────

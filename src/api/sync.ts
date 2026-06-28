@@ -30,6 +30,10 @@ interface BackendInventory {
   partName?: string;
   movements?: BackendMovement[];
   createdAt?: string | null;
+  lastSoldAt?: string | null;
+  lastPurchasedAt?: string | null;
+  maxStockLevel?: number | null;
+  images?: string | string[] | null;
 }
 
 interface BackendMasterPart {
@@ -129,6 +133,12 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     imageEmoji: getCategoryEmoji(inv.customCategoryL1 || mp?.categoryL1),
     sku: oemStr || String(inv.inventoryId).slice(0, 8),
     createdAt: inv.createdAt ? new Date(inv.createdAt).getTime() : undefined,
+    lastSoldAt: inv.lastSoldAt ? new Date(inv.lastSoldAt).getTime() : undefined,
+    lastPurchasedAt: inv.lastPurchasedAt ? new Date(inv.lastPurchasedAt).getTime() : undefined,
+    maxStock: inv.maxStockLevel ?? undefined,
+    images: inv.images
+      ? (Array.isArray(inv.images) ? inv.images : JSON.parse(String(inv.images))) as string[]
+      : undefined,
   };
 }
 

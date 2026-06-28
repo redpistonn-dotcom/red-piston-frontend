@@ -689,15 +689,68 @@ export function InventoryPage() {
                                                         </div>
                                                     </div>
                                                     {/* Location + Stock Details strip */}
-                                                    <div style={{ display: "flex", gap: 16, marginTop: 12, padding: "10px 14px", background: T.card, borderRadius: 8, border: `1px solid ${T.border}`, alignItems: "center", fontSize: 12 }}>
+                                                    <div style={{ display: "flex", gap: 16, marginTop: 12, padding: "10px 14px", background: T.card, borderRadius: 8, border: `1px solid ${T.border}`, alignItems: "center", fontSize: 12, flexWrap: "wrap" }}>
                                                         <div><span style={{ color: T.t3, fontWeight: 600 }}>📍 Location: </span><span style={{ fontFamily: FONT.mono, color: T.t1, fontWeight: 700 }}>{p.location || "—"}</span></div>
                                                         <div style={{ width: 1, height: 16, background: T.border }} />
-                                                        <div><span style={{ color: T.t3, fontWeight: 600 }}>📦 Stock: </span><span style={{ fontFamily: FONT.mono, fontWeight: 800, color: p.stock === 0 ? T.crimson : p.stock < p.minStock ? T.amber : T.emerald }}>{p.stock}</span><span style={{ color: T.t4 }}> / {p.minStock} min</span></div>
+                                                        <div>
+                                                            <span style={{ color: T.t3, fontWeight: 600 }}>📦 Stock: </span>
+                                                            <span style={{ fontFamily: FONT.mono, fontWeight: 800, color: p.stock === 0 ? T.crimson : p.stock < p.minStock ? T.amber : T.emerald }}>{p.stock}</span>
+                                                            <span style={{ color: T.t4 }}> / {p.minStock} min</span>
+                                                            {p.maxStock != null && (
+                                                                <>
+                                                                    <span style={{ color: T.t4 }}> / {p.maxStock} max</span>
+                                                                    {p.stock > p.maxStock && (
+                                                                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: T.sky, background: T.skyBg, padding: "1px 6px", borderRadius: 4 }}>OVERSTOCK</span>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
                                                         <div style={{ width: 1, height: 16, background: T.border }} />
                                                         <div><span style={{ color: T.t3, fontWeight: 600 }}>💰 Inventory Value: </span><span style={{ fontFamily: FONT.mono, fontWeight: 800, color: T.amber }}>{fmt(p.buyPrice * p.stock)}</span></div>
                                                         <div style={{ width: 1, height: 16, background: T.border }} />
                                                         <div><span style={{ color: T.t3, fontWeight: 600 }}>📈 Potential Revenue: </span><span style={{ fontFamily: FONT.mono, fontWeight: 800, color: T.emerald }}>{fmt(p.sellPrice * p.stock)}</span></div>
+                                                        {p.lastSoldAt && (
+                                                            <>
+                                                                <div style={{ width: 1, height: 16, background: T.border }} />
+                                                                <div>
+                                                                    <span style={{ color: T.t3, fontWeight: 600 }}>🛒 Last Sold: </span>
+                                                                    <span style={{ fontFamily: FONT.mono, color: T.t2 }}>
+                                                                        {Math.floor((Date.now() - p.lastSoldAt) / 86400000) === 0
+                                                                            ? "Today"
+                                                                            : `${Math.floor((Date.now() - p.lastSoldAt) / 86400000)}d ago`}
+                                                                    </span>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                        {p.lastPurchasedAt && (
+                                                            <>
+                                                                <div style={{ width: 1, height: 16, background: T.border }} />
+                                                                <div>
+                                                                    <span style={{ color: T.t3, fontWeight: 600 }}>🛍 Last Purchased: </span>
+                                                                    <span style={{ fontFamily: FONT.mono, color: T.t2 }}>
+                                                                        {Math.floor((Date.now() - p.lastPurchasedAt) / 86400000) === 0
+                                                                            ? "Today"
+                                                                            : `${Math.floor((Date.now() - p.lastPurchasedAt) / 86400000)}d ago`}
+                                                                    </span>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
+                                                    {/* Multi-photo gallery — show all images[] if more than the primary image */}
+                                                    {p.images && p.images.length > 0 && (
+                                                        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                                                            {p.images.map((url, i) => (
+                                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", flexShrink: 0 }}>
+                                                                    <img
+                                                                        src={url}
+                                                                        alt={`${p.name} photo ${i + 1}`}
+                                                                        style={{ width: 80, height: 80, borderRadius: 8, objectFit: "cover", border: `1px solid ${T.border}`, cursor: "pointer" }}
+                                                                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                                                    />
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
