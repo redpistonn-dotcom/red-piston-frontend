@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-06-28] — Fix: invoice/print always showed "RED PISTON — Shop" instead of real shop name
+
+### Fix
+- **Shop name resolved from `currentUser.shop` when store `shops` array is empty** (`src/pages/POSBillingPage.tsx`): the POS shop lookup only searched the `shops` store array, which is frequently empty at page load. This caused the in-app invoice preview and both A4/Thermal print templates to show the "RED PISTON — Shop" fallback. Fixed by mirroring the ERPShell pattern: if `shops.find(…)` returns nothing, fall back to `currentUser.shop` from AppCtx. Removed "RED PISTON — Shop" as the hardcoded fallback string (now "My Shop") and cleared the "GSTIN —" / "India" placeholder fallbacks so they show blank rather than mock data.
+
 ## [2026-06-28] — Dual-printer support: Thermal (80mm) + A4; shop branding on all bills
 
 ### New Features

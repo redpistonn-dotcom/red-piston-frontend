@@ -31,16 +31,21 @@ function PayBtn({ label, icon, active, onClick }: { label: string; icon: string;
 
 export function POSBillingPage() {
     const { products, activeShopId, shops, parties, movements } = useStore();
-    const { handleMultiItemSale: onMultiSale, toast } = useContext(AppCtx);
+    const { handleMultiItemSale: onMultiSale, toast, currentUser } = useContext(AppCtx);
     const navigate = useNavigate();
-    const shop = useMemo(() => (shops || []).find((s: any) => s.id === activeShopId) || null, [shops, activeShopId]);
+    const shop = useMemo(() => {
+        const fromStore = (shops || []).find((s: any) => s.id === activeShopId || s.shopId === activeShopId);
+        if (fromStore) return fromStore;
+        if ((currentUser as any)?.shop) return (currentUser as any).shop;
+        return null;
+    }, [shops, activeShopId, currentUser]);
     const shopProducts = useMemo(() => (products || []).filter((p: any) => p.shopId === activeShopId && p.isActive !== false), [products, activeShopId]);
 
-    const shopName    = shop?.name    || "RED PISTON — Shop";
-    const shopAddress = [shop?.address, shop?.city, shop?.pincode].filter(Boolean).join(" · ") || "India";
-    const shopGst     = shop?.gstNo   || shop?.gstin || "GSTIN —";
+    const shopName    = shop?.name    || shop?.shopName || "My Shop";
+    const shopAddress = [shop?.address, shop?.city, shop?.pincode].filter(Boolean).join(" · ") || "";
+    const shopGst     = shop?.gstNo   || shop?.gstin || "";
     const shopPhone   = shop?.phone   || "";
-    const shopCity    = shop?.city    || "India";
+    const shopCity    = shop?.city    || "";
 
     // ── Bill state ─────────────────────────────────────────────────────────────
     const [billType, setBillType]   = useState("Sale");
