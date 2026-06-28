@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { api, setTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
 import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
+import { signInWithGoogle } from "../firebase.js";
 
 /** Minimal photo uploader used only inside the shop registration step */
 function ShopPhotoUploader({ photoUrl, onUploaded }: { photoUrl: string; onUploaded: (url: string) => void }) {
@@ -175,6 +176,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
   const [forgotSent, setForgotSent]       = useState(false);
   const [landingTab, setLandingTab]       = useState("owner"); // "owner" | "customer"
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Modal-responsive style tokens — shadow module-level BASE_S
   const S = isModal ? {
@@ -402,6 +404,27 @@ export default function LoginPage({ onLogin, isModal = false }) {
     setLoading(false);
   };
 
+  // ── Google Sign-In ─────────────────────────────────────────────────────────
+  const callBackendFirebase = async (token: string) => {
+    const data = await api.post("/api/auth/firebase", { token, role });
+    handleAuthResponse(data);
+  };
+
+  const googleAuth = async (_intent: string) => {
+    setError(""); setGoogleLoading(true);
+    try {
+      const { token } = await signInWithGoogle();
+      await callBackendFirebase(token);
+    } catch (e: any) {
+      if (e?.code === "auth/popup-closed-by-user" || e?.code === "auth/cancelled-popup-request") {
+        setError(""); // user dismissed — not an error
+      } else {
+        setError(getErr(e, "Google sign-in failed. Try again."));
+      }
+    }
+    setGoogleLoading(false);
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────
@@ -492,8 +515,13 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 <div style={{ textAlign: "right", marginBottom: isModal ? 10 : 18 }}>
                   <button onClick={() => { setForgotMode(true); setForgotEmail(email); setError(""); }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 12, fontFamily: FONT.ui, fontWeight: 600 }}>Forgot password?</button>
                 </div>
-                <button className="btn-primary" style={{ ...S.btnPrimary(loading), marginBottom: isModal ? 10 : 16 }} disabled={loading} onClick={emailSignIn}>
+                <button className="btn-primary" style={{ ...S.btnPrimary(loading || googleLoading), marginBottom: isModal ? 10 : 16 }} disabled={loading || googleLoading} onClick={emailSignIn}>
                   {loading ? "Signing in…" : "Sign In →"}
+                </button>
+                <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
+                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("signin")}>
+                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                  {googleLoading ? "Signing in…" : "Continue with Google"}
                 </button>
               </>
             )}
@@ -598,8 +626,13 @@ export default function LoginPage({ onLogin, isModal = false }) {
               <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showConfirmPwd ? "text" : "password"} placeholder="Repeat password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && emailRegister()} />
               <button onClick={() => setShowConfirmPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showConfirmPwd ? "🙈" : "👁"}</button>
             </div>
-            <button className="btn-primary" style={{ ...S.btnPrimary(loading), marginBottom: 14 }} disabled={loading} onClick={emailRegister}>
+            <button className="btn-primary" style={{ ...S.btnPrimary(loading || googleLoading), marginBottom: 14 }} disabled={loading || googleLoading} onClick={emailRegister}>
               {loading ? "Creating account…" : (role === "shop" ? "Continue to Shop Details →" : "Create Account →")}
+            </button>
+            <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
+            <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer", marginBottom: 6 }} disabled={loading || googleLoading} onClick={() => googleAuth("register")}>
+              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+              {googleLoading ? "Signing in…" : "Continue with Google"}
             </button>
 
             <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 6, paddingTop: 16, borderTop: `1px solid #E0D5C8` }}>
