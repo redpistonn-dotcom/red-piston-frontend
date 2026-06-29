@@ -91,8 +91,15 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
     }
   }, []);
 
-  // Fetch PDF server-side with auth token, open as blob so browser shows the PDF viewer
+  // Open the supplier PDF.
+  // New bills are stored as Cloudinary raw/upload resources (public access) —
+  // open them directly in a new tab without the proxy.
+  // Older image/upload bills still need the auth proxy.
   const openPdf = useCallback(async (fileUrl: string) => {
+    if (fileUrl.includes('/raw/upload/')) {
+      window.open(fileUrl, '_blank');
+      return;
+    }
     try {
       const token = getAccessToken();
       const proxyUrl = `${BASE_URL}/api/shop/purchase-bills/pdf-proxy?url=${encodeURIComponent(fileUrl)}`;
