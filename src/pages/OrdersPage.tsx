@@ -422,9 +422,9 @@ ${order.product ? `<tr><td>Product</td><td>${order.product}</td></tr>` : ""}
         if (search.trim()) {
             const q = search.toLowerCase();
             list = list.filter(o =>
-                o.orderId.toLowerCase().includes(q) ||
-                o.partyName.toLowerCase().includes(q) ||
-                o.product.toLowerCase().includes(q)
+                (o.orderId || "").toLowerCase().includes(q) ||
+                (o.partyName || "").toLowerCase().includes(q) ||
+                (o.product || "").toLowerCase().includes(q)
             );
         }
         return list;

@@ -73,8 +73,8 @@ export function SupplierAutocomplete({
   const q = value.trim().toLowerCase();
   const filtered = q.length === 0
     ? parties
-    : parties.filter(p => p.name.toLowerCase().includes(q));
-  const exactMatch = parties.some(p => p.name.toLowerCase() === q);
+    : parties.filter(p => (p.name || "").toLowerCase().includes(q));
+  const exactMatch = parties.some(p => (p.name || "").toLowerCase() === q);
   const showAddNew = q.length > 0 && !exactMatch;
   const showDropdown = open && loaded && (filtered.length > 0 || showAddNew);
 

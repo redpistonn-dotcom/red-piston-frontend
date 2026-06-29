@@ -21,8 +21,8 @@ function isProductCompatible(product, matchStr) {
   if (product.isUniversal) return "universal";
   const compat = product.compatibleVehicles || [];
   if (compat.length === 0) return "universal"; // unknown fitment → always visible
-  if (compat.some(v => v.toLowerCase() === "universal")) return "universal";
-  if (compat.some(v => v.toLowerCase().includes(matchStr.toLowerCase()))) return "compatible";
+  if (compat.some(v => v && v.toLowerCase() === "universal")) return "universal";
+  if (compat.some(v => v && v.toLowerCase().includes(matchStr.toLowerCase()))) return "compatible";
   return false;
 }
 
@@ -227,11 +227,31 @@ export function InventoryPage() {
     // Low-stock banner: dismissed per browser session so it resets on next login
     const [bannerDismissed, setBannerDismissed] = useState(() => sessionStorage.getItem('vl_low_stock_dismissed') === '1');
     const dismissBanner = () => { sessionStorage.setItem('vl_low_stock_dismissed', '1'); setBannerDismissed(true); };
+    const [density, setDensity] = useState<'comfortable'|'compact'>(() => (localStorage.getItem('rp_inv_density') as 'comfortable'|'compact') || 'comfortable');
 
     // Block render until API responds — prevents stale localStorage flash.
     // Shimmer skeleton so the load is clearly visible.
     if (storeProducts === null) {
-      return <Skeleton.Page kpis={4} cols={6} rows={8} />;
+      return (
+        <div style={{ padding: 24 }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+            <div className="skeleton" style={{ height: 36, width: 260 }} />
+            <div className="skeleton" style={{ height: 36, width: 120 }} />
+            <div className="skeleton" style={{ height: 36, width: 120 }} />
+          </div>
+          <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #E5E7EB', display: 'flex', gap: 16 }}>
+              {[120, 200, 80, 80, 100, 80].map((w, i) => <div key={i} className="skeleton" style={{ height: 10, width: w }} />)}
+            </div>
+            {[0,1,2,3,4,5].map(i => (
+              <div key={i} style={{ padding: '14px 16px', borderBottom: '1px solid #F3F4F6', display: 'flex', gap: 16, alignItems: 'center' }}>
+                <div className="skeleton" style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0 }} />
+                {[160, 100, 60, 60, 80, 60].map((w, j) => <div key={j} className="skeleton" style={{ height: 10, width: w }} />)}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
     }
 
     return (
@@ -295,7 +315,7 @@ export function InventoryPage() {
                     fontFamily: FONT.ui, outline: "none", boxSizing: "border-box",
                     transition: "border-color 0.15s",
                   }}
-                  onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                  onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.sky; }}
                   onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }}
                 />
                 {search && (
@@ -379,7 +399,7 @@ export function InventoryPage() {
                         fontSize: 13, color: T.t1,
                         fontFamily: FONT.ui, outline: "none", boxSizing: "border-box",
                       }}
-                      onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                      onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.sky; }}
                       onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }}
                     />
                     {batchSearch && (
@@ -415,10 +435,10 @@ export function InventoryPage() {
                             {b.sku && <div style={{ fontSize: 10, color: T.t3, fontFamily: FONT.mono, marginTop: 1 }}>{b.sku}</div>}
                           </div>
                           {b.batchNumber && (
-                            <span style={{ fontSize: 11, fontFamily: FONT.mono, color: T.amber, background: T.amberGlow, padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>📦 {b.batchNumber}</span>
+                            <span style={{ fontSize: 11, fontFamily: FONT.mono, color: T.amber, background: T.amberGlow, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>📦 {b.batchNumber}</span>
                           )}
                           {b.serialNumber && (
-                            <span style={{ fontSize: 11, fontFamily: FONT.mono, color: T.sky, background: T.skyBg, padding: "2px 8px", borderRadius: 6, fontWeight: 700 }}>S/N {b.serialNumber}</span>
+                            <span style={{ fontSize: 11, fontFamily: FONT.mono, color: T.sky, background: T.skyBg, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>S/N {b.serialNumber}</span>
                           )}
                           <div style={{ fontSize: 11, color: T.t2, fontFamily: FONT.ui }}>
                             Rcvd: <span style={{ fontWeight: 700, fontFamily: FONT.mono }}>{b.qtyReceived}</span>
@@ -497,7 +517,7 @@ export function InventoryPage() {
                 )}
             </div>
 
-            {/* Results count */}
+            {/* Results count + density toggle */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
                     Showing <span style={{ color: T.t1, fontWeight: 700 }}>{Math.min(visibleCount, filtered.length)}</span> of <span style={{ color: T.t1, fontWeight: 700 }}>{filtered.length}</span> products
@@ -505,7 +525,14 @@ export function InventoryPage() {
                         <button onClick={() => { setSearch(""); setCat("All"); setStatusF("All"); setSelBrand(null); setSelModel(null); setSelYear(""); }} style={{ marginLeft: 10, background: "none", border: "none", color: T.amber, fontSize: 12, cursor: "pointer", fontWeight: 600, fontFamily: FONT.ui }}>Clear filters</button>
                     )}
                 </div>
-                <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>{shopProducts.length} total SKUs</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ display: "flex", background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: "hidden" }}>
+                        {(['comfortable', 'compact'] as const).map(d => (
+                            <button key={d} onClick={() => { setDensity(d); localStorage.setItem('rp_inv_density', d); }} style={{ padding: "4px 10px", border: "none", background: density === d ? T.amber : "transparent", color: density === d ? "#fff" : T.t3, fontSize: 11, fontWeight: density === d ? 700 : 400, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}>{d === 'comfortable' ? '≡' : '⋮⋮'}</button>
+                        ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>{shopProducts.length} total SKUs</div>
+                </div>
             </div>
 
             {/* Empty state */}
@@ -513,7 +540,11 @@ export function InventoryPage() {
                 <div style={{ textAlign: "center", padding: "60px 20px", color: T.t3 }}>
                     <div style={{ fontSize: 56, opacity: 0.3, marginBottom: 16 }}>📦</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: T.t2, marginBottom: 8, fontFamily: FONT.display }}>No products found</div>
-                    <div style={{ fontSize: 13, color: T.t3, marginBottom: 20 }}>Try adjusting your search or filters</div>
+                    <div style={{ fontSize: 13, color: T.t3, marginBottom: 20 }}>
+                        {(search || cat !== "All" || statusF !== "All")
+                            ? "No parts match your current filters. Try a different search term or clear the filters."
+                            : "Your inventory is empty. Add your first part to start tracking stock, prices, and movement."}
+                    </div>
                     <button onClick={() => { setSearch(""); setCat("All"); setStatusF("All"); setSelBrand(null); setSelModel(null); setSelYear(""); }} style={{ background: T.amber, border: "none", borderRadius: 10, padding: "8px 20px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>Clear Filters</button>
                 </div>
             )}
@@ -524,7 +555,7 @@ export function InventoryPage() {
             <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.sm }}>
               <div className="table-scroll">
                 <table className="inv-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
+                    <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                         <tr>
                             <th className="th-cell" style={{ width: 48, padding: "11px 14px" }} />
                             {[
@@ -545,6 +576,7 @@ export function InventoryPage() {
                         {filtered.slice(0, visibleCount).map(p => {
                             const mg = margin(p.buyPrice, p.sellPrice);
                             const st = stockStatus(p);
+                            const tdPad = density === 'compact' ? "5px 12px" : "10px 12px";
                             return (
                                 <Fragment key={p.id}>
                                     <tr className="trow" onClick={() => setExpandedId(expandedId === p.id ? null : p.id)} style={{
@@ -554,7 +586,7 @@ export function InventoryPage() {
                                         borderLeft: `3px solid ${st === "out" ? T.crimson : st === "low" ? "#F59E0B" : "transparent"}`,
                                     }}>
                                         {/* ICON */}
-                                        <td style={{ padding: "10px 10px 10px 14px" }}>
+                                        <td style={{ padding: density === 'compact' ? "5px 10px 5px 14px" : "10px 10px 10px 14px" }}>
                                             {p.image && p.image.startsWith("http") ? (
                                                 <img src={p.image} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", display: "block", border: `1px solid ${T.border}` }}
                                                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
@@ -566,7 +598,7 @@ export function InventoryPage() {
                                             )}
                                         </td>
                                         {/* PRODUCT (name + OEM sub-text) */}
-                                        <td style={{ padding: "10px 12px" }}>
+                                        <td style={{ padding: tdPad }}>
                                             <div style={{ fontWeight: 700, color: T.t1, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{p.name}</div>
                                             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 2, flexWrap: "wrap" }}>
                                                 {p.oemNumber && <span style={{ fontSize: 10, color: T.t3, fontFamily: FONT.mono }}>{p.oemNumber}</span>}
@@ -581,19 +613,19 @@ export function InventoryPage() {
                                             </div>
                                         </td>
                                         {/* CAT. */}
-                                        <td style={{ padding: "10px 12px" }}>
-                                            <span style={{ background: `${T.amber}12`, color: T.amber, fontSize: 10, padding: "3px 8px", borderRadius: 6, fontWeight: 700, fontFamily: FONT.ui }}>{p.category}</span>
+                                        <td style={{ padding: tdPad }}>
+                                            <span style={{ background: `${T.amber}12`, color: T.amber, fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700, fontFamily: FONT.ui }}>{p.category}</span>
                                         </td>
                                         {/* BUY */}
-                                        <td style={{ padding: "10px 12px", textAlign: "right", color: T.t3, fontFamily: FONT.mono, fontSize: 12 }}>{fmt(p.buyPrice)}</td>
+                                        <td style={{ padding: tdPad, textAlign: "right", color: T.t3, fontFamily: FONT.mono, fontSize: 12 }}>{fmt(p.buyPrice)}</td>
                                         {/* SELL */}
-                                        <td style={{ padding: "10px 12px", textAlign: "right", color: T.t1, fontFamily: FONT.mono, fontSize: 13, fontWeight: 700 }}>{fmt(p.sellPrice)}</td>
+                                        <td style={{ padding: tdPad, textAlign: "right", color: T.t1, fontFamily: FONT.mono, fontSize: 13, fontWeight: 700 }}>{fmt(p.sellPrice)}</td>
                                         {/* MARGIN */}
-                                        <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                                        <td style={{ padding: tdPad, textAlign: "right" }}>
                                             <span style={{ fontSize: 12, fontFamily: FONT.mono, fontWeight: 700, color: +mg > 30 ? T.emerald : +mg > 15 ? "#D97706" : T.crimson }}>{mg}%</span>
                                         </td>
                                         {/* STOCK (current / min) */}
-                                        <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                                        <td style={{ padding: tdPad, textAlign: "center" }}>
                                             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 2 }}>
                                                 <span style={{ fontFamily: FONT.mono, fontWeight: 800, fontSize: 15, color: p.stock === 0 ? T.crimson : p.stock < p.minStock ? "#D97706" : T.t1 }}>{p.stock}</span>
                                                 <span style={{ fontSize: 10, color: T.t4, fontFamily: FONT.mono }}>/{p.minStock}</span>
@@ -604,9 +636,9 @@ export function InventoryPage() {
                                             </div>
                                         </td>
                                         {/* RACK */}
-                                        <td style={{ padding: "10px 12px", fontFamily: FONT.mono, fontSize: 11, color: p.location ? T.t2 : T.t4 }}>{p.location || "—"}</td>
+                                        <td style={{ padding: tdPad, fontFamily: FONT.mono, fontSize: 11, color: p.location ? T.t2 : T.t4 }}>{p.location || "—"}</td>
                                         {/* ACTIONS */}
-                                        <td style={{ padding: "10px 14px 10px 10px", textAlign: "center" }}>
+                                        <td style={{ padding: density === 'compact' ? "5px 14px 5px 10px" : "10px 14px 10px 10px", textAlign: "center" }}>
                                             <div style={{ display: "flex", gap: 4, justifyContent: "center", alignItems: "center" }} onClick={e => e.stopPropagation()}>
                                                 {/* Edit icon button */}
                                                 <button title="Edit" onClick={() => onEdit(p)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}>✎</button>
