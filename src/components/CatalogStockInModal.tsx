@@ -214,11 +214,11 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
               ? (item.part.imageUrl || (item.part.images && item.part.images[0]))
               : null;
 
-            const editable = item.type === "catalog";
+            const editable = true;
             return (
               <div key={item.cartId}
-                onClick={editable ? () => onEdit?.(item.cartId) : undefined}
-                title={editable ? "Click to edit price / stock / supplier" : undefined}
+                onClick={() => onEdit?.(item.cartId)}
+                title="Click to edit price / stock / supplier"
                 style={{
                   background: T.surface,
                   border: `1px solid ${T.border}`,
@@ -227,7 +227,7 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
                   display: "flex",
                   gap: 10,
                   alignItems: "flex-start",
-                  cursor: editable ? "pointer" : "default",
+                  cursor: "pointer",
                 }}>
                 {/* Icon */}
                 <div style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.1 }}>
@@ -249,7 +249,7 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
                     <span style={{ fontFamily: FONT.mono, color: T.emerald, fontWeight: 700 }}>₹{fmt(parseFloat(item.form.sellPrice) || 0)}</span>
                     <span style={{ color: T.t4 }}>·</span>
                     <span style={{ color: T.t2 }}>{parseInt(item.form.stockQty) || 0} units</span>
-                    {editable && <span style={{ color: T.amber, fontWeight: 700 }}>· ✎ edit</span>}
+                    <span style={{ color: T.amber, fontWeight: 700 }}>· ✎ edit</span>
                     {item.type === "contribution" && (
                       <span style={{ fontSize: 9, color: T.amber, fontWeight: 700, background: `${T.amber}18`, padding: "1px 5px", borderRadius: 3 }}>NEW</span>
                     )}
@@ -870,7 +870,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
 }
 
 // ─── Fallback: Contribute new part ────────────────────────────────────────────
-function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving }) {
+function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSave, saving }) {
   const blank = {
     partName: initialName || "", brand: "", categoryL1: "", categoryL2: "",
     oemNumber: initialBarcode || "", hsnCode: "", gstRate: "18", unitOfSale: "Piece", description: "",
@@ -878,7 +878,7 @@ function ContributeStep({ initialName, initialBarcode, onBack, onSave, saving })
     imageUrl: "", partType: "OEM",
     _scannedBarcode: initialBarcode || "",
   };
-  const [f, setF] = useState(blank);
+  const [f, setF] = useState(initialForm || blank);
   const [errors, setErrors] = useState({});
   // Vehicle fitment state
   const [fitments, setFitments] = useState([]); // [{ make, model, yearFrom, yearTo, fitType }]
@@ -1120,10 +1120,18 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
     setStep("search");
   }, [selected, editingCartId]);
 
-  // ── Click a (catalog) cart item → re-open it in the configure form ─────────
+  // ── Click a cart item → re-open it in the configure/contribute form ────────
   const handleEditCart = useCallback((cartId) => {
     const item = cart.find((it) => it.cartId === cartId);
-    if (!item || item.type !== "catalog") return;
+    if (!item) return;
+    if (item.type === "contribution") {
+      setEditingCartId(cartId);
+      setEditForm(item.form);
+      setManualQuery(item.form.partName || "");
+      setManualBarcode(item.form._scannedBarcode || item.form.oemNumber || "");
+      setStep("contribute");
+      return;
+    }
     setSelected(item.part);
     setEditForm(item.form);
     setEditingCartId(cartId);
@@ -1132,9 +1140,16 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
 
   // ── Add contributed part to cart (no API call yet) ────────────────────────
   const handleContributeSave = useCallback((form) => {
-    setCart((c) => [...c, { cartId: uid(), type: "contribution", form }]);
+    setCart((c) => {
+      if (editingCartId) {
+        return c.map((it) => it.cartId === editingCartId ? { ...it, form } : it);
+      }
+      return [...c, { cartId: uid(), type: "contribution", form }];
+    });
+    setEditingCartId(null);
+    setEditForm(null);
     setStep("search");
-  }, []);
+  }, [editingCartId]);
 
   // ── Remove item from cart ─────────────────────────────────────────────────
   const handleRemoveFromCart = useCallback((cartId) => {
@@ -1411,7 +1426,8 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
             <ContributeStep
               initialName={manualQuery}
               initialBarcode={manualBarcode}
-              onBack={() => setStep("search")}
+              initialForm={editForm}
+              onBack={() => { setEditingCartId(null); setEditForm(null); setStep("search"); }}
               onSave={handleContributeSave}
               saving={false}
             />
