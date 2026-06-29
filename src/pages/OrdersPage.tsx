@@ -86,7 +86,7 @@ function movementToOrder(m: any) {
     if (isOpening) {
         status = "Stock Added" as OrderStatus; // opening stock added directly to inventory
     } else if (m.paymentStatus === "paid" || m.paymentMode === "Cash" || m.paymentMode === "UPI" || m.paymentMode === "Card") {
-        status = isSale ? "Delivered" : "Shipped";
+        status = "Delivered";
     } else if (m.paymentStatus === "cancelled") {
         status = "Cancelled";
     } else if (m.paymentStatus === "pending" || m.paymentMode === "Credit") {

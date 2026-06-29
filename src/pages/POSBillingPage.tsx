@@ -48,15 +48,29 @@ export function POSBillingPage() {
     const shopCity    = shop?.city    || "";
 
     // ── Bill state ─────────────────────────────────────────────────────────────
-    const [billType, setBillType]   = useState("Sale");
-    const [items, setItems]         = useState<any[]>([]);
-    const [paymentMode, setPaymentMode] = useState("Cash");  // Cash | Card/UPI | Udhaar
-    const [additionalDisc, setAdditionalDisc] = useState(0);
-    const [notes, setNotes]         = useState("");
-    const [customerName, setCustomerName] = useState("");
-    const [customerPhone, setCustomerPhone] = useState("");
-    const [vehicleReg, setVehicleReg]   = useState("");
-    const [partyId, setPartyId]     = useState<string | number | null>(null);
+    // Restore draft from localStorage (per shop, 24h expiry)
+    const draftKey = `pos_draft_${activeShopId || "default"}`;
+    const loadDraft = () => {
+        try {
+            const raw = JSON.parse(localStorage.getItem(draftKey) || "null");
+            if (!raw || (raw.expiresAt && Date.now() > raw.expiresAt)) {
+                localStorage.removeItem(draftKey);
+                return null;
+            }
+            return raw;
+        } catch { return null; }
+    };
+    const draft = loadDraft();
+
+    const [billType, setBillType]   = useState(draft?.billType || "Sale");
+    const [items, setItems]         = useState<any[]>(draft?.items || []);
+    const [paymentMode, setPaymentMode] = useState(draft?.paymentMode || "Cash");
+    const [additionalDisc, setAdditionalDisc] = useState(draft?.additionalDisc || 0);
+    const [notes, setNotes]         = useState(draft?.notes || "");
+    const [customerName, setCustomerName] = useState(draft?.customerName || "");
+    const [customerPhone, setCustomerPhone] = useState(draft?.customerPhone || "");
+    const [vehicleReg, setVehicleReg]   = useState(draft?.vehicleReg || "");
+    const [partyId, setPartyId]     = useState<string | number | null>(draft?.partyId || null);
     const [showInvoice, setShowInvoice] = useState(false);
     const [saving, setSaving]       = useState(false);
     const [invoiceNo, setInvoiceNo] = useState("");
@@ -87,6 +101,20 @@ export function POSBillingPage() {
 
     const searchRef = useRef<HTMLInputElement>(null);
 
+    // Auto-save draft to localStorage (debounced 600ms, 24h expiry)
+    useEffect(() => {
+        if (showInvoice) return; // don't overwrite draft while invoice is shown
+        const t = setTimeout(() => {
+            if (items.length === 0) { localStorage.removeItem(draftKey); return; }
+            localStorage.setItem(draftKey, JSON.stringify({
+                items, billType, paymentMode, additionalDisc,
+                notes, customerName, customerPhone, vehicleReg, partyId,
+                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+            }));
+        }, 600);
+        return () => clearTimeout(t);
+    }, [items, billType, paymentMode, additionalDisc, notes, customerName, customerPhone, vehicleReg, partyId, showInvoice, draftKey]);
+
     useEffect(() => { searchRef.current?.focus(); }, []);
 
     // The sale syncs to the backend asynchronously — capture the created
@@ -100,11 +128,14 @@ export function POSBillingPage() {
         return () => window.removeEventListener("invoice:synced", handler);
     }, []);
 
-    // Ctrl+Enter shortcut
+    // Ctrl+Enter shortcut + "/" to focus search
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && items.length > 0 && !saving && !showInvoice) {
                 e.preventDefault(); handleSubmitRef.current?.();
+            }
+            if (e.key === "/" && document.activeElement !== searchRef.current) {
+                e.preventDefault(); searchRef.current?.focus();
             }
         };
         document.addEventListener("keydown", handler);
@@ -119,6 +150,23 @@ export function POSBillingPage() {
             [p.name, p.sku, p.brand, p.category, p.oemNumber].some(s => String(s ?? "").toLowerCase().includes(q))
         ).slice(0, 8);
     }, [search, shopProducts]);
+
+    // Recent items: last 8 unique products sold from this shop's movements
+    const recentItems = useMemo(() => {
+        const seen = new Set<string>();
+        const result: any[] = [];
+        const shopMoves = (movements || [])
+            .filter((m: any) => m.type === "SALE" && m.shopId === activeShopId)
+            .sort((a: any, b: any) => (b.date || 0) - (a.date || 0));
+        for (const m of shopMoves) {
+            const pid = String(m.productId);
+            if (!pid || seen.has(pid)) continue;
+            const prod = shopProducts.find((p: any) => String(p.id) === pid);
+            if (prod && prod.stock > 0) { seen.add(pid); result.push(prod); }
+            if (result.length >= 8) break;
+        }
+        return result;
+    }, [movements, shopProducts, activeShopId]);
 
     // Add product
     const addProduct = useCallback((p: any) => {
@@ -250,12 +298,14 @@ export function POSBillingPage() {
             total: finalTotal, gstAmount: grandGst, profit: grandProfit, date: ts,
         });
         if (safeOverride) setBillType(safeOverride);
+        localStorage.removeItem(draftKey); // clear draft on successful save
         setSaving(false); setShowInvoice(true);
     };
 
     useLayoutEffect(() => { handleSubmitRef.current = handleSubmit; });
 
     const newBill = () => {
+        localStorage.removeItem(draftKey);
         setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setVehicleReg("");
         setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
         setInvoiceAt(null); setBillType("Sale");
@@ -357,8 +407,8 @@ export function POSBillingPage() {
             <div data-print-area className="invoice-print-root" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, padding: "22px 26px", fontFamily: FONT.ui }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, paddingBottom: 16, borderBottom: `2px solid ${T.amber}`, marginBottom: 16 }}>
                     <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                        {(shop as any)?.logoUrl
-                            ? <img src={(shop as any).logoUrl} alt={shopName} style={{ width: 52, height: 52, borderRadius: 10, objectFit: "contain", border: `1px solid ${T.border}` }} />
+                        {((shop as any)?.logoUrl || (shop as any)?.photoUrl)
+                            ? <img src={(shop as any).logoUrl || (shop as any).photoUrl} alt={shopName} style={{ width: 52, height: 52, borderRadius: 10, objectFit: "contain", border: `1px solid ${T.border}` }} />
                             : <div style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(145deg,#1e3a5f,#0f2040)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, fontWeight: 900 }}>{shopName.charAt(0).toUpperCase()}</div>
                         }
                         <div>
@@ -377,7 +427,7 @@ export function POSBillingPage() {
                 {customerName && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}><span style={{ color: T.t3 }}>Customer</span><span style={{ fontWeight: 600 }}>{customerName}</span></div>}
                 {vehicleReg && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 8 }}><span style={{ color: T.t3 }}>Vehicle</span><span style={{ fontFamily: FONT.mono, color: T.amber, fontWeight: 700 }}>{vehicleReg}</span></div>}
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 4 }}>
-                    <thead>
+                    <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                         <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
                             {["#","Item","SKU","Qty","Rate","Disc","GST","Amount"].map(h => (
                                 <th key={h} style={{ padding: "8px 6px", textAlign: h === "Item" || h === "SKU" ? "left" : "right", color: T.t3, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>
@@ -428,8 +478,8 @@ export function POSBillingPage() {
                     fontSize: 12, color: "#000",
                 }}>
                     {/* Shop header */}
-                    {(shop as any)?.logoUrl
-                        ? <div style={{ textAlign: "center", marginBottom: 4 }}><img src={(shop as any).logoUrl} alt={shopName} style={{ height: 44, maxWidth: 200, objectFit: "contain" }} /></div>
+                    {((shop as any)?.logoUrl || (shop as any)?.photoUrl)
+                        ? <div style={{ textAlign: "center", marginBottom: 4 }}><img src={(shop as any).logoUrl || (shop as any).photoUrl} alt={shopName} style={{ height: 44, maxWidth: 200, objectFit: "contain" }} /></div>
                         : <div style={{ textAlign: "center", fontSize: 26, fontWeight: 900, marginBottom: 2 }}>{shopName.charAt(0).toUpperCase()}</div>
                     }
                     <div style={{ textAlign: "center", fontWeight: 900, fontSize: 14, letterSpacing: "0.04em", marginBottom: 2 }}>{shopName}</div>
@@ -511,7 +561,7 @@ export function POSBillingPage() {
                 <button onClick={() => {
                     printInvoice({
                         format: printFormat,
-                        shop: { name: shopName, address: shopAddress, gstin: shopGst, phone: shopPhone, logoUrl: shop?.logoUrl || undefined },
+                        shop: { name: shopName, address: shopAddress, gstin: shopGst, phone: shopPhone, logoUrl: (shop as any)?.logoUrl || (shop as any)?.photoUrl || undefined },
                         invoice: {
                             invoiceNo,
                             invoiceAt: invoiceAt ? fmtDateTime(invoiceAt) : undefined,
@@ -703,6 +753,36 @@ export function POSBillingPage() {
                 )}
             </div>
 
+            {items.length > 0 && (
+              <div style={{ display: "flex", gap: 16, alignItems: "center", padding: "6px 14px", background: T.surfaceContainerLow, borderRadius: 8, fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>
+                <span>Shortcuts:</span>
+                <span><kbd style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 4, padding: "1px 6px", fontFamily: FONT.mono, fontSize: 10, color: T.t1 }}>/</kbd> Search</span>
+                <span><kbd style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 4, padding: "1px 6px", fontFamily: FONT.mono, fontSize: 10, color: T.t1 }}>Ctrl+Enter</kbd> Print Bill</span>
+              </div>
+            )}
+
+            {/* ── RECENT ITEMS QUICK-ADD STRIP ── */}
+            {recentItems.length > 0 && (
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: FONT.ui, flexShrink: 0 }}>Recent:</span>
+                    {recentItems.map((p: any) => (
+                        <button key={p.id} onClick={() => addProduct(p)} style={{
+                            display: "flex", alignItems: "center", gap: 5,
+                            padding: "5px 11px", borderRadius: 20,
+                            border: `1px solid ${items.some(i => i.productId === p.id) ? T.amber : T.border}`,
+                            background: items.some(i => i.productId === p.id) ? T.amberGlow : "#FFFFFF",
+                            color: items.some(i => i.productId === p.id) ? T.amber : T.t2,
+                            fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui,
+                            transition: "all 0.12s", whiteSpace: "nowrap",
+                        }}>
+                            <span style={{ fontSize: 14 }}>{p.image?.startsWith("http") ? "" : p.image || "📦"}</span>
+                            <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                            <span style={{ fontSize: 10, color: T.t3, fontFamily: FONT.ui }}>{fmt(p.sellPrice)}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {/* ── INVOICE ITEMS ── */}
             <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
                 {/* Header */}
@@ -724,7 +804,7 @@ export function POSBillingPage() {
                 ) : (
                     <div className="table-scroll">
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
+                            <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                                 <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
                                     {["#","Product","SKU","Qty","Price","Disc.","Total","Actions"].map(h => (
                                         <th key={h} style={{ padding: "10px 14px", textAlign: h === "Price" || h === "Total" || h === "Disc." ? "right" : "left", fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>{h}</th>
@@ -787,6 +867,7 @@ export function POSBillingPage() {
                                             <td style={{ padding: "12px 10px", textAlign: "right" }}>
                                                 <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
                                                     <input type="number" value={item.discount} min="0"
+                                                        onFocus={e => e.target.select()}
                                                         onChange={e => updateItem(idx, "discount", Math.max(0, +e.target.value))}
                                                         style={{ width: 46, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, padding: "0 6px", color: T.t1, fontFamily: FONT.mono, fontSize: 12, textAlign: "center", outline: "none" }} />
                                                     <span style={{ fontSize: 11, color: T.t3, cursor: "pointer", userSelect: "none" }} onClick={() => updateItem(idx, "discountType", item.discountType === "%" ? "flat" : "%")}>
