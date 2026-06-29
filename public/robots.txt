@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Block internal/auth pages from indexing
+Disallow: /erp
+Disallow: /erp/
+Disallow: /api/
+
+Sitemap: https://www.redpiston.in/sitemap.xml
