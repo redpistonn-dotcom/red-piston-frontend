@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { api, setTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
 import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
-import { signInWithGoogle } from "../firebase.js";
+import { useGoogleLogin } from "@react-oauth/google";
 
 /** Minimal photo uploader used only inside the shop registration step */
 function ShopPhotoUploader({ photoUrl, onUploaded }: { photoUrl: string; onUploaded: (url: string) => void }) {
@@ -405,24 +405,29 @@ export default function LoginPage({ onLogin, isModal = false }) {
   };
 
   // ── Google Sign-In ─────────────────────────────────────────────────────────
-  const callBackendFirebase = async (firebaseToken: string) => {
-    const data = await api.post("/api/auth/firebase", { firebaseToken, role });
-    handleAuthResponse(data);
-  };
-
-  const googleAuth = async (_intent: string) => {
-    setError(""); setGoogleLoading(true);
-    try {
-      const { token } = await signInWithGoogle();
-      await callBackendFirebase(token);
-    } catch (e: any) {
-      if (e?.code === "auth/popup-closed-by-user" || e?.code === "auth/cancelled-popup-request") {
-        setError(""); // user dismissed — not an error
-      } else {
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const data = await api.post("/api/auth/google", { accessToken: tokenResponse.access_token, role });
+        handleAuthResponse(data);
+      } catch (e: any) {
         setError(getErr(e, "Google sign-in failed. Try again."));
       }
-    }
-    setGoogleLoading(false);
+      setGoogleLoading(false);
+    },
+    onError: () => {
+      setError("Google sign-in failed. Try again.");
+      setGoogleLoading(false);
+    },
+    onNonOAuthError: () => {
+      setError(""); // user closed the popup — not an error
+      setGoogleLoading(false);
+    },
+  });
+
+  const googleAuth = (_intent: string) => {
+    setError(""); setGoogleLoading(true);
+    googleLogin();
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -893,7 +898,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
               </div>
             )}
             <div style={{ fontSize: 13, color: "#9C8C7C", marginBottom: 24, lineHeight: 1.7 }}>
-              If you believe this is a mistake, contact our support team at <strong style={{ color: "#BE2B1A" }}>support@autospaceerp.com</strong>
+              If you believe this is a mistake, contact our support team at <strong style={{ color: "#BE2B1A" }}>support@redpiston.in</strong>
             </div>
             <button style={{ ...S.btnOutline }} onClick={() => { go(STEPS.LANDING); setRole(""); }}>← Back to Home</button>
           </div>
@@ -916,7 +921,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e2e5", marginBottom: 20 }}>Admin Sign In</div>
             {error && <div style={S.error}>{error}</div>}
             <label style={S.label}>Admin Email</label>
-            <input className="auth-input admin-input" style={{ ...S.input, marginBottom: 14 }} type="email" placeholder="admin@autospaceerp.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
+            <input className="auth-input admin-input" style={{ ...S.input, marginBottom: 14 }} type="email" placeholder="admin@redpiston.in" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
             <label style={S.label}>Password</label>
             <div style={{ position: "relative", marginBottom: 22 }}>
               <input className="auth-input admin-input" style={{ ...S.input, paddingRight: 44 }} type={showPwd ? "text" : "password"} placeholder="Admin password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && adminSignIn()} />

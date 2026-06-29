@@ -1,5 +1,58 @@
 # Changelog
 
+## [2026-06-29] — Fix Google sign-in: remove Firebase signInWithPopup dependency
+
+### Fixes
+- **LoginPage**: replaced Firebase `signInWithGoogle` (which calls `signInWithPopup` and requires the domain in Firebase's Authorized Domains list) with `@react-oauth/google`'s `useGoogleLogin`. This eliminates the `auth/unauthorized-domain` error that blocked customer sign-in on `redpiston.in`.
+- **main.tsx**: added `GoogleOAuthProvider` wrapper (required by `useGoogleLogin`).
+- **New env var**: `VITE_GOOGLE_CLIENT_ID` — Google OAuth 2.0 client ID from Google Cloud Console. Must be set in Vercel environment variables.
+
+## [2026-06-28] — Loading skeletons on initial page fetch
+
+### UI/UX
+- **Dashboard**: replaced spinner with 4 KPI + 2 chart skeleton shimmer cards while data loads
+- **Inventory**: replaced spinner with shimmer table skeleton (toolbar + 6 row placeholders)
+- **Parties**: replaced spinner with shimmer list skeleton (5 avatar + text row placeholders)
+
+## [2026-06-28] — Tier 2 + Tier 3 UI/UX improvements
+
+### New Features
+- **T2-1 Dashboard freshness chip**: each KPI card now shows a "• Updated just now" chip beneath the value so users know the data is live.
+- **T2-2 Persistent tab memory** (`PartiesPage`, `WorkshopPage`): active tab / status filter restored from `localStorage` on revisit so navigating away and back doesn't reset the view.
+- **T2-3 Sortable Date & Amount columns** (`HistoryPage`): clicking the "Date & Time" or "Amount" column header sorts ascending/descending; active column highlighted in amber with a ↑/↓ indicator.
+- **T2-4 Amber OVERDUE badge** (`PartiesPage`): customer rows with `daysOverdue > 0` show a small amber "OVERDUE" pill next to the name in the desktop table.
+- **T2-5 Workshop Kanban view toggle** (`WorkshopPage`): ⊞/☰ button added next to Export CSV; kanban renders job cards in 4 columns (Draft / In Progress / Completed / Invoiced) with coloured headers; selection persisted to `localStorage`.
+- **T2-7 Mini SVG sparkline** (`DashboardPage`): each KPI card renders an inline 80×28 SVG sparkline derived pseudo-randomly from the metric value; color matches the card accent.
+- **T3-1 Collapsible settings sections** (`ShopSettingsPage`): "Shop Profile" and "Bank Details" cards each have a ▸/▾ chevron button that collapses/expands the content via `maxHeight` toggle.
+- **T3-2 Print-optimised CSS** (`App.css`): expanded `@media print` block — hides nav/topbar/buttons, removes backgrounds from badges, enforces A4 margins, makes tables border-collapsed and full-width, no horizontal scrolling.
+- **T3-3 Comfortable/Compact density toggle** (`InventoryPage`): two-segment toggle persisted to `localStorage`; compact mode halves row padding from `10px` to `5px` so more rows fit on screen.
+- **T3-4 Contextual empty state copy** (`InventoryPage`, `PartiesPage`, `WorkshopPage`): empty states now distinguish between "no results for your filters" vs "nothing added yet", with actionable guidance in each case.
+- **T3-5 Recent items quick-add strip** (`POSBillingPage`): a pill strip above the invoice items table shows the last 8 unique in-stock products sold from this shop (derived from `movements`); clicking a pill calls `addProduct` directly, skipping the search step.
+- **T3-6 Color-coded left border on History rows** (`HistoryPage`): `borderLeft: 3px solid` — emerald for SALE, sky for PURCHASE, amber for returns, crimson for DAMAGE/THEFT, transparent for others.
+- **T3-7 Global Cmd+K search overlay** (`ERPShell`): pressing ⌘K / Ctrl+K opens a portal-mounted modal with an autofocused input that filters NAV_ITEMS by name; clicking a result navigates to that page and closes the overlay; Escape dismisses.
+
+## [2026-06-28] — Brand fix: replace all "AutoSpace" references with "RedPiston"
+
+### Fixes
+- **ResetPasswordPage**: logo text "AutoSpace" → "RedPiston" (both the invalid-link screen and the main reset form)
+- **ProfilePage**: staff invite callout "AutoSpace account" → "RedPiston account"
+- **PartiesPage**: footer watermark "AUTOSPACE ENTERPRISE V2.4" → "REDPISTON" (both vehicle and customer/supplier panels)
+- **LoginPage**: account-rejection support email `support@autospaceerp.com` → `support@redpiston.in`; admin login placeholder `admin@autospaceerp.com` → `admin@redpiston.in`
+- **Backend whatsapp.js**: WhatsApp broadcast name `'AutoSpace'` → `'RedPiston'`
+- **Backend index.js**: server startup log "AutoSpace backend running…" → "RedPiston backend running…"
+
+## [2026-06-28] — UI/UX polish pass: design tokens, animations, responsive tables, empty states
+
+### Refactors
+- **Design tokens applied consistently across all pages and UI components**: button sizes (`"10px 22px"` padding, `borderRadius: 10`, `minHeight: 38`), input/select focus highlight changed from amber to `T.sky` with `borderRadius: 10`, field label size standardised to `fontSize: 12`, skeleton card grid updated to `repeat(auto-fill, minmax(160px, 1fr))`.
+- **CSS utility classes defined** (`src/styles/App.css`): added ~140 lines covering `skeleton-shimmer`, `fadeIn`/`scaleIn`/`slideUpSheet` keyframes, `page-in`, `rp-gap`, `kpi-grid-3/4/6`, `table-scroll`, `th-cell`, `trow`/`row-hover`, `card-hover`, responsive media queries — these were referenced across JSX but had no definitions, so shimmer animations, hover transitions and responsive table scrolling were silently no-ops.
+- **Badge pills standardised** (`InventoryPage`, `PartiesPage`): `borderRadius: 99`, `padding: "3px 10px"`, `fontSize: 11`, `fontWeight: 700` applied to category/tag/batch-number chips.
+- **Expanded row entrance animation** (`PartiesPage`): added `animation: "fadeIn 0.15s ease"` on the ledger detail `<td>` so expand/collapse feels responsive.
+- **Table scroll wrapper added** (`StaffPage`): table wrapped in `overflowX: "auto"` so narrow viewports can scroll horizontally instead of clipping content.
+- **Empty state improved** (`StaffPage`): replaced plain text fallback with centred 40px emoji + 16px title + 13px subtitle layout matching design standard.
+- **KPI grid inline `gridTemplateColumns` added** (`HistoryPage`, `DashboardPage`): belt-and-suspenders inline style `repeat(auto-fill, minmax(160px, 1fr))` so grids reflow even if the CSS class is not yet applied.
+- **Search input focus colour fixed** (`HistoryPage`, `InventoryPage`, `WorkshopPage`): `onFocus` border was hardcoded to `T.amber`; updated to `T.sky` per design standards.
+
 ## [2026-06-28] — Implement all audit gaps: API coverage, new pages, sort fixes
 
 ### New Features
