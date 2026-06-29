@@ -21,6 +21,7 @@ import { Modal, Field, Input, Select, Btn } from "./ui";
 import { BarcodeScanner } from "./BarcodeScanner.jsx";
 import { lookupCatalog, lookupByBarcode, scanBarcode, addInventory, contributePart } from "../api/inventory.js";
 import { uid, CATEGORIES, fmt } from "../utils";
+import { SupplierAutocomplete } from "./SupplierAutocomplete";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ function BackButton({ onClick, label = "Back to search" }) {
 }
 
 // ─── sub-component: CartPanel ─────────────────────────────────────────────────
-function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSupplier }) {
+function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSupplier, toast }) {
   const [triedSave, setTriedSave] = useState(false);
   const nameErr    = triedSave && !supplier.name.trim();
   const invoiceErr = triedSave && !supplier.invoiceNo.trim();
@@ -290,12 +291,19 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             <div style={{ gridColumn: "span 2" }}>
-              <input
+              <SupplierAutocomplete
                 value={supplier.name}
-                onChange={e => setSupplier(s => ({ ...s, name: e.target.value }))}
-                placeholder="Supplier Name *"
-                maxLength={100}
-                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${nameErr ? T.crimson : T.border}`, borderRadius: 7, padding: "7px 9px", fontSize: 11, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+                onChange={name => setSupplier(s => ({ ...s, name }))}
+                onSelect={({ name, phone, gstin }) =>
+                  setSupplier(s => ({
+                    ...s,
+                    name,
+                    phone: phone || s.phone,
+                    gstin: gstin || s.gstin,
+                  }))
+                }
+                error={nameErr}
+                toast={toast}
               />
               {nameErr && <div style={{ fontSize: 10, color: T.crimson, marginTop: 2 }}>Supplier name is required</div>}
             </div>
@@ -1443,6 +1451,7 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
           saving={saving}
           supplier={supplier}
           setSupplier={setSupplier}
+          toast={toast}
         />
       </div>
     </Modal>

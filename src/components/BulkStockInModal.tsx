@@ -13,6 +13,7 @@ import { T, FONT } from '../theme';
 import { fmt } from '../utils';
 import { lookupCatalog, lookupByBarcode, bulkStockIn, contributePart, addInventory } from '../api/inventory';
 import { mapInventoryToProduct } from '../api/sync';
+import { SupplierAutocomplete } from './SupplierAutocomplete';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -463,7 +464,7 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
 
 // ─── PHASE 2: Supplier / Invoice Details ──────────────────────────────────────
 
-function SupplierPhase({ cart, onBack, onSubmit, submitting }) {
+function SupplierPhase({ cart, onBack, onSubmit, submitting, toast }) {
   const [form, setForm] = useState({
     supplierName:  '',
     supplierPhone: '',
@@ -505,7 +506,19 @@ function SupplierPhase({ cart, onBack, onSubmit, submitting }) {
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }} className="custom-scroll">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, maxWidth: 600 }}>
           <Field label="Supplier / Vendor Name">
-            <Input value={form.supplierName} onChange={f('supplierName')} placeholder="e.g. Bosch India Pvt Ltd" />
+            <SupplierAutocomplete
+              value={form.supplierName}
+              onChange={name => setForm(p => ({ ...p, supplierName: name }))}
+              onSelect={({ name, phone }) =>
+                setForm(p => ({
+                  ...p,
+                  supplierName: name,
+                  supplierPhone: phone || p.supplierPhone,
+                }))
+              }
+              placeholder="e.g. Bosch India Pvt Ltd"
+              toast={toast}
+            />
           </Field>
           <Field label="Supplier Phone">
             <Input value={form.supplierPhone} onChange={f('supplierPhone')} placeholder="+91 98765 43210" />
@@ -823,6 +836,7 @@ export function BulkStockInModal({ open, onClose, onSave, toast, activeShopId })
               onBack={() => setPhase(1)}
               onSubmit={handleSubmit}
               submitting={submitting}
+              toast={toast}
             />
           )}
         </div>

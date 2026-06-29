@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-06-29] — Supplier autocomplete in Stock In modals
+
+### New Features
+- **SupplierAutocomplete** (`src/components/SupplierAutocomplete.tsx`): shared component that lazy-loads the shop's SUPPLIER parties on first focus and shows a filtered dropdown as the user types. Selecting a row auto-fills name, phone, and GSTIN. If no match exists, shows "＋ Add as new supplier" which calls `POST /api/shop/parties` and confirms with a toast.
+- **CatalogStockInModal** (`CartPanel`): supplier name field replaced with `SupplierAutocomplete`; selecting an existing supplier auto-fills phone and GSTIN.
+- **BulkStockInModal** (`SupplierPhase`): supplier name field replaced with `SupplierAutocomplete`; phone auto-fills on selection; phone field remains editable for overrides.
+
 ## [2026-06-29] — Fix Google sign-in: remove Firebase signInWithPopup dependency
 
 ### Fixes
