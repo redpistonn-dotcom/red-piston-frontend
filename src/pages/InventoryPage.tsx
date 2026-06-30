@@ -119,13 +119,9 @@ export function InventoryPage() {
       return () => { cancelled = true; };
     }, [debouncedBatchSearch]);
 
-    // Catalog search — fires when user types in the Parts Catalog search box
+    // Catalog search — loads all items on open; filters when user types
     useEffect(() => {
       if (!showCatalog) return;
-      if (!debouncedCatalogQuery.trim()) {
-        setCatalogResults([]);
-        return;
-      }
       let cancelled = false;
       setCatalogLoading(true);
       searchCatalog(debouncedCatalogQuery.trim(), 50)
@@ -586,9 +582,9 @@ export function InventoryPage() {
                       fontFamily: FONT.ui, outline: "none",
                     }}
                   />
-                  {catalogLoading && <span style={{ fontSize: 12, color: "#7C3AED", fontFamily: FONT.ui }}>Searching…</span>}
+                  {catalogLoading && <span style={{ fontSize: 12, color: "#7C3AED", fontFamily: FONT.ui }}>Loading…</span>}
                   <span style={{ fontSize: 11, color: "#6D28D9", fontFamily: FONT.ui, flexShrink: 0 }}>
-                    Search the full parts catalog — type at least 2 characters
+                    Showing first 50 — type to filter
                   </span>
                 </div>
 
@@ -640,15 +636,9 @@ export function InventoryPage() {
                   </div>
                 )}
 
-                {!catalogLoading && debouncedCatalogQuery.length >= 2 && catalogResults.length === 0 && (
+                {!catalogLoading && catalogResults.length === 0 && (
                   <div style={{ padding: "40px 20px", textAlign: "center", color: T.t3, fontSize: 13, fontFamily: FONT.ui }}>
-                    No parts found for "{debouncedCatalogQuery}" in the catalog
-                  </div>
-                )}
-
-                {!debouncedCatalogQuery && (
-                  <div style={{ padding: "32px 20px", textAlign: "center", color: T.t3, fontSize: 13, fontFamily: FONT.ui }}>
-                    Type a part name (e.g. "Clutch Cable") or OEM number to find parts from the master catalog
+                    {debouncedCatalogQuery ? `No parts found for "${debouncedCatalogQuery}"` : "No catalog items found"}
                   </div>
                 )}
               </div>
