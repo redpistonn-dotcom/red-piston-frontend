@@ -485,7 +485,7 @@ export function InventoryPage() {
                   cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s",
                 }}
               >Parts Catalog</button>
-              {!showCatalog && ["All", ...availableCats].map(c => {
+              {["All", ...availableCats].map(c => {
                 const isAct = c === cat;
                 return (
                   <button key={c} onClick={() => setCat(c)} style={{
