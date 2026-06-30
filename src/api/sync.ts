@@ -233,6 +233,24 @@ export async function fetchInventory(): Promise<Product[] | null> {
   }
 }
 
+interface CatalogSearchResponse {
+  inventory?: BackendInventory[];
+  total?: number;
+}
+
+// Search across ALL shop inventory (including zero-priced seeded catalog items).
+// Used by the "Parts Catalog" tab to let the shop owner find and configure parts.
+export async function searchCatalog(query: string, limit = 50): Promise<Product[]> {
+  try {
+    const qp = new URLSearchParams({ all: 'true', search: query, limit: String(limit) });
+    const data = await api.get<CatalogSearchResponse>(`/api/shop/inventory?${qp}`);
+    return (data.inventory || []).map(mapInventoryToProduct);
+  } catch (err: unknown) {
+    console.warn('[Sync] Catalog search failed:', (err as Error).message);
+    return [];
+  }
+}
+
 export async function fetchParties(): Promise<Party[] | null> {
   try {
     const data = await api.get<PartiesApiResponse>('/api/shop/parties');

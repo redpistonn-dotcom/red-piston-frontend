@@ -10,7 +10,7 @@ import { printBarcodeLabels } from "../barcode";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { useVehicleManufacturers, useVehicleModels } from "../hooks/queries";
-import { fetchInventory } from "../api/sync.js";
+import { fetchInventory, searchCatalog } from "../api/sync.js";
 import { deleteInventory, toggleMarketplace, contributePart } from "../api/inventory.js";
 import { BatchesSlideOver } from "../components/BatchesSlideOver";
 import { searchBatches } from "../api/stockBatches.js";
@@ -82,6 +82,13 @@ export function InventoryPage() {
     const [poModalOpen, setPoModalOpen] = useState(false);
     const [batchP, setBatchP] = useState(null);
 
+    // Parts Catalog tab state
+    const [showCatalog, setShowCatalog] = useState(false);
+    const [catalogQuery, setCatalogQuery] = useState("");
+    const [catalogResults, setCatalogResults] = useState<any[]>([]);
+    const [catalogLoading, setCatalogLoading] = useState(false);
+    const debouncedCatalogQuery = useDebounce(catalogQuery, 400);
+
     // Batch search state
     const [batchSearch, setBatchSearch] = useState("");
     const [batchResults, setBatchResults] = useState<any[]>([]);
@@ -111,6 +118,21 @@ export function InventoryPage() {
         .finally(() => { if (!cancelled) setBatchSearching(false); });
       return () => { cancelled = true; };
     }, [debouncedBatchSearch]);
+
+    // Catalog search — fires when user types in the Parts Catalog search box
+    useEffect(() => {
+      if (!showCatalog) return;
+      if (!debouncedCatalogQuery.trim()) {
+        setCatalogResults([]);
+        return;
+      }
+      let cancelled = false;
+      setCatalogLoading(true);
+      searchCatalog(debouncedCatalogQuery.trim(), 50)
+        .then(data => { if (!cancelled) setCatalogResults(data); })
+        .finally(() => { if (!cancelled) setCatalogLoading(false); });
+      return () => { cancelled = true; };
+    }, [debouncedCatalogQuery, showCatalog]);
 
     // Vehicle data via TanStack Query — auto-cached, no manual useEffect needed
     const { data: mfgData } = useVehicleManufacturers();
@@ -455,7 +477,19 @@ export function InventoryPage() {
 
             {/* ── CATEGORY TABS (design: pill tabs; mobile = one scrollable row) ── */}
             <div className="inv-chips" style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {["All", ...availableCats].map(c => {
+              {/* Parts Catalog tab — searches the full seeded catalog */}
+              <button
+                onClick={() => { setShowCatalog(v => !v); setCatalogQuery(""); setCatalogResults([]); }}
+                style={{
+                  padding: "7px 18px", borderRadius: 20,
+                  border: `1px solid ${showCatalog ? "#7C3AED" : T.border}`,
+                  background: showCatalog ? "#7C3AED" : "#FFFFFF",
+                  color: showCatalog ? "#FFFFFF" : T.t2,
+                  fontSize: 13, fontWeight: showCatalog ? 700 : 500,
+                  cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s",
+                }}
+              >Parts Catalog</button>
+              {!showCatalog && ["All", ...availableCats].map(c => {
                 const isAct = c === cat;
                 return (
                   <button key={c} onClick={() => setCat(c)} style={{
@@ -518,7 +552,7 @@ export function InventoryPage() {
             </div>
 
             {/* Results count + density toggle */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {!showCatalog && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
                     Showing <span style={{ color: T.t1, fontWeight: 700 }}>{Math.min(visibleCount, filtered.length)}</span> of <span style={{ color: T.t1, fontWeight: 700 }}>{filtered.length}</span> products
                     {(search || cat !== "All" || statusF !== "All") && (
@@ -533,10 +567,95 @@ export function InventoryPage() {
                     </div>
                     <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>{shopProducts.length} total SKUs</div>
                 </div>
-            </div>
+            </div>}
+
+            {/* ── PARTS CATALOG SEARCH PANEL ── */}
+            {showCatalog && (
+              <div style={{ background: T.card, border: `1px solid #DDD6FE`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.sm }}>
+                <div style={{ padding: "14px 16px", borderBottom: `1px solid #EDE9FE`, background: "#F5F3FF", display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 16 }}>🔍</span>
+                  <input
+                    autoFocus
+                    value={catalogQuery}
+                    onChange={e => setCatalogQuery(e.target.value)}
+                    placeholder="Search by part name or OEM number…"
+                    style={{
+                      flex: 1, height: 38, background: "#FFFFFF",
+                      border: `1px solid #C4B5FD`, borderRadius: 8,
+                      padding: "0 12px", fontSize: 13, color: T.t1,
+                      fontFamily: FONT.ui, outline: "none",
+                    }}
+                  />
+                  {catalogLoading && <span style={{ fontSize: 12, color: "#7C3AED", fontFamily: FONT.ui }}>Searching…</span>}
+                  <span style={{ fontSize: 11, color: "#6D28D9", fontFamily: FONT.ui, flexShrink: 0 }}>
+                    Search the full parts catalog — type at least 2 characters
+                  </span>
+                </div>
+
+                {/* Results */}
+                {catalogResults.length > 0 && (
+                  <div>
+                    {catalogResults.map(p => {
+                      const isConfigured = p.sellPrice > 0 || p.stock > 0;
+                      return (
+                        <div key={p.id} style={{
+                          display: "flex", alignItems: "center", gap: 12, padding: "11px 16px",
+                          borderBottom: `1px solid ${T.border}`,
+                        }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 8, background: "#EDE9FE", border: `1px solid #DDD6FE`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>
+                            {p.image && p.image.startsWith("http") ? (
+                              <img src={p.image} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
+                            ) : (p.imageEmoji || "🔧")}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, fontFamily: FONT.ui, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                              {p.oemNumber && <span style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono }}>{p.oemNumber}</span>}
+                              {p.brand && <span style={{ fontSize: 11, color: T.t3 }}>{p.brand}</span>}
+                              {p.category && <span style={{ fontSize: 11, background: T.amberGlow, color: T.amber, padding: "1px 8px", borderRadius: 99, fontWeight: 600 }}>{p.category}</span>}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right", flexShrink: 0 }}>
+                            {isConfigured ? (
+                              <div style={{ fontSize: 12, color: "#059669", fontWeight: 600, fontFamily: FONT.ui, marginBottom: 4 }}>
+                                ₹{p.sellPrice} · {p.stock} in stock
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginBottom: 4 }}>Not priced yet</div>
+                            )}
+                            <button
+                              onClick={() => setPModal({ open: true, product: p })}
+                              style={{
+                                background: isConfigured ? "#FFFFFF" : "#7C3AED",
+                                border: isConfigured ? `1px solid ${T.border}` : "none",
+                                color: isConfigured ? T.t2 : "#FFFFFF",
+                                borderRadius: 8, padding: "5px 14px",
+                                fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui,
+                              }}
+                            >{isConfigured ? "Edit" : "Set Price"}</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {!catalogLoading && debouncedCatalogQuery.length >= 2 && catalogResults.length === 0 && (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: T.t3, fontSize: 13, fontFamily: FONT.ui }}>
+                    No parts found for "{debouncedCatalogQuery}" in the catalog
+                  </div>
+                )}
+
+                {!debouncedCatalogQuery && (
+                  <div style={{ padding: "32px 20px", textAlign: "center", color: T.t3, fontSize: 13, fontFamily: FONT.ui }}>
+                    Type a part name (e.g. "Clutch Cable") or OEM number to find parts from the master catalog
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Empty state */}
-            {filtered.length === 0 && (
+            {!showCatalog && filtered.length === 0 && (
                 <div style={{ textAlign: "center", padding: "60px 20px", color: T.t3 }}>
                     <div style={{ fontSize: 56, opacity: 0.3, marginBottom: 16 }}>📦</div>
                     <div style={{ fontSize: 16, fontWeight: 700, color: T.t2, marginBottom: 8, fontFamily: FONT.display }}>No products found</div>
@@ -551,7 +670,7 @@ export function InventoryPage() {
 
             {/* ── PRODUCT TABLE (design: ICON | PRODUCT | CAT. | BUY | SELL | MARGIN | STOCK | RACK | ACTIONS)
                  Rendered at ALL widths — on mobile the design keeps the table, horizontally scrollable inside .table-scroll ── */}
-            {filtered.length > 0 && (
+            {!showCatalog && filtered.length > 0 && (
             <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", boxShadow: SHADOWS.sm }}>
               <div className="table-scroll">
                 <table className="inv-table" style={{ width: "100%", borderCollapse: "collapse" }}>
