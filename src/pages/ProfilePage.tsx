@@ -235,6 +235,20 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
 
+  // Email OTP verification (shown inline when emailVerified is false)
+  const [showEmailOtp, setShowEmailOtp] = useState(false);
+  const [emailOtpCode, setEmailOtpCode] = useState("");
+  const [emailOtpError, setEmailOtpError] = useState("");
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [resendingEmailOtp, setResendingEmailOtp] = useState(false);
+  const [emailOtpCooldown, setEmailOtpCooldown] = useState(0);
+
+  useEffect(() => {
+    if (emailOtpCooldown <= 0) return;
+    const t = setTimeout(() => setEmailOtpCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [emailOtpCooldown]);
+
   // Password change
   const [pwdCurrent, setPwdCurrent] = useState("");
   const [pwdNew, setPwdNew] = useState("");
@@ -301,7 +315,9 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
       if (onUserUpdate) onUserUpdate(newUser);
       if (emailChanged && updated.emailVerified === false) {
         api.post("/api/auth/resend-verification", { email: updated.email }).catch(() => {});
-        showToast("Verification email sent to your new address");
+        setEmailOtpCode(""); setEmailOtpError(""); setEmailOtpCooldown(30);
+        setShowEmailOtp(true);
+        showToast("Verification code sent to your new address");
       } else {
         showToast("Profile updated");
       }
@@ -309,6 +325,36 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
       setError(e.data?.error?.message || e.message || "Failed to save");
     }
     setSaving(false);
+  };
+
+  const verifyProfileEmailOtp = async () => {
+    if (!/^\d{6}$/.test(emailOtpCode)) { setEmailOtpError("Enter the 6-digit code"); return; }
+    setEmailOtpError(""); setVerifyingEmail(true);
+    try {
+      await api.post("/api/auth/verify-email", { email: userData?.email, code: emailOtpCode });
+      setUserData(prev => ({ ...prev, emailVerified: true }));
+      const stored = JSON.parse(localStorage.getItem("as_user") || "{}");
+      const newUser = { ...stored, emailVerified: true };
+      localStorage.setItem("as_user", JSON.stringify(newUser));
+      if (onUserUpdate) onUserUpdate(newUser);
+      setShowEmailOtp(false);
+      showToast("Email verified");
+    } catch (e) {
+      setEmailOtpError(e.data?.error?.message || e.message || "Invalid or expired code. Try again.");
+    }
+    setVerifyingEmail(false);
+  };
+
+  const resendProfileEmailOtp = async () => {
+    if (emailOtpCooldown > 0 || !userData?.email) return;
+    setResendingEmailOtp(true); setEmailOtpError("");
+    try {
+      await api.post("/api/auth/resend-verification", { email: userData.email });
+      setEmailOtpCooldown(30);
+    } catch (e) {
+      setEmailOtpError(e.data?.error?.message || e.message || "Could not resend code. Try again.");
+    }
+    setResendingEmailOtp(false);
   };
 
   const handleSaveProfile = async () => {
@@ -498,16 +544,40 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
           <div style={S.title}>My Profile</div>
         </div>
 
-        {userData?.email && userData?.emailVerified === false && (
+        {userData?.email && userData?.emailVerified === false && !showEmailOtp && (
           <div style={S.warningBanner}>
-            <span>⚠️ Your email address is not verified. Check your inbox.</span>
+            <span>⚠️ Your email address is not verified.</span>
             <button
               style={{ background: "none", border: "none", color: T.amber, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui, whiteSpace: "nowrap" }}
               onClick={() => {
-                api.post("/api/auth/resend-verification", { email: userData.email }).catch(() => {});
-                showToast("Verification email resent");
+                setEmailOtpCode(""); setEmailOtpError(""); setEmailOtpCooldown(0);
+                setShowEmailOtp(true);
+                resendProfileEmailOtp();
               }}
-            >Resend</button>
+            >Verify now</button>
+          </div>
+        )}
+        {userData?.email && userData?.emailVerified === false && showEmailOtp && (
+          <div style={{ ...S.section, marginBottom: 20, borderColor: T.amber }}>
+            <div style={S.sectionTitle}>📧 Verify {userData.email}</div>
+            <div style={{ fontSize: 13, color: T.t3, marginBottom: 14 }}>Enter the 6-digit code we emailed you. It expires in 10 minutes.</div>
+            {emailOtpError && <div style={S.error}>{emailOtpError}</div>}
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <input
+                style={{ ...S.input, width: 160, textAlign: "center", fontSize: 18, letterSpacing: "0.25em", fontWeight: 700 }}
+                inputMode="numeric" maxLength={6} placeholder="000000"
+                value={emailOtpCode}
+                onChange={e => setEmailOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={e => e.key === "Enter" && emailOtpCode.length === 6 && verifyProfileEmailOtp()}
+                autoFocus
+              />
+              <button style={S.btn("primary")} disabled={verifyingEmail || emailOtpCode.length !== 6} onClick={verifyProfileEmailOtp}>
+                {verifyingEmail ? "Verifying…" : "Verify"}
+              </button>
+              <button style={S.btn("secondary")} disabled={resendingEmailOtp || emailOtpCooldown > 0} onClick={resendProfileEmailOtp}>
+                {emailOtpCooldown > 0 ? `Resend in ${emailOtpCooldown}s` : (resendingEmailOtp ? "Sending…" : "Resend code")}
+              </button>
+            </div>
           </div>
         )}
         {error && <div style={S.error}>{error}</div>}
@@ -752,7 +822,7 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
                   {inviting ? "Adding..." : "Add Staff"}
                 </button>
               </div>
-              <div style={{ fontSize: 11, color: T.t3, marginTop: 8 }}>Staff must already have an AutoSpace account. They will get immediate access.</div>
+              <div style={{ fontSize: 11, color: T.t3, marginTop: 8 }}>Staff must already have a RedPiston account. They will get immediate access.</div>
             </div>
 
             {/* Staff list */}

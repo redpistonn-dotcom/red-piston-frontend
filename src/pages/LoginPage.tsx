@@ -47,14 +47,21 @@ function ShopPhotoUploader({ photoUrl, onUploaded }: { photoUrl: string; onUploa
  *
  * SIGN IN (existing users)
  *   → Email + Password → login
+ *   → If email never verified → OTP screen (resent automatically) before entry
  *   → Forgot password → reset link
  *   → If shop owner PENDING/REJECTED → show status screen
  *
  * CREATE ACCOUNT (new users)
  *   → Pick role (Shop Owner / Customer)
  *   → Email + Password
+ *   → Verify the 6-digit code emailed to them (REG_VERIFY_EMAIL) — required,
+ *     since this is the one signup path where we haven't already had a
+ *     third party (Google) vouch for the address
  *   → Shop Owner: Shop Details form → PENDING screen
  *   → Customer: Name → Marketplace
+ *
+ * Google sign-in skips OTP entirely — the backend marks emailVerified=true
+ * for those accounts at creation, since Google already verified the address.
  */
 
 const STEPS = {
@@ -62,6 +69,7 @@ const STEPS = {
   SIGNIN:       "signin",       // Sign-in form (email + password)
   REG_ROLE:     "reg_role",     // Role selection for new users
   REG_AUTH:     "reg_auth",     // Email registration form
+  VERIFY_EMAIL: "verify_email", // 6-digit code sent to the email just entered/signed-in-with
   SHOP_DETAILS: "shop_details", // Shop info form (new shop owners)
   PROFILE:      "profile",      // Name setup (new customers)
   PENDING:      "pending",      // Shop owner awaiting approval
@@ -178,6 +186,15 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [landingTab, setLandingTab]       = useState("owner"); // "owner" | "customer"
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  // ── Email OTP verification (manual signup/login only — Google is pre-verified) ──
+  const [otpCode, setOtpCode]             = useState("");
+  const [otpError, setOtpError]           = useState("");
+  const [otpVerifying, setOtpVerifying]   = useState(false);
+  const [otpResending, setOtpResending]   = useState(false);
+  const [otpResendCooldown, setOtpResendCooldown] = useState(0);
+  // What to do once the code checks out — set right before go(STEPS.VERIFY_EMAIL)
+  const [afterVerify, setAfterVerify]     = useState(null);
+
   // Modal-responsive style tokens — shadow module-level BASE_S
   const S = isModal ? {
     ...BASE_S,
@@ -200,6 +217,47 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
   const go = (s) => { setStep(s); setError(""); };
   const back = (s) => { setStep(s); setError(""); };
+
+  // ── Email OTP verification (manual signup/login only) ─────────────────────
+  // Google-authenticated accounts are marked emailVerified server-side at
+  // creation and never pass through here — see googleLogin below.
+  const goVerifyEmail = (onVerified, { autoResend = false } = {}) => {
+    setOtpCode(""); setOtpError(""); setOtpResendCooldown(0);
+    setAfterVerify(() => onVerified);
+    go(STEPS.VERIFY_EMAIL);
+    if (autoResend) resendOtp();
+  };
+
+  const verifyOtp = async () => {
+    if (!/^\d{6}$/.test(otpCode)) { setOtpError("Enter the 6-digit code"); return; }
+    setOtpError(""); setOtpVerifying(true);
+    try {
+      await api.post("/api/auth/verify-email", { email, code: otpCode });
+      setOtpVerifying(false);
+      afterVerify?.();
+    } catch (e) {
+      setOtpVerifying(false);
+      setOtpError(getErr(e, "Invalid or expired code. Try again."));
+    }
+  };
+
+  const resendOtp = async () => {
+    if (otpResendCooldown > 0) return;
+    setOtpResending(true); setOtpError("");
+    try {
+      await api.post("/api/auth/resend-verification", { email });
+      setOtpResendCooldown(30);
+    } catch (e) {
+      setOtpError(getErr(e, "Could not resend code. Try again."));
+    }
+    setOtpResending(false);
+  };
+
+  useEffect(() => {
+    if (otpResendCooldown <= 0) return;
+    const t = setTimeout(() => setOtpResendCooldown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [otpResendCooldown]);
 
   // ── Handle backend response (shared across all auth methods) ──────────────
   const handleAuthResponse = (data) => {
@@ -261,17 +319,29 @@ export default function LoginPage({ onLogin, isModal = false }) {
       if (!userData) throw new Error("Server returned an unexpected response.");
       setTokens(data.accessToken, data.refreshToken);
 
-      // Customer who never finished the name step — resume it
-      if (!userData.name && userData.role === "CUSTOMER") {
-        setPendingUser(userData);
-        setResumeNotice("Welcome back! Just tell us your name to finish setting up your account.");
-        go(STEPS.PROFILE);
+      const proceedPastEmailCheck = () => {
+        // Customer who never finished the name step — resume it
+        if (!userData.name && userData.role === "CUSTOMER") {
+          setPendingUser(userData);
+          setResumeNotice("Welcome back! Just tell us your name to finish setting up your account.");
+          go(STEPS.PROFILE);
+          return;
+        }
+        localStorage.setItem("as_user", JSON.stringify(userData));
+        onLogin(userData);
+      };
+
+      // Signed up manually, never verified the email — this is the one signup
+      // path with no third party vouching for the address, so we don't let it
+      // sit unverified indefinitely. Login itself doesn't send a fresh code,
+      // so fire one now (autoResend).
+      if (!userData.emailVerified) {
         setLoading(false);
+        goVerifyEmail(() => { userData.emailVerified = true; proceedPastEmailCheck(); }, { autoResend: true });
         return;
       }
 
-      localStorage.setItem("as_user", JSON.stringify(userData));
-      onLogin(userData);
+      proceedPastEmailCheck();
     } catch (e) {
       const code = e.data?.error?.code;
       if (code === "NO_ACCOUNT") { setError("No account found with this email. Please create an account first."); setLoading(false); return; }
@@ -292,18 +362,21 @@ export default function LoginPage({ onLogin, isModal = false }) {
     try {
       const vehiclePayload = vehicle.make && vehicle.model && vehicle.year ? vehicle : undefined;
       const data = await api.post("/api/auth/register", { email, password, role, name: profile.name || undefined, vehicle: vehiclePayload });
+      setLoading(false);
+      // /register already sent the first OTP — no need to fire another.
       if (data?.needsShopDetails) {
-        setLoading(false);
-        setSettingUp(true);
-        handleAuthResponse(data); // stores tokens + prefills + goes to SHOP_DETAILS
-        setTimeout(() => setSettingUp(false), 500);
+        goVerifyEmail(() => {
+          setSettingUp(true);
+          handleAuthResponse(data); // stores tokens + prefills + goes to SHOP_DETAILS
+          setTimeout(() => setSettingUp(false), 500);
+        });
         return;
       }
       const userData = data?.user;
       if (!userData) throw new Error("Server returned an unexpected response.");
       setTokens(data.accessToken, data.refreshToken);
       setPendingUser(userData);
-      go(STEPS.PROFILE);
+      goVerifyEmail(() => go(STEPS.PROFILE));
     } catch (e) {
       const code = e.data?.error?.code;
       if (code === "EMAIL_EXISTS") {
@@ -681,6 +754,44 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 6, paddingTop: 16, borderTop: `1px solid #E0D5C8` }}>
               Already have an account?{" "}
               <button onClick={() => go(STEPS.SIGNIN)} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>Sign in →</button>
+            </div>
+          </div>
+        );
+
+      // ── Email OTP — required for manual signup/login, skipped for Google ──
+      case STEPS.VERIFY_EMAIL:
+        return (
+          <div className="auth-card">
+            <div style={S.chip}>Verify your email</div>
+            <div style={S.heading}>Enter the code we sent</div>
+            <div style={S.sub}>We emailed a 6-digit code to <strong>{email}</strong>. It expires in 10 minutes.</div>
+
+            {(error || otpError) && <div style={S.error}>{error || otpError}</div>}
+
+            <label style={S.label}>Verification Code</label>
+            <input
+              className="auth-input"
+              style={{ ...S.input, marginBottom: 20, textAlign: "center", fontSize: 22, letterSpacing: "0.3em", fontWeight: 700 }}
+              inputMode="numeric" maxLength={6} placeholder="000000"
+              value={otpCode}
+              onChange={e => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onKeyDown={e => e.key === "Enter" && otpCode.length === 6 && verifyOtp()}
+              autoFocus
+            />
+
+            <button className="btn-primary" style={S.btnPrimary(otpVerifying || otpCode.length !== 6)} disabled={otpVerifying || otpCode.length !== 6} onClick={verifyOtp}>
+              {otpVerifying ? "Verifying…" : "Verify & Continue →"}
+            </button>
+
+            <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 16 }}>
+              Didn't get it?{" "}
+              <button
+                onClick={resendOtp}
+                disabled={otpResending || otpResendCooldown > 0}
+                style={{ background: "none", border: "none", color: otpResendCooldown > 0 ? "#BFB0A0" : "#BE2B1A", cursor: otpResendCooldown > 0 ? "default" : "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}
+              >
+                {otpResendCooldown > 0 ? `Resend in ${otpResendCooldown}s` : (otpResending ? "Sending…" : "Resend code")}
+              </button>
             </div>
           </div>
         );
