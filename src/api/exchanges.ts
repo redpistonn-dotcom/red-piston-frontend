@@ -1,8 +1,11 @@
 import { api } from './client.js';
 
 export interface CreateExchangePayload {
-  originalInvoiceId: number;
-  returnItems: { invoiceItemId: number; qty: number; condition: 'SEALED' | 'GOOD' | 'DAMAGED' | 'USED' }[];
+  /** Provide EITHER originalInvoiceId+returnItems (normal path) OR walkInItems (no invoice found). */
+  originalInvoiceId?: number;
+  returnItems?: { invoiceItemId: number; qty: number; condition: 'SEALED' | 'GOOD' | 'DAMAGED' | 'USED' }[];
+  walkInItems?: { inventoryId: number; qty: number; condition: 'SEALED' | 'GOOD' | 'DAMAGED' | 'USED'; unitPrice: number }[];
+  walkInPartyId?: number;
   returnReason: 'WRONG_PART' | 'DEFECTIVE' | 'WARRANTY' | 'CHANGED_MIND' | 'OTHER';
   returnNotes?: string;
   newItems: { inventoryId: number; qty: number; unitPrice?: number; discount?: number }[];

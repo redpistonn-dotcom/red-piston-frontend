@@ -3,7 +3,7 @@ import { T, FONT } from "../theme";
 import { Modal, Btn, Field, Input, Select } from "./ui";
 import { useStore } from "../store";
 import { getInvoices } from "../api/billing";
-import { getEligibleReturnItems, createSalesReturn, type ReturnableItem } from "../api/returns";
+import { getEligibleReturnItems, createSalesReturn, createWalkInSalesReturn, type ReturnableItem } from "../api/returns";
 import { createExchange } from "../api/exchanges";
 import { useDebounce } from "../utils";
 
@@ -25,10 +25,11 @@ const REFUND_MODES = [
   { value: "BANK", label: "Bank transfer" }, { value: "STORE_CREDIT", label: "Store credit" },
 ];
 
-type Step = "pick-invoice" | "pick-items" | "resolve";
+type Step = "pick-invoice" | "walk-in-items" | "pick-items" | "resolve";
 type Resolution = "REFUND" | "EXCHANGE";
 
 interface InvoiceHit { invoiceId: number; invoiceNumber: string; partyName?: string; totalAmount: string; createdAt: string; partyId?: number | null; }
+interface PartyHit { id: number; name: string; phone?: string; }
 
 interface Props {
   open: boolean;
@@ -40,17 +41,28 @@ interface Props {
 }
 
 export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initialInvoice }: Props) {
-  const { products: storeProducts, activeShopId } = useStore();
+  const { products: storeProducts, parties: storeParties, activeShopId } = useStore();
   const [step, setStep] = useState<Step>("pick-invoice");
 
   // ── Step 1: invoice search ──
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 350);
   const [hits, setHits] = useState<InvoiceHit[]>([]);
+  const [recentHits, setRecentHits] = useState<InvoiceHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [invoice, setInvoice] = useState<InvoiceHit | null>(null);
 
-  // ── Step 2: items + reason ──
+  // ── Walk-in fallback: no invoice could be found ──
+  // isWalkIn stays true for the rest of the flow once entered this way — `invoice`
+  // is never set on this path, so submit() branches on `!invoice`.
+  const [walkInSearch, setWalkInSearch] = useState("");
+  const [partySearch, setPartySearch] = useState("");
+  const [selectedParty, setSelectedParty] = useState<PartyHit | null>(null);
+
+  // ── Step 2: items + reason (shared shape for both invoice and walk-in paths —
+  // walk-in items are added directly into `items`/`selected` using inventoryId
+  // as the synthetic invoiceItemId key, so pick-items/resolve/submit all work
+  // unchanged for either source) ──
   const [items, setItems] = useState<ReturnableItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [withinPolicy, setWithinPolicy] = useState(true);
@@ -73,12 +85,18 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
   useEffect(() => {
     if (!open) {
       setStep("pick-invoice"); setSearch(""); setHits([]); setInvoice(null);
+      setWalkInSearch(""); setPartySearch(""); setSelectedParty(null);
       setItems([]); setSelected({}); setReason("WRONG_PART"); setNotes("");
       setResolution(null); setRefundMode("CASH"); setNewSearch(""); setNewItems({});
       setCashAmount(""); setUpiAmount(""); setError("");
       return;
     }
-    if (initialInvoice) pickInvoice(initialInvoice);
+    if (initialInvoice) { pickInvoice(initialInvoice); return; }
+    // No pre-selected invoice — show a browsable list of recent sales, since a
+    // walk-in customer has no name/phone on file to search by.
+    getInvoices({ limit: "20" })
+      .then((data: any) => setRecentHits(Array.isArray(data?.invoices) ? data.invoices : []))
+      .catch(() => setRecentHits([]));
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -91,6 +109,44 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
       .finally(() => { if (!cancelled) setSearching(false); });
     return () => { cancelled = true; };
   }, [debouncedSearch, step]);
+
+  // Shared product list — used by both the walk-in item picker below and the
+  // exchange "giving instead" picker further down.
+  const shopProducts = useMemo(() => (storeProducts ?? []).filter((p: any) => p.shopId === activeShopId), [storeProducts, activeShopId]);
+
+  // ── Walk-in item picker — same shopProducts list the exchange "giving instead" search uses ──
+  const walkInProductHits = useMemo(() => {
+    if (!walkInSearch.trim()) return [];
+    const q = walkInSearch.toLowerCase();
+    return shopProducts.filter((p: any) => (p.name || "").toLowerCase().includes(q) || (p.oemNumber || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q)).slice(0, 10);
+  }, [shopProducts, walkInSearch]);
+
+  const addWalkInItem = (p: any) => {
+    const id = Number(p.inventoryId ?? p.id);
+    setItems(prev => [...prev.filter(i => i.invoiceItemId !== id), {
+      invoiceItemId: id, inventoryId: id, partName: p.name,
+      unitPrice: Number(p.sellPrice) || 0, discount: 0, gstRate: Number(p.gstRate) || 18,
+      qtySold: 0, qtyReturned: 0, qtyReturnable: 9999,
+    }]);
+    setSelected(prev => ({ ...prev, [id]: { qty: 1, condition: "GOOD" } }));
+    setWalkInSearch("");
+  };
+  const removeWalkInItem = (id: number) => {
+    setItems(prev => prev.filter(i => i.invoiceItemId !== id));
+    setSelected(prev => { const next = { ...prev }; delete next[id]; return next; });
+  };
+  const updateWalkInPrice = (id: number, unitPrice: number) =>
+    setItems(prev => prev.map(i => i.invoiceItemId === id ? { ...i, unitPrice } : i));
+
+  // ── Party picker — filters the already-loaded store parties, no extra request ──
+  const partyHits = useMemo(() => {
+    if (!partySearch.trim()) return [];
+    const q = partySearch.toLowerCase();
+    return (storeParties ?? [])
+      .filter((p: any) => p.shopId === activeShopId && ((p.name || "").toLowerCase().includes(q) || (p.phone || "").includes(q)))
+      .slice(0, 8)
+      .map((p: any) => ({ id: Number(p.partyId ?? p.id), name: p.name, phone: p.phone }));
+  }, [storeParties, activeShopId, partySearch]);
 
   function pickInvoice(inv: InvoiceHit) {
     setInvoice(inv);
@@ -119,8 +175,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
 
   const selectedCount = Object.keys(selected).length;
 
-  // ── New-item picker (exchange path only) ──
-  const shopProducts = useMemo(() => (storeProducts ?? []).filter((p: any) => p.shopId === activeShopId), [storeProducts, activeShopId]);
+  // ── New-item picker (exchange path only) — shopProducts defined earlier, shared with walk-in picker ──
   const productHits = useMemo(() => {
     if (!newSearch.trim()) return [];
     const q = newSearch.toLowerCase();
@@ -140,30 +195,57 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
   const newTotalEst = newTaxable * 1.18;
   const netAmount = newTotalEst - oldTotalEst;
 
+  // Walk-in mode = no invoice was ever picked (the "Process without one" fallback).
+  const isWalkIn = !invoice;
+  const effectivePartyId = invoice?.partyId ?? selectedParty?.id;
+
   const canSubmit = resolution === "REFUND"
-    ? selectedCount > 0 && (refundMode !== "STORE_CREDIT" || !!invoice?.partyId)
+    ? selectedCount > 0 && (refundMode !== "STORE_CREDIT" || !!effectivePartyId)
     : resolution === "EXCHANGE"
     ? selectedCount > 0 && newItemCount > 0
     : false;
 
   const submit = async () => {
-    if (!invoice || !resolution) return;
+    if (!resolution || (!invoice && !isWalkIn)) return;
     setSubmitting(true);
     setError("");
     try {
       if (resolution === "REFUND") {
-        await createSalesReturn({
-          originalInvoiceId: invoice.invoiceId,
-          items: Object.entries(selected).map(([id, v]) => ({ invoiceItemId: Number(id), qty: v.qty, condition: v.condition as any })),
-          reason: reason as any,
-          refundMode: refundMode as any,
-          notes: notes || undefined,
-        });
+        if (isWalkIn) {
+          await createWalkInSalesReturn({
+            items: Object.entries(selected).map(([id, v]) => {
+              const item = items.find(i => i.invoiceItemId === Number(id))!;
+              return { inventoryId: item.inventoryId, qty: v.qty, condition: v.condition as any, unitPrice: item.unitPrice };
+            }),
+            reason: reason as any,
+            refundMode: refundMode as any,
+            notes: notes || undefined,
+            partyId: selectedParty?.id,
+          });
+        } else {
+          await createSalesReturn({
+            originalInvoiceId: invoice!.invoiceId,
+            items: Object.entries(selected).map(([id, v]) => ({ invoiceItemId: Number(id), qty: v.qty, condition: v.condition as any })),
+            reason: reason as any,
+            refundMode: refundMode as any,
+            notes: notes || undefined,
+          });
+        }
         toast("Return created — credit note generated", "success");
       } else {
         await createExchange({
-          originalInvoiceId: invoice.invoiceId,
-          returnItems: Object.entries(selected).map(([id, v]) => ({ invoiceItemId: Number(id), qty: v.qty, condition: v.condition as any })),
+          ...(isWalkIn
+            ? {
+                walkInItems: Object.entries(selected).map(([id, v]) => {
+                  const item = items.find(i => i.invoiceItemId === Number(id))!;
+                  return { inventoryId: item.inventoryId, qty: v.qty, condition: v.condition as any, unitPrice: item.unitPrice };
+                }),
+                walkInPartyId: selectedParty?.id,
+              }
+            : {
+                originalInvoiceId: invoice!.invoiceId,
+                returnItems: Object.entries(selected).map(([id, v]) => ({ invoiceItemId: Number(id), qty: v.qty, condition: v.condition as any })),
+              }),
           returnReason: reason as any,
           returnNotes: notes || undefined,
           newItems: Object.entries(newItems).map(([id, v]) => ({ inventoryId: Number(id), qty: v.qty })),
@@ -181,8 +263,14 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
     }
   };
 
+  const subtitle = invoice
+    ? `Invoice ${invoice.invoiceNumber}`
+    : step === "pick-invoice"
+    ? "Find the original invoice to start"
+    : "Walk-in — no invoice on file";
+
   return (
-    <Modal open={open} onClose={onClose} title="Return / Exchange" subtitle={invoice ? `Invoice ${invoice.invoiceNumber}` : "Find the original invoice to start"} width={680}>
+    <Modal open={open} onClose={onClose} title="Return / Exchange" subtitle={subtitle} width={680}>
       {/* ── Step 1: find invoice ── */}
       {step === "pick-invoice" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -206,6 +294,121 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
               ))}
             </div>
           )}
+
+          {/* No active search — show a browsable recent-sales list. A walk-in
+              customer has no name/phone on file, so text search alone can leave
+              staff with nothing to type. */}
+          {!debouncedSearch.trim() && recentHits.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Recent sales</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
+                {recentHits.map(inv => (
+                  <button key={inv.invoiceId} onClick={() => pickInvoice(inv)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderRadius: 10, border: `1px solid ${T.border}`, background: T.surface, cursor: "pointer", textAlign: "left", minHeight: 44 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, fontFamily: FONT.mono }}>{inv.invoiceNumber}</div>
+                      <div style={{ fontSize: 12, color: T.t3, marginTop: 2 }}>{inv.partyName || "Walk-in"} · {new Date(inv.createdAt).toLocaleDateString()}</div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, fontFamily: FONT.mono }}>₹{Number(inv.totalAmount).toFixed(0)}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button onClick={() => setStep("walk-in-items")} style={{ background: "none", border: "none", color: T.amber, fontSize: 12, fontWeight: 700, cursor: "pointer", textAlign: "left", padding: "6px 0", minHeight: 32 }}>
+            Can't find the invoice? Process without one →
+          </button>
+        </div>
+      )}
+
+      {/* ── Step 1b: walk-in fallback — no invoice could be located ── */}
+      {step === "walk-in-items" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: "#FFFBF0", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 10, padding: "10px 14px", fontSize: 12, color: "#92400E", display: "flex", gap: 8 }}>
+            <span>⚠</span>
+            <span>No invoice on file — this will be recorded as a walk-in return and automatically flagged for manager review.</span>
+          </div>
+
+          <Field label="Item(s) being returned" required hint="Search the shop's own inventory for what the customer is bringing back">
+            <Input value={walkInSearch} onChange={setWalkInSearch} placeholder="Search parts by name or OEM number…" icon="🔍" />
+          </Field>
+          {walkInProductHits.length > 0 && (
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
+              {walkInProductHits.map((p: any) => (
+                <button key={p.inventoryId ?? p.id} onClick={() => addWalkInItem(p)} style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", border: "none", borderBottom: `1px solid ${T.border}`, background: T.surface, cursor: "pointer", textAlign: "left", minHeight: 44 }}>
+                  <span style={{ fontSize: 13, color: T.t1 }}>{p.name}</span>
+                  <span style={{ fontSize: 13, fontFamily: FONT.mono, color: T.t2 }}>₹{p.sellPrice}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {items.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {items.map(item => {
+                const sel = selected[item.invoiceItemId];
+                if (!sel) return null;
+                return (
+                  <div key={item.invoiceItemId} style={{ border: `1px solid ${T.amber}`, borderRadius: 10, padding: 12, background: T.amberGlow }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>{item.partName}</div>
+                      <button onClick={() => removeWalkInItem(item.invoiceItemId)} style={{ background: "none", border: "none", color: T.crimson, cursor: "pointer", fontSize: 16, minWidth: 32, minHeight: 32 }}>×</button>
+                    </div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                      <Field label="Qty" horizontal>
+                        <input type="number" min={1} value={sel.qty}
+                          onChange={e => updateSelection(item.invoiceItemId, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
+                          style={{ width: 60, padding: "6px 8px", borderRadius: 8, border: `1px solid ${T.border}`, fontFamily: FONT.mono, fontSize: 13 }} />
+                      </Field>
+                      <Field label="Condition" horizontal>
+                        <Select value={sel.condition} onChange={v => updateSelection(item.invoiceItemId, { condition: v })} options={CONDITIONS} style={{ width: 120, padding: "6px 10px" }} />
+                      </Field>
+                      <Field label="Price paid (₹/unit)" horizontal hint="Staff-entered — no invoice line to read it from">
+                        <input type="number" min={0} value={item.unitPrice}
+                          onChange={e => updateWalkInPrice(item.invoiceItemId, Math.max(0, parseFloat(e.target.value) || 0))}
+                          style={{ width: 80, padding: "6px 8px", borderRadius: 8, border: `1px solid ${T.border}`, fontFamily: FONT.mono, fontSize: 13 }} />
+                      </Field>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <Field label="Customer (optional)" hint="Search if they're a registered customer — needed to offer store credit">
+            <Input value={partySearch} onChange={setPartySearch} placeholder="Search by name or phone…" />
+          </Field>
+          {partyHits.length > 0 && (
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
+              {partyHits.map(p => (
+                <button key={p.id} onClick={() => { setSelectedParty(p); setPartySearch(""); }} style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", border: "none", borderBottom: `1px solid ${T.border}`, background: T.surface, cursor: "pointer", textAlign: "left", minHeight: 44 }}>
+                  <span style={{ fontSize: 13, color: T.t1 }}>{p.name}</span>
+                  {p.phone && <span style={{ fontSize: 12, fontFamily: FONT.mono, color: T.t3 }}>{p.phone}</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedParty && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, border: `1px solid ${T.amber}`, background: T.amberGlow, width: "fit-content" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>{selectedParty.name}</span>
+              <button onClick={() => setSelectedParty(null)} style={{ background: "none", border: "none", color: T.crimson, cursor: "pointer", fontSize: 14, minWidth: 24, minHeight: 24 }}>×</button>
+            </div>
+          )}
+
+          <Field label="Reason" required>
+            <Select value={reason} onChange={setReason} options={REASONS} />
+          </Field>
+          <Field label="Notes" hint="Optional context — helpful since there's no invoice to refer back to">
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: `1px solid ${T.border}`, fontFamily: FONT.ui, fontSize: 13, resize: "vertical" }} />
+          </Field>
+
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <Btn variant="ghost" onClick={() => setStep("pick-invoice")}>Back</Btn>
+            <Btn variant="amber" onClick={() => setStep("resolve")} disabled={selectedCount === 0}>
+              Continue{selectedCount > 0 ? ` (${selectedCount} item${selectedCount > 1 ? "s" : ""})` : ""}
+            </Btn>
+          </div>
         </div>
       )}
 
@@ -291,7 +494,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
                   <div style={{ fontSize: 12, color: T.t3, marginTop: 2 }}>Give a different part instead — only the price difference changes hands</div>
                 </div>
               </button>
-              <Btn variant="ghost" onClick={() => setStep("pick-items")} style={{ alignSelf: "flex-start", marginTop: 4 }}>Back</Btn>
+              <Btn variant="ghost" onClick={() => setStep(isWalkIn ? "walk-in-items" : "pick-items")} style={{ alignSelf: "flex-start", marginTop: 4 }}>Back</Btn>
             </div>
           )}
 
@@ -301,8 +504,10 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
               <Field label="Refund mode" required>
                 <Select value={refundMode} onChange={setRefundMode} options={REFUND_MODES} />
               </Field>
-              {refundMode === "STORE_CREDIT" && !invoice?.partyId && (
-                <div style={{ fontSize: 12, color: T.crimson, fontWeight: 600 }}>↑ Store credit needs a registered customer — this sale was to a walk-in. Choose Cash/UPI/Bank instead.</div>
+              {refundMode === "STORE_CREDIT" && !effectivePartyId && (
+                <div style={{ fontSize: 12, color: T.crimson, fontWeight: 600 }}>
+                  ↑ Store credit needs a registered customer{isWalkIn ? " — search/select one on the previous step, or " : " — this sale was to a walk-in. "}Choose Cash/UPI/Bank instead.
+                </div>
               )}
               {error && <div style={{ fontSize: 12, color: T.crimson, fontWeight: 600 }}>{error}</div>}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>

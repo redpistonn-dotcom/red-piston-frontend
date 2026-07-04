@@ -136,10 +136,12 @@ export function ReturnsPage() {
               <td style={TC}><TypeBadge isExchange={isExchange} /></td>
               <td style={TCMono}>{isExchange ? row.exchangeOrder.exchangeNo : row.returnNo}</td>
               <td style={TC}>{new Date(row.createdAt).toLocaleDateString()}</td>
-              <td style={{ ...TCMono, fontSize: 12 }}>{row.invoice?.invoiceNumber || "—"}</td>
+              <td style={{ ...TCMono, fontSize: 12 }}>{row.isWalkIn ? "Walk-in" : row.invoice?.invoiceNumber || "—"}</td>
               <td style={TC}>
                 {REASON_LABEL[row.reason] || row.reason}
-                {row.requiresApproval && <span title="Outside return policy window — flagged for review" style={{ marginLeft: 6, fontSize: 11 }}>⚠</span>}
+                {row.requiresApproval && (
+                  <span title={row.isWalkIn ? "No invoice found — flagged for manager review" : "Outside return policy window — flagged for review"} style={{ marginLeft: 6, fontSize: 11 }}>⚠</span>
+                )}
               </td>
               <td style={TC}>{isExchange ? settlementBadge(row.exchangeOrder.settlementType) : refundModeBadge(row.refundMode)}</td>
               <td style={{ ...TCMono, textAlign: "right" }}>₹{rowValue(row).toFixed(0)}</td>

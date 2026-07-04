@@ -288,7 +288,7 @@ function CreditNoteRegisterReport() {
         renderRow={(row: any) => (
           <tr key={row.creditNoteNo} className="trow">
             <td style={TCMono}>{row.creditNoteNo}</td><td style={TC}>{row.issueDate}</td>
-            <td style={{ ...TCMono, fontSize: 12 }}>{row.invoiceNumber}</td><td style={TC}>{row.party}</td>
+            <td style={{ ...TCMono, fontSize: 12 }}>{row.invoiceNumber || "—"}</td><td style={TC}>{row.party}</td>
             <td style={TC}>{row.type}</td><td style={{ ...TCMono, textAlign: "right" }}>₹{row.totalAmount.toFixed(0)}</td>
             <td style={{ ...TCMono, textAlign: "right" }}>₹{row.remainingBalance.toFixed(0)}</td><td style={TC}>{row.status.replace(/_/g, " ")}</td>
           </tr>

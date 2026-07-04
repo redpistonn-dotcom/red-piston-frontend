@@ -10,10 +10,11 @@
  * Auth: same Bearer token as all other pages (via api.get / raw fetch with
  * Authorization header for the binary Excel download).
  */
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt } from "../utils";
 import { api, getAccessToken, BASE_URL } from "../api/client.js";
+import { getGstPeriodLocks, lockGstPeriod, unlockGstPeriod, type GstPeriodLock } from "../api/gstPeriods";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,19 @@ interface B2CSRow {
   cesAmount?: number;
 }
 
+interface CreditNoteRow {
+  gstin?: string | null;
+  noteNumber: string;
+  noteDate: string;
+  originalInvoiceNumber?: string | null;
+  originalInvoiceDate?: string | null;
+  taxableValue: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  totalAmount: number;
+}
+
 // ── PERIOD PRESETS ────────────────────────────────────────────────────────────
 
 const PRESETS = [
@@ -99,12 +113,41 @@ export function GstrPage() {
   const [customFrom, setCustomFrom] = useState(firstOfMonth);
   const [customTo,   setCustomTo]   = useState(lastOfMonth);
 
-  const [previewMode, setPreviewMode]   = useState<"b2b" | "hsn" | "b2cs" | null>(null);
-  const [previewData, setPreviewData]   = useState<B2BRow[] | HsnRow[] | null>(null);
+  const [previewMode, setPreviewMode]   = useState<"b2b" | "hsn" | "b2cs" | "credit-notes" | null>(null);
+  const [previewData, setPreviewData]   = useState<B2BRow[] | HsnRow[] | CreditNoteRow[] | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError]   = useState("");
+  const [cnSummary, setCnSummary] = useState<{ taxableValue: number; cgst: number; sgst: number; igst: number; totalAmount: number } | null>(null);
 
   const [downloadMsg, setDownloadMsg] = useState("");
+
+  // ── GST period locking ──────────────────────────────────────────────────────
+  const [locks, setLocks] = useState<GstPeriodLock[]>([]);
+  const [lockPeriod, setLockPeriod] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [lockBusy, setLockBusy] = useState(false);
+  const [lockError, setLockError] = useState("");
+
+  const loadLocks = useCallback(() => {
+    getGstPeriodLocks().then(res => setLocks(res.locks || [])).catch(() => {});
+  }, []);
+  useEffect(() => { loadLocks(); }, [loadLocks]);
+
+  const toggleLock = useCallback(async (period: string, currentlyLocked: boolean) => {
+    setLockBusy(true);
+    setLockError("");
+    try {
+      if (currentlyLocked) await unlockGstPeriod(period);
+      else await lockGstPeriod(period);
+      loadLocks();
+    } catch (e: any) {
+      setLockError(e?.message || "Could not update the lock");
+    } finally {
+      setLockBusy(false);
+    }
+  }, [loadLocks]);
 
   // Resolve active date range from the chosen preset or custom inputs
   const dateRange = (() => {
@@ -114,12 +157,20 @@ export function GstrPage() {
 
   // ── Preview ──────────────────────────────────────────────────────────────────
 
-  const fetchPreview = useCallback(async (mode: "b2b" | "hsn" | "b2cs") => {
+  const fetchPreview = useCallback(async (mode: "b2b" | "hsn" | "b2cs" | "credit-notes") => {
     setPreviewMode(mode);
     setPreviewData(null);
+    setCnSummary(null);
     setPreviewError("");
     setPreviewLoading(true);
     try {
+      if (mode === "credit-notes") {
+        const res: any = await api.get("/api/billing/gstr1/credit-notes", { from: dateRange.from, to: dateRange.to, format: "json" });
+        setPreviewData(res?.rows || []);
+        setCnSummary(res?.summary || null);
+        setPreviewLoading(false);
+        return;
+      }
       // Backend returns { success, period, invoiceCount, b2b, b2cs, hsn } for format=json.
       // "preview" is not a recognised format value — use json and extract the relevant section.
       const res: any = await api.get("/api/billing/gstr1", {
@@ -198,6 +249,36 @@ export function GstrPage() {
       const a = document.createElement("a");
       a.href = objUrl;
       a.download = `GSTR1_${dateRange.from}_${dateRange.to}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(objUrl); a.remove(); }, 2000);
+      setDownloadMsg("Downloaded!");
+    } catch (e: any) {
+      setDownloadMsg("Download failed: " + (e?.message || "Unknown error"));
+    } finally {
+      setTimeout(() => setDownloadMsg(""), 4000);
+    }
+  }, [dateRange.from, dateRange.to]);
+
+  const downloadCreditNotes = useCallback(async (format: "excel" | "json") => {
+    const params = new URLSearchParams({ from: dateRange.from, to: dateRange.to, format });
+    const url = `${BASE_URL}/api/billing/gstr1/credit-notes?${params}`;
+
+    if (format === "json") {
+      window.open(url, "_blank");
+      return;
+    }
+
+    setDownloadMsg("Preparing Excel…");
+    try {
+      const token = getAccessToken();
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: "include" });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      const blob = await res.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = `GSTR1_9B_CreditNotes_${dateRange.from}_${dateRange.to}.xlsx`;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(objUrl); a.remove(); }, 2000);
@@ -316,6 +397,45 @@ export function GstrPage() {
     </div>
   );
 
+  const renderCreditNotes = (rows: CreditNoteRow[]) => (
+    <div style={{ overflowX: "auto", marginTop: 16 }}>
+      <div style={{ fontSize: 12, color: T.t3, marginBottom: 8 }}>
+        {rows.length} GST credit note{rows.length !== 1 ? "s" : ""} — commercial-only notes are excluded (never affect GST returns)
+      </div>
+      {cnSummary && (
+        <div style={{ display: "flex", gap: 16, marginBottom: 12, padding: "10px 14px", background: T.surfaceContainerLow, borderRadius: 10, fontSize: 12 }}>
+          <span>Taxable: <strong style={{ fontFamily: FONT.mono }}>{fmt(cnSummary.taxableValue)}</strong></span>
+          <span>CGST: <strong style={{ fontFamily: FONT.mono }}>{fmt(cnSummary.cgst)}</strong></span>
+          <span>SGST: <strong style={{ fontFamily: FONT.mono }}>{fmt(cnSummary.sgst)}</strong></span>
+          <span>Total (3.1(a) adjustment): <strong style={{ fontFamily: FONT.mono, color: T.amber }}>{fmt(cnSummary.totalAmount)}</strong></span>
+        </div>
+      )}
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: T.surfaceContainerLow }}>
+            {["Credit Note No", "Date", "Original Invoice", "GSTIN", "Taxable", "CGST", "SGST", "Total"].map(h => (
+              <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: T.t2, borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} style={{ borderBottom: `1px solid ${T.border}` }}>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono, fontWeight: 600 }}>{r.noteNumber}</td>
+              <td style={{ padding: "8px 12px", color: T.t3 }}>{r.noteDate}</td>
+              <td style={{ padding: "8px 12px" }}>{r.originalInvoiceNumber || "—"}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono, color: T.t3 }}>{r.gstin || "—"}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{fmt(r.taxableValue)}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{fmt(r.cgst)}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono }}>{fmt(r.sgst)}</td>
+              <td style={{ padding: "8px 12px", fontFamily: FONT.mono, fontWeight: 700, color: T.amber }}>{fmt(r.totalAmount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   // ── JSX ───────────────────────────────────────────────────────────────────────
 
   return (
@@ -397,6 +517,15 @@ export function GstrPage() {
             Preview B2CS
           </button>
 
+          <button
+            onClick={() => fetchPreview("credit-notes")}
+            style={{ ...btnBase, background: T.violet, color: "#fff" }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = "0.85")}
+            onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+          >
+            Preview Credit Notes (9B)
+          </button>
+
           <div style={{ width: 1, height: 28, background: T.border, margin: "0 4px" }} />
 
           <button
@@ -417,6 +546,15 @@ export function GstrPage() {
             Download JSON
           </button>
 
+          <div style={{ width: 1, height: 28, background: T.border, margin: "0 4px" }} />
+
+          <button
+            onClick={() => downloadCreditNotes("excel")}
+            style={{ ...btnBase, background: "transparent", color: T.violet, border: `1.5px solid ${T.violet}` }}
+          >
+            Download Credit Notes (Excel)
+          </button>
+
           {downloadMsg && (
             <span style={{
               fontSize: 12, color: downloadMsg.startsWith("Download failed") ? T.crimson : T.emerald,
@@ -431,7 +569,7 @@ export function GstrPage() {
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.xs }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, fontFamily: FONT.display }}>
-              {previewMode === "b2b" ? "B2B Invoice Preview" : previewMode === "b2cs" ? "B2CS Preview" : "HSN Summary Preview"}
+              {previewMode === "b2b" ? "B2B Invoice Preview" : previewMode === "b2cs" ? "B2CS Preview" : previewMode === "credit-notes" ? "Credit Notes (Table 9B) Preview" : "HSN Summary Preview"}
             </div>
             <button
               onClick={() => { setPreviewMode(null); setPreviewData(null); setPreviewError(""); }}
@@ -464,11 +602,48 @@ export function GstrPage() {
               ? renderB2B(previewData as B2BRow[])
               : previewMode === "hsn"
               ? renderHsn(previewData as HsnRow[])
+              : previewMode === "credit-notes"
+              ? renderCreditNotes(previewData as CreditNoteRow[])
               : null
           )}
           {previewMode === "b2cs" && Array.isArray(previewData) && renderB2CS(previewData as B2CSRow[])}
         </div>
       )}
+
+      {/* GST period locking */}
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, boxShadow: SHADOWS.xs }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
+          GST Period Locking
+        </div>
+        <p style={{ margin: "0 0 14px", fontSize: 12, color: T.t3 }}>
+          Once a month is filed/reconciled, lock it — any new return's credit note that would otherwise declare into a locked period is automatically kept commercial-only instead of adjusting GST.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <input type="month" value={lockPeriod} onChange={e => setLockPeriod(e.target.value)} style={inputStyle} />
+          {(() => {
+            const isLocked = locks.some(l => l.period === lockPeriod);
+            return (
+              <button
+                onClick={() => toggleLock(lockPeriod, isLocked)}
+                disabled={lockBusy}
+                style={{ ...btnBase, background: isLocked ? "transparent" : T.crimson, color: isLocked ? T.crimson : "#fff", border: isLocked ? `1.5px solid ${T.crimson}` : "none", opacity: lockBusy ? 0.6 : 1 }}
+              >
+                {isLocked ? "Unlock period" : "Lock period"}
+              </button>
+            );
+          })()}
+          {lockError && <span style={{ fontSize: 12, color: T.crimson, fontWeight: 600 }}>{lockError}</span>}
+        </div>
+        {locks.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+            {locks.map(l => (
+              <span key={l.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 999, background: "rgba(190,43,26,0.08)", color: T.crimson, fontSize: 12, fontWeight: 600, fontFamily: FONT.mono }}>
+                🔒 {l.period}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

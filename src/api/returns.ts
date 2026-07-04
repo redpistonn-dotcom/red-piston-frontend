@@ -41,6 +41,26 @@ export interface CreateReturnPayload {
 export const createSalesReturn = (data: CreateReturnPayload) =>
   api.post('/api/shop/returns', data);
 
+export interface CreateWalkInReturnItem {
+  inventoryId: number;
+  qty: number;
+  condition: 'SEALED' | 'GOOD' | 'DAMAGED' | 'USED';
+  unitPrice: number;
+}
+
+export interface CreateWalkInReturnPayload {
+  items: CreateWalkInReturnItem[];
+  reason: 'WRONG_PART' | 'DEFECTIVE' | 'WARRANTY' | 'CHANGED_MIND' | 'OTHER';
+  refundMode: 'CASH' | 'UPI' | 'BANK' | 'STORE_CREDIT';
+  notes?: string;
+  partyId?: number;
+}
+
+// Fallback when staff can't locate the original invoice (no name/phone on
+// file, receipt lost, etc.) — always flagged for manager review server-side.
+export const createWalkInSalesReturn = (data: CreateWalkInReturnPayload) =>
+  api.post('/api/shop/returns/walk-in', data);
+
 export const getSalesReturns = (params?: Record<string, string>) =>
   api.get('/api/shop/returns', params);
 
