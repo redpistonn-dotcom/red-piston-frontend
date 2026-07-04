@@ -29,13 +29,13 @@ const VARIANTS = {
 };
 
 const SIZES = {
-    xs: { pad: "4px 10px",  fs: 11, radius: 6  },
-    sm: { pad: "6px 14px",  fs: 12, radius: 7  },
-    md: { pad: "9px 20px",  fs: 13, radius: 8  },
-    lg: { pad: "12px 28px", fs: 15, radius: 10 },
+    xs: { pad: "4px 10px",   fs: 11, radius: 8  },
+    sm: { pad: "6px 14px",   fs: 12, radius: 9  },
+    md: { pad: "10px 22px",  fs: 13, radius: 10 },
+    lg: { pad: "12px 28px",  fs: 15, radius: 10 },
 };
 
-export function Btn({ children, onClick, variant = "amber", size = "md", full, disabled, loading, style: sx = {}, className = "", type = "button", ...rest }) {
+export function Btn({ children, onClick, variant = "amber", size = "md", full = false, disabled = false, loading = false, style: sx = {}, className = "", type = "button", ...rest }: BtnProps) {
     const [hovered, setHovered] = useState(false);
     const [active, setActive] = useState(false);
 
@@ -83,11 +83,12 @@ export function Btn({ children, onClick, variant = "amber", size = "md", full, d
                 justifyContent: "center",
                 gap: 6,
                 width: full ? "100%" : "auto",
-                opacity: disabled ? 0.45 : 1,
+                opacity: disabled ? 0.5 : (hovered && isInteractive ? 0.88 : 1),
                 letterSpacing: "0.01em",
                 boxShadow: shadow,
                 transform,
-                transition: "transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s cubic-bezier(0.16,1,0.3,1), border-color 0.15s, color 0.15s",
+                minHeight: 38,
+                transition: "all 0.15s ease, transform 0.18s cubic-bezier(0.16,1,0.3,1), box-shadow 0.18s cubic-bezier(0.16,1,0.3,1)",
                 userSelect: "none",
                 WebkitUserSelect: "none",
                 ...sx,

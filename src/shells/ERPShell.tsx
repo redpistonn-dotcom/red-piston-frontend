@@ -10,6 +10,7 @@
  *   Mobile   → bottom tab bar (CSS only via GLOBAL_CSS @media)
  */
 import { useState, useContext, useMemo, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { T, FONT, GLOBAL_CSS, SP, SHADOWS } from "../theme";
 import { fmt } from "../utils";
@@ -47,6 +48,9 @@ const NAV_ITEMS = [
   { key: "audit",       path: "/audit",              icon: "manage_search",  label: "Audit Log"      },
   { key: "staff",       path: "/staff",              icon: "group",          label: "Staff"          },
   { key: "shop-settings", path: "/shop-settings",   icon: "store",          label: "Shop Settings"  },
+  { key: "returns",     path: "/returns",            icon: "assignment_return", label: "Returns & Exchange" },
+  { key: "purchase-returns", path: "/purchase-returns", icon: "unarchive",  label: "Purchase Returns" },
+  { key: "warranty",    path: "/warranty",           icon: "verified",       label: "Warranty"       },
 ] as const;
 
 // Resolve a single active nav key: the item whose path is the LONGEST match for
@@ -252,6 +256,23 @@ export function ERPShell({ children }: ERPShellProps) {
   // ── Mobile drawer state ───────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
   const touchStartX = useRef(0);
+
+  // ── Global Cmd+K search overlay ─────────────────────────────────────
+  const [showSearch, setShowSearch] = useState(false);
+  const [cmdKQuery, setCmdKQuery] = useState("");
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowSearch(s => !s);
+        setCmdKQuery("");
+      }
+      if (e.key === "Escape") setShowSearch(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // ── Server-first data loader — fetch on mount and re-fetch on rp:data-changed ─
   const [dataLoadError, setDataLoadError] = useState(false);
@@ -677,6 +698,13 @@ export function ERPShell({ children }: ERPShellProps) {
               {/* Live sync status pill */}
               <SyncIndicator />
 
+              {/* Cmd+K hint chip */}
+              <button onClick={() => { setShowSearch(true); setCmdKQuery(""); }}
+                style={{ background: T.surfaceContainerHigh, border: `1px solid ${T.border}`, borderRadius: 8, padding: "3px 10px", fontSize: 11, color: T.t3, cursor: "pointer", fontFamily: FONT.mono, flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}
+                title="Global search (⌘K)">
+                🔍 <span style={{ fontSize: 10 }}>⌘K</span>
+              </button>
+
               {/* Low stock warning chip */}
               {lowCount > 0 && currentPath !== "/inventory" && (
                 <button
@@ -906,6 +934,44 @@ export function ERPShell({ children }: ERPShellProps) {
       </nav>
 
       <Toast items={toasts} onRemove={removeToast} />
+
+      {/* ── Cmd+K Global Search Overlay ── */}
+      {showSearch && createPortal(
+        <div
+          onClick={() => setShowSearch(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 2147483647, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 80 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: `min(600px, 92vw)`, borderRadius: 16, background: "#fff", boxShadow: "0 24px 64px rgba(0,0,0,0.4)", overflow: "hidden" }}>
+            <input
+              autoFocus
+              value={cmdKQuery}
+              onChange={e => setCmdKQuery(e.target.value)}
+              placeholder="Search pages…"
+              style={{ width: "100%", fontSize: 16, padding: "14px 20px", border: "none", outline: "none", borderBottom: `1px solid ${T.border}`, fontFamily: FONT.ui, color: T.t1, boxSizing: "border-box" }}
+            />
+            <div style={{ maxHeight: 360, overflowY: "auto" }}>
+              {NAV_ITEMS.filter(n => !cmdKQuery.trim() || n.label.toLowerCase().includes(cmdKQuery.toLowerCase())).map(n => {
+                const isActive = n.key === navActiveKey;
+                return (
+                  <button key={n.key} onClick={() => { navigate(n.path); setShowSearch(false); setCmdKQuery(""); }}
+                    style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", border: "none", background: isActive ? T.amberGlow : "transparent", cursor: "pointer", textAlign: "left", fontFamily: FONT.ui, borderBottom: `1px solid ${T.border}` }}>
+                    <MSIcon name={n.icon} filled={isActive} size={18} />
+                    <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 400, color: isActive ? T.amber : T.t1 }}>{n.label}</span>
+                    {isActive && <span style={{ marginLeft: "auto", fontSize: 10, color: T.t3 }}>Current</span>}
+                  </button>
+                );
+              })}
+              {cmdKQuery.trim() && NAV_ITEMS.filter(n => n.label.toLowerCase().includes(cmdKQuery.toLowerCase())).length === 0 && (
+                <div style={{ padding: "20px 20px", fontSize: 13, color: T.t3, textAlign: "center" }}>No pages match "{cmdKQuery}"</div>
+              )}
+            </div>
+            <div style={{ padding: "10px 20px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 11, color: T.t3 }}>↑↓ navigate · Enter to open · Esc to close</span>
+              <span style={{ fontSize: 11, background: T.surfaceContainerHigh, borderRadius: 6, padding: "2px 8px", color: T.t3, fontFamily: FONT.mono }}>⌘K</span>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Shop setup nudge modal ────────────────────────────────────────
           Prompts shop owners to add photo + contact; dismissible via X.

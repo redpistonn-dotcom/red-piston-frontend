@@ -52,6 +52,10 @@ const OrdersPage     = lazy(() => import("./pages/OrdersPage").then(m => ({ defa
 const PartiesPage    = lazy(() => import("./pages/PartiesPage").then(m => ({ default: m.PartiesPage })));
 const WorkshopPage   = lazy(() => import("./pages/WorkshopPage").then(m => ({ default: m.WorkshopPage })));
 const PricingPage    = lazy(() => import("./pages/PricingPage").then(m => ({ default: m.PricingPage })));
+const ReturnsPage         = lazy(() => import("./pages/ReturnsPage").then(m => ({ default: m.ReturnsPage })));
+const PurchaseReturnsPage = lazy(() => import("./pages/PurchaseReturnsPage").then(m => ({ default: m.PurchaseReturnsPage })));
+const WarrantyPage        = lazy(() => import("./pages/WarrantyPage").then(m => ({ default: m.WarrantyPage })));
+const ReturnsReportsPage  = lazy(() => import("./pages/ReturnsReportsPage").then(m => ({ default: m.ReturnsReportsPage })));
 
 const MarketplaceHome    = lazy(() => import("./marketplace/pages/MarketplaceHome").then(m => ({ default: m.MarketplaceHome })));
 // New marketplace + cart pages (Stitch design)
@@ -822,6 +826,12 @@ function AppContent() {
           <Route path="/audit"      element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><AuditLogPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/staff"      element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><StaffPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/shop-settings" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ShopSettingsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/returns"          element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ReturnsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/purchase-returns" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><PurchaseReturnsPage /></PageErrorBoundary></ERPShell>)} />
+          {/* Returns and Exchange merged into one flow — old bookmarks to /exchanges still land somewhere sensible */}
+          <Route path="/exchanges"        element={<Navigate to="/returns" replace />} />
+          <Route path="/warranty"         element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><WarrantyPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/reports/returns"  element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ReturnsReportsPage /></PageErrorBoundary></ERPShell>)} />
 
           {/* Marketplace routes */}
           {/* New marketplace — Stitch design (browse without login, cart requires login) */}

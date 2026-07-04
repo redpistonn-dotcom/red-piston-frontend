@@ -1,5 +1,22 @@
 import { useState, useRef, useEffect } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import { T, FONT } from "../../theme";
+
+interface InputProps {
+    value: string | number;
+    onChange?: (v: string) => void;
+    placeholder?: string;
+    type?: string;
+    prefix?: string;
+    suffix?: string;
+    icon?: string;
+    autoFocus?: boolean;
+    onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+    readOnly?: boolean;
+    disabled?: boolean;
+    style?: CSSProperties;
+    [key: string]: unknown;
+}
 
 export function Input({
     value,
@@ -15,7 +32,7 @@ export function Input({
     disabled,
     style: sx = {},
     ...rest
-}) {
+}: InputProps) {
     const [focus, setF] = useState(false);
     const ref = useRef(null);
     useEffect(() => { if (autoFocus && ref.current) ref.current.focus(); }, [autoFocus]);
@@ -51,15 +68,15 @@ export function Input({
                 style={{
                     width: "100%",
                     background: T.surface,
-                    border: `1px solid ${focus ? T.amber : T.border}`,
+                    border: `1px solid ${focus ? T.sky : T.border}`,
                     color: T.t1,
-                    borderRadius: 8,
-                    padding: `10px ${suffix ? "36px" : "12px"} 10px ${(icon || prefix) ? "34px" : "12px"}`,
+                    borderRadius: 10,
+                    padding: `11px ${suffix ? "36px" : "14px"} 11px ${(icon || prefix) ? "34px" : "14px"}`,
                     fontSize: 14,
                     outline: "none",
                     fontFamily: type === "number" ? FONT.mono : FONT.ui,
                     transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-                    boxShadow: focus ? `0 0 0 3px ${T.amber}22` : "none",
+                    boxShadow: focus ? `0 0 0 3px ${T.sky}22` : "none",
                     cursor: disabled ? "not-allowed" : undefined,
                     opacity: disabled ? 0.55 : 1,
                     ...sx,

@@ -1,10 +1,20 @@
+import type { ReactNode } from "react";
 import { T, FONT } from "../../theme";
 
-export function Field({ label, required, hint, error, children, horizontal }) {
+interface FieldProps {
+    label?: string;
+    required?: boolean;
+    hint?: string;
+    error?: string;
+    children: ReactNode;
+    horizontal?: boolean;
+}
+
+export function Field({ label, required = false, hint, error, children, horizontal = false }: FieldProps) {
     return (
-        <div style={{ display: "flex", flexDirection: horizontal ? "row" : "column", gap: horizontal ? 12 : 5, alignItems: horizontal ? "center" : "stretch" }}>
+        <div style={{ display: "flex", flexDirection: horizontal ? "row" : "column", gap: horizontal ? 12 : 6, alignItems: horizontal ? "center" : "stretch" }}>
             {label && (
-                <label style={{ fontSize: 11, fontWeight: 600, color: T.t3, letterSpacing: "0.07em", textTransform: "uppercase", fontFamily: FONT.ui, whiteSpace: "nowrap", flexShrink: 0 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: T.t3, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: FONT.ui, whiteSpace: "nowrap", flexShrink: 0, marginBottom: horizontal ? 0 : 0 }}>
                     {label}{required && <span style={{ color: T.crimson, marginLeft: 2 }}>*</span>}
                 </label>
             )}
