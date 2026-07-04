@@ -18,6 +18,9 @@ interface BackendInventory {
   shopId: number;
   sellingPrice: number | string;
   buyingPrice: number | string;
+  mrp?: number | string | null;
+  nickname?: string | null;
+  customPartName?: string | null;
   stockQty?: number;
   computedStock?: number;
   minStockAlert?: number;
@@ -112,7 +115,8 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     inventoryId: inv.inventoryId,
     masterPartId: inv.masterPartId ?? undefined,
     globalSku: String(inv.masterPartId ?? ''),
-    name: inv.customPartName || mp?.partName || inv.partName || 'Unknown Part',
+    name: inv.nickname || inv.customPartName || mp?.partName || inv.partName || 'Unknown Part',
+    nickname: inv.nickname || null,
     oemNumber: oemStr || null,
     barcodes: barcodesArr as string[],
     brand: mp?.brand || null,
@@ -123,6 +127,7 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     description: mp?.description || null,
     sellPrice: parseFloat(String(inv.sellingPrice ?? 0)),
     buyPrice: parseFloat(String(inv.buyingPrice ?? 0)),
+    mrp: inv.mrp != null ? parseFloat(String(inv.mrp)) : null,
     stock: inv.computedStock ?? inv.stockQty ?? 0,
     minStock: inv.minStockAlert ?? 5,
     rack: inv.rackLocation || null,
@@ -340,6 +345,7 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
       await api.put(`/api/shop/inventory/${product.inventoryId}`, {
         sellingPrice: product.sellPrice,
         buyingPrice: product.buyPrice,
+        mrp: product.mrp ?? undefined,
         rackLocation: product.rack ?? product.location,
         minStockAlert: product.minStock,
         maxStockLevel: product.maxStock ?? undefined,

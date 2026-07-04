@@ -8,3 +8,4 @@ export const getOverdueParties = () => api.get('/api/shop/parties/summary/overdu
 export const updateParty = (id, data) => api.put(`/api/shop/parties/${id}`, data);
 export const deleteParty = (id) => api.delete(`/api/shop/parties/${id}`);
 export const addLedgerEntry = (id, data) => api.post(`/api/shop/parties/${id}/ledger`, data);
+export const applySupplierCredit = (id, data) => api.post(`/api/shop/parties/${id}/apply-supplier-credit`, data);

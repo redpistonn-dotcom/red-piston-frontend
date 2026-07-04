@@ -71,6 +71,10 @@ export interface Product {
   description?: string | null;
   sellPrice: number;
   buyPrice: number;
+  /** Maximum Retail Price — printed ceiling price, independent of sellPrice */
+  mrp?: number | null;
+  /** Customer-facing nickname (Manual Entry "Part Name") — distinct from the OEM name */
+  nickname?: string | null;
   stock: number;
   minStock: number;
   rack?: string | null;

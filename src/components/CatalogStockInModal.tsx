@@ -208,7 +208,7 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
       {cart.length > 0 && (
         <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, marginBottom: 14, maxHeight: 460 }}>
           {cart.map((item) => {
-            const name     = item.type === "catalog" ? item.part.partName  : item.form.partName;
+            const name     = item.type === "catalog" ? item.part.partName  : (item.form.nickname || item.form.partName);
             const brand    = item.type === "catalog" ? item.part.brand     : item.form.brand;
             const category = item.type === "catalog" ? item.part.categoryL1 : item.form.categoryL1;
             const imgSrc   = item.type === "catalog"
@@ -709,7 +709,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
   const catalogImage = part.imageUrl || (part.images && part.images[0]) || "";
   // When re-editing a cart item, prefill with its saved form; otherwise blank.
   const [f, setF] = useState(initialForm || {
-    buyPrice: "", sellPrice: "", stockQty: "0",
+    buyPrice: "", sellPrice: "", mrp: "", stockQty: "0",
     rackLocation: "", minStockAlert: "5",
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
@@ -728,6 +728,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
     const e = {};
     if (!f.buyPrice || isNaN(f.buyPrice) || parseFloat(f.buyPrice) <= 0) e.buyPrice = "Must be greater than 0";
     if (!f.sellPrice || isNaN(f.sellPrice) || parseFloat(f.sellPrice) <= 0) e.sellPrice = "Must be greater than 0";
+    if (f.mrp && (isNaN(f.mrp) || parseFloat(f.mrp) <= 0)) e.mrp = "Must be greater than 0";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -819,6 +820,9 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
           <Field label="Selling Price (₹)" required error={errors.sellPrice}>
             <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
           </Field>
+          <Field label="MRP (₹)" error={errors.mrp} hint="Printed ceiling price (optional)">
+            <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
+          </Field>
           <Field label="Opening Stock" required error={errors.stockQty} hint="Units currently in hand">
             <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" />
           </Field>
@@ -880,9 +884,9 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
 // ─── Fallback: Contribute new part ────────────────────────────────────────────
 function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSave, saving }) {
   const blank = {
-    partName: initialName || "", brand: "", categoryL1: "", categoryL2: "",
+    partName: initialName || "", nickname: "", brand: "", categoryL1: "", categoryL2: "",
     oemNumber: initialBarcode || "", hsnCode: "", gstRate: "18", unitOfSale: "Piece", description: "",
-    buyPrice: "", sellPrice: "", stockQty: "0", rackLocation: "", minStockAlert: "5",
+    buyPrice: "", sellPrice: "", mrp: "", stockQty: "0", rackLocation: "", minStockAlert: "5",
     imageUrl: "", partType: "OEM",
     _scannedBarcode: initialBarcode || "",
   };
@@ -912,6 +916,7 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
     if (!f.categoryL1)      e.categoryL1 = "Select a category";
     if (!f.buyPrice || isNaN(f.buyPrice) || parseFloat(f.buyPrice) <= 0) e.buyPrice = "Must be greater than 0";
     if (!f.sellPrice || isNaN(f.sellPrice) || parseFloat(f.sellPrice) <= 0) e.sellPrice = "Must be greater than 0";
+    if (f.mrp && (isNaN(f.mrp) || parseFloat(f.mrp) <= 0)) e.mrp = "Must be greater than 0";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -947,12 +952,16 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <div style={{ gridColumn: "span 2" }}>
-          <Field label="Part Name" required error={errors.partName}>
-            <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" maxLength={200} />
-          </Field>
-        </div>
         {/* Photo is added later at marketplace "Go Live" — not required here. */}
+        <Field label="OEM Name" required error={errors.partName} hint="The official / manufacturer name">
+          <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" maxLength={200} />
+        </Field>
+        <Field label="OEM Part Number" hint="From the box / manufacturer website">
+          <Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="04465-02220" maxLength={50} />
+        </Field>
+        <Field label="Part Name" hint="Nickname shown to customers (optional)">
+          <Input value={f.nickname} onChange={set("nickname")} placeholder="Front Brake Pad" maxLength={200} />
+        </Field>
         <Field label="Brand">
           <Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK, Denso…" maxLength={80} />
         </Field>
@@ -966,6 +975,9 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
             ]}
           />
         </Field>
+        <Field label="Unit of Sale">
+          <Select value={f.unitOfSale} onChange={set("unitOfSale")} options={UNIT_OPTIONS.map((u) => ({ value: u, label: u }))} />
+        </Field>
         <div style={{ gridColumn: "span 2" }}>
           <Field label="Part Type" hint="OEM = original manufacturer part · OES = aftermarket / compatible">
             <Select
@@ -978,19 +990,11 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
             />
           </Field>
         </div>
-        <div style={{ gridColumn: "span 2" }}>
-          <Field label="OEM Part Number" hint="From the box / manufacturer website">
-            <Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="04465-02220" maxLength={50} />
-          </Field>
-        </div>
         <Field label="HSN Code">
           <Input value={f.hsnCode} onChange={e => set("hsnCode")(e.replace(/[^\d]/g, "").slice(0, 8))} placeholder="87083000" maxLength={8} inputMode="numeric" />
         </Field>
         <Field label="GST Rate">
           <Select value={f.gstRate} onChange={set("gstRate")} options={GST_RATES.map((r) => ({ value: r, label: r + "% GST" }))} />
-        </Field>
-        <Field label="Unit of Sale">
-          <Select value={f.unitOfSale} onChange={set("unitOfSale")} options={UNIT_OPTIONS.map((u) => ({ value: u, label: u }))} />
         </Field>
         <Field label="Buying Price (₹)" required error={errors.buyPrice}>
           <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
@@ -998,17 +1002,18 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
         <Field label="Selling Price (₹)" required error={errors.sellPrice}>
           <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
         </Field>
+        <Field label="MRP (₹)" error={errors.mrp} hint="Printed ceiling price (optional)">
+          <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
+        </Field>
         <Field label="Opening Stock" required error={errors.stockQty}>
           <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" />
         </Field>
         <Field label="Min Stock Alert">
           <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" min="0" max="10000" />
         </Field>
-        <div style={{ gridColumn: "span 2" }}>
-          <Field label="Rack / Storage Location">
-            <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" />
-          </Field>
-        </div>
+        <Field label="Rack / Storage Location">
+          <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" />
+        </Field>
         <div style={{ gridColumn: "span 2" }}>
           <Field label="Description" hint="Technical notes, material, application">
             <Input value={f.description} onChange={set("description")} placeholder="Ceramic brake pads for front axle…" />
@@ -1188,6 +1193,7 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
               masterPartId:  part.masterPartId,
               sellingPrice:  parseFloat(form.sellPrice),
               buyingPrice:   parseFloat(form.buyPrice),
+              mrp:           form.mrp ? parseFloat(form.mrp) : undefined,
               stockQty:      parseInt(form.stockQty) || 0,
               rackLocation:  form.rackLocation || null,
               minStockAlert: parseInt(form.minStockAlert) || 5,
@@ -1216,6 +1222,7 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
               specifications: part.specifications || {},
               sellPrice:      parseFloat(form.sellPrice),
               buyPrice:       parseFloat(form.buyPrice),
+              mrp:            form.mrp ? parseFloat(form.mrp) : null,
               stock:          parseInt(form.stockQty) || 0,
               minStock:       parseInt(form.minStockAlert) || 5,
               rack:           form.rackLocation || "",
@@ -1303,6 +1310,8 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
                 masterPartId,
                 sellingPrice:  parseFloat(form.sellPrice),
                 buyingPrice:   parseFloat(form.buyPrice),
+                mrp:           form.mrp ? parseFloat(form.mrp) : undefined,
+                nickname:      form.nickname || undefined,
                 stockQty:      parseInt(form.stockQty) || 0,
                 rackLocation:  form.rackLocation || null,
                 minStockAlert: parseInt(form.minStockAlert) || 5,
@@ -1317,7 +1326,8 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
                 inventoryId:  invRes.item.inventoryId,
                 masterPartId,
                 globalSku:    masterPartId,
-                name:         form.partName,
+                name:         form.nickname || form.partName,
+                nickname:     form.nickname || null,
                 oemNumber:    form.oemNumber || "",
                 brand:        form.brand    || "",
                 category:     form.categoryL1 || "General",
@@ -1326,6 +1336,7 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
                 unitOfSale:   form.unitOfSale || "Piece",
                 sellPrice:    parseFloat(form.sellPrice),
                 buyPrice:     parseFloat(form.buyPrice),
+                mrp:          form.mrp ? parseFloat(form.mrp) : null,
                 stock:        parseInt(form.stockQty) || 0,
                 minStock:     parseInt(form.minStockAlert) || 5,
                 rack:         form.rackLocation || "",

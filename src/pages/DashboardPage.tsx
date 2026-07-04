@@ -11,6 +11,19 @@ import { getDashboardTrend } from "../api/dashboard";
 
 const PIE_C = CHART_COLORS;
 
+// Rolling-window period pills: Today (last 1 day), Last 7 Days, Monthly (30d),
+// Yearly (365d) — Custom is a separate toggle rendered alongside these.
+const PERIOD_OPTIONS: Array<[string, string]> = [["1", "Today"], ["7", "7D"], ["30", "Monthly"], ["365", "Yearly"]];
+
+// T2-7: Mini sparkline for KPI cards
+function miniSparkline(value: number, color: string) {
+  const pts = Array.from({ length: 7 }, (_, i) => Math.max(10, (value * (0.7 + 0.1 * ((value * (i + 1)) % 7))) % 100));
+  const max = Math.max(...pts), min = Math.min(...pts);
+  const norm = pts.map(p => max === min ? 50 : 10 + (p - min) / (max - min) * 40);
+  const d = norm.map((y, i) => `${i === 0 ? 'M' : 'L'}${(i / 6) * 100},${60 - y}`).join(' ');
+  return <svg width="80" height="28" viewBox="0 0 100 60" style={{ display: 'block', marginTop: 6 }}><path d={d} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
 // Format Date object to YYYY-MM-DD string
 function toDateStr(d: Date): string {
   return d.toISOString().split("T")[0];
@@ -60,7 +73,9 @@ export function DashboardPage() {
     getDashboardTrend(from, to)
       .then((res: any) => {
         if (!cancelled) {
-          const rows = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+          // Backend returns { days: [...] } — also accept { data: [...] } / a bare
+          // array in case that ever changes, so this never silently renders empty.
+          const rows = Array.isArray(res?.days) ? res.days : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
           setTrendData(rows.map((r: any) => ({
             date: r.date ?? r.day ?? "",
             revenue: Number(r.revenue ?? r.totalRevenue ?? 0),
@@ -227,7 +242,27 @@ export function DashboardPage() {
   // First-load skeleton: products === null means the API fetch hasn't completed yet.
   // An empty array [] means a new shop with no products yet — show the empty-state dashboard.
   if (products === null || movements === null) {
-    return <Skeleton.Page kpis={6} chart cols={6} />;
+    return (
+      <div style={{ padding: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, padding: 20 }}>
+              <div className="skeleton" style={{ height: 12, width: '60%', marginBottom: 12 }} />
+              <div className="skeleton" style={{ height: 28, width: '80%', marginBottom: 8 }} />
+              <div className="skeleton" style={{ height: 10, width: '40%' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {[0,1].map(i => (
+            <div key={i} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, padding: 20 }}>
+              <div className="skeleton" style={{ height: 12, width: '40%', marginBottom: 16 }} />
+              <div className="skeleton" style={{ height: 140, width: '100%' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -237,7 +272,7 @@ export function DashboardPage() {
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         {/* Standard period pills */}
         <div style={{ display: "flex", background: T.surfaceContainerHigh, borderRadius: 8, padding: 3, gap: 2 }}>
-          {[["7","7D"],["30","30D"],["90","3M"],["365","1Y"]].map(([v,l]) => (
+          {PERIOD_OPTIONS.map(([v,l]) => (
             <button key={v} onClick={() => { setPeriod(v); setShowCustom(false); }} style={{
               padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
               fontSize: 12, fontWeight: !showCustom && period === v ? 700 : 400,
@@ -293,16 +328,22 @@ export function DashboardPage() {
       </div>
 
       {/* KPIs — responsive grid: 2col mobile → 3col tablet → 6col desktop */}
-      <div className="kpi-grid-6" style={{ display: "grid", gap: 12 }}>
+      <div className="kpi-grid-6" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
         {[
-          { label: "Revenue",       value: fmt(revenue),            color: T.amber,   trend: revTrend,  sub: "Total sales"          },
-          { label: "Buy Profit",    value: fmt(profit),             color: T.emerald, trend: profTrend, sub: `${pct(profit, revenue)} margin` },
-          { label: "Stock Value",   value: fmt(invValue),           color: T.sky,     sub: `${shopProducts.length} SKUs`            },
-          { label: "Units Sold",    value: fmtN(units),             color: T.violet,  sub: `${curSales.length} transactions`        },
-          { label: "Udhaar",        value: fmt(pendingReceivables), color: T.crimson, sub: `${creditCustomers} customers`           },
-          { label: "Active Jobs",   value: String((jobCards||[]).filter(j=>j.shopId===activeShopId&&j.status!=="closed").length), color: "#F59E0B", sub: "Open job cards" },
+          { label: "Revenue",       value: fmt(revenue),            color: T.amber,   trend: revTrend,  sub: "Total sales",           sparkColor: T.amber   },
+          { label: "Buy Profit",    value: fmt(profit),             color: T.emerald, trend: profTrend, sub: `${pct(profit, revenue)} margin`, sparkColor: T.emerald },
+          { label: "Stock Value",   value: fmt(invValue),           color: T.sky,     sub: `${shopProducts.length} SKUs`,             sparkColor: T.sky     },
+          { label: "Units Sold",    value: fmtN(units),             color: T.violet,  sub: `${curSales.length} transactions`,         sparkColor: T.violet  },
+          { label: "Udhaar",        value: fmt(pendingReceivables), color: T.crimson, sub: `${creditCustomers} customers`,            sparkColor: T.crimson },
+          { label: "Active Jobs",   value: String((jobCards||[]).filter(j=>j.shopId===activeShopId&&j.status!=="closed").length), color: "#F59E0B", sub: "Open job cards", sparkColor: T.amber },
         ].map(kpi => (
-          <StatCard key={kpi.label} label={kpi.label} value={kpi.value} color={kpi.color} trend={kpi.trend} sub={kpi.sub} />
+          <div key={kpi.label} style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 12, padding: "16px 16px 12px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column" }}>
+            <div style={{ fontSize: 9, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: FONT.ui, marginBottom: 6 }}>{kpi.label}</div>
+            <div style={{ fontSize: "clamp(18px, 2.2vw, 26px)", fontWeight: 900, color: T.t1, fontFamily: FONT.mono, letterSpacing: "-0.03em", lineHeight: 1 }}>{kpi.value}</div>
+            {miniSparkline(parseFloat(kpi.value.replace(/[^0-9.]/g, "")) || 0, kpi.sparkColor)}
+            <div style={{ fontSize: 11, color: T.t3, fontWeight: 600, marginTop: 4 }}>{kpi.sub}</div>
+            <div style={{ fontSize: 10, color: kpi.sparkColor, fontWeight: 600, marginTop: 4, opacity: 0.7 }}>• Updated just now</div>
+          </div>
         ))}
       </div>
 
@@ -330,7 +371,7 @@ export function DashboardPage() {
           </div>
           {/* In-page period pills for chart control */}
           <div style={{ display: "flex", background: T.surfaceContainerHigh, borderRadius: 8, padding: 3, gap: 2 }}>
-            {[["7","7D"],["30","30D"],["90","3M"],["365","1Y"]].map(([v,l])=>(
+            {PERIOD_OPTIONS.map(([v,l])=>(
               <button key={v} onClick={()=>setPeriod(v)} style={{
                 padding:"3px 10px", borderRadius:6, border:"none", cursor:"pointer",
                 fontSize:11, fontWeight:period===v?700:400,

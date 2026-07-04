@@ -132,7 +132,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
 
             const inv: any = await addInventory({
                 masterPartId,
-                sellingPrice: +f.sellPrice, buyingPrice: +f.buyPrice,
+                sellingPrice: +f.sellPrice, buyingPrice: +f.buyPrice, mrp: +f.mrp || undefined,
                 stockQty: +f.stock || 0, rackLocation: f.location || null,
                 minStockAlert: +f.minStock || 5,
                 supplierName: f.supplier || undefined,

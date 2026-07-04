@@ -1,9 +1,121 @@
 import { useState, useEffect, useCallback } from "react";
 import { T, FONT } from "../theme";
 import { useAppCtx } from "../AppCtx";
-import { Btn, Select, DataTable, TC, TCMono, type Column } from "../components/ui";
-import { getPurchaseReturns } from "../api/purchaseReturns";
+import { Btn, Select, Field, Input, Modal, DataTable, TC, TCMono, type Column } from "../components/ui";
+import { getPurchaseReturns, updatePurchaseReturnResolution } from "../api/purchaseReturns";
+import { getPartyLedger, applySupplierCredit } from "../api/parties";
 import { NewPurchaseReturnModal } from "../components/NewPurchaseReturnModal";
+
+const RESOLUTION_OPTIONS = [
+  { value: "PENDING", label: "Pending" },
+  { value: "SUPPLIER_REFUND", label: "Supplier refund" },
+  { value: "SUPPLIER_CREDIT", label: "Supplier credit" },
+  { value: "REPLACEMENT", label: "Replacement" },
+];
+
+// Update a return's resolution, and — once it's SUPPLIER_CREDIT — apply that
+// supplier's available credit against a later purchase. The credit itself is
+// a real PartyLedger balance (posted server-side the first time resolution
+// lands on SUPPLIER_CREDIT), not just this status label.
+function ResolutionModal({ row, onClose, onUpdated, toast }: any) {
+  const [resolution, setResolution] = useState(row.resolution);
+  const [supplierCreditNoteNo, setSupplierCreditNoteNo] = useState(row.supplierCreditNoteNo || "");
+  const [saving, setSaving] = useState(false);
+  const [party, setParty] = useState<any>(null);
+  const [partyLoading, setPartyLoading] = useState(false);
+  const [applyAmount, setApplyAmount] = useState("");
+  const [applyNotes, setApplyNotes] = useState("");
+  const [applying, setApplying] = useState(false);
+  // Tracks version/partyId locally so a second save in the same modal session
+  // (e.g. edit the credit note no. after it's already SUPPLIER_CREDIT) doesn't
+  // 409 against the now-stale version from the initial `row` prop.
+  const [current, setCurrent] = useState(row);
+
+  const loadParty = useCallback(() => {
+    if (!current.partyId) return;
+    setPartyLoading(true);
+    getPartyLedger(current.partyId)
+      .then((res: any) => setParty(res?.party || null))
+      .catch(() => setParty(null))
+      .finally(() => setPartyLoading(false));
+  }, [current.partyId]);
+
+  useEffect(() => { if (current.resolution === "SUPPLIER_CREDIT") loadParty(); }, [loadParty, current.resolution]);
+
+  const handleSave = () => {
+    setSaving(true);
+    updatePurchaseReturnResolution(current.returnId, { resolution, supplierCreditNoteNo: supplierCreditNoteNo || undefined, version: current.version })
+      .then((res: any) => {
+        if (res?.purchaseReturn) setCurrent(res.purchaseReturn);
+        if (res?.ledgerSkippedReason) toast(res.ledgerSkippedReason, "warning");
+        else if (res?.ledgerBalanceAfter != null) toast(`Supplier credit posted — new balance ₹${Number(res.ledgerBalanceAfter).toFixed(2)}`, "success");
+        onUpdated();
+        if (resolution === "SUPPLIER_CREDIT") loadParty();
+        else onClose();
+      })
+      .catch((e: any) => toast(e?.message || "Could not update resolution", "error"))
+      .finally(() => setSaving(false));
+  };
+
+  const handleApply = () => {
+    const amt = parseFloat(applyAmount);
+    if (!amt || amt <= 0) return;
+    setApplying(true);
+    applySupplierCredit(current.partyId, { amount: amt, notes: applyNotes || undefined })
+      .then((res: any) => {
+        toast(`Applied ₹${amt.toFixed(2)} — remaining balance ₹${Number(res.newOutstanding).toFixed(2)}`, "success");
+        setApplyAmount(""); setApplyNotes("");
+        loadParty();
+      })
+      .catch((e: any) => toast(e?.message || "Could not apply credit", "error"))
+      .finally(() => setApplying(false));
+  };
+
+  const available = party ? Number(party.outstanding) : 0;
+
+  return (
+    <Modal open onClose={onClose} title="Update Resolution" subtitle={current.returnNo} width={460}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <Field label="Resolution">
+          <Select value={resolution} onChange={setResolution} options={RESOLUTION_OPTIONS} />
+        </Field>
+        <Field label="Supplier Credit Note No." hint="Optional — for audit matching against the supplier's GSTR-1/2B">
+          <Input value={supplierCreditNoteNo} onChange={setSupplierCreditNoteNo} placeholder="CN-2026-00045" maxLength={60} />
+        </Field>
+        <Btn variant="amber" loading={saving} onClick={handleSave}>Save Resolution</Btn>
+
+        {resolution === "SUPPLIER_CREDIT" && current.partyId && (
+          <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 14, marginTop: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: T.violet, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+              Supplier Credit Balance
+            </div>
+            {partyLoading ? (
+              <div style={{ fontSize: 12, color: T.t3 }}>Loading…</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 20, fontWeight: 800, color: available > 0 ? T.violet : T.t3, fontFamily: FONT.mono, marginBottom: 10 }}>
+                  ₹{Math.max(available, 0).toFixed(2)} <span style={{ fontSize: 11, color: T.t3, fontWeight: 600 }}>owed by supplier</span>
+                </div>
+                {available > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <Input type="number" value={applyAmount} onChange={setApplyAmount} placeholder="Amount to apply" prefix="₹" min="0" max={String(available)} step="0.01" />
+                    <Input value={applyNotes} onChange={setApplyNotes} placeholder="Notes (optional) — e.g. netted off invoice #123" maxLength={200} />
+                    <Btn variant="ghost" loading={applying} onClick={handleApply}>Apply Credit to a Purchase</Btn>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {resolution === "SUPPLIER_CREDIT" && !current.partyId && (
+          <div style={{ fontSize: 12, color: T.amber, background: `${T.amber}12`, border: `1px solid ${T.amber}44`, borderRadius: 8, padding: "8px 12px" }}>
+            This supplier isn't a registered party, so no credit balance is tracked. Register them as a party to use this.
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
 
 const REASON_FILTER = [
   { value: "", label: "All reasons" },
@@ -40,6 +152,7 @@ const COLUMNS: Column[] = [
   { key: "reason", label: "Reason", width: 120 },
   { key: "resolution", label: "Resolution", width: 130 },
   { key: "amount", label: "Amount", width: 100, align: "right" },
+  { key: "actions", label: "", width: 40 },
 ];
 
 export function PurchaseReturnsPage() {
@@ -49,6 +162,7 @@ export function PurchaseReturnsPage() {
   const [error, setError] = useState<string | null>(null);
   const [reasonFilter, setReasonFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [resolutionRow, setResolutionRow] = useState<any>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -112,9 +226,24 @@ export function PurchaseReturnsPage() {
             <td style={{ ...TCMono, textAlign: "right" }}>
               ₹{(row.items || []).reduce((s: number, i: any) => s + Number(i.taxableValue) + Number(i.cgst) + Number(i.sgst), 0).toFixed(0)}
             </td>
+            <td style={TC}>
+              <button onClick={() => setResolutionRow(row)} title="Update resolution"
+                style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 6, width: 26, height: 26, cursor: "pointer", color: T.t3, fontSize: 13 }}>
+                ✎
+              </button>
+            </td>
           </tr>
         )}
       />
+
+      {resolutionRow && (
+        <ResolutionModal
+          row={resolutionRow}
+          onClose={() => setResolutionRow(null)}
+          onUpdated={load}
+          toast={toast}
+        />
+      )}
 
       <NewPurchaseReturnModal
         open={modalOpen}
