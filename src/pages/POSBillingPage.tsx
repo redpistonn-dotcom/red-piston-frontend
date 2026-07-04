@@ -6,6 +6,7 @@ import { fmt, fmtDateTime, margin } from "../utils";
 import { Modal } from "../components/ui";
 import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
 import { PurchaseBills } from "../components/PurchaseBills";
+import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { getAccessToken } from "../api/client";
@@ -88,6 +89,7 @@ export function POSBillingPage() {
 
     // Backend invoice id once the sale syncs — enables PDF download + WhatsApp share
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
+    const [returnModalOpen, setReturnModalOpen] = useState(false);
     const [suspendedBill, setSuspendedBill] = useState(() => {
         try {
             const raw = JSON.parse(localStorage.getItem("vl_suspended_bill") || "null");
@@ -631,8 +633,30 @@ export function POSBillingPage() {
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#25D366", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui }}>
                     💬 Share WhatsApp
                 </button>
+                {syncedInvoiceId && billType === "Sale" && (
+                    <button onClick={() => setReturnModalOpen(true)} title="Start a return or exchange for this invoice"
+                        style={{ flex: 1, minWidth: 140, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t1, cursor: "pointer", fontFamily: FONT.ui }}>
+                        ↩️ Return / Exchange
+                    </button>
+                )}
                 <button onClick={newBill} style={{ flex: 1.5, minWidth: 130, height: 42, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui }}>🆕 New Bill</button>
             </div>
+            {syncedInvoiceId && (
+                <NewReturnExchangeModal
+                    open={returnModalOpen}
+                    onClose={() => setReturnModalOpen(false)}
+                    onCreated={() => setReturnModalOpen(false)}
+                    toast={toast}
+                    initialInvoice={{
+                        invoiceId: syncedInvoiceId,
+                        invoiceNumber: invoiceNo,
+                        partyName: customerName || undefined,
+                        partyId: partyId ? Number(partyId) : null,
+                        totalAmount: String(finalTotal),
+                        createdAt: invoiceAt ? new Date(invoiceAt).toISOString() : new Date().toISOString(),
+                    }}
+                />
+            )}
         </div>
     );
 
