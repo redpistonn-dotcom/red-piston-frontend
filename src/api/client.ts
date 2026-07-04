@@ -124,6 +124,25 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
   return _doRequest<T>(url, options);
 }
 
+// Regular requests have no timeout by default, which is the other half of
+// the "dashboard stuck on skeletons forever" bug: if the backend hangs on a
+// dead pooled DB/Redis connection (see backend prisma.js/cache.js fixes),
+// a plain fetch() just sits there — no error ever fires, so a loading
+// spinner/skeleton never resolves either way. 30s comfortably covers a
+// Render cold start (the refresh call already succeeded by the time these
+// fire in practice) while still giving the UI a bounded failure to react to.
+const REQUEST_TIMEOUT_MS = 30_000;
+
+async function fetchWithTimeout(url: string, options: RequestInit, ms: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -133,8 +152,13 @@ async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}
 
   let res: Response;
   try {
-    res = await fetch(url, { ...options, headers, credentials: 'include' });
-  } catch {
+    res = await fetchWithTimeout(url, { ...options, headers, credentials: 'include' }, REQUEST_TIMEOUT_MS);
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw Object.assign(new Error('Request timed out. Please try again.'), {
+        status: 0, code: 'TIMEOUT',
+      });
+    }
     throw Object.assign(new Error('Network error. Please check your connection.'), {
       status: 0, code: 'NETWORK_ERROR',
     });
@@ -147,7 +171,7 @@ async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}
       try {
         const newToken = await refreshAccessToken();
         headers['Authorization'] = `Bearer ${newToken}`;
-        res = await fetch(url, { ...options, headers, credentials: 'include', _isRetry: true } as RequestOptions);
+        res = await fetchWithTimeout(url, { ...options, headers, credentials: 'include', _isRetry: true } as RequestOptions, REQUEST_TIMEOUT_MS);
       } catch (refreshErr: any) {
         // Only end the session when the refresh token was actually REJECTED.
         // A network error / cold-start timeout is transient — the user is still

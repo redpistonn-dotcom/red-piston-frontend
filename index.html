@@ -47,14 +47,47 @@
       · Poppins     → Brand name, section headers (geometric, modern)
       · Inter       → All UI labels, body, table data, form fields (systematic, legible at density)
       · JetBrains Mono → Prices, codes, stock numbers (monospaced precision)
-      · Material Symbols Outlined → Icon set
+      · Material Symbols Outlined → Icon set (loaded on its own link, see note below)
     -->
     <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
       media="print" onload="this.media='all'" />
     <noscript>
       <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+        href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
+    </noscript>
+
+    <!--
+      Material Symbols is a LIGATURE font: the DOM text is the literal icon
+      name ("dashboard", "point_of_sale"...) and the font is what turns it
+      into a glyph. display=swap (correct for real text) is wrong here —
+      the "fallback" IS the raw icon name, so a slow/cold load flashes
+      readable garbage text in the sidebar. Load it with display=block (glyph
+      area stays blank instead of showing text) AND keep it invisible via
+      .icon-font-loading until the Font Loading API confirms it's ready, so
+      there's no flash even if the font takes longer than the browser's
+      built-in block period.
+    -->
+    <style>.icon-font-loading .material-symbols-outlined { visibility: hidden; }</style>
+    <script>
+      document.documentElement.classList.add('icon-font-loading');
+      window.__revealIcons = function () {
+        var reveal = function () { document.documentElement.classList.remove('icon-font-loading'); };
+        if (window.document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(reveal).catch(reveal);
+        } else {
+          reveal();
+        }
+        // Safety cap — never leave icons invisible if font loading stalls/fails.
+        setTimeout(reveal, 3000);
+      };
+    </script>
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
+      media="print" onload="this.media='all'; window.__revealIcons()" />
+    <noscript>
+      <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block" />
     </noscript>
   </head>
   <body>

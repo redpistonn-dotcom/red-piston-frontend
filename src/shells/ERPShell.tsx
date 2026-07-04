@@ -296,9 +296,19 @@ export function ERPShell({ children }: ERPShellProps) {
           fetchParties(),
         ]);
         if (cancelled) return;
-        if (Array.isArray(prods)) saveProducts(prods, true);
-        if (Array.isArray(movs)) saveMovements(movs);
-        if (Array.isArray(parts)) saveParties(parts);
+        // fetchInventory/fetchMovements/fetchParties each swallow their own
+        // errors and resolve to null (so other callers like HistoryPage/
+        // PartiesPage can no-op gracefully) — meaning Promise.all above never
+        // rejects on a real failure. Without this check, a failed fetch just
+        // leaves the store at its initial null forever: no retry, no error
+        // banner, just blank skeletons — exactly the "stuck after a long
+        // idle gap" symptom. Treat a null result as a failure explicitly.
+        if (prods === null || movs === null || parts === null) {
+          throw new Error('One or more shop data fetches failed');
+        }
+        saveProducts(prods, true);
+        saveMovements(movs);
+        saveParties(parts);
         setDataLoadError(false);
       } catch (e) {
         console.error('[ERPShell] data load failed:', e);
