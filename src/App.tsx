@@ -40,6 +40,7 @@ import { AdminShell } from "./shells/AdminShell";
 const LandingPage       = lazy(() => import("./pages/LandingPage").then(m => ({ default: m.LandingPage })));
 const LoginPage         = lazy(() => import("./pages/LoginPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const AcceptInvitePage  = lazy(() => import("./pages/AcceptInvitePage"));
 const ProfilePage       = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
 const SettingsPage      = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 
@@ -175,6 +176,18 @@ function AuthenticatedShell({ user, children }) {
 // ── Role gate helper — used inline in routes ──────────────────────────────────
 function requireRole(user, role, element) {
   if (getUserRole(user) === role) return element;
+  return <Navigate to={user ? getDefaultRoute(user) : "/login"} replace />;
+}
+
+// ── Section gate — the ERP route guard. SHOP_OWNER/PLATFORM_ADMIN always pass;
+// SHOP_STAFF needs the matching section (see ERPShell NAV_ITEMS keys — the
+// backend's ShopUser.sections uses the same keys, set at invite time). Pass
+// sectionKey=null for pages any signed-in staff member can reach regardless
+// of sections (currently just the dashboard). ──────────────────────────────
+function requireSection(user, sectionKey, element) {
+  const role = getUserRole(user);
+  if (role === "SHOP_OWNER" || role === "PLATFORM_ADMIN") return element;
+  if (role === "SHOP_STAFF" && (!sectionKey || (user?.sections || []).includes(sectionKey))) return element;
   return <Navigate to={user ? getDefaultRoute(user) : "/login"} replace />;
 }
 
@@ -811,27 +824,30 @@ function AppContent() {
           {/* /login shows LandingPage with auth modal pre-opened */}
           <Route path="/login" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LandingPage openAuth />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
-          {/* ERP routes — pages pull data via useStore(), handlers via useContext(AppCtx) */}
-          <Route path="/dashboard" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><DashboardPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/inventory"  element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><InventoryPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/billing"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><POSBillingPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/parties"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><PartiesPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/workshop"             element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><WorkshopPage section="jobs" /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/workshop/marketplace" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><WorkshopPage section="marketplace" /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/history"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><HistoryPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/reports"    element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ReportsPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/orders"     element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><OrdersPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/gstr"       element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><GstrPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/audit"      element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><AuditLogPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/staff"      element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><StaffPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/shop-settings" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ShopSettingsPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/returns"          element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ReturnsPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/purchase-returns" element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><PurchaseReturnsPage /></PageErrorBoundary></ERPShell>)} />
+          {/* ERP routes — pages pull data via useStore(), handlers via useContext(AppCtx).
+              Second arg to requireSection is the nav section key (see ERPShell
+              NAV_ITEMS) a SHOP_STAFF must hold to reach that page; null = any staff. */}
+          <Route path="/dashboard" element={requireSection(currentUser, null, <ERPShell><PageErrorBoundary><DashboardPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/inventory"  element={requireSection(currentUser, "inventory", <ERPShell><PageErrorBoundary><InventoryPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/billing"    element={requireSection(currentUser, "pos", <ERPShell><PageErrorBoundary><POSBillingPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/parties"    element={requireSection(currentUser, "parties", <ERPShell><PageErrorBoundary><PartiesPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/workshop"             element={requireSection(currentUser, "workshop", <ERPShell><PageErrorBoundary><WorkshopPage section="jobs" /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/workshop/marketplace" element={requireSection(currentUser, "workshop-mp", <ERPShell><PageErrorBoundary><WorkshopPage section="marketplace" /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/history"    element={requireSection(currentUser, "history", <ERPShell><PageErrorBoundary><HistoryPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/reports"    element={requireSection(currentUser, "reports", <ERPShell><PageErrorBoundary><ReportsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/orders"     element={requireSection(currentUser, "orders", <ERPShell><PageErrorBoundary><OrdersPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/gstr"       element={requireSection(currentUser, "gstr", <ERPShell><PageErrorBoundary><GstrPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/audit"      element={requireSection(currentUser, "audit", <ERPShell><PageErrorBoundary><AuditLogPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/staff"      element={requireSection(currentUser, "staff", <ERPShell><PageErrorBoundary><StaffPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/shop-settings" element={requireSection(currentUser, "shop-settings", <ERPShell><PageErrorBoundary><ShopSettingsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/returns"          element={requireSection(currentUser, "returns", <ERPShell><PageErrorBoundary><ReturnsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/purchase-returns" element={requireSection(currentUser, "purchase-returns", <ERPShell><PageErrorBoundary><PurchaseReturnsPage /></PageErrorBoundary></ERPShell>)} />
           {/* Returns and Exchange merged into one flow — old bookmarks to /exchanges still land somewhere sensible */}
           <Route path="/exchanges"        element={<Navigate to="/returns" replace />} />
-          <Route path="/warranty"         element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><WarrantyPage /></PageErrorBoundary></ERPShell>)} />
-          <Route path="/reports/returns"  element={requireRole(currentUser, "SHOP_OWNER", <ERPShell><PageErrorBoundary><ReturnsReportsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/warranty"         element={requireSection(currentUser, "warranty", <ERPShell><PageErrorBoundary><WarrantyPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/reports/returns"  element={requireSection(currentUser, "reports", <ERPShell><PageErrorBoundary><ReturnsReportsPage /></PageErrorBoundary></ERPShell>)} />
 
           {/* Marketplace routes */}
           {/* New marketplace — Stitch design (browse without login, cart requires login) */}

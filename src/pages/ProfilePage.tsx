@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
+import { createStaffInvite, getStaffInvites, resendStaffInvite, cancelStaffInvite, SECTION_OPTIONS, type StaffInvite } from "../api/staff";
 import { T, FONT } from "../theme.js";
 import { Avatar } from "../components/Avatar.jsx";
 
@@ -227,9 +228,13 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
   const [editingAddress, setEditingAddress] = useState(null);
   const [showGarageForm, setShowGarageForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
-  const [inviteRole, setInviteRole] = useState("CASHIER");
+  const [inviteRoleLabel, setInviteRoleLabel] = useState("");
+  const [inviteSections, setInviteSections] = useState<string[]>([]);
   const [inviting, setInviting] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<StaffInvite[]>([]);
 
   // Editable fields
   const [name, setName] = useState("");
@@ -268,6 +273,7 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
   }, [user]);
 
   useEffect(() => { loadProfile(); }, []);
+  useEffect(() => { if (user?.role === "SHOP_OWNER") loadPendingInvites(); }, [user?.role]);
 
   const loadProfile = async () => {
     try {
@@ -487,20 +493,53 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
     }
   };
 
-  // ── Staff handlers ────────────────────────────────────────────────────────────
+  // ── Staff invite handlers ─────────────────────────────────────────────────────
+  const loadPendingInvites = async () => {
+    try {
+      const res = await getStaffInvites();
+      setPendingInvites(res.data || []);
+    } catch (e) {
+      console.warn("[Profile] Could not load pending invites:", e.message);
+    }
+  };
+
+  const toggleInviteSection = (key: string) =>
+    setInviteSections(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+
   const handleInviteStaff = async () => {
-    if (!invitePhone.trim()) return;
+    if (!inviteName.trim() || !inviteEmail.trim() || !inviteRoleLabel.trim() || inviteSections.length === 0) return;
     setInviting(true); setError("");
     try {
-      const res = await api.post("/api/shop/staff/invite", { phone: invitePhone.trim(), role: inviteRole });
-      const newMember = res.data || res;
-      setShopStaff(prev => [...prev, newMember]);
-      setInvitePhone("");
-      showToast(`${newMember.user?.name || "Staff member"} added as ${inviteRole}`);
+      await createStaffInvite({
+        name: inviteName.trim(), email: inviteEmail.trim(), phone: invitePhone.trim() || undefined,
+        roleLabel: inviteRoleLabel.trim(), sections: inviteSections,
+      });
+      setInviteName(""); setInviteEmail(""); setInvitePhone(""); setInviteRoleLabel(""); setInviteSections([]);
+      showToast(`Invite sent to ${inviteEmail.trim()} — they'll get a verification code by email`);
+      loadPendingInvites();
     } catch (e) {
       setError(e.data?.error?.message || e.message || "Failed to invite staff");
     }
     setInviting(false);
+  };
+
+  const handleResendInvite = async (id: number) => {
+    try {
+      await resendStaffInvite(id);
+      showToast("Verification code resent");
+    } catch (e) {
+      setError(e.data?.error?.message || e.message || "Failed to resend");
+    }
+  };
+
+  const handleCancelInvite = async (id: number) => {
+    if (!window.confirm("Cancel this invite?")) return;
+    try {
+      await cancelStaffInvite(id);
+      setPendingInvites(prev => prev.filter(i => i.id !== id));
+    } catch (e) {
+      setError(e.data?.error?.message || e.message || "Failed to cancel");
+    }
   };
 
   const handleDeactivateStaff = async (staffId) => {
@@ -806,24 +845,56 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
             {/* Invite form */}
             <div style={{ ...S.card, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.t2, marginBottom: 10 }}>Invite Staff Member</div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <input
-                  style={{ ...S.input, flex: "1 1 160px", minWidth: 160 }}
-                  value={invitePhone}
-                  onChange={e => setInvitePhone(e.target.value)}
-                  placeholder="Phone number of staff"
-                />
-                <select style={{ ...S.input, flex: "0 0 140px", cursor: "pointer" }} value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                  {["MANAGER", "CASHIER", "MECHANIC", "DELIVERY"].map(r => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-                <button style={{ ...S.btn("primary"), whiteSpace: "nowrap" }} onClick={handleInviteStaff} disabled={inviting || !invitePhone.trim()}>
-                  {inviting ? "Adding..." : "Add Staff"}
-                </button>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                <input style={{ ...S.input, flex: "1 1 160px", minWidth: 160 }} value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="Full name" />
+                <input style={{ ...S.input, flex: "1 1 200px", minWidth: 200 }} type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="Email (verification code sent here)" />
+                <input style={{ ...S.input, flex: "1 1 140px", minWidth: 140 }} value={invitePhone} onChange={e => setInvitePhone(e.target.value)} placeholder="Phone (optional)" />
+                <input style={{ ...S.input, flex: "1 1 140px", minWidth: 140 }} value={inviteRoleLabel} onChange={e => setInviteRoleLabel(e.target.value)} placeholder="Role, e.g. Mechanic" />
               </div>
-              <div style={{ fontSize: 11, color: T.t3, marginTop: 8 }}>Staff must already have a RedPiston account. They will get immediate access.</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, marginBottom: 8 }}>Sections they can access</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                {SECTION_OPTIONS.map(s => (
+                  <label key={s.key} style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
+                    border: `1.5px solid ${inviteSections.includes(s.key) ? T.amber : T.border}`,
+                    background: inviteSections.includes(s.key) ? `${T.amber}18` : "transparent",
+                    cursor: "pointer", fontSize: 12, fontWeight: inviteSections.includes(s.key) ? 700 : 400,
+                    color: inviteSections.includes(s.key) ? T.amber : T.t2,
+                  }}>
+                    <input type="checkbox" checked={inviteSections.includes(s.key)} onChange={() => toggleInviteSection(s.key)} style={{ width: 14, height: 14 }} />
+                    {s.label}
+                  </label>
+                ))}
+              </div>
+              <button
+                style={{ ...S.btn("primary"), whiteSpace: "nowrap" }}
+                onClick={handleInviteStaff}
+                disabled={inviting || !inviteName.trim() || !inviteEmail.trim() || !inviteRoleLabel.trim() || inviteSections.length === 0}
+              >
+                {inviting ? "Sending…" : "Send Invite"}
+              </button>
+              <div style={{ fontSize: 11, color: T.t3, marginTop: 8 }}>They'll get a verification code by email — access activates only once they enter it.</div>
             </div>
+
+            {/* Pending invites */}
+            {pendingInvites.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, marginBottom: 8 }}>Pending Invites</div>
+                {pendingInvites.map(inv => (
+                  <div key={inv.id} style={{ ...S.card, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{inv.name} <span style={{ fontWeight: 400, color: T.t3 }}>· {inv.roleLabel}</span></div>
+                      <div style={{ fontSize: 12, color: T.t3 }}>{inv.email}</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={S.badge(T.amber)}>Awaiting verification</span>
+                      <button style={{ ...S.btn("secondary"), padding: "4px 12px", fontSize: 12 }} onClick={() => handleResendInvite(inv.id)}>Resend</button>
+                      <button style={{ ...S.btn("danger"), padding: "4px 12px", fontSize: 12 }} onClick={() => handleCancelInvite(inv.id)}>Cancel</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Staff list */}
             {shopStaff.length === 0 ? (
@@ -843,10 +914,13 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{s.user?.name || "—"}</div>
                       <div style={{ fontSize: 12, color: T.t3 }}>{s.user?.phone || s.user?.email || "—"}</div>
+                      {Array.isArray(s.sections) && s.sections.length > 0 && (
+                        <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>{s.sections.join(", ")}</div>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={S.badge(STAFF_ROLE_COLORS[s.role] || T.t3)}>{s.role}</span>
+                    <span style={S.badge(STAFF_ROLE_COLORS[s.role] || T.t3)}>{s.roleLabel || s.role}</span>
                     {!s.isActive && <span style={S.badge(T.crimson)}>Inactive</span>}
                     {s.role !== "OWNER" && (
                       s.isActive

@@ -158,6 +158,17 @@ export function ERPShell({ children }: ERPShellProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // SHOP_OWNER/PLATFORM_ADMIN see everything; SHOP_STAFF only the sections they
+  // were granted at invite time (see App.tsx requireSection for the matching
+  // route-level gate — this just keeps the sidebar from listing pages they'd
+  // get redirected away from). "dashboard" is always visible, matching the
+  // route guard's null-section special case.
+  const visibleNavItems = useMemo(() => {
+    if (currentUser?.role !== "SHOP_STAFF") return NAV_ITEMS;
+    const sections = currentUser?.sections || [];
+    return NAV_ITEMS.filter(n => n.key === "dashboard" || sections.includes(n.key));
+  }, [currentUser]);
+
 
   // ── Mandatory shop profile completion (photo + contact number) ─────────
   const needsShopSetup = useMemo(() => {
@@ -357,9 +368,9 @@ export function ERPShell({ children }: ERPShellProps) {
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
-  // Primary nav (bottom bar): first 4 items + "More" button
-  const PRIMARY_NAV = NAV_ITEMS.slice(0, 4);
-  const SECONDARY_NAV = NAV_ITEMS.slice(4);
+  // Primary nav (bottom bar): first 4 visible items + "More" button
+  const PRIMARY_NAV = visibleNavItems.slice(0, 4);
+  const SECONDARY_NAV = visibleNavItems.slice(4);
 
   // ── Low-stock banner dismiss ──────────────────────────────────────────
   const [lowBannerDismissed, setLowBannerDismissed] = useState(() => {
@@ -413,7 +424,7 @@ export function ERPShell({ children }: ERPShellProps) {
           padding: "0 8px",
           display: "flex", flexDirection: "column", gap: 1,
         }}>
-          {NAV_ITEMS.map(n => {
+          {visibleNavItems.map(n => {
             const isActive = n.key === navActiveKey;
             return (
               <button
@@ -585,7 +596,7 @@ export function ERPShell({ children }: ERPShellProps) {
 
         {/* Drawer nav — all 8 items */}
         <nav style={{ flex: 1, overflowY: "auto", padding: "12px 12px" }}>
-          {NAV_ITEMS.map(n => {
+          {visibleNavItems.map(n => {
             const isActive = n.key === navActiveKey;
             return (
               <button
@@ -959,7 +970,7 @@ export function ERPShell({ children }: ERPShellProps) {
               style={{ width: "100%", fontSize: 16, padding: "14px 20px", border: "none", outline: "none", borderBottom: `1px solid ${T.border}`, fontFamily: FONT.ui, color: T.t1, boxSizing: "border-box" }}
             />
             <div style={{ maxHeight: 360, overflowY: "auto" }}>
-              {NAV_ITEMS.filter(n => !cmdKQuery.trim() || n.label.toLowerCase().includes(cmdKQuery.toLowerCase())).map(n => {
+              {visibleNavItems.filter(n => !cmdKQuery.trim() || n.label.toLowerCase().includes(cmdKQuery.toLowerCase())).map(n => {
                 const isActive = n.key === navActiveKey;
                 return (
                   <button key={n.key} onClick={() => { navigate(n.path); setShowSearch(false); setCmdKQuery(""); }}
@@ -970,7 +981,7 @@ export function ERPShell({ children }: ERPShellProps) {
                   </button>
                 );
               })}
-              {cmdKQuery.trim() && NAV_ITEMS.filter(n => n.label.toLowerCase().includes(cmdKQuery.toLowerCase())).length === 0 && (
+              {cmdKQuery.trim() && visibleNavItems.filter(n => n.label.toLowerCase().includes(cmdKQuery.toLowerCase())).length === 0 && (
                 <div style={{ padding: "20px 20px", fontSize: 13, color: T.t3, textAlign: "center" }}>No pages match "{cmdKQuery}"</div>
               )}
             </div>
