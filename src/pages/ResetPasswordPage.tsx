@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { T, FONT } from "../theme.js";
+import { BrandHeader } from "../components/BrandHeader";
 
 const S = {
   page: { display: "flex", minHeight: "100vh", background: T.bg, fontFamily: FONT.ui, alignItems: "center", justifyContent: "center" },
@@ -83,8 +84,7 @@ export default function ResetPasswordPage() {
       <div style={S.page}>
         <div style={S.card}>
           <div style={S.logo}>
-            <div style={S.logoMark}>⚙️</div>
-            <span style={S.logoText}>AutoSpace</span>
+            <BrandHeader subtitle="Set New Password" logoSize={40} />
           </div>
           <div style={S.heading}>Invalid Link</div>
           <div style={S.sub}>This password reset link is missing or invalid.</div>
@@ -98,8 +98,7 @@ export default function ResetPasswordPage() {
     <div style={S.page}>
       <div style={S.card}>
         <div style={S.logo}>
-          <div style={S.logoMark}>⚙️</div>
-          <span style={S.logoText}>AutoSpace</span>
+          <BrandHeader subtitle="Set New Password" logoSize={40} />
         </div>
 
         {success ? (
