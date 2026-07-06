@@ -1480,20 +1480,6 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     }
   };
 
-  const handleChangeUserType = async (user, userTypeId) => {
-    setError("");
-    try {
-      const res = await api.patch(`/api/admin/users/${user.userId}/usertype`, { userTypeId });
-      setUsers(prev => prev.map(u =>
-        u.userId === user.userId
-          ? { ...u, role: res.data.role, userType: res.data.userType }
-          : u
-      ));
-    } catch (e) {
-      setError(e.message || "Failed to change user type");
-    }
-  };
-
   const handleVerify = async (userId, action, reason) => {
     setVerError(""); setVerSuccess("");
     try {
@@ -1813,7 +1799,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                 <table style={S.table}>
                   <thead>
                     <tr>
-                      {["User", "Role", "Change Type", "Shop", "Last Login", "Logins", "Status", "Actions"].map(h => (
+                      {["User", "Role", "Shop", "Last Login", "Logins", "Status", "Actions"].map(h => (
                         <th key={h} style={S.th}>{h}</th>
                       ))}
                     </tr>
@@ -1847,24 +1833,6 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                           </div>
                         </td>
                         <td style={S.td}><RoleBadge slug={u.userType?.slug || u.role} name={u.userType?.name} /></td>
-                        <td style={S.td}>
-                          <select
-                            style={{
-                              background: C.surface, color: C.t1, border: `1px solid ${C.border}`,
-                              borderRadius: 7, padding: "4px 8px", fontSize: 12, fontFamily: FONT.ui,
-                              cursor: currentUser?.userId === u.userId ? "not-allowed" : "pointer",
-                              opacity: currentUser?.userId === u.userId ? 0.5 : 1, outline: "none",
-                            }}
-                            value={u.userType?.id || ""}
-                            disabled={currentUser?.userId === u.userId}
-                            onChange={e => handleChangeUserType(u, e.target.value)}
-                          >
-                            <option value="">— Select —</option>
-                            {userTypes.map(ut => (
-                              <option key={ut.id} value={ut.id}>{ut.name}</option>
-                            ))}
-                          </select>
-                        </td>
                         <td style={S.td}>
                           {u.shop ? (
                             <div>
@@ -1933,25 +1901,9 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                         {u.isActive ? "Active" : "Inactive"}
                       </span>
                     </div>
-                    {/* Row 2: Role badge + type select + shop */}
+                    {/* Row 2: Role badge + shop */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <RoleBadge slug={u.userType?.slug || u.role} name={u.userType?.name} />
-                      <select
-                        style={{
-                          background: C.surface, color: C.t1, border: `1px solid ${C.border}`,
-                          borderRadius: 7, padding: "5px 8px", fontSize: 12, fontFamily: FONT.ui,
-                          cursor: currentUser?.userId === u.userId ? "not-allowed" : "pointer",
-                          opacity: currentUser?.userId === u.userId ? 0.5 : 1, outline: "none",
-                        }}
-                        value={u.userType?.id || ""}
-                        disabled={currentUser?.userId === u.userId}
-                        onChange={e => handleChangeUserType(u, e.target.value)}
-                      >
-                        <option value="">— Type —</option>
-                        {userTypes.map(ut => (
-                          <option key={ut.id} value={ut.id}>{ut.name}</option>
-                        ))}
-                      </select>
                       {u.shop && (
                         <span style={{ fontSize: 12, color: C.t3, fontFamily: FONT.ui }}>🏪 {u.shop.name}, {u.shop.city}</span>
                       )}
