@@ -233,6 +233,13 @@ export async function fetchInventory(): Promise<Product[] | null> {
     const data = await api.get<InventoryApiResponse>('/api/shop/inventory');
     return (data.inventory || []).map(mapInventoryToProduct);
   } catch (err: unknown) {
+    // A 403 means this account's granted sections don't include inventory (a
+    // shop-staff member invited with limited access) — that's a permanent,
+    // correct state, not a transient failure. Returning null here made
+    // ERPShell's loader treat it as "server error, retry" forever, which
+    // could never succeed and left restricted staff stuck on an endless
+    // "could not load shop data" banner. Resolve to an empty list instead.
+    if ((err as { status?: number })?.status === 403) return [];
     console.warn('[Sync] Could not fetch inventory:', (err as Error).message);
     return null;
   }
@@ -261,6 +268,9 @@ export async function fetchParties(): Promise<Party[] | null> {
     const data = await api.get<PartiesApiResponse>('/api/shop/parties');
     return (data.parties || []).map(mapParty);
   } catch (err: unknown) {
+    // See fetchInventory's comment — a 403 (staff account without the
+    // "parties" section) is a permanent, expected state, not a failure.
+    if ((err as { status?: number })?.status === 403) return [];
     console.warn('[Sync] Could not fetch parties:', (err as Error).message);
     return null;
   }
@@ -298,6 +308,10 @@ export async function fetchMovements(params?: MovementsParams): Promise<Movement
     const data = await api.get<MovementsApiResponse>(`/api/shop/inventory/movements${qs ? `?${qs}` : ''}`);
     return (data.movements || []).map(mapMovement);
   } catch (err: unknown) {
+    // See fetchInventory's comment — a 403 (staff account without the
+    // "inventory" section, which movements are mounted under) is a
+    // permanent, expected state, not a failure.
+    if ((err as { status?: number })?.status === 403) return [];
     console.warn('[Sync] Could not fetch movements:', (err as Error).message);
     return null;
   }

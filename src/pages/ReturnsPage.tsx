@@ -3,6 +3,7 @@ import { T, FONT } from "../theme";
 import { useAppCtx } from "../AppCtx";
 import { Btn, Select, DataTable, TC, TCMono, type Column } from "../components/ui";
 import { getSalesReturns } from "../api/returns";
+import { openExchangeInvoicePdf } from "../api/exchanges";
 import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
 
 // One unified list: a SalesReturn with no exchangeOrder is a plain Return; one
@@ -58,6 +59,7 @@ const COLUMNS: Column[] = [
   { key: "reason", label: "Reason", width: 140 },
   { key: "resolution", label: "Resolution", width: 130 },
   { key: "amount", label: "Amount", width: 100, align: "right" },
+  { key: "actions", label: "", width: 60 },
 ];
 
 export function ReturnsPage() {
@@ -67,6 +69,14 @@ export function ReturnsPage() {
   const [error, setError] = useState<string | null>(null);
   const [reasonFilter, setReasonFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [openingInvoiceId, setOpeningInvoiceId] = useState<number | null>(null);
+
+  const viewExchangeInvoice = async (exchangeId: number) => {
+    setOpeningInvoiceId(exchangeId);
+    try { await openExchangeInvoicePdf(exchangeId); }
+    catch (e: any) { toast(e?.message || "Could not open the exchange invoice", "error"); }
+    setOpeningInvoiceId(null);
+  };
 
   const load = useCallback(() => {
     setLoading(true);
@@ -145,6 +155,18 @@ export function ReturnsPage() {
               </td>
               <td style={TC}>{isExchange ? settlementBadge(row.exchangeOrder.settlementType) : refundModeBadge(row.refundMode)}</td>
               <td style={{ ...TCMono, textAlign: "right" }}>₹{rowValue(row).toFixed(0)}</td>
+              <td style={TC}>
+                {isExchange && (
+                  <button
+                    onClick={() => viewExchangeInvoice(row.exchangeOrder.exchangeId)}
+                    disabled={openingInvoiceId === row.exchangeOrder.exchangeId}
+                    title="View Exchange Invoice"
+                    style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 7, padding: "4px 8px", cursor: "pointer", fontSize: 12, color: T.t2 }}
+                  >
+                    {openingInvoiceId === row.exchangeOrder.exchangeId ? "…" : "🖨"}
+                  </button>
+                )}
+              </td>
             </tr>
           );
         }}

@@ -4,7 +4,7 @@ import { Modal, Btn, Field, Input, Select, QtyStepper } from "./ui";
 import { useStore } from "../store";
 import { getInvoices } from "../api/billing";
 import { getEligibleReturnItems, createSalesReturn, createWalkInSalesReturn, type ReturnableItem } from "../api/returns";
-import { createExchange } from "../api/exchanges";
+import { createExchange, openExchangeInvoicePdf } from "../api/exchanges";
 import { useDebounce } from "../utils";
 
 // Same reason list drives both a plain return and an exchange — the customer's
@@ -82,6 +82,8 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [selectionError, setSelectionError] = useState(false);
+  const [completedExchangeId, setCompletedExchangeId] = useState<number | null>(null);
+  const [openingInvoice, setOpeningInvoice] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -90,6 +92,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
       setItems([]); setSelected({}); setReason("WRONG_PART"); setNotes("");
       setResolution(null); setRefundMode("CASH"); setNewSearch(""); setNewItems({});
       setCashAmount(""); setUpiAmount(""); setError(""); setSelectionError(false);
+      setCompletedExchangeId(null); setOpeningInvoice(false);
       return;
     }
     if (initialInvoice) { pickInvoice(initialInvoice); return; }
@@ -251,7 +254,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
         }
         toast("Return created — credit note generated", "success");
       } else {
-        await createExchange({
+        const result: any = await createExchange({
           ...(isWalkIn
             ? {
                 walkInItems: Object.entries(selected).map(([id, v]) => {
@@ -271,6 +274,11 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
           upiAmount: upiAmount ? parseFloat(upiAmount) : undefined,
         });
         toast("Exchange completed", "success");
+        onCreated?.();
+        // Stay open one more beat so the owner can pull up the Exchange
+        // Invoice right away, instead of having to find it later in the list.
+        setCompletedExchangeId(result?.exchangeOrder?.exchangeId ?? null);
+        return;
       }
       onCreated?.();
       onClose();
@@ -289,6 +297,32 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
 
   return (
     <Modal open={open} onClose={onClose} title="Return / Exchange" subtitle={subtitle} width={680}>
+      {/* ── Exchange completed — offer the Exchange Invoice right away ── */}
+      {completedExchangeId != null ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "20px 0" }}>
+          <div style={{ fontSize: 40 }}>✅</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: T.t1 }}>Exchange completed</div>
+          <div style={{ fontSize: 13, color: T.t3, textAlign: "center" }}>
+            The old item was credited and the new item was sold. You can pull up the Exchange Invoice — it shows both items and the price difference — any time from the Returns &amp; Exchange list.
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+            <Btn variant="ghost" onClick={onClose}>Done</Btn>
+            <Btn
+              variant="amber"
+              loading={openingInvoice}
+              onClick={async () => {
+                setOpeningInvoice(true);
+                try { await openExchangeInvoicePdf(completedExchangeId); }
+                catch (e: any) { toast(e?.message || "Could not open the exchange invoice", "error"); }
+                setOpeningInvoice(false);
+              }}
+            >
+              🖨 View Exchange Invoice
+            </Btn>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* ── Step 1: find invoice ── */}
       {step === "pick-invoice" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -604,6 +638,8 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
             </>
           )}
         </div>
+      )}
+      </>
       )}
     </Modal>
   );
