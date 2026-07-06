@@ -404,6 +404,10 @@ interface SyncInvoiceParams {
   upiAmount?: number;
   creditAmount?: number;
   notes?: string;
+  /** Redeem an existing store-credit note against this sale — requires cashAmount
+   *  or upiAmount to also be forwarded for the remainder (see syncInvoice). */
+  appliedCreditNoteId?: number;
+  appliedCreditAmount?: number;
 }
 
 // Returns { ok, error? } — never throws.
@@ -426,12 +430,22 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: bool
       partyName: params.partyName || undefined,
       partyPhone: params.partyPhone || undefined,
       paymentMode: params.paymentMode || 'CASH',
-      // Do not forward cashAmount/upiAmount — the frontend uses GST-inclusive totals
-      // while the backend recomputes GST-exclusive, so the amounts never match and
-      // the backend's payment-breakdown check returns 400. paymentMode is sufficient
-      // for the backend to record how the customer paid. creditAmount IS needed so
-      // the backend can write the party-ledger debit on credit (Udhaar) sales.
+      // Do not forward cashAmount/upiAmount in the default case — the frontend uses
+      // GST-inclusive totals while the backend recomputes GST-exclusive, so the
+      // amounts never match exactly and the backend's payment-breakdown check
+      // returns 400. paymentMode is sufficient for the backend to record how the
+      // customer paid. creditAmount IS needed so the backend can write the
+      // party-ledger debit on credit (Udhaar) sales.
+      //
+      // EXCEPTION: once a store-credit note is applied, the backend's breakdown
+      // check activates unconditionally (appliedAmt > 0 triggers it) and needs
+      // cash/upi to reconcile the remainder — so forward it only in that case,
+      // relying on the backend's ±₹1 rounding tolerance.
       creditAmount: params.creditAmount || undefined,
+      appliedCreditNoteId: params.appliedCreditNoteId || undefined,
+      appliedCreditAmount: params.appliedCreditAmount || undefined,
+      cashAmount: params.appliedCreditAmount ? (params.cashAmount || undefined) : undefined,
+      upiAmount: params.appliedCreditAmount ? (params.upiAmount || undefined) : undefined,
       notes: params.notes || undefined,
     });
     // Tell the POS page which backend invoice this sale became so it can offer

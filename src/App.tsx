@@ -56,6 +56,7 @@ const PricingPage    = lazy(() => import("./pages/PricingPage").then(m => ({ def
 const ReturnsPage         = lazy(() => import("./pages/ReturnsPage").then(m => ({ default: m.ReturnsPage })));
 const PurchaseReturnsPage = lazy(() => import("./pages/PurchaseReturnsPage").then(m => ({ default: m.PurchaseReturnsPage })));
 const WarrantyPage        = lazy(() => import("./pages/WarrantyPage").then(m => ({ default: m.WarrantyPage })));
+const CreditNotesPage     = lazy(() => import("./pages/CreditNotesPage").then(m => ({ default: m.CreditNotesPage })));
 const ReturnsReportsPage  = lazy(() => import("./pages/ReturnsReportsPage").then(m => ({ default: m.ReturnsReportsPage })));
 
 const MarketplaceHome    = lazy(() => import("./marketplace/pages/MarketplaceHome").then(m => ({ default: m.MarketplaceHome })));
@@ -617,6 +618,8 @@ function AppContent() {
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
+        appliedCreditNoteId: data.appliedCreditNoteId || undefined,
+        appliedCreditAmount: data.appliedCreditAmount || undefined,
       }).then(({ ok, error }) => {
         window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: -1, error: !ok } }));
         if (ok) {
@@ -847,6 +850,7 @@ function AppContent() {
           {/* Returns and Exchange merged into one flow — old bookmarks to /exchanges still land somewhere sensible */}
           <Route path="/exchanges"        element={<Navigate to="/returns" replace />} />
           <Route path="/warranty"         element={requireSection(currentUser, "warranty", <ERPShell><PageErrorBoundary><WarrantyPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/credit-notes"     element={requireSection(currentUser, "returns", <ERPShell><PageErrorBoundary><CreditNotesPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/reports/returns"  element={requireSection(currentUser, "reports", <ERPShell><PageErrorBoundary><ReturnsReportsPage /></PageErrorBoundary></ERPShell>)} />
 
           {/* Marketplace routes */}

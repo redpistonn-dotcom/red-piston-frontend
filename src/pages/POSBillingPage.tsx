@@ -6,10 +6,12 @@ import { fmt, fmtDateTime, margin } from "../utils";
 import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
 import { PurchaseBills } from "../components/PurchaseBills";
 import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
+import { PartyAutocomplete } from "../components/PartyAutocomplete";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { getAccessToken } from "../api/client";
 import { getInvoicePdfUrl } from "../api/billing";
+import { getAvailableCreditNotes } from "../api/creditNotes";
 import { printInvoice } from "../lib/printInvoice";
 import { getPrintFormat, setPrintFormat, type PrintFormat } from "../lib/printSettings";
 
@@ -73,6 +75,38 @@ export function POSBillingPage() {
     const [partyId, setPartyId]     = useState<string | number | null>(draft?.partyId || null);
     const [showInvoice, setShowInvoice] = useState(false);
     const [saving, setSaving]       = useState(false);
+
+    // Store credit available for the linked customer (partyId), and how much
+    // of it the cashier chose to apply to this bill.
+    const [availableCredit, setAvailableCredit] = useState<{ creditNoteId: number; remainingBalance: number }[]>([]);
+    const [appliedCreditNoteId, setAppliedCreditNoteId] = useState<number | null>(null);
+    const [appliedCreditAmount, setAppliedCreditAmount] = useState(0);
+
+    useEffect(() => {
+        setAppliedCreditNoteId(null);
+        setAppliedCreditAmount(0);
+        if (!partyId) { setAvailableCredit([]); return; }
+        let cancelled = false;
+        getAvailableCreditNotes(partyId).then((res: any) => {
+            if (cancelled) return;
+            const list = Array.isArray(res) ? res : (res?.creditNotes || []);
+            setAvailableCredit(list.map((c: any) => ({ creditNoteId: c.creditNoteId, remainingBalance: parseFloat(c.remainingBalance) || 0 })));
+        }).catch(() => { if (!cancelled) setAvailableCredit([]); });
+        return () => { cancelled = true; };
+    }, [partyId]);
+
+    const totalAvailableCredit = availableCredit.reduce((s, c) => s + c.remainingBalance, 0);
+
+    const applyCreditAmount = (raw: number, finalTotal: number) => {
+        const max = Math.min(totalAvailableCredit, finalTotal);
+        const amt = Math.max(0, Math.min(max, raw));
+        setAppliedCreditAmount(amt);
+        // Redeem from the first note(s) with enough balance — server-side only takes
+        // one creditNoteId per sale today, so pick the first note that can cover it,
+        // or the largest one otherwise (cashier can split across bills if needed).
+        const covering = availableCredit.find(c => c.remainingBalance >= amt);
+        setAppliedCreditNoteId(amt > 0 ? (covering?.creditNoteId ?? availableCredit[0]?.creditNoteId ?? null) : null);
+    };
     const [invoiceNo, setInvoiceNo] = useState("");
     const [invoiceAt, setInvoiceAt] = useState<number | null>(null);
     const [scanOpen, setScanOpen]   = useState(false);
@@ -237,6 +271,11 @@ export function POSBillingPage() {
         };
     }, [items]);
     const finalTotal = Math.max(0, grandTotal - additionalDisc);
+    // Clamp applied credit whenever the bill total shrinks below it (item removed, etc).
+    useEffect(() => {
+        if (appliedCreditAmount > finalTotal) applyCreditAmount(finalTotal, finalTotal);
+    }, [finalTotal]); // eslint-disable-line react-hooks/exhaustive-deps
+    const amountDue = Math.max(0, finalTotal - appliedCreditAmount);
 
     // Credit limit check for Udhaar
     const selectedParty = useMemo(() => (parties || []).find((p: any) => String(p.id) === String(partyId)), [parties, partyId]);
@@ -300,7 +339,14 @@ export function POSBillingPage() {
             })),
             customerName, customerPhone, vehicleReg, notes,
             partyId: partyId || undefined,
-            payments: { [paymentMode === "Udhaar" ? "Credit" : paymentMode]: finalTotal },
+            // amountDue (finalTotal minus any applied store credit) is what's actually
+            // collected via the chosen payment method — the credit portion is reported
+            // separately below so the backend can redeem the credit note. Keys here must
+            // match what handleMultiItemSale reads (data.payments?.Cash/.UPI/.Credit) —
+            // paymentMode's *display* label ("Card/UPI") does not equal "UPI", so map it.
+            payments: { [paymentMode === "Udhaar" ? "Credit" : paymentMode === "Card/UPI" ? "UPI" : "Cash"]: amountDue },
+            appliedCreditNoteId: appliedCreditNoteId || undefined,
+            appliedCreditAmount: appliedCreditAmount || undefined,
             paymentMode, subtotal: grandSubtotal, discount: grandDiscount + additionalDisc,
             total: finalTotal, gstAmount: grandGst, profit: grandProfit, date: ts,
         });
@@ -315,6 +361,7 @@ export function POSBillingPage() {
         localStorage.removeItem(draftKey);
         setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setVehicleReg("");
         setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
+        setAppliedCreditNoteId(null); setAppliedCreditAmount(0);
         setInvoiceAt(null); setBillType("Sale");
         setTimeout(() => searchRef.current?.focus(), 50);
     };
@@ -1004,11 +1051,20 @@ export function POSBillingPage() {
                     <div style={{ padding: "12px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, borderBottom: `1px solid ${T.border}` }}>
                         <div>
                             <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>Customer Name</label>
-                            <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name or garage"
-                                maxLength={80}
-                                style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box" }}
-                                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
-                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
+                            <PartyAutocomplete
+                                type="CUSTOMER"
+                                value={customerName}
+                                onChange={name => { setCustomerName(name); setPartyId(null); }}
+                                onSelect={({ partyId: pid, name, phone }) => {
+                                    setCustomerName(name);
+                                    setPartyId(pid);
+                                    if (phone) setCustomerPhone(phone);
+                                }}
+                                placeholder="Name or garage"
+                                inputStyle={{ height: 34, fontSize: 12 }}
+                                toast={toast}
+                            />
+                            {partyId && <div style={{ fontSize: 10, color: T.emerald, marginTop: 3 }}>✓ Linked to saved customer{totalAvailableCredit > 0 ? ` · ₹${totalAvailableCredit.toFixed(0)} credit available` : ""}</div>}
                         </div>
                         <div>
                             <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>WhatsApp No.</label>
@@ -1092,6 +1148,24 @@ export function POSBillingPage() {
                                         style={{ width: 80, height: 30, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, padding: "0 8px 0 18px", fontFamily: FONT.mono, fontSize: 13, color: T.t1, outline: "none", textAlign: "right" }} />
                                 </div>
                             </div>
+                            {totalAvailableCredit > 0 && (
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                                    <span style={{ color: T.emerald, fontWeight: 600 }}>Store Credit (₹{totalAvailableCredit.toFixed(0)} available)</span>
+                                    <div style={{ position: "relative" }}>
+                                        <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: T.t3, pointerEvents: "none" }}>₹</span>
+                                        <input type="number" value={appliedCreditAmount || ""} min="0" max={Math.min(totalAvailableCredit, finalTotal)}
+                                            onChange={e => applyCreditAmount(+e.target.value || 0, finalTotal)}
+                                            placeholder="0.00"
+                                            style={{ width: 80, height: 30, background: T.bg, border: `1px solid ${T.emerald}`, borderRadius: 7, padding: "0 8px 0 18px", fontFamily: FONT.mono, fontSize: 13, color: T.t1, outline: "none", textAlign: "right" }} />
+                                    </div>
+                                </div>
+                            )}
+                            {appliedCreditAmount > 0 && (
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700, color: T.t1, paddingTop: 6, borderTop: `1px dashed ${T.border}` }}>
+                                    <span>Amount Due</span>
+                                    <span style={{ fontFamily: FONT.mono }}>{fmt(amountDue)}</span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Payment method */}

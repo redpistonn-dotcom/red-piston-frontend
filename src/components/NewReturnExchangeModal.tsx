@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { T, FONT } from "../theme";
 import { Modal, Btn, Field, Input, Select, QtyStepper } from "./ui";
+import { PartyAutocomplete } from "./PartyAutocomplete";
 import { useStore } from "../store";
 import { getInvoices } from "../api/billing";
 import { getEligibleReturnItems, createSalesReturn, createWalkInSalesReturn, type ReturnableItem } from "../api/returns";
@@ -41,7 +42,7 @@ interface Props {
 }
 
 export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initialInvoice }: Props) {
-  const { products: storeProducts, parties: storeParties, activeShopId } = useStore();
+  const { products: storeProducts, activeShopId } = useStore();
   const [step, setStep] = useState<Step>("pick-invoice");
 
   // ── Step 1: invoice search ──
@@ -141,16 +142,6 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
   };
   const updateWalkInPrice = (id: number, unitPrice: number) =>
     setItems(prev => prev.map(i => i.invoiceItemId === id ? { ...i, unitPrice } : i));
-
-  // ── Party picker — filters the already-loaded store parties, no extra request ──
-  const partyHits = useMemo(() => {
-    if (!partySearch.trim()) return [];
-    const q = partySearch.toLowerCase();
-    return (storeParties ?? [])
-      .filter((p: any) => p.shopId === activeShopId && ((p.name || "").toLowerCase().includes(q) || (p.phone || "").includes(q)))
-      .slice(0, 8)
-      .map((p: any) => ({ id: Number(p.partyId ?? p.id), name: p.name, phone: p.phone }));
-  }, [storeParties, activeShopId, partySearch]);
 
   function pickInvoice(inv: InvoiceHit) {
     setInvoice(inv);
@@ -425,23 +416,28 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
             </div>
           )}
 
-          <Field label="Customer (optional)" hint="Search if they're a registered customer — needed to offer store credit">
-            <Input value={partySearch} onChange={setPartySearch} placeholder="Search by name or phone…" />
+          <Field label="Customer" hint="Select or add a customer — required to give store credit; without one it's a cash-only refund with no traceable record">
+            <PartyAutocomplete
+              type="CUSTOMER"
+              value={partySearch}
+              onChange={name => { setPartySearch(name); if (selectedParty) setSelectedParty(null); }}
+              onSelect={({ partyId, name, phone }) => {
+                if (partyId) setSelectedParty({ id: partyId, name, phone });
+                setPartySearch("");
+              }}
+              placeholder="Search or add a customer…"
+              toast={toast}
+            />
           </Field>
-          {partyHits.length > 0 && (
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-              {partyHits.map(p => (
-                <button key={p.id} onClick={() => { setSelectedParty(p); setPartySearch(""); }} style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", border: "none", borderBottom: `1px solid ${T.border}`, background: T.surface, cursor: "pointer", textAlign: "left", minHeight: 44 }}>
-                  <span style={{ fontSize: 13, color: T.t1 }}>{p.name}</span>
-                  {p.phone && <span style={{ fontSize: 12, fontFamily: FONT.mono, color: T.t3 }}>{p.phone}</span>}
-                </button>
-              ))}
-            </div>
-          )}
           {selectedParty && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10, border: `1px solid ${T.amber}`, background: T.amberGlow, width: "fit-content" }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>{selectedParty.name}</span>
               <button onClick={() => setSelectedParty(null)} style={{ background: "none", border: "none", color: T.crimson, cursor: "pointer", fontSize: 14, minWidth: 24, minHeight: 24 }}>×</button>
+            </div>
+          )}
+          {!selectedParty && (
+            <div style={{ fontSize: 11, color: T.amber, fontWeight: 600 }}>
+              ⚠ No customer linked — this refund can only be given as cash, not store credit, since there's no one to credit.
             </div>
           )}
 

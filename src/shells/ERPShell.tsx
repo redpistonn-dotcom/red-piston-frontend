@@ -51,6 +51,7 @@ const NAV_ITEMS = [
   { key: "returns",     path: "/returns",            icon: "assignment_return", label: "Returns & Exchange" },
   { key: "purchase-returns", path: "/purchase-returns", icon: "unarchive",  label: "Purchase Returns" },
   { key: "warranty",    path: "/warranty",           icon: "verified",       label: "Warranty"       },
+  { key: "credit-notes", path: "/credit-notes",      icon: "receipt_long",   label: "Credit Notes"   },
 ] as const;
 
 // Resolve a single active nav key: the item whose path is the LONGEST match for
@@ -166,7 +167,9 @@ export function ERPShell({ children }: ERPShellProps) {
   const visibleNavItems = useMemo(() => {
     if (currentUser?.role !== "SHOP_STAFF") return NAV_ITEMS;
     const sections = currentUser?.sections || [];
-    return NAV_ITEMS.filter(n => n.key === "dashboard" || sections.includes(n.key));
+    // "credit-notes" rides on the "returns" permission (see App.tsx's matching
+    // requireSection gate) rather than its own section key — it's the same data.
+    return NAV_ITEMS.filter(n => n.key === "dashboard" || sections.includes(n.key === "credit-notes" ? "returns" : n.key));
   }, [currentUser]);
 
 
