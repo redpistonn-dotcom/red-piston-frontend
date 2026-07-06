@@ -76,7 +76,9 @@ export function SupplierAutocomplete({
     : parties.filter(p => (p.name || "").toLowerCase().includes(q));
   const exactMatch = parties.some(p => (p.name || "").toLowerCase() === q);
   const showAddNew = q.length > 0 && !exactMatch;
-  const showDropdown = open && loaded && (filtered.length > 0 || showAddNew);
+  // Open on focus even with zero suppliers / empty query — otherwise a shop
+  // with no suppliers yet sees no dropdown at all and the feature looks broken.
+  const showDropdown = open && loaded;
 
   const pick = (p: Party) => {
     onSelect({ name: p.name, phone: p.phone || '', gstin: p.gstin || '' });
@@ -113,7 +115,7 @@ export function SupplierAutocomplete({
           boxSizing: 'border-box',
           border: `1px solid ${error ? T.crimson : T.border}`,
           borderRadius: 7,
-          padding: '7px 9px',
+          padding: '7px 24px 7px 9px',
           fontSize: 11,
           fontFamily: FONT.ui,
           color: T.t1,
@@ -122,6 +124,7 @@ export function SupplierAutocomplete({
           ...inputStyle,
         }}
       />
+      <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: T.t4, pointerEvents: 'none' }}>▾</span>
       {showDropdown && (
         <div style={{
           position: 'absolute',
@@ -136,6 +139,11 @@ export function SupplierAutocomplete({
           maxHeight: 220,
           overflowY: 'auto',
         }}>
+          {filtered.length === 0 && !showAddNew && (
+            <div style={{ padding: '10px', fontSize: 11, color: T.t4, fontFamily: FONT.ui }}>
+              {q.length === 0 ? 'No suppliers yet — type a name to add one.' : 'No match — keep typing to add this as a new supplier.'}
+            </div>
+          )}
           {filtered.map(p => (
             <div
               key={p.partyId ?? p.id ?? p.name}

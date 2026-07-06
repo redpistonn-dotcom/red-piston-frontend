@@ -95,7 +95,7 @@ export function POSBillingPage() {
     // customer-facing bill never shows OEM/MRP unless the shop explicitly opts in.
     const [billOptsOpen, setBillOptsOpen] = useState(false);
     const [pendingBillAction, setPendingBillAction] = useState<null | "print" | "download" | "whatsapp">(null);
-    const [showOemOnBill, setShowOemOnBill] = useState(false);
+    const [showOemOnBill, setShowOemOnBill] = useState(true);
     const [showMrpOnBill, setShowMrpOnBill] = useState(false);
     const [suspendedBill, setSuspendedBill] = useState(() => {
         try {

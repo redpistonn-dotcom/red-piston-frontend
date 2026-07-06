@@ -795,6 +795,11 @@ export function InventoryPage() {
                                                             <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>SKU Number</div>
                                                             <div style={{ fontSize: 14, fontWeight: 800, fontFamily: FONT.mono, color: T.sky }}>{p.sku || "Not Available"}</div>
                                                         </div>
+                                                        {/* MRP */}
+                                                        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
+                                                            <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>MRP</div>
+                                                            <div style={{ fontSize: 14, fontWeight: 800, fontFamily: FONT.mono, color: p.mrp != null ? T.t1 : T.t4 }}>{p.mrp != null ? fmt(p.mrp) : "Not Set"}</div>
+                                                        </div>
                                                         {/* Position */}
                                                         <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 10, padding: "12px 14px" }}>
                                                             <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Position</div>
