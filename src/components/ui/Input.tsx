@@ -14,6 +14,8 @@ interface InputProps {
     onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
     readOnly?: boolean;
     disabled?: boolean;
+    /** Red border + glow — set true when a required field is empty on a failed submit attempt. */
+    invalid?: boolean;
     style?: CSSProperties;
     [key: string]: unknown;
 }
@@ -30,6 +32,7 @@ export function Input({
     onKeyDown,
     readOnly,
     disabled,
+    invalid,
     style: sx = {},
     ...rest
 }: InputProps) {
@@ -68,7 +71,7 @@ export function Input({
                 style={{
                     width: "100%",
                     background: T.surface,
-                    border: `1px solid ${focus ? T.sky : T.border}`,
+                    border: `1px solid ${invalid ? T.crimson : focus ? T.sky : T.border}`,
                     color: T.t1,
                     borderRadius: 10,
                     padding: `11px ${suffix ? "36px" : "14px"} 11px ${(icon || prefix) ? "34px" : "14px"}`,
@@ -76,7 +79,7 @@ export function Input({
                     outline: "none",
                     fontFamily: type === "number" ? FONT.mono : FONT.ui,
                     transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-                    boxShadow: focus ? `0 0 0 3px ${T.sky}22` : "none",
+                    boxShadow: invalid ? `0 0 0 3px ${T.crimson}22` : focus ? `0 0 0 3px ${T.sky}22` : "none",
                     cursor: disabled ? "not-allowed" : undefined,
                     opacity: disabled ? 0.55 : 1,
                     ...sx,

@@ -81,6 +81,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [selectionError, setSelectionError] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -88,7 +89,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
       setWalkInSearch(""); setPartySearch(""); setSelectedParty(null);
       setItems([]); setSelected({}); setReason("WRONG_PART"); setNotes("");
       setResolution(null); setRefundMode("CASH"); setNewSearch(""); setNewItems({});
-      setCashAmount(""); setUpiAmount(""); setError("");
+      setCashAmount(""); setUpiAmount(""); setError(""); setSelectionError(false);
       return;
     }
     if (initialInvoice) { pickInvoice(initialInvoice); return; }
@@ -418,9 +419,12 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
               style={{ width: "100%", padding: 10, borderRadius: 10, border: `1px solid ${T.border}`, fontFamily: FONT.ui, fontSize: 13, resize: "vertical" }} />
           </Field>
 
+          {selectionError && selectedCount === 0 && (
+            <div style={{ fontSize: 12, color: T.crimson, fontWeight: 600, textAlign: "right" }}>↑ Add at least one item being returned</div>
+          )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <Btn variant="ghost" onClick={() => setStep("pick-invoice")}>Back</Btn>
-            <Btn variant="amber" onClick={() => setStep("resolve")} disabled={selectedCount === 0}>
+            <Btn variant="amber" onClick={() => selectedCount === 0 ? setSelectionError(true) : (setSelectionError(false), setStep("resolve"))}>
               Continue{selectedCount > 0 ? ` (${selectedCount} item${selectedCount > 1 ? "s" : ""})` : ""}
             </Btn>
           </div>

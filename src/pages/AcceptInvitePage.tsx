@@ -38,6 +38,7 @@ const S = {
     background: "#1c0909", border: `1.5px solid ${T.crimson}`, borderRadius: 10,
     padding: "11px 14px", color: T.crimson, fontSize: 13, marginBottom: 14,
   },
+  fieldError: { fontSize: 12, color: T.crimson, fontWeight: 600, marginTop: -8, marginBottom: 14 },
   success: {
     background: "#091c0f", border: `1.5px solid ${T.emerald}`, borderRadius: 10,
     padding: "16px", textAlign: "center" as const, marginBottom: 14,
@@ -57,13 +58,22 @@ export default function AcceptInvitePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({ email: false, code: false, name: false, phone: false });
 
   const phoneDigits = phone.replace(/\D/g, "").slice(-10);
-  const canSubmit = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && /^\d{6}$/.test(code)
-    && name.trim().length > 0 && /^[6-9]\d{9}$/.test(phoneDigits);
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const codeValid = /^\d{6}$/.test(code);
+  const nameValid = name.trim().length > 0;
+  const phoneValid = /^[6-9]\d{9}$/.test(phoneDigits);
+  const canSubmit = emailValid && codeValid && nameValid && phoneValid;
 
   const handleVerify = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      setFieldErrors({ email: !emailValid, code: !codeValid, name: !nameValid, phone: !phoneValid });
+      setError("Please fix the highlighted fields below.");
+      return;
+    }
+    setFieldErrors({ email: false, code: false, name: false, phone: false });
     setError(""); setLoading(true);
     try {
       const data: any = await acceptStaffInvite({
@@ -109,47 +119,51 @@ export default function AcceptInvitePage() {
 
             <label style={S.label}>Email</label>
             <input
-              style={S.input}
+              style={{ ...S.input, border: fieldErrors.email ? `1.5px solid ${T.crimson}` : S.input.border, boxShadow: fieldErrors.email ? `0 0 0 3px ${T.crimson}22` : "none" }}
               type="email"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={e => { setEmail(e.target.value); setFieldErrors(p => ({ ...p, email: false })); }}
               placeholder="you@example.com"
               autoFocus={!searchParams.get("email")}
             />
+            {fieldErrors.email && <div style={S.fieldError}>↑ {email.trim() ? "Enter a valid email address" : "Email is required"}</div>}
 
             <label style={S.label}>Verification code</label>
             <input
-              style={S.codeInput}
+              style={{ ...S.codeInput, border: fieldErrors.code ? `1.5px solid ${T.crimson}` : S.codeInput.border, boxShadow: fieldErrors.code ? `0 0 0 3px ${T.crimson}22` : "none" }}
               type="text"
               inputMode="numeric"
               maxLength={6}
               value={code}
-              onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              onChange={e => { setCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setFieldErrors(p => ({ ...p, code: false })); }}
               placeholder="······"
               autoFocus={!!searchParams.get("email")}
             />
+            {fieldErrors.code && <div style={S.fieldError}>↑ Enter the 6-digit code from your email</div>}
 
             <label style={S.label}>Your full name</label>
             <input
-              style={S.input}
+              style={{ ...S.input, border: fieldErrors.name ? `1.5px solid ${T.crimson}` : S.input.border, boxShadow: fieldErrors.name ? `0 0 0 3px ${T.crimson}22` : "none" }}
               type="text"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => { setName(e.target.value); setFieldErrors(p => ({ ...p, name: false })); }}
               placeholder="Full name"
             />
+            {fieldErrors.name && <div style={S.fieldError}>↑ Your name is required</div>}
 
             <label style={S.label}>Your mobile number</label>
             <input
-              style={S.input}
+              style={{ ...S.input, border: fieldErrors.phone ? `1.5px solid ${T.crimson}` : S.input.border, boxShadow: fieldErrors.phone ? `0 0 0 3px ${T.crimson}22` : "none" }}
               type="tel"
               inputMode="numeric"
               value={phone}
-              onChange={e => setPhone(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
+              onChange={e => { setPhone(e.target.value.replace(/[^\d]/g, "").slice(0, 10)); setFieldErrors(p => ({ ...p, phone: false })); }}
               placeholder="10-digit mobile number"
               maxLength={10}
             />
+            {fieldErrors.phone && <div style={S.fieldError}>↑ Enter a valid 10-digit mobile number</div>}
 
-            <button style={S.btn(!canSubmit || loading)} onClick={handleVerify} disabled={!canSubmit || loading}>
+            <button style={S.btn(loading)} onClick={handleVerify} disabled={loading}>
               {loading ? "Verifying…" : "Verify & Continue"}
             </button>
 

@@ -233,6 +233,7 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
   const [inviteSections, setInviteSections] = useState<string[]>([]);
   const [inviting, setInviting] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<StaffInvite[]>([]);
+  const [inviteFieldErrors, setInviteFieldErrors] = useState({ email: false, roleLabel: false, sections: false });
 
   // Editable fields
   const [name, setName] = useState("");
@@ -505,7 +506,17 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
     setInviteSections(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
 
   const handleInviteStaff = async () => {
-    if (!inviteEmail.trim() || !inviteRoleLabel.trim() || inviteSections.length === 0) return;
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim());
+    const errors = {
+      email: !emailValid,
+      roleLabel: !inviteRoleLabel.trim(),
+      sections: inviteSections.length === 0,
+    };
+    setInviteFieldErrors(errors);
+    if (errors.email || errors.roleLabel || errors.sections) {
+      setError(!inviteEmail.trim() ? "Email is required" : errors.email ? "Enter a valid email address" : errors.roleLabel ? "A role is required" : "Pick at least one section");
+      return;
+    }
     setInviting(true); setError("");
     try {
       await createStaffInvite({
@@ -513,6 +524,7 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
       });
       const sentTo = inviteEmail.trim();
       setInviteEmail(""); setInviteRoleLabel(""); setInviteSections([]);
+      setInviteFieldErrors({ email: false, roleLabel: false, sections: false });
       showToast(`Invite sent to ${sentTo} — they'll get a verification code by email`);
       loadPendingInvites();
     } catch (e) {
@@ -838,17 +850,40 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
         {/* ─── Shop Owner: Staff Management ─── */}
         {role === "SHOP_OWNER" && (
           <div style={S.section}>
-            <div style={S.sectionTitle}>👥 Staff Management</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={S.sectionTitle}>👥 Staff Management</div>
+              <button onClick={() => navigate("/staff")} style={{ background: "none", border: "none", color: T.amber, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: FONT.ui }}>Edit access & roles →</button>
+            </div>
 
             {/* Invite form */}
             <div style={{ ...S.card, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.t2, marginBottom: 10 }}>Invite Staff Member</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-                <input style={{ ...S.input, flex: "1 1 220px", minWidth: 220 }} type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="Their email (verification code sent here)" />
-                <input style={{ ...S.input, flex: "1 1 160px", minWidth: 160 }} value={inviteRoleLabel} onChange={e => setInviteRoleLabel(e.target.value)} placeholder="Role, e.g. Mechanic" />
+                <div style={{ flex: "1 1 220px", minWidth: 220 }}>
+                  <input
+                    style={{ ...S.input, border: inviteFieldErrors.email ? `1.5px solid ${T.crimson}` : S.input.border, boxShadow: inviteFieldErrors.email ? `0 0 0 3px ${T.crimson}22` : "none" }}
+                    type="email" value={inviteEmail}
+                    onChange={e => { setInviteEmail(e.target.value); setInviteFieldErrors(p => ({ ...p, email: false })); }}
+                    placeholder="Their email (verification code sent here)"
+                  />
+                  {inviteFieldErrors.email && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginTop: 4 }}>↑ {inviteEmail.trim() ? "Enter a valid email address" : "Email is required"}</div>}
+                </div>
+                <div style={{ flex: "1 1 160px", minWidth: 160 }}>
+                  <input
+                    style={{ ...S.input, border: inviteFieldErrors.roleLabel ? `1.5px solid ${T.crimson}` : S.input.border, boxShadow: inviteFieldErrors.roleLabel ? `0 0 0 3px ${T.crimson}22` : "none" }}
+                    value={inviteRoleLabel}
+                    onChange={e => { setInviteRoleLabel(e.target.value); setInviteFieldErrors(p => ({ ...p, roleLabel: false })); }}
+                    placeholder="Role, e.g. Mechanic"
+                  />
+                  {inviteFieldErrors.roleLabel && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginTop: 4 }}>↑ Required</div>}
+                </div>
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, marginBottom: 8 }}>Sections they can access</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+              <div style={{
+                display: "flex", flexWrap: "wrap", gap: 8, marginBottom: inviteFieldErrors.sections ? 4 : 12,
+                padding: inviteFieldErrors.sections ? 8 : 0, borderRadius: 10,
+                border: inviteFieldErrors.sections ? `1.5px solid ${T.crimson}` : "none",
+              }}>
                 {SECTION_OPTIONS.map(s => (
                   <label key={s.key} style={{
                     display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
@@ -857,15 +892,16 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
                     cursor: "pointer", fontSize: 12, fontWeight: inviteSections.includes(s.key) ? 700 : 400,
                     color: inviteSections.includes(s.key) ? T.amber : T.t2,
                   }}>
-                    <input type="checkbox" checked={inviteSections.includes(s.key)} onChange={() => toggleInviteSection(s.key)} style={{ width: 14, height: 14 }} />
+                    <input type="checkbox" checked={inviteSections.includes(s.key)} onChange={() => { toggleInviteSection(s.key); setInviteFieldErrors(p => ({ ...p, sections: false })); }} style={{ width: 14, height: 14 }} />
                     {s.label}
                   </label>
                 ))}
               </div>
+              {inviteFieldErrors.sections && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginBottom: 12 }}>↑ Pick at least one section</div>}
               <button
                 style={{ ...S.btn("primary"), whiteSpace: "nowrap" }}
                 onClick={handleInviteStaff}
-                disabled={inviting || !inviteEmail.trim() || !inviteRoleLabel.trim() || inviteSections.length === 0}
+                disabled={inviting}
               >
                 {inviting ? "Sending…" : "Send Invite"}
               </button>

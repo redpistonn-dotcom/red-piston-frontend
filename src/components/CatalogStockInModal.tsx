@@ -815,16 +815,16 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <Field label="Buying Price (₹)" required error={errors.buyPrice}>
-            <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" autoFocus min="0" max="10000000" step="0.01" />
+            <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" autoFocus min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
           </Field>
           <Field label="Selling Price (₹)" required error={errors.sellPrice}>
-            <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
+            <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.sellPrice} />
           </Field>
           <Field label="MRP (₹)" error={errors.mrp} hint="Printed ceiling price (optional)">
-            <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
+            <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.mrp} />
           </Field>
           <Field label="Opening Stock" required error={errors.stockQty} hint="Units currently in hand">
-            <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" />
+            <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" invalid={!!errors.stockQty} />
           </Field>
           <Field label="Min Stock Alert" hint="Alert below this threshold">
             <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" min="0" max="10000" />
@@ -954,7 +954,7 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         {/* Photo is added later at marketplace "Go Live" — not required here. */}
         <Field label="OEM Name" required error={errors.partName} hint="The official / manufacturer name">
-          <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" maxLength={200} />
+          <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" maxLength={200} invalid={!!errors.partName} />
         </Field>
         <Field label="OEM Part Number" hint="From the box / manufacturer website">
           <Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="04465-02220" maxLength={50} />
@@ -973,6 +973,7 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
               { value: "", label: "Select category…" },
               ...CATEGORIES.map((c) => ({ value: c, label: c })),
             ]}
+            invalid={!!errors.categoryL1}
           />
         </Field>
         <Field label="Unit of Sale">
@@ -997,16 +998,16 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
           <Select value={f.gstRate} onChange={set("gstRate")} options={GST_RATES.map((r) => ({ value: r, label: r + "% GST" }))} />
         </Field>
         <Field label="Buying Price (₹)" required error={errors.buyPrice}>
-          <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
+          <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
         </Field>
         <Field label="Selling Price (₹)" required error={errors.sellPrice}>
-          <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
+          <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.sellPrice} />
         </Field>
         <Field label="MRP (₹)" error={errors.mrp} hint="Printed ceiling price (optional)">
-          <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" />
+          <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.mrp} />
         </Field>
         <Field label="Opening Stock" required error={errors.stockQty}>
-          <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" />
+          <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" invalid={!!errors.stockQty} />
         </Field>
         <Field label="Min Stock Alert">
           <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" min="0" max="10000" />

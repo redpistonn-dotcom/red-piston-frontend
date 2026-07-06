@@ -136,7 +136,8 @@ export function PartiesPage() {
             .catch(() => {});
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const [view, setView]           = useState("customers");
+    const [view, setView]           = useState(() => localStorage.getItem('rp_parties_tab') || 'customers');
+    useEffect(() => { localStorage.setItem('rp_parties_tab', view); }, [view]);
     const [search, setSearch]       = useState("");
     const [editParty, setEditParty] = useState<any>(null);
     const [showAddModal, setShowAddModal] = useState(false);
@@ -360,7 +361,27 @@ export function PartiesPage() {
 
     // First-load skeleton: show until this page's own fetch resolves.
     if (!partiesLoaded && shopParties.length === 0) {
-        return <Skeleton.Page kpis={4} cols={7} />;
+        return (
+          <div style={{ padding: 24 }}>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+              <div className="skeleton" style={{ height: 36, width: 220 }} />
+              <div className="skeleton" style={{ height: 36, width: 100 }} />
+            </div>
+            <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
+              {[0,1,2,3,4].map(i => (
+                <div key={i} style={{ padding: '16px 18px', borderBottom: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div className="skeleton" style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton" style={{ height: 11, width: '40%', marginBottom: 7 }} />
+                    <div className="skeleton" style={{ height: 10, width: '25%' }} />
+                  </div>
+                  <div className="skeleton" style={{ height: 10, width: 70 }} />
+                  <div className="skeleton" style={{ height: 10, width: 60 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
     }
 
     return (
@@ -470,9 +491,9 @@ export function PartiesPage() {
                                 <button onClick={() => setShowVehForm(true)} style={{ height: 40, padding: "0 20px", borderRadius: 9, border: "none", background: T.amber, color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>+ Add First Vehicle</button>
                             </div>
                         ) : (
-                            <div style={{ overflowX: "auto" }}>
+                            <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "60vh" }}>
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                    <thead>
+                                    <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                                         <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
                                             {[["Vehicle","left"],["Reg. No.","left"],["Owner","left"],["Engine","left"],["Odometer","right"],["","right"]].map(([h, al], i) => (
                                                 <th key={i} style={{ padding: "10px 14px", textAlign: al as any, fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>{h}</th>
@@ -507,7 +528,7 @@ export function PartiesPage() {
                     {/* Footer */}
                     <div style={{ padding: "10px 18px", borderTop: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: FONT.ui }}>{shopVehicles.length} VEHICLES TOTAL</span>
-                        <span style={{ fontSize: 10, color: T.t3, fontFamily: FONT.ui }}>AUTOSPACE ENTERPRISE V2.4</span>
+                        <span style={{ fontSize: 10, color: T.t3, fontFamily: FONT.ui }}>REDPISTON</span>
                     </div>
                 </div>
             )}
@@ -629,7 +650,9 @@ export function PartiesPage() {
                                 <div style={{ fontSize: 13, color: T.t3, maxWidth: 360, margin: "0 auto 28px", lineHeight: 1.6 }}>
                                     {search
                                         ? `No results match "${search}". Try a different name, phone or GSTIN.`
-                                        : `Start by adding your first shop ${view === "customers" ? "customer" : "supplier"} to manage ledgers, outstanding credit, and service history.`}
+                                        : view === "customers"
+                                            ? "No customers yet. They're added automatically when you create a bill, or add one manually."
+                                            : "No suppliers yet. Add a supplier to track purchases and credit."}
                                 </div>
                                 {!search && (
                                     <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
@@ -707,7 +730,7 @@ export function PartiesPage() {
                         ) : (
                             <div className="table-scroll">
                                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                    <thead>
+                                    <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                                         <tr>
                                             {[
                                                 { key: "name", label: "Name" },
@@ -745,7 +768,12 @@ export function PartiesPage() {
                                                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                                                 <Avatar name={p.name} size={32} />
                                                                 <div>
-                                                                    <div style={{ fontWeight: 700, color: T.t1, fontSize: 13 }}>{p.name}</div>
+                                                                    <div style={{ fontWeight: 700, color: T.t1, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                                                                        {p.name}
+                                                                        {(p.daysOverdue > 0 || p.overdueDays > 0) && (
+                                                                            <span style={{ fontSize: 9, fontWeight: 700, color: '#D97706', background: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: 99, padding: '1px 7px' }}>OVERDUE</span>
+                                                                        )}
+                                                                    </div>
                                                                     {p.email && <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>{p.email}</div>}
                                                                     {bal > 0 && age > 0 && <span style={{ fontSize: 9, fontWeight: 700, color: ageColor, background: `${ageColor}18`, padding: "1px 6px", borderRadius: 4, marginTop: 3, display: "inline-block" }}>{age}d overdue</span>}
                                                                 </div>
@@ -771,7 +799,7 @@ export function PartiesPage() {
                                                         <td style={{ padding: "13px 14px" }}>
                                                             <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                                                                 {(p.tags || []).map((t: string) => (
-                                                                    <span key={t} style={{ background: `${T.amber}14`, color: T.amber, fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: 700 }}>{t}</span>
+                                                                    <span key={t} style={{ background: `${T.amber}14`, color: T.amber, fontSize: 11, padding: "3px 10px", borderRadius: 99, fontWeight: 700 }}>{t}</span>
                                                                 ))}
                                                             </div>
                                                         </td>
@@ -802,7 +830,7 @@ export function PartiesPage() {
                                                     {/* Expanded ledger row — real PartyLedger from API */}
                                                     {isEx && (
                                                         <tr key={p.id + "_detail"}>
-                                                            <td colSpan={9} style={{ padding: "0 14px 14px 14px", background: `${T.bg}` }}>
+                                                            <td colSpan={9} style={{ padding: "0 14px 14px 14px", background: `${T.bg}`, animation: "fadeIn 0.15s ease" }}>
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 10px" }}>
                                                                     <div style={{ width: 3, height: 14, background: T.amber, borderRadius: 2 }} />
                                                                     <span style={{ fontSize: 9, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: FONT.ui }}>UDHAAR LEDGER</span>
@@ -815,7 +843,7 @@ export function PartiesPage() {
                                                                     <div style={{ color: T.t3, fontSize: 12 }}>No ledger entries yet.</div>
                                                                 ) : (
                                                                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
-                                                                        <thead>
+                                                                        <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                                                                             <tr style={{ borderBottom: `1px solid ${T.border}` }}>
                                                                                 {["Date","Entry Type","Invoice","Debit (↑ owes)","Credit (↓ paid)","Balance"].map(h => (
                                                                                     <th key={h} style={{ padding: "5px 8px", textAlign: "left", color: T.t4, fontWeight: 600, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FONT.ui }}>{h}</th>
@@ -859,7 +887,7 @@ export function PartiesPage() {
                             <span style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: FONT.ui }}>
                                 {filtered.length} {view.toUpperCase()} TOTAL
                             </span>
-                            <span style={{ fontSize: 10, color: T.t3, fontFamily: FONT.ui, letterSpacing: "0.04em" }}>AUTOSPACE ENTERPRISE V2.4</span>
+                            <span style={{ fontSize: 10, color: T.t3, fontFamily: FONT.ui, letterSpacing: "0.04em" }}>REDPISTON</span>
                         </div>
                     </div>
                 </>
@@ -887,16 +915,18 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
     const isEdit = !!party;
     const blank = { name: "", phone: "", email: "", gstin: "", address: "", city: "", creditLimit: "0", creditDays: "30", loyaltyPoints: "0", openingBalance: "0", outstanding: "0", tags: "", notes: "" };
     const [f, setF] = useState(blank);
+    const [nameError, setNameError] = useState(false);
 
     useEffect(() => {
         if (party) setF({ ...party, creditLimit: String(party.creditLimit || 0), creditDays: String(party.creditDays || 30), loyaltyPoints: String(party.loyaltyPoints || 0), openingBalance: String(party.openingBalance || 0), outstanding: String(party.outstanding || 0), tags: (party.tags || []).join(", ") });
         else setF(blank);
+        setNameError(false);
     }, [party, open]);
 
-    const set = (k: string) => (v: any) => setF(p => ({ ...p, [k]: v }));
+    const set = (k: string) => (v: any) => { setF(p => ({ ...p, [k]: v })); if (k === "name") setNameError(false); };
 
     const handleSave = () => {
-        if (!f.name.trim()) return;
+        if (!f.name.trim()) { setNameError(true); return; }
         onSave({
             ...f, id: party?.id || (type === "customer" ? "cust" : "sup") + "_" + uid(),
             shopId: party?.shopId || activeShopId, type: party?.type || type,
@@ -911,7 +941,7 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
     return (
         <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${type === "customer" ? "Customer" : "Supplier"}` : `Add ${type === "customer" ? "Customer" : "Supplier"}`} width={560}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div style={{ gridColumn: "span 2" }}><Field label="Name" required><Input value={f.name} onChange={set("name")} placeholder="Business or person name" /></Field></div>
+                <div style={{ gridColumn: "span 2" }}><Field label="Name" required error={nameError ? "Name is required" : undefined}><Input value={f.name} onChange={set("name")} placeholder="Business or person name" invalid={nameError} /></Field></div>
                 <Field label="Phone"><Input value={f.phone} onChange={set("phone")} placeholder="+91 9876543210" /></Field>
                 <Field label="Email"><Input value={f.email} onChange={set("email")} placeholder="email@example.com" /></Field>
                 <Field label="GSTIN"><Input value={f.gstin} onChange={set("gstin")} placeholder="22AAAAA0000A1Z5" /></Field>

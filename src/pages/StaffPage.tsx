@@ -28,6 +28,7 @@ export function StaffPage() {
 
     // Section-edit inline state: staffId → draft section list (pending confirm)
     const [editingSections, setEditingSections] = useState<Record<number, string[]>>({});
+    const [editingRoleLabel, setEditingRoleLabel] = useState<Record<number, string>>({});
 
     const load = async () => {
         setLoading(true);
@@ -74,8 +75,10 @@ export function StaffPage() {
         }
     };
 
-    const startEditingSections = (member: StaffMember) =>
+    const startEditingSections = (member: StaffMember) => {
         setEditingSections(prev => ({ ...prev, [member.id]: member.sections || [] }));
+        setEditingRoleLabel(prev => ({ ...prev, [member.id]: member.roleLabel || "" }));
+    };
 
     const toggleEditingSection = (memberId: number, key: string) =>
         setEditingSections(prev => ({
@@ -83,13 +86,27 @@ export function StaffPage() {
             [memberId]: prev[memberId].includes(key) ? prev[memberId].filter(k => k !== key) : [...prev[memberId], key],
         }));
 
+    const [sectionsInvalid, setSectionsInvalid] = useState<Record<number, boolean>>({});
+    const [roleLabelInvalid, setRoleLabelInvalid] = useState<Record<number, boolean>>({});
+
     const handleSaveSections = async (member: StaffMember) => {
         const sections = editingSections[member.id];
-        if (!sections || sections.length === 0) { toast?.("At least one section is required", "error"); return; }
+        const roleLabel = editingRoleLabel[member.id]?.trim() ?? "";
+        const noSections = !sections || sections.length === 0;
+        const noRoleLabel = !roleLabel;
+        if (noSections || noRoleLabel) {
+            setSectionsInvalid(prev => ({ ...prev, [member.id]: noSections }));
+            setRoleLabelInvalid(prev => ({ ...prev, [member.id]: noRoleLabel }));
+            toast?.(noSections ? "At least one section is required" : "A role label is required", "error");
+            return;
+        }
         try {
-            await updateStaffAccess(member.id, { sections });
-            setStaff(prev => prev.map(m => m.id === member.id ? { ...m, sections } : m));
+            await updateStaffAccess(member.id, { sections, roleLabel });
+            setStaff(prev => prev.map(m => m.id === member.id ? { ...m, sections, roleLabel } : m));
             setEditingSections(prev => { const next = { ...prev }; delete next[member.id]; return next; });
+            setEditingRoleLabel(prev => { const next = { ...prev }; delete next[member.id]; return next; });
+            setSectionsInvalid(prev => ({ ...prev, [member.id]: false }));
+            setRoleLabelInvalid(prev => ({ ...prev, [member.id]: false }));
             toast?.("Access updated", "success");
         } catch (e: any) {
             toast?.(e?.data?.error?.message || e?.message || "Failed to update access", "error");
@@ -192,7 +209,20 @@ export function StaffPage() {
                                         </td>
 
                                         <td style={{ padding: "12px 16px" }}>
-                                            <span style={{ fontSize: 11, background: `${color}22`, color, padding: "3px 9px", borderRadius: 99, fontWeight: 700 }}>{m.roleLabel || m.role}</span>
+                                            {editing ? (
+                                                <input
+                                                    value={editingRoleLabel[m.id] ?? ""}
+                                                    onChange={e => { setEditingRoleLabel(p => ({ ...p, [m.id]: e.target.value })); setRoleLabelInvalid(p => ({ ...p, [m.id]: false })); }}
+                                                    placeholder="e.g. Mechanic"
+                                                    style={{
+                                                        width: 110, fontSize: 12, padding: "5px 8px", borderRadius: 7, fontFamily: FONT.ui, outline: "none",
+                                                        border: `1.5px solid ${roleLabelInvalid[m.id] ? T.crimson : T.border}`,
+                                                        boxShadow: roleLabelInvalid[m.id] ? `0 0 0 2px ${T.crimson}22` : "none",
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span style={{ fontSize: 11, background: `${color}22`, color, padding: "3px 9px", borderRadius: 99, fontWeight: 700 }}>{m.roleLabel || m.role}</span>
+                                            )}
                                         </td>
 
                                         {/* Sections + inline edit */}
@@ -201,7 +231,10 @@ export function StaffPage() {
                                                 <span style={{ fontSize: 12, color: T.t3 }}>All sections</span>
                                             ) : editing ? (
                                                 <div>
-                                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+                                                    <div style={{
+                                                        display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6, padding: sectionsInvalid[m.id] ? 6 : 0,
+                                                        borderRadius: 8, border: sectionsInvalid[m.id] ? `1.5px solid ${T.crimson}` : "none",
+                                                    }}>
                                                         {SECTION_OPTIONS.map(s => (
                                                             <label key={s.key} style={{
                                                                 display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 99,
@@ -209,13 +242,14 @@ export function StaffPage() {
                                                                 background: editing.includes(s.key) ? `${T.amber}18` : "transparent",
                                                                 cursor: "pointer", fontSize: 11, color: editing.includes(s.key) ? T.amber : T.t3,
                                                             }}>
-                                                                <input type="checkbox" checked={editing.includes(s.key)} onChange={() => toggleEditingSection(m.id, s.key)} style={{ width: 12, height: 12 }} />
+                                                                <input type="checkbox" checked={editing.includes(s.key)} onChange={() => { toggleEditingSection(m.id, s.key); setSectionsInvalid(p => ({ ...p, [m.id]: false })); }} style={{ width: 12, height: 12 }} />
                                                                 {s.label}
                                                             </label>
                                                         ))}
                                                     </div>
+                                                    {sectionsInvalid[m.id] && <div style={{ fontSize: 10, color: T.crimson, fontWeight: 600, marginBottom: 6 }}>↑ Pick at least one section</div>}
                                                     <button onClick={() => handleSaveSections(m)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "none", background: T.emerald, color: "#fff", cursor: "pointer", fontWeight: 700, marginRight: 6 }}>Save</button>
-                                                    <button onClick={() => setEditingSections(p => { const n = { ...p }; delete n[m.id]; return n; })} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", color: T.t3, cursor: "pointer" }}>Cancel</button>
+                                                    <button onClick={() => { setEditingSections(p => { const n = { ...p }; delete n[m.id]; return n; }); setEditingRoleLabel(p => { const n = { ...p }; delete n[m.id]; return n; }); setSectionsInvalid(p => ({ ...p, [m.id]: false })); setRoleLabelInvalid(p => ({ ...p, [m.id]: false })); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", color: T.t3, cursor: "pointer" }}>Cancel</button>
                                                 </div>
                                             ) : (
                                                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>

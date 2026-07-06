@@ -211,8 +211,8 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
             </div>
 
             <div className="inner-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div style={{ gridColumn: "span 2" }}><Field label="Product Name" required error={errors.name}><Input value={f.name} onChange={set("name")} placeholder="Bosch Brake Pad Set — Front" /></Field></div>
-                <Field label="SKU / Code" required error={errors.sku}><Input value={f.sku} onChange={set("sku")} placeholder="BRK-F-0042" /></Field>
+                <div style={{ gridColumn: "span 2" }}><Field label="Product Name" required error={errors.name}><Input value={f.name} onChange={set("name")} placeholder="Bosch Brake Pad Set — Front" invalid={!!errors.name} /></Field></div>
+                <Field label="SKU / Code" required error={errors.sku}><Input value={f.sku} onChange={set("sku")} placeholder="BRK-F-0042" invalid={!!errors.sku} /></Field>
                 <Field label="HSN / SAC Code" hint="For GST filing"><Input value={f.hsnCode} onChange={set("hsnCode")} placeholder="87083000" /></Field>
                 <Field label="Category"><Select value={f.category} onChange={set("category")} options={CATEGORIES.map(c => ({ value: c, label: c }))} /></Field>
                 <Field label="Brand / Manufacturer"><Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK…" /></Field>
@@ -236,8 +236,8 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
 
                 <Divider label="Pricing" />
                 <div style={{ gridColumn: "span 2" }} />
-                <Field label="Buying Price (₹)" required error={errors.buyPrice}><Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" /></Field>
-                <Field label="Selling Price (₹)" required error={errors.sellPrice}><Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" /></Field>
+                <Field label="Buying Price (₹)" required error={errors.buyPrice}><Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" invalid={!!errors.buyPrice} /></Field>
+                <Field label="Selling Price (₹)" required error={errors.sellPrice}><Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" invalid={!!errors.sellPrice} /></Field>
                 <Field label="MRP (₹)" hint="Maximum Retail Price"><Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" /></Field>
                 <Field label="GST Rate"><Select value={String(f.gstRate)} onChange={set("gstRate")} options={["0", "5", "12", "18", "28"].map(v => ({ value: v, label: v + "% GST" }))} /></Field>
 
@@ -256,7 +256,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
 
                 <Divider label="Inventory" />
                 <div style={{ gridColumn: "span 2" }} />
-                <Field label={isEdit ? "Current Stock" : "Opening Stock"} required error={errors.stock}><Input type="number" value={f.stock} onChange={set("stock")} placeholder="0" suffix="units" /></Field>
+                <Field label={isEdit ? "Current Stock" : "Opening Stock"} required error={errors.stock}><Input type="number" value={f.stock} onChange={set("stock")} placeholder="0" suffix="units" invalid={!!errors.stock} /></Field>
                 <Field label="Min Stock Alert" hint="Alert when stock drops below"><Input type="number" value={f.minStock} onChange={set("minStock")} placeholder="10" suffix="units" /></Field>
                 <Field label="Max Stock" hint="Maximum capacity"><Input type="number" value={f.maxStock} onChange={set("maxStock")} placeholder="1000" suffix="units" /></Field>
                 <Field label="Reorder Qty" hint="Auto PO quantity"><Input type="number" value={f.reorderQty} onChange={set("reorderQty")} placeholder="20" suffix="units" /></Field>

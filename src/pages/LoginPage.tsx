@@ -140,7 +140,11 @@ const BASE_S = {
   sub: { fontSize: 14, color: "#9C8C7C", marginBottom: 24, lineHeight: 1.55 },
   chip: { fontSize: 10, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#BE2B1A", marginBottom: 8, fontFamily: "'Inter', sans-serif" },
   hint: { fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, marginBottom: 16 },
+  fieldErr: { fontSize: 11, color: "#DC2626", fontWeight: 600, marginBottom: 10 },
 };
+
+// Red border + glow to apply to a field's style object when it failed validation on submit.
+const errStyle = (invalid) => invalid ? { border: "1.5px solid #DC2626", boxShadow: "0 0 0 3px rgba(220,38,38,0.13)" } : {};
 
 // ─── Indian states for shop registration ─────────────────────────────────────
 const INDIA_STATES = [
@@ -173,6 +177,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [settingUp, setSettingUp] = useState(false); // overlay while transitioning to shop-details
   const [error, setError]         = useState("");
   const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "", shopCategory: "", whatsappNumber: "", photoUrl: "" });
+  const [shopFieldErrors, setShopFieldErrors] = useState<Record<string, boolean>>({});
   const [vehicle, setVehicle] = useState({ make: "", model: "", year: "", fuelType: "", registrationNo: "" });
   const [profile, setProfile]     = useState({ name: "", profileType: "INDIVIDUAL" });
   const [pendingUserId, setPendingUserId] = useState(null);
@@ -390,21 +395,30 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
   // ── Submit shop details → POST /api/auth/shop-setup ───────────────────────
   const submitShopDetails = async () => {
-    if (!shopDetails.ownerName.trim()) { setError("Enter your full name"); return; }
-    if (!shopDetails.shopName.trim())  { setError("Enter your shop name"); return; }
-    if (!shopDetails.address.trim())   { setError("Enter your shop address"); return; }
-    if (!shopDetails.city.trim())      { setError("Enter your city"); return; }
-    if (!shopDetails.state)            { setError("Select your state"); return; }
     const pin = shopDetails.pincode.replace(/\D/g, "");
-    if (!pin || pin.length !== 6)      { setError("Enter a valid 6-digit pincode"); return; }
     const ph = shopDetails.contactPhone.replace(/\D/g, "");
-    if (ph.length !== 10) { setError("Enter a valid 10-digit contact number"); return; }
     const wa = shopDetails.whatsappNumber.replace(/\D/g, "");
-    if (wa.length !== 10) { setError("Enter a valid 10-digit WhatsApp number"); return; }
-    if (!shopDetails.email.trim()) { setError("Enter your shop email address"); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shopDetails.email.trim())) { setError("Enter a valid email address"); return; }
-    if (shopDetails.gstin.length !== 15) { setError("Enter a valid 15-character GSTIN"); return; }
-    if (!shopDetails.photoUrl) { setError("Upload a shop photo to continue"); return; }
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shopDetails.email.trim());
+    const errs = {
+      ownerName: !shopDetails.ownerName.trim(),
+      shopName: !shopDetails.shopName.trim(),
+      address: !shopDetails.address.trim(),
+      city: !shopDetails.city.trim(),
+      state: !shopDetails.state,
+      pincode: pin.length !== 6,
+      contactPhone: ph.length !== 10,
+      shopCategory: !shopDetails.shopCategory,
+      whatsappNumber: wa.length !== 10,
+      email: !shopDetails.email.trim() || !emailValid,
+      gstin: shopDetails.gstin.length !== 15,
+      photoUrl: !shopDetails.photoUrl,
+    };
+    if (Object.values(errs).some(Boolean)) {
+      setShopFieldErrors(errs);
+      setError("Please fix the highlighted fields below.");
+      return;
+    }
+    setShopFieldErrors({});
     setError(""); setLoading(true);
     try {
       await api.post("/api/auth/shop-setup", {
@@ -824,33 +838,39 @@ export default function LoginPage({ onLogin, isModal = false }) {
             {error && <div style={S.error}>{error}</div>}
 
             <label style={S.label}>Your Full Name <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Rajesh Kumar" value={shopDetails.ownerName} onChange={e => setShopDetails(d => ({ ...d, ownerName: e.target.value }))} autoFocus />
+            <input className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.ownerName ? 4 : 14, ...errStyle(shopFieldErrors.ownerName) }} placeholder="e.g. Rajesh Kumar" value={shopDetails.ownerName} onChange={e => { setShopDetails(d => ({ ...d, ownerName: e.target.value })); setShopFieldErrors(p => ({ ...p, ownerName: false })); }} autoFocus />
+            {shopFieldErrors.ownerName && <div style={S.fieldErr}>↑ Required</div>}
 
             <label style={S.label}>Shop Name <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Kumar Auto Parts" value={shopDetails.shopName} onChange={e => setShopDetails(d => ({ ...d, shopName: e.target.value }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.shopName ? 4 : 14, ...errStyle(shopFieldErrors.shopName) }} placeholder="e.g. Kumar Auto Parts" value={shopDetails.shopName} onChange={e => { setShopDetails(d => ({ ...d, shopName: e.target.value })); setShopFieldErrors(p => ({ ...p, shopName: false })); }} />
+            {shopFieldErrors.shopName && <div style={S.fieldErr}>↑ Required</div>}
 
             <label style={S.label}>Shop Address <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Plot 12, KPHB Colony, Kukatpally" value={shopDetails.address} onChange={e => setShopDetails(d => ({ ...d, address: e.target.value }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.address ? 4 : 14, ...errStyle(shopFieldErrors.address) }} placeholder="e.g. Plot 12, KPHB Colony, Kukatpally" value={shopDetails.address} onChange={e => { setShopDetails(d => ({ ...d, address: e.target.value })); setShopFieldErrors(p => ({ ...p, address: false })); }} />
+            {shopFieldErrors.address && <div style={S.fieldErr}>↑ Required</div>}
 
             <label style={S.label}>City <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Hyderabad" value={shopDetails.city} onChange={e => setShopDetails(d => ({ ...d, city: e.target.value }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.city ? 4 : 14, ...errStyle(shopFieldErrors.city) }} placeholder="e.g. Hyderabad" value={shopDetails.city} onChange={e => { setShopDetails(d => ({ ...d, city: e.target.value })); setShopFieldErrors(p => ({ ...p, city: false })); }} />
+            {shopFieldErrors.city && <div style={S.fieldErr}>↑ Required</div>}
 
             <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
               <div style={{ flex: 2 }}>
                 <label style={S.label}>State <span style={{ color: "#DC2626" }}>*</span></label>
-                <select className="auth-input" style={{ ...S.input, cursor: "pointer" }} value={shopDetails.state} onChange={e => setShopDetails(d => ({ ...d, state: e.target.value }))}>
+                <select className="auth-input" style={{ ...S.input, cursor: "pointer", ...errStyle(shopFieldErrors.state) }} value={shopDetails.state} onChange={e => { setShopDetails(d => ({ ...d, state: e.target.value })); setShopFieldErrors(p => ({ ...p, state: false })); }}>
                   <option value="">Select state…</option>
                   {INDIA_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
+                {shopFieldErrors.state && <div style={S.fieldErr}>↑ Required</div>}
               </div>
               <div style={{ flex: 1 }}>
                 <label style={S.label}>Pincode <span style={{ color: "#DC2626" }}>*</span></label>
-                <input className="auth-input" style={S.input} placeholder="500001" value={shopDetails.pincode} maxLength={6} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, pincode: e.target.value.replace(/\D/g, "") }))} />
+                <input className="auth-input" style={{ ...S.input, ...errStyle(shopFieldErrors.pincode) }} placeholder="500001" value={shopDetails.pincode} maxLength={6} inputMode="numeric" onChange={e => { setShopDetails(d => ({ ...d, pincode: e.target.value.replace(/\D/g, "") })); setShopFieldErrors(p => ({ ...p, pincode: false })); }} />
+                {shopFieldErrors.pincode && <div style={S.fieldErr}>↑ 6 digits</div>}
               </div>
             </div>
 
             <label style={S.label}>Shop Category <span style={{ color: "#DC2626" }}>*</span></label>
-            <select className="auth-input" style={{ ...S.input, marginBottom: 14, cursor: "pointer" }} value={shopDetails.shopCategory} onChange={e => setShopDetails(d => ({ ...d, shopCategory: e.target.value }))}>
+            <select className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.shopCategory ? 4 : 14, cursor: "pointer", ...errStyle(shopFieldErrors.shopCategory) }} value={shopDetails.shopCategory} onChange={e => { setShopDetails(d => ({ ...d, shopCategory: e.target.value })); setShopFieldErrors(p => ({ ...p, shopCategory: false })); }}>
               <option value="">Select category…</option>
               <option value="AUTO_PARTS">Auto Parts Retailer</option>
               <option value="WORKSHOP">Workshop / Service Centre</option>
@@ -859,34 +879,42 @@ export default function LoginPage({ onLogin, isModal = false }) {
               <option value="ELECTRICAL">Auto Electrical</option>
               <option value="GENERAL">General Automotive</option>
             </select>
+            {shopFieldErrors.shopCategory && <div style={S.fieldErr}>↑ Required</div>}
 
             <label style={S.label}>Shop Contact Number <span style={{ color: "#DC2626" }}>*</span></label>
-            <div style={{ ...S.phoneRow, marginBottom: 14 }}>
+            <div style={{ ...S.phoneRow, marginBottom: shopFieldErrors.contactPhone ? 4 : 14 }}>
               <div style={S.phoneFlag}>IN +91</div>
-              <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" value={shopDetails.contactPhone} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, contactPhone: e.target.value.replace(/\D/g, "") }))} />
+              <input className="auth-input" style={{ ...S.phoneInput, ...errStyle(shopFieldErrors.contactPhone) }} placeholder="98765 43210" value={shopDetails.contactPhone} maxLength={10} inputMode="numeric" onChange={e => { setShopDetails(d => ({ ...d, contactPhone: e.target.value.replace(/\D/g, "") })); setShopFieldErrors(p => ({ ...p, contactPhone: false })); }} />
             </div>
+            {shopFieldErrors.contactPhone && <div style={S.fieldErr}>↑ Enter a valid 10-digit number</div>}
 
             <label style={S.label}>WhatsApp Number <span style={{ color: "#DC2626" }}>*</span></label>
-            <div style={{ ...S.phoneRow, marginBottom: 14 }}>
+            <div style={{ ...S.phoneRow, marginBottom: shopFieldErrors.whatsappNumber ? 4 : 14 }}>
               <div style={S.phoneFlag}>IN +91</div>
-              <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" value={shopDetails.whatsappNumber} maxLength={10} inputMode="numeric" onChange={e => setShopDetails(d => ({ ...d, whatsappNumber: e.target.value.replace(/\D/g, "") }))} />
+              <input className="auth-input" style={{ ...S.phoneInput, ...errStyle(shopFieldErrors.whatsappNumber) }} placeholder="98765 43210" value={shopDetails.whatsappNumber} maxLength={10} inputMode="numeric" onChange={e => { setShopDetails(d => ({ ...d, whatsappNumber: e.target.value.replace(/\D/g, "") })); setShopFieldErrors(p => ({ ...p, whatsappNumber: false })); }} />
             </div>
+            {shopFieldErrors.whatsappNumber && <div style={S.fieldErr}>↑ Enter a valid 10-digit number</div>}
 
             <label style={S.label}>Shop Email <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} type="email" placeholder="shop@example.com" value={shopDetails.email} onChange={e => setShopDetails(d => ({ ...d, email: e.target.value }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.email ? 4 : 14, ...errStyle(shopFieldErrors.email) }} type="email" placeholder="shop@example.com" value={shopDetails.email} onChange={e => { setShopDetails(d => ({ ...d, email: e.target.value })); setShopFieldErrors(p => ({ ...p, email: false })); }} />
+            {shopFieldErrors.email && <div style={S.fieldErr}>↑ Enter a valid email address</div>}
 
             <label style={S.label}>GSTIN <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14, fontFamily: FONT.mono, letterSpacing: "1px" }} placeholder="22AAAAA0000A1Z5" value={shopDetails.gstin} maxLength={15} onChange={e => setShopDetails(d => ({ ...d, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.gstin ? 4 : 14, fontFamily: FONT.mono, letterSpacing: "1px", ...errStyle(shopFieldErrors.gstin) }} placeholder="22AAAAA0000A1Z5" value={shopDetails.gstin} maxLength={15} onChange={e => { setShopDetails(d => ({ ...d, gstin: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })); setShopFieldErrors(p => ({ ...p, gstin: false })); }} />
+            {shopFieldErrors.gstin && <div style={S.fieldErr}>↑ Enter a valid 15-character GSTIN</div>}
 
             <label style={{ ...S.label, marginBottom: 6 }}>Shop Photo <span style={{ color: "#DC2626" }}>*</span></label>
-            <ShopPhotoUploader photoUrl={shopDetails.photoUrl} onUploaded={url => setShopDetails(d => ({ ...d, photoUrl: url }))} />
+            <div style={shopFieldErrors.photoUrl ? { border: "1.5px solid #DC2626", borderRadius: 10, padding: 4 } : undefined}>
+              <ShopPhotoUploader photoUrl={shopDetails.photoUrl} onUploaded={url => { setShopDetails(d => ({ ...d, photoUrl: url })); setShopFieldErrors(p => ({ ...p, photoUrl: false })); }} />
+            </div>
+            {shopFieldErrors.photoUrl && <div style={{ ...S.fieldErr, marginTop: -10 }}>↑ Upload a shop photo to continue</div>}
 
             {/* Repeat the error near the button — on mobile the top-of-form error is off-screen */}
             {error && (
               <div style={{ ...S.error, marginTop: 16, marginBottom: 0 }}>{error}</div>
             )}
-            <button className="btn-primary" style={{ ...S.btnPrimary(loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory || shopDetails.whatsappNumber.length !== 10 || !shopDetails.email.trim() || shopDetails.gstin.length !== 15 || !shopDetails.photoUrl), marginTop: 12 }}
-              disabled={loading || !shopDetails.ownerName.trim() || !shopDetails.shopName.trim() || !shopDetails.address.trim() || !shopDetails.city.trim() || shopDetails.pincode.replace(/\D/g,"").length !== 6 || shopDetails.contactPhone.length !== 10 || !shopDetails.shopCategory || shopDetails.whatsappNumber.length !== 10 || !shopDetails.email.trim() || shopDetails.gstin.length !== 15 || !shopDetails.photoUrl}
+            <button className="btn-primary" style={{ ...S.btnPrimary(loading), marginTop: 12 }}
+              disabled={loading}
               onClick={submitShopDetails}>
               {loading ? "Submitting…" : "Submit for Verification →"}
             </button>
@@ -912,7 +940,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
             )}
             {error && <div style={S.error}>{error}</div>}
             <label style={S.label}>Full Name <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 18 }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} autoFocus />
+            <input className="auth-input" style={{ ...S.input, marginBottom: 18, ...errStyle(!!error && !profile.name.trim()) }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => { setProfile(p => ({ ...p, name: e.target.value })); setError(""); }} autoFocus />
             <label style={S.label}>I am a…</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
               {[
@@ -951,7 +979,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
               </div>
             </div>
 
-            <button className="btn-primary" style={S.btnPrimary(loading || !profile.name.trim())} disabled={loading || !profile.name.trim()} onClick={saveProfile}>
+            <button className="btn-primary" style={S.btnPrimary(loading)} disabled={loading} onClick={saveProfile}>
               {loading ? "Saving…" : "Enter RedPiston →"}
             </button>
           </div>
