@@ -244,6 +244,10 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
           });
         }
         toast("Return created — credit note generated", "success");
+        // Stock (RETURN_IN), History, Parties/credit balance, and the Credit Notes
+        // page all reload off this event — without it they'd show stale data
+        // until an unrelated action or manual refresh happened to trigger it.
+        window.dispatchEvent(new CustomEvent("rp:data-changed"));
       } else {
         const result: any = await createExchange({
           ...(isWalkIn
@@ -265,6 +269,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
           upiAmount: upiAmount ? parseFloat(upiAmount) : undefined,
         });
         toast("Exchange completed", "success");
+        window.dispatchEvent(new CustomEvent("rp:data-changed"));
         onCreated?.();
         // Stay open one more beat so the owner can pull up the Exchange
         // Invoice right away, instead of having to find it later in the list.
