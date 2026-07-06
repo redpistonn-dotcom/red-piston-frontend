@@ -6,6 +6,31 @@ import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 import { useJobCardHistory } from "../hooks/useJobCardHistory";
 import { fetchMovements } from "../api/sync";
+import { getInvoicePdfUrl } from "../api/billing";
+import { getAccessToken } from "../api/client";
+
+// ─── View/download a saved invoice PDF ─────────────────────────────────────────
+// Saves via a named <a download> rather than window.open(blob:…) — a blob: URL
+// handed to an external PDF viewer (common on mobile) can go stale before that
+// viewer reads it, producing "Failed to load PDF document" even on success.
+async function viewInvoicePdf(invoiceId: number, invoiceNo?: string | null) {
+    try {
+        const res = await fetch(getInvoicePdfUrl(invoiceId), {
+            headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+        });
+        if (!res.ok) throw new Error("failed");
+        const blobUrl = URL.createObjectURL(await res.blob());
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = `${invoiceNo || "invoice"}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    } catch {
+        window.alert("Could not load this invoice's PDF. It may not have finished syncing yet.");
+    }
+}
 
 // ─── Group movements that share the same invoiceNo or batchId ─────────────────
 function groupMovements(filtered: any[]) {
@@ -61,7 +86,15 @@ function GroupRow({ group, isExpanded, onToggle, isLast }: any) {
                 <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontWeight: 700, color: totalProfit > 0 ? T.emerald : totalProfit < 0 ? T.crimson : T.t4 }}>
                     {totalProfit ? (totalProfit > 0 ? "+" : "") + fmt(totalProfit) : <span style={{ color: T.t4 }}>—</span>}
                 </td>
-                <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>{invoiceDisplay}</td>
+                <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>
+                    {first.invoiceId ? (
+                        <button onClick={e => { e.stopPropagation(); viewInvoicePdf(first.invoiceId, first.invoiceNo); }}
+                            title="View / download invoice PDF"
+                            style={{ background: "none", border: "none", padding: 0, color: T.sky, fontFamily: FONT.mono, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
+                            {invoiceDisplay}
+                        </button>
+                    ) : invoiceDisplay}
+                </td>
                 <td style={{ padding: "12px 14px", fontSize: 12, color: T.t2, maxWidth: 130 }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{partyName}</div>
                 </td>
@@ -154,7 +187,15 @@ function SingleRow({ m, isExpanded, onToggle, isLast }: any) {
                 <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontWeight: 700, color: m.profit > 0 ? T.emerald : m.profit < 0 ? T.crimson : T.t4 }}>
                     {m.profit ? (m.profit > 0 ? "+" : "") + fmt(m.profit) : <span style={{ color: T.t4 }}>—</span>}
                 </td>
-                <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>{m.invoiceNo || <span style={{ color: T.t4 }}>—</span>}</td>
+                <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>
+                    {m.invoiceId ? (
+                        <button onClick={e => { e.stopPropagation(); viewInvoicePdf(m.invoiceId, m.invoiceNo); }}
+                            title="View / download invoice PDF"
+                            style={{ background: "none", border: "none", padding: 0, color: T.sky, fontFamily: FONT.mono, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
+                            {m.invoiceNo || "View"}
+                        </button>
+                    ) : (m.invoiceNo || <span style={{ color: T.t4 }}>—</span>)}
+                </td>
                 <td style={{ padding: "12px 14px", fontSize: 12, color: T.t2, maxWidth: 130 }}>
                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {(m.type === "PURCHASE" || m.type === "OPENING") ? (m.supplierName || m.supplier || "—") : (m.customerName || "Walk-in")}

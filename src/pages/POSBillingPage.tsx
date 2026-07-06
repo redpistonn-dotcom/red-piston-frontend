@@ -90,6 +90,13 @@ export function POSBillingPage() {
     // Backend invoice id once the sale syncs — enables PDF download + WhatsApp share
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
     const [returnModalOpen, setReturnModalOpen] = useState(false);
+
+    // Bill visibility options — asked once per print/download/share action so the
+    // customer-facing bill never shows OEM/MRP unless the shop explicitly opts in.
+    const [billOptsOpen, setBillOptsOpen] = useState(false);
+    const [pendingBillAction, setPendingBillAction] = useState<null | "print" | "download" | "whatsapp">(null);
+    const [showOemOnBill, setShowOemOnBill] = useState(false);
+    const [showMrpOnBill, setShowMrpOnBill] = useState(false);
     const [suspendedBill, setSuspendedBill] = useState(() => {
         try {
             const raw = JSON.parse(localStorage.getItem("vl_suspended_bill") || "null");
@@ -181,7 +188,7 @@ export function POSBillingPage() {
             const existing = prev.find(i => i.productId === p.id);
             if (existing) return prev.map(i => i.productId === p.id ? { ...i, qty: Math.min(i.qty + 1, i.maxStock) } : i);
             return [...prev, {
-                productId: p.id, name: p.name, sku: p.sku || "", image: p.image || "📦",
+                productId: p.id, name: p.name, sku: p.sku || "", oemNumber: p.oemNumber || "", image: p.image || "📦",
                 qty: 1, price: p.sellPrice, originalPrice: p.sellPrice, discount: 0, discountType: "%",
                 gstRate: p.gstRate || 18, buyPrice: p.buyPrice, maxStock: p.stock, hsnCode: p.hsnCode || "",
                 mrp: p.mrp || null,
@@ -342,7 +349,8 @@ export function POSBillingPage() {
 
     // Build the GST invoice as a jsPDF doc from the on-screen bill (jsPDF lazy-loaded).
     // Shared by "Download PDF" and "Share WhatsApp" (so WhatsApp can attach the file).
-    const buildBillPdf = async () => {
+    const buildBillPdf = async (opts?: { showOem?: boolean; showMrp?: boolean }) => {
+        const showOem = !!opts?.showOem, showMrp = !!opts?.showMrp;
         const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
         const autoTable = autoTableMod.default;
         const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -362,17 +370,22 @@ export function POSBillingPage() {
         y = Math.max(y, 90);
         if (customerName) { doc.text(`Customer: ${customerName}`, M, y); y += 12; }
         if (vehicleReg) { doc.text(`Vehicle: ${vehicleReg}`, M, y); y += 12; }
+        const head = ["#", "Item", ...(showOem ? ["OEM No."] : []), "Qty", "Rate", ...(showMrp ? ["MRP"] : []), "Disc", "GST", "Amount"];
         autoTable(doc, {
             startY: y + 8,
-            head: [["#", "Item", "Qty", "Rate", "Disc", "GST", "Amount"]],
+            head: [head],
             body: items.map((it: any, i: number) => {
                 const lc = lineCalcs[i];
-                return [String(i + 1), it.name, String(it.qty), rs(it.price),
-                    lc.discAmt > 0 ? `-${rs(lc.discAmt)}` : "-", rs(lc.gstAmt), rs(lc.afterDisc)];
+                return [
+                    String(i + 1), it.name,
+                    ...(showOem ? [it.oemNumber || "—"] : []),
+                    String(it.qty), rs(it.price),
+                    ...(showMrp ? [it.mrp ? rs(it.mrp) : "—"] : []),
+                    lc.discAmt > 0 ? `-${rs(lc.discAmt)}` : "-", rs(lc.gstAmt), rs(lc.afterDisc),
+                ];
             }),
             styles: { fontSize: 9, cellPadding: 5 },
             headStyles: { fillColor: [139, 30, 30] },
-            columnStyles: { 0: { cellWidth: 24, halign: "center" }, 2: { halign: "right" }, 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" } },
             margin: { left: M, right: M },
         });
         let fy = ((doc as any).lastAutoTable?.finalY || y + 40) + 16;
@@ -393,6 +406,89 @@ export function POSBillingPage() {
         doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(120);
         doc.text(`Paid via ${paymentMode} - computer-generated ${billType === "Sale" ? "tax invoice" : "quotation"}.`, M, fy);
         return doc;
+    };
+
+    // Runs the actual print/download/share action once the shop has confirmed
+    // whether OEM number and MRP should appear on the bill.
+    const runBillAction = async (action: "print" | "download" | "whatsapp", opts: { showOem: boolean; showMrp: boolean }) => {
+        if (action === "print") {
+            printInvoice({
+                format: printFormat,
+                shop: { name: shopName, address: shopAddress, gstin: shopGst, phone: shopPhone, logoUrl: (shop as any)?.logoUrl || (shop as any)?.photoUrl || undefined },
+                invoice: {
+                    invoiceNo,
+                    invoiceAt: invoiceAt ? fmtDateTime(invoiceAt) : undefined,
+                    isInvoice: billType === "Sale",
+                    customerName: customerName || undefined,
+                    vehicleReg: vehicleReg || undefined,
+                    paymentMode: paymentMode || undefined,
+                    notes: notes || undefined,
+                },
+                items: items.map((item, idx) => {
+                    const lc = lineCalcs[idx];
+                    return { name: item.name, sku: item.sku, oemNumber: item.oemNumber, mrp: item.mrp, qty: item.qty, price: item.price, discAmt: lc.discAmt, gstAmt: lc.gstAmt, afterDisc: lc.afterDisc };
+                }),
+                totals: { grandDiscount, additionalDisc, grandGst, finalTotal },
+                showOem: opts.showOem,
+                showMrp: opts.showMrp,
+            });
+            return;
+        }
+
+        if (action === "download") {
+            // Server-rendered PDF has no OEM/MRP toggle, so only use it when neither
+            // extra field was requested; otherwise always build client-side.
+            if (syncedInvoiceId && !opts.showOem && !opts.showMrp) {
+                try {
+                    const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
+                        headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                    });
+                    if (res.ok) {
+                        // Save via a named <a download> instead of window.open(blob:…) — a
+                        // blob: URL handed to an external PDF viewer (common on mobile) can
+                        // go stale before that viewer reads it, producing "Failed to load
+                        // PDF document" even though the fetch succeeded. A real download
+                        // with a proper filename always leaves a complete file on disk.
+                        const blobUrl = URL.createObjectURL(await res.blob());
+                        const a = document.createElement("a");
+                        a.href = blobUrl;
+                        a.download = `${invoiceNo || "invoice"}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+                        return;
+                    }
+                } catch { /* fall through to the client-side PDF */ }
+            }
+            try {
+                const doc = await buildBillPdf(opts);
+                doc.save(`${invoiceNo || "invoice"}.pdf`);
+            } catch { toast?.("Could not generate the PDF", "warning"); }
+            return;
+        }
+
+        // whatsapp
+        const text = `*${shopName}*\n${billType === "Sale" ? "Tax Invoice" : "Quotation"} ${invoiceNo}\nItems: ${items.length}\nTotal: ₹${finalTotal.toFixed(2)}\n\nThank you for your business! 🙏`;
+        let pdfDownloaded = false;
+        try {
+            const doc = await buildBillPdf(opts);
+            const blob = doc.output("blob");
+            const file = new File([blob], `${invoiceNo || "invoice"}.pdf`, { type: "application/pdf" });
+            const nav: any = navigator;
+            if (nav.canShare && nav.canShare({ files: [file] })) {
+                try { await nav.share({ files: [file], text, title: `Invoice ${invoiceNo}` }); return; }
+                catch (e: any) { if (e?.name === "AbortError") return; /* else fall through */ }
+            }
+            doc.save(`${invoiceNo || "invoice"}.pdf`);
+            pdfDownloaded = true;
+        } catch { /* PDF unavailable — still send the text */ }
+        const ph = customerPhone.replace(/\D/g, "");
+        const url = ph.length === 10
+            ? `https://wa.me/91${ph}?text=${encodeURIComponent(text)}`
+            : `https://wa.me/?text=${encodeURIComponent(text)}`;
+        window.open(url, "_blank");
+        if (pdfDownloaded) toast?.("Invoice PDF downloaded — attach it in the WhatsApp chat that just opened.", "info");
     };
 
     // ─── Invoice Preview ───────────────────────────────────────────────────────
@@ -561,76 +657,14 @@ export function POSBillingPage() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                <button onClick={() => {
-                    printInvoice({
-                        format: printFormat,
-                        shop: { name: shopName, address: shopAddress, gstin: shopGst, phone: shopPhone, logoUrl: (shop as any)?.logoUrl || (shop as any)?.photoUrl || undefined },
-                        invoice: {
-                            invoiceNo,
-                            invoiceAt: invoiceAt ? fmtDateTime(invoiceAt) : undefined,
-                            isInvoice: billType === "Sale",
-                            customerName: customerName || undefined,
-                            vehicleReg: vehicleReg || undefined,
-                            paymentMode: paymentMode || undefined,
-                            notes: notes || undefined,
-                        },
-                        items: items.map((item, idx) => {
-                            const lc = lineCalcs[idx];
-                            return { name: item.name, sku: item.sku, qty: item.qty, price: item.price, discAmt: lc.discAmt, gstAmt: lc.gstAmt, afterDisc: lc.afterDisc };
-                        }),
-                        totals: { grandDiscount, additionalDisc, grandGst, finalTotal },
-                    });
-                }} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
+                <button onClick={() => { setPendingBillAction("print"); setBillOptsOpen(true); }} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
                 <button
-                    onClick={async () => {
-                        // Prefer the server-rendered invoice PDF once the sale has synced.
-                        if (syncedInvoiceId) {
-                            try {
-                                const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
-                                    headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
-                                });
-                                if (res.ok) { window.open(URL.createObjectURL(await res.blob()), "_blank"); return; }
-                            } catch { /* fall through to the client-side PDF */ }
-                        }
-                        // Fallback (or sale not yet synced): build the PDF client-side from
-                        // the on-screen bill so Download ALWAYS works, regardless of backend
-                        // sync / cold starts.
-                        try {
-                            const doc = await buildBillPdf();
-                            doc.save(`${invoiceNo || "invoice"}.pdf`);
-                        } catch { toast?.("Could not generate the PDF", "warning"); }
-                    }}
+                    onClick={() => { setPendingBillAction("download"); setBillOptsOpen(true); }}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: syncedInvoiceId ? T.t1 : T.t3, cursor: "pointer", fontFamily: FONT.ui }}>
                     📄 Download PDF
                 </button>
                 <button
-                    onClick={async () => {
-                        const text =
-                            `*${shopName}*\n${billType === "Sale" ? "Tax Invoice" : "Quotation"} ${invoiceNo}\nItems: ${items.length}\nTotal: ₹${finalTotal.toFixed(2)}\n\nThank you for your business! 🙏`;
-                        // Best path (mobile): share the actual PDF *and* the text in one go via
-                        // the native share sheet — WhatsApp appears as a target and receives both.
-                        let pdfDownloaded = false;
-                        try {
-                            const doc = await buildBillPdf();
-                            const blob = doc.output("blob");
-                            const file = new File([blob], `${invoiceNo || "invoice"}.pdf`, { type: "application/pdf" });
-                            const nav: any = navigator;
-                            if (nav.canShare && nav.canShare({ files: [file] })) {
-                                try { await nav.share({ files: [file], text, title: `Invoice ${invoiceNo}` }); return; }
-                                catch (e: any) { if (e?.name === "AbortError") return; /* else fall through */ }
-                            }
-                            // Desktop / no file-share support: download the PDF so it can be attached.
-                            doc.save(`${invoiceNo || "invoice"}.pdf`);
-                            pdfDownloaded = true;
-                        } catch { /* PDF unavailable — still send the text */ }
-                        // Open WhatsApp with the text (to the customer's number if provided).
-                        const ph = customerPhone.replace(/\D/g, "");
-                        const url = ph.length === 10
-                            ? `https://wa.me/91${ph}?text=${encodeURIComponent(text)}`
-                            : `https://wa.me/?text=${encodeURIComponent(text)}`;
-                        window.open(url, "_blank");
-                        if (pdfDownloaded) toast?.("Invoice PDF downloaded — attach it in the WhatsApp chat that just opened.", "info");
-                    }}
+                    onClick={() => { setPendingBillAction("whatsapp"); setBillOptsOpen(true); }}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#25D366", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui }}>
                     💬 Share WhatsApp
                 </button>
@@ -658,6 +692,31 @@ export function POSBillingPage() {
                     }}
                 />
             )}
+            <Modal open={billOptsOpen} onClose={() => setBillOptsOpen(false)} title="Before you continue" width={380}>
+                <div style={{ fontSize: 13, color: T.t2, marginBottom: 16 }}>
+                    Choose what the customer's bill should show.
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}>
+                    <input type="checkbox" checked={showOemOnBill} onChange={e => setShowOemOnBill(e.target.checked)} style={{ width: 18, height: 18 }} />
+                    <span style={{ fontSize: 14, color: T.t1 }}>Show OEM number on the bill</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}>
+                    <input type="checkbox" checked={showMrpOnBill} onChange={e => setShowMrpOnBill(e.target.checked)} style={{ width: 18, height: 18 }} />
+                    <span style={{ fontSize: 14, color: T.t1 }}>Show MRP on the bill</span>
+                </label>
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                    <button onClick={() => setBillOptsOpen(false)} style={{ flex: 1, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>Cancel</button>
+                    <button
+                        onClick={() => {
+                            const action = pendingBillAction;
+                            setBillOptsOpen(false);
+                            if (action) runBillAction(action, { showOem: showOemOnBill, showMrp: showMrpOnBill });
+                        }}
+                        style={{ flex: 1, height: 42, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui }}>
+                        Continue
+                    </button>
+                </div>
+            </Modal>
         </div>
     );
 
@@ -836,7 +895,7 @@ export function POSBillingPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                                 <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                                    {["#","Product","SKU","Qty","Price","Disc.","Total","Actions"].map(h => (
+                                    {["#","Product","OEM No.","Qty","Price","Disc.","Total","Actions"].map(h => (
                                         <th key={h} style={{ padding: "10px 14px", textAlign: h === "Price" || h === "Total" || h === "Disc." ? "right" : "left", fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>{h}</th>
                                     ))}
                                 </tr>
@@ -880,7 +939,7 @@ export function POSBillingPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>{item.sku || "—"}</td>
+                                            <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>{item.oemNumber || "—"}</td>
                                             <td style={{ padding: "12px 10px" }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                                                     <button onClick={() => updateItem(idx, "qty", Math.max(1, item.qty - 1))}

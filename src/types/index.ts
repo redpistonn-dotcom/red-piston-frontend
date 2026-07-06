@@ -135,6 +135,7 @@ export interface Movement {
   supplier?: string | null;
   supplierName?: string | null;
   invoiceNo?: string | null;
+  invoiceId?: number | null;
   batchId?: string | null;
   partyId?: string | null;
   payment?: string | null;

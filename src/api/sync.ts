@@ -200,6 +200,7 @@ export function mapMovement(m: BackendMovement): Movement {
     note: m.notes || '',
     date: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
     invoiceNo: m.referenceNumber || (m.invoiceId ? String(m.invoiceId) : null),
+    invoiceId: m.invoiceId ?? null,
     partyId: m.partyId ? String(m.partyId) : null,
     supplierName: isSupply ? partyName : null,
     customerName: isSupply ? null : partyName,

@@ -32,6 +32,8 @@ interface InvoiceInfo {
 interface LineItem {
   name: string;
   sku?: string;
+  oemNumber?: string;
+  mrp?: number | null;
   qty: number;
   price: number;
   discAmt: number;
@@ -52,6 +54,10 @@ export interface PrintInvoiceParams {
   invoice: InvoiceInfo;
   items: LineItem[];
   totals: Totals;
+  /** Show each item's OEM number on the printed/shared bill. Off by default. */
+  showOem?: boolean;
+  /** Show each item's MRP on the printed/shared bill. Off by default. */
+  showMrp?: boolean;
 }
 
 export function printInvoice(p: PrintInvoiceParams): void {
@@ -82,7 +88,7 @@ function rs(n: number): string {
 
 // ─── A4 template ─────────────────────────────────────────────────────────────
 function a4Html(p: PrintInvoiceParams): string {
-  const { shop, invoice, items, totals } = p;
+  const { shop, invoice, items, totals, showOem, showMrp } = p;
   const label = invoice.isInvoice ? "TAX INVOICE" : "ESTIMATE / QUOTATION";
   const accentColor = invoice.isInvoice ? "#d97706" : "#2563eb";
 
@@ -90,9 +96,10 @@ function a4Html(p: PrintInvoiceParams): string {
     <tr>
       <td class="num">${i + 1}</td>
       <td>${esc(item.name)}</td>
-      <td class="mono muted">${esc(item.sku) || "—"}</td>
+      ${showOem ? `<td class="mono muted">${esc(item.oemNumber) || "—"}</td>` : ""}
       <td class="num">${item.qty}</td>
       <td class="num">${rs(item.price)}</td>
+      ${showMrp ? `<td class="num muted">${item.mrp ? rs(item.mrp) : "—"}</td>` : ""}
       <td class="num red">${item.discAmt > 0 ? `−${rs(item.discAmt)}` : "—"}</td>
       <td class="num muted">${rs(item.gstAmt)}</td>
       <td class="num bold">${rs(item.afterDisc)}</td>
@@ -115,7 +122,7 @@ function a4Html(p: PrintInvoiceParams): string {
   .red{color:#dc2626}
   table{width:100%;border-collapse:collapse;margin-top:10px}
   th{padding:7px 6px;text-align:right;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #f3f0eb}
-  th:nth-child(1),th:nth-child(2),th:nth-child(3){text-align:left}
+  th.left{text-align:left}
   td{padding:7px 6px;border-bottom:1px solid #f3f0eb}
   .num{text-align:right;font-family:monospace}
   .bold{font-weight:700}
@@ -149,7 +156,7 @@ ${invoice.vehicleReg ? `<div class="meta-row"><span class="muted">Vehicle</span>
 ${invoice.notes ? `<div class="meta-row"><span class="muted">Notes</span><span>${esc(invoice.notes)}</span></div>` : ""}
 
 <table>
-  <thead><tr>${["#","Item","SKU","Qty","Rate","Disc","GST","Amount"].map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+  <thead><tr>${["#","Item", ...(showOem ? ["OEM No."] : []), "Qty","Rate", ...(showMrp ? ["MRP"] : []), "Disc","GST","Amount"].map(h=>`<th${["#","Item","OEM No."].includes(h) ? ' class="left"' : ""}>${h}</th>`).join("")}</tr></thead>
   <tbody>${rows}</tbody>
 </table>
 
@@ -174,7 +181,7 @@ ${invoice.notes ? `<div class="meta-row"><span class="muted">Notes</span><span>$
 
 // ─── Thermal (80 mm) template ─────────────────────────────────────────────────
 function thermalHtml(p: PrintInvoiceParams): string {
-  const { shop, invoice, items, totals } = p;
+  const { shop, invoice, items, totals, showOem, showMrp } = p;
   const label = invoice.isInvoice ? "TAX INVOICE" : "QUOTATION";
 
   // Build item rows — narrow, right-aligned amounts
@@ -183,12 +190,16 @@ function thermalHtml(p: PrintInvoiceParams): string {
     const rateDisc  = item.discAmt > 0
       ? `${rs(item.price)} - ${rs(item.discAmt)} disc`
       : `${rs(item.price)}`;
+    const extras = [
+      showOem && item.oemNumber ? `OEM: ${esc(item.oemNumber)}` : "",
+      showMrp && item.mrp ? `MRP: ${rs(item.mrp)}` : "",
+    ].filter(Boolean).join(" | ");
     return `
 <div class="item-row">
   <div class="item-name">${item.qty} x ${esc(item.name)}</div>
   <div class="item-right">${rs(item.afterDisc)}</div>
 </div>
-<div class="item-sub">${rateDisc}${item.sku ? ` | ${esc(item.sku)}` : ""}</div>`;
+<div class="item-sub">${rateDisc}${extras ? ` | ${extras}` : ""}</div>`;
   }).join("");
 
   const dashes = "------------------------------------------------";
