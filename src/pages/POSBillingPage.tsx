@@ -961,10 +961,13 @@ export function POSBillingPage() {
                                                     <input type="number" value={item.discount} min="0"
                                                         onFocus={e => e.target.select()}
                                                         onChange={e => updateItem(idx, "discount", Math.max(0, +e.target.value))}
-                                                        style={{ width: 46, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 7, padding: "0 6px", color: T.t1, fontFamily: FONT.mono, fontSize: 12, textAlign: "center", outline: "none" }} />
-                                                    <span style={{ fontSize: 11, color: T.t3, cursor: "pointer", userSelect: "none" }} onClick={() => updateItem(idx, "discountType", item.discountType === "%" ? "flat" : "%")}>
-                                                        {item.discountType === "%" ? "%" : "₹"}
-                                                    </span>
+                                                        style={{ width: 46, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: "7px 0 0 7px", borderRight: "none", padding: "0 6px", color: T.t1, fontFamily: FONT.mono, fontSize: 12, textAlign: "center", outline: "none" }} />
+                                                    <select value={item.discountType} onChange={e => updateItem(idx, "discountType", e.target.value)}
+                                                        title="Discount type: percentage or fixed amount"
+                                                        style={{ height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: "0 7px 7px 0", color: T.t2, fontFamily: FONT.ui, fontSize: 12, fontWeight: 700, outline: "none", cursor: "pointer", padding: "0 4px" }}>
+                                                        <option value="%">%</option>
+                                                        <option value="flat">₹</option>
+                                                    </select>
                                                 </div>
                                             </td>
                                             <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontWeight: 800, fontSize: 14, color: T.t1, textAlign: "right" }}>{fmt(lc.afterDisc)}</td>
