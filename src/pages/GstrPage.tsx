@@ -221,55 +221,13 @@ export function GstrPage() {
 
   // ── Download ─────────────────────────────────────────────────────────────────
 
-  const download = useCallback(async (format: "excel" | "json") => {
-    const params = new URLSearchParams({
-      from: dateRange.from,
-      to: dateRange.to,
-      format,
-    });
-    const url = `${BASE_URL}/api/billing/gstr1?${params}`;
-
-    if (format === "json") {
-      // JSON: open in new tab (browser will show or download)
-      window.open(url, "_blank");
-      return;
-    }
-
-    // Excel: fetch as blob so we can attach auth header
-    setDownloadMsg("Preparing Excel…");
-    try {
-      const token = getAccessToken();
-      const res = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objUrl;
-      a.download = `GSTR1_${dateRange.from}_${dateRange.to}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { URL.revokeObjectURL(objUrl); a.remove(); }, 2000);
-      setDownloadMsg("Downloaded!");
-    } catch (e: any) {
-      setDownloadMsg("Download failed: " + (e?.message || "Unknown error"));
-    } finally {
-      setTimeout(() => setDownloadMsg(""), 4000);
-    }
-  }, [dateRange.from, dateRange.to]);
-
-  const downloadCreditNotes = useCallback(async (format: "excel" | "json") => {
-    const params = new URLSearchParams({ from: dateRange.from, to: dateRange.to, format });
-    const url = `${BASE_URL}/api/billing/gstr1/credit-notes?${params}`;
-
-    if (format === "json") {
-      window.open(url, "_blank");
-      return;
-    }
-
-    setDownloadMsg("Preparing Excel…");
+  // Shared by both download functions below — window.open() can't attach an
+  // Authorization header, so a JSON "download" against an authenticated
+  // endpoint used to just open a blank/401 tab with no error shown anywhere.
+  // Fetching as a blob (like the Excel path already did) works for either
+  // format and gives us a real success/failure signal to report.
+  const downloadBlob = async (url: string, filename: string) => {
+    setDownloadMsg(filename.endsWith(".json") ? "Preparing JSON…" : "Preparing Excel…");
     try {
       const token = getAccessToken();
       const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {}, credentials: "include" });
@@ -278,7 +236,7 @@ export function GstrPage() {
       const objUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objUrl;
-      a.download = `GSTR1_9B_CreditNotes_${dateRange.from}_${dateRange.to}.xlsx`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(objUrl); a.remove(); }, 2000);
@@ -288,6 +246,18 @@ export function GstrPage() {
     } finally {
       setTimeout(() => setDownloadMsg(""), 4000);
     }
+  };
+
+  const download = useCallback((format: "excel" | "json") => {
+    const params = new URLSearchParams({ from: dateRange.from, to: dateRange.to, format });
+    const url = `${BASE_URL}/api/billing/gstr1?${params}`;
+    downloadBlob(url, `GSTR1_${dateRange.from}_${dateRange.to}.${format === "json" ? "json" : "xlsx"}`);
+  }, [dateRange.from, dateRange.to]);
+
+  const downloadCreditNotes = useCallback((format: "excel" | "json") => {
+    const params = new URLSearchParams({ from: dateRange.from, to: dateRange.to, format });
+    const url = `${BASE_URL}/api/billing/gstr1/credit-notes?${params}`;
+    downloadBlob(url, `GSTR1_9B_CreditNotes_${dateRange.from}_${dateRange.to}.${format === "json" ? "json" : "xlsx"}`);
   }, [dateRange.from, dateRange.to]);
 
   // ── render helpers ────────────────────────────────────────────────────────────
@@ -553,6 +523,13 @@ export function GstrPage() {
             style={{ ...btnBase, background: "transparent", color: T.violet, border: `1.5px solid ${T.violet}` }}
           >
             Download Credit Notes (Excel)
+          </button>
+
+          <button
+            onClick={() => downloadCreditNotes("json")}
+            style={{ ...btnBase, background: "transparent", color: T.violet, border: `1.5px solid ${T.violet}` }}
+          >
+            Download Credit Notes (JSON)
           </button>
 
           {downloadMsg && (

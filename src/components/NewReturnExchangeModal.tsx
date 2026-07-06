@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { T, FONT } from "../theme";
-import { Modal, Btn, Field, Input, Select } from "./ui";
+import { Modal, Btn, Field, Input, Select, QtyStepper } from "./ui";
 import { useStore } from "../store";
 import { getInvoices } from "../api/billing";
 import { getEligibleReturnItems, createSalesReturn, createWalkInSalesReturn, type ReturnableItem } from "../api/returns";
@@ -75,7 +75,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
   const [resolution, setResolution] = useState<Resolution | null>(null);
   const [refundMode, setRefundMode] = useState("CASH");
   const [newSearch, setNewSearch] = useState("");
-  const [newItems, setNewItems] = useState<Record<number, { qty: number; name: string; unitPrice: number }>>({});
+  const [newItems, setNewItems] = useState<Record<number, { qty: number; name: string; unitPrice: number; gstRate: number }>>({});
   const [cashAmount, setCashAmount] = useState("");
   const [upiAmount, setUpiAmount] = useState("");
 
@@ -181,19 +181,36 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
     const q = newSearch.toLowerCase();
     return shopProducts.filter((p: any) => (p.name || "").toLowerCase().includes(q) || (p.oemNumber || "").toLowerCase().includes(q) || (p.sku || "").toLowerCase().includes(q)).slice(0, 10);
   }, [shopProducts, newSearch]);
-  const addNewItem = (p: any) => { setNewItems(prev => ({ ...prev, [p.inventoryId ?? p.id]: { qty: 1, name: p.name, unitPrice: p.sellPrice } })); setNewSearch(""); };
+  const addNewItem = (p: any) => {
+    setNewItems(prev => ({ ...prev, [p.inventoryId ?? p.id]: { qty: 1, name: p.name, unitPrice: Number(p.sellPrice) || 0, gstRate: Number(p.gstRate) || 18 } }));
+    setNewSearch("");
+  };
   const removeNewItem = (id: number) => setNewItems(prev => { const next = { ...prev }; delete next[id]; return next; });
   const updateNewQty = (id: number, qty: number) => setNewItems(prev => ({ ...prev, [id]: { ...prev[id], qty: Math.max(1, qty) } }));
   const newItemCount = Object.keys(newItems).length;
 
+  // Each item keeps its own real GST rate — auto parts commonly span 5/12/18/28%,
+  // so a flat 18% assumption (the old behavior) showed a total that didn't match
+  // what the backend actually charges on submit.
   const oldTaxable = Object.entries(selected).reduce((sum, [id, v]) => {
     const item = items.find(i => i.invoiceItemId === Number(id));
     return item ? sum + (item.unitPrice - item.discount) * v.qty : sum;
   }, 0);
-  const oldTotalEst = oldTaxable * 1.18;
+  const oldGst = Object.entries(selected).reduce((sum, [id, v]) => {
+    const item = items.find(i => i.invoiceItemId === Number(id));
+    if (!item) return sum;
+    const taxable = (item.unitPrice - item.discount) * v.qty;
+    return sum + taxable * (item.gstRate / 100);
+  }, 0);
+  const oldTotalEst = oldTaxable + oldGst;
+
   const newTaxable = Object.values(newItems).reduce((sum, v) => sum + v.unitPrice * v.qty, 0);
-  const newTotalEst = newTaxable * 1.18;
+  const newGst = Object.values(newItems).reduce((sum, v) => sum + v.unitPrice * v.qty * (v.gstRate / 100), 0);
+  const newTotalEst = newTaxable + newGst;
+
   const netAmount = newTotalEst - oldTotalEst;
+  const amountCollected = (parseFloat(cashAmount) || 0) + (parseFloat(upiAmount) || 0);
+  const collectionShort = netAmount > 0.5 && amountCollected < netAmount - 0.5;
 
   // Walk-in mode = no invoice was ever picked (the "Process without one" fallback).
   const isWalkIn = !invoice;
@@ -202,7 +219,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
   const canSubmit = resolution === "REFUND"
     ? selectedCount > 0 && (refundMode !== "STORE_CREDIT" || !!effectivePartyId)
     : resolution === "EXCHANGE"
-    ? selectedCount > 0 && newItemCount > 0
+    ? selectedCount > 0 && newItemCount > 0 && !collectionShort
     : false;
 
   const submit = async () => {
@@ -356,9 +373,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
                     </div>
                     <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
                       <Field label="Qty" horizontal>
-                        <input type="number" min={1} value={sel.qty}
-                          onChange={e => updateSelection(item.invoiceItemId, { qty: Math.max(1, parseInt(e.target.value) || 1) })}
-                          style={{ width: 60, padding: "6px 8px", borderRadius: 8, border: `1px solid ${T.border}`, fontFamily: FONT.mono, fontSize: 13 }} />
+                        <QtyStepper value={sel.qty} min={1} onChange={qty => updateSelection(item.invoiceItemId, { qty })} />
                       </Field>
                       <Field label="Condition" horizontal>
                         <Select value={sel.condition} onChange={v => updateSelection(item.invoiceItemId, { condition: v })} options={CONDITIONS} style={{ width: 120, padding: "6px 10px" }} />
@@ -442,9 +457,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
                     {sel && (
                       <div style={{ display: "flex", gap: 10, marginTop: 10, paddingLeft: 28 }}>
                         <Field label="Qty" horizontal>
-                          <input type="number" min={1} max={item.qtyReturnable} value={sel.qty}
-                            onChange={e => updateSelection(item.invoiceItemId, { qty: Math.min(item.qtyReturnable, Math.max(1, parseInt(e.target.value) || 1)) })}
-                            style={{ width: 60, padding: "6px 8px", borderRadius: 8, border: `1px solid ${T.border}`, fontFamily: FONT.mono, fontSize: 13 }} />
+                          <QtyStepper value={sel.qty} min={1} max={item.qtyReturnable} onChange={qty => updateSelection(item.invoiceItemId, { qty })} />
                         </Field>
                         <Field label="Condition" horizontal>
                           <Select value={sel.condition} onChange={v => updateSelection(item.invoiceItemId, { condition: v })} options={CONDITIONS} style={{ width: 130, padding: "6px 10px" }} />
@@ -538,7 +551,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
                     {Object.entries(newItems).map(([id, v]) => (
                       <div key={id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: `1px solid ${T.amber}`, background: T.amberGlow }}>
                         <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: T.t1 }}>{v.name}</div>
-                        <input type="number" min={1} value={v.qty} onChange={e => updateNewQty(Number(id), parseInt(e.target.value) || 1)} style={{ width: 50, padding: "6px 8px", borderRadius: 8, border: `1px solid ${T.border}`, fontFamily: FONT.mono, fontSize: 13 }} />
+                        <QtyStepper value={v.qty} min={1} onChange={qty => updateNewQty(Number(id), qty)} />
                         <div style={{ fontSize: 13, fontFamily: FONT.mono, color: T.t2, width: 70, textAlign: "right" }}>₹{(v.unitPrice * v.qty).toFixed(0)}</div>
                         <button onClick={() => removeNewItem(Number(id))} style={{ background: "none", border: "none", color: T.crimson, cursor: "pointer", fontSize: 16, minWidth: 32, minHeight: 32 }}>×</button>
                       </div>
@@ -549,9 +562,17 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
 
               {(selectedCount > 0 || newItemCount > 0) && (
                 <div style={{ background: T.surfaceContainerLow, borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: T.t3 }}>Old item value (est.)</span><span style={{ fontFamily: FONT.mono }}>₹{oldTotalEst.toFixed(0)}</span></div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}><span style={{ color: T.t3 }}>New item value (est.)</span><span style={{ fontFamily: FONT.mono }}>₹{newTotalEst.toFixed(0)}</span></div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 800, borderTop: `1px solid ${T.border}`, paddingTop: 6, marginTop: 2 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Old item(s) returned</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: T.t3 }}>Taxable value</span><span style={{ fontFamily: FONT.mono }}>₹{oldTaxable.toFixed(0)}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: T.t3 }}>GST</span><span style={{ fontFamily: FONT.mono }}>₹{oldGst.toFixed(0)}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700 }}><span style={{ color: T.t2 }}>Old item value</span><span style={{ fontFamily: FONT.mono }}>₹{oldTotalEst.toFixed(0)}</span></div>
+
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 10, marginBottom: 2 }}>New item(s) given</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: T.t3 }}>Taxable value</span><span style={{ fontFamily: FONT.mono }}>₹{newTaxable.toFixed(0)}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}><span style={{ color: T.t3 }}>GST</span><span style={{ fontFamily: FONT.mono }}>₹{newGst.toFixed(0)}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700 }}><span style={{ color: T.t2 }}>New item value</span><span style={{ fontFamily: FONT.mono }}>₹{newTotalEst.toFixed(0)}</span></div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 800, borderTop: `1px solid ${T.border}`, paddingTop: 8, marginTop: 6 }}>
                     <span>{netAmount > 0.5 ? "Customer pays" : netAmount < -0.5 ? "Credit to customer" : "Even exchange"}</span>
                     <span style={{ fontFamily: FONT.mono, color: netAmount > 0.5 ? T.crimson : netAmount < -0.5 ? T.emerald : T.t1 }}>₹{Math.abs(netAmount).toFixed(0)}</span>
                   </div>
@@ -559,10 +580,17 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
               )}
 
               {netAmount > 0.5 && (
-                <div style={{ display: "flex", gap: 10 }}>
-                  <Field label="Cash collected"><Input type="number" value={cashAmount} onChange={setCashAmount} placeholder="0" /></Field>
-                  <Field label="UPI collected"><Input type="number" value={upiAmount} onChange={setUpiAmount} placeholder="0" /></Field>
-                </div>
+                <>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <Field label="Cash collected"><Input type="number" value={cashAmount} onChange={setCashAmount} placeholder="0" /></Field>
+                    <Field label="UPI collected"><Input type="number" value={upiAmount} onChange={setUpiAmount} placeholder="0" /></Field>
+                  </div>
+                  {collectionShort && (
+                    <div style={{ fontSize: 12, color: T.crimson, fontWeight: 600 }}>
+                      ↑ ₹{netAmount.toFixed(0)} is due but only ₹{amountCollected.toFixed(0)} is entered — collect the rest before completing.
+                    </div>
+                  )}
+                </>
               )}
 
               {error && <div style={{ fontSize: 12, color: T.crimson, fontWeight: 600 }}>{error}</div>}

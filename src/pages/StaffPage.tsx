@@ -106,7 +106,7 @@ export function StaffPage() {
     };
 
     const handleCancelInvite = async (invite: StaffInvite) => {
-        if (!window.confirm(`Cancel the invite to ${invite.name}?`)) return;
+        if (!window.confirm(`Cancel the invite to ${invite.email}?`)) return;
         try {
             await cancelStaffInvite(invite.id);
             setInvites(prev => prev.filter(i => i.id !== invite.id));
@@ -134,8 +134,8 @@ export function StaffPage() {
                         {invites.map(inv => (
                             <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, padding: "8px 12px", borderRadius: 10, border: `1px solid ${T.border}` }}>
                                 <div>
-                                    <div style={{ fontWeight: 700, fontSize: 13, color: T.t1 }}>{inv.name} <span style={{ fontWeight: 400, color: T.t3 }}>· {inv.roleLabel}</span></div>
-                                    <div style={{ fontSize: 12, color: T.t3 }}>{inv.email}</div>
+                                    <div style={{ fontWeight: 700, fontSize: 13, color: T.t1 }}>{inv.email} <span style={{ fontWeight: 400, color: T.t3 }}>· {inv.roleLabel}</span></div>
+                                    <div style={{ fontSize: 12, color: T.t3 }}>Waiting for them to verify and fill in their details</div>
                                 </div>
                                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                     <span style={{ fontSize: 11, fontWeight: 700, color: T.amber, background: `${T.amber}18`, padding: "3px 9px", borderRadius: 99 }}>Awaiting verification</span>

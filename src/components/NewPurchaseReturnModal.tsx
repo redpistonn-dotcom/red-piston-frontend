@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { T, FONT } from "../theme";
-import { Modal, Btn, Field, Input, Select } from "./ui";
+import { Modal, Btn, Field, Input, Select, QtyStepper } from "./ui";
 import { getPurchaseBills } from "../api/purchaseBills";
 import { getEligiblePurchaseReturnItems, createPurchaseReturn, type PurchaseReturnableItem } from "../api/purchaseReturns";
 import { useDebounce } from "../utils";
@@ -174,11 +174,8 @@ export function NewPurchaseReturnModal({ open, onClose, onCreated, toast }: Prop
                     {sel != null && (
                       <div style={{ display: "flex", gap: 10, marginTop: 10, paddingLeft: 28 }}>
                         <Field label="Qty" horizontal>
-                          <input
-                            type="number" min={1} max={item.qtyReturnable} value={sel}
-                            onChange={e => setSelected(prev => ({ ...prev, [item.sourceMovementId]: Math.min(item.qtyReturnable, Math.max(1, parseInt(e.target.value) || 1)) }))}
-                            style={{ width: 60, padding: "6px 8px", borderRadius: 8, border: `1px solid ${T.border}`, fontFamily: FONT.mono, fontSize: 13 }}
-                          />
+                          <QtyStepper value={sel} min={1} max={item.qtyReturnable}
+                            onChange={qty => setSelected(prev => ({ ...prev, [item.sourceMovementId]: qty }))} />
                         </Field>
                       </div>
                     )}

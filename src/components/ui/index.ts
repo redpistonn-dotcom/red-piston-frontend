@@ -12,3 +12,4 @@ export * from './Modal';
 export * from './Skeleton';
 export * from './DataTable';
 export * from './MobileCard';
+export * from './QtyStepper';

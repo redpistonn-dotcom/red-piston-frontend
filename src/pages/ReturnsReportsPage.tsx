@@ -40,27 +40,41 @@ function EmptyState({ label }: { label: string }) {
 }
 
 // ─── Sales / Purchase Returns — grouped bar with a dimension toggle ──────────
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const daysAgoISO = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+
 function GroupedReturnsReport({ kind }: { kind: "sales" | "purchase" }) {
   const groupOptions = kind === "sales"
     ? [{ value: "reason", label: "By reason" }, { value: "product", label: "By product" }, { value: "staff", label: "By staff" }, { value: "date", label: "By date" }]
     : [{ value: "reason", label: "By reason" }, { value: "supplier", label: "By supplier" }, { value: "resolution", label: "By resolution" }];
   const [groupBy, setGroupBy] = useState(groupOptions[0].value);
+  // The endpoint already accepted from/to — only the UI control to set them was missing.
+  const [from, setFrom] = useState(daysAgoISO(30));
+  const [to, setTo] = useState(todayISO());
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     const fetcher = kind === "sales" ? getSalesReturnsReport : getPurchaseReturnsReport;
-    fetcher({ groupBy })
+    fetcher({ groupBy, from, to })
       .then((data: any) => setRows(Array.isArray(data?.rows) ? data.rows : []))
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
-  }, [kind, groupBy]);
+  }, [kind, groupBy, from, to]);
+
+  const inputStyle: React.CSSProperties = {
+    border: `1.5px solid ${T.border}`, borderRadius: 8, padding: "6px 10px",
+    fontSize: 13, fontFamily: FONT.ui, color: T.t1, background: "#fff", outline: "none",
+  };
 
   return (
     <ChartCard title={kind === "sales" ? "Sales Returns" : "Purchase Returns"}>
-      <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 14 }}>
         <Select value={groupBy} onChange={setGroupBy} options={groupOptions} style={{ width: 180 }} />
+        <input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} style={inputStyle} />
+        <span style={{ color: T.t3, fontSize: 12 }}>to</span>
+        <input type="date" value={to} min={from} max={todayISO()} onChange={e => setTo(e.target.value)} style={inputStyle} />
       </div>
       {loading ? <EmptyState label="Loading…" /> : rows.length === 0 ? <EmptyState label="No returns in this period" /> : (
         <ResponsiveContainer width="100%" height={CHART_HEIGHTS.lg} className="chart-container">
@@ -242,25 +256,30 @@ function CreditNoteRegisterReport() {
   const [summary, setSummary] = useState<any>(null);
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   const load = useCallback(() => {
-    setLoading(true);
-    getCreditNoteRegister().then((d: any) => { setSummary(d?.summary); setRows(Array.isArray(d?.rows) ? d.rows : []); }).catch(() => setRows([])).finally(() => setLoading(false));
+    setLoading(true); setLoadError("");
+    getCreditNoteRegister().then((d: any) => { setSummary(d?.summary); setRows(Array.isArray(d?.rows) ? d.rows : []); })
+      .catch((e: any) => { setRows([]); setLoadError(e?.data?.error?.message || e?.message || "Could not load credit notes"); })
+      .finally(() => setLoading(false));
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const exportExcel = async () => {
-    setExporting(true);
+    setExporting(true); setExportError("");
     try {
       const res = await fetch(getCreditNoteRegisterExcelUrl(), { headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include" });
-      if (!res.ok) throw new Error("export failed");
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url; a.download = "credit_note_register.xlsx"; a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      // Silent — user can retry; not worth a modal for a report export
+    } catch (e: any) {
+      setExportError(e?.message || "Export failed — try again");
+      setTimeout(() => setExportError(""), 5000);
     } finally {
       setExporting(false);
     }
@@ -284,6 +303,8 @@ function CreditNoteRegisterReport() {
         </div>
         <Btn variant="subtle" size="sm" onClick={exportExcel} loading={exporting} style={{ marginLeft: 12 }}>⬇ Export Excel</Btn>
       </div>
+      {loadError && <div style={{ fontSize: 12, color: "#B91C1C", fontWeight: 600 }}>{loadError} — <button onClick={load} style={{ background: "none", border: "none", color: "#B91C1C", textDecoration: "underline", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: 0 }}>retry</button></div>}
+      {exportError && <div style={{ fontSize: 12, color: "#B91C1C", fontWeight: 600 }}>Export failed: {exportError}</div>}
       <DataTable columns={columns} rows={rows} loading={loading} empty="No credit notes in this period" emptyIcon="🧾"
         renderRow={(row: any) => (
           <tr key={row.creditNoteNo} className="trow">

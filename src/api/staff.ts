@@ -37,7 +37,8 @@ export interface StaffMember {
 export interface StaffInvite {
   id: number;
   shopId: number;
-  name: string;
+  // The owner no longer sets this — it's null until the invitee verifies.
+  name: string | null;
   email: string;
   phone: string | null;
   roleLabel: string;
@@ -50,7 +51,9 @@ export const getStaff = () => api.get<{ success: boolean; data: StaffMember[] }>
 
 export const getStaffInvites = () => api.get<{ success: boolean; data: StaffInvite[] }>('/api/shop/staff/invites');
 
-export const createStaffInvite = (data: { name: string; email: string; phone?: string; roleLabel: string; sections: string[] }) =>
+// Owner only picks the role + sections — the invitee provides their own name
+// and mobile number when they verify the OTP (see acceptStaffInvite).
+export const createStaffInvite = (data: { email: string; roleLabel: string; sections: string[] }) =>
   api.post('/api/shop/staff/invite', data);
 
 export const resendStaffInvite = (id: number | string) => api.post(`/api/shop/staff/invite/${id}/resend`);
@@ -65,5 +68,7 @@ export const reactivateStaff = (id: number | string) => api.patch(`/api/shop/sta
 export const removeStaff = (id: number | string) => api.delete(`/api/shop/staff/${id}`);
 
 // PUBLIC — no auth token required, the invitee may have no account yet.
-export const acceptStaffInvite = (data: { email: string; code: string }) =>
+// name/phone are required for a brand-new account; the backend skips them
+// when an existing account already has that data.
+export const acceptStaffInvite = (data: { email: string; code: string; name?: string; phone?: string }) =>
   api.post('/api/shop/staff-invite/accept', data);

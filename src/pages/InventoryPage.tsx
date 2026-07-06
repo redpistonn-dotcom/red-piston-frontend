@@ -727,8 +727,13 @@ export function InventoryPage() {
                                         </td>
                                         {/* BUY */}
                                         <td style={{ padding: tdPad, textAlign: "right", color: T.t3, fontFamily: FONT.mono, fontSize: 12 }}>{fmt(p.buyPrice)}</td>
-                                        {/* SELL */}
-                                        <td style={{ padding: tdPad, textAlign: "right", color: T.t1, fontFamily: FONT.mono, fontSize: 13, fontWeight: 700 }}>{fmt(p.sellPrice)}</td>
+                                        {/* SELL (+ MRP struck through, when set and higher) */}
+                                        <td style={{ padding: tdPad, textAlign: "right" }}>
+                                            <div style={{ color: T.t1, fontFamily: FONT.mono, fontSize: 13, fontWeight: 700 }}>{fmt(p.sellPrice)}</div>
+                                            {p.mrp != null && +p.mrp > +p.sellPrice && (
+                                                <div style={{ color: T.t4, fontFamily: FONT.mono, fontSize: 10, textDecoration: "line-through" }}>MRP {fmt(p.mrp)}</div>
+                                            )}
+                                        </td>
                                         {/* MARGIN */}
                                         <td style={{ padding: tdPad, textAlign: "right" }}>
                                             <span style={{ fontSize: 12, fontFamily: FONT.mono, fontWeight: 700, color: +mg > 30 ? T.emerald : +mg > 15 ? "#D97706" : T.crimson }}>{mg}%</span>

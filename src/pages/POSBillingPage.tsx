@@ -184,6 +184,7 @@ export function POSBillingPage() {
                 productId: p.id, name: p.name, sku: p.sku || "", image: p.image || "📦",
                 qty: 1, price: p.sellPrice, originalPrice: p.sellPrice, discount: 0, discountType: "%",
                 gstRate: p.gstRate || 18, buyPrice: p.buyPrice, maxStock: p.stock, hsnCode: p.hsnCode || "",
+                mrp: p.mrp || null,
             }];
         });
         setSearch("");
@@ -755,7 +756,12 @@ export function POSBillingPage() {
                                         <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono, marginTop: 1 }}>{p.sku} · Stock: {p.stock}</div>
                                     </div>
                                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                        <div style={{ fontFamily: FONT.mono, fontWeight: 800, color: T.amber, fontSize: 14 }}>{fmt(p.sellPrice)}</div>
+                                        <div style={{ display: "flex", alignItems: "baseline", gap: 6, justifyContent: "flex-end" }}>
+                                            {p.mrp > p.sellPrice && (
+                                                <span style={{ fontFamily: FONT.mono, fontSize: 11, color: T.t3, textDecoration: "line-through" }}>{fmt(p.mrp)}</span>
+                                            )}
+                                            <span style={{ fontFamily: FONT.mono, fontWeight: 800, color: T.amber, fontSize: 14 }}>{fmt(p.sellPrice)}</span>
+                                        </div>
                                         <div style={{ fontSize: 10, color: T.t3 }}>{margin(p.buyPrice, p.sellPrice)}% margin</div>
                                     </div>
                                     {items.some(i => i.productId === p.id) && <span style={{ background: T.emeraldBg, color: T.emerald, fontSize: 10, padding: "2px 8px", borderRadius: 20, fontWeight: 700, flexShrink: 0 }}>Added</span>}
@@ -866,7 +872,10 @@ export function POSBillingPage() {
                                                         )}
                                                         {String(item.productId || "").startsWith("custom_")
                                                             ? <div style={{ fontSize: 10, color: T.amber, marginTop: 1, fontWeight: 600 }}>Custom · GST {item.gstRate}%</div>
-                                                            : <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>Stock: {item.maxStock} · GST {item.gstRate}%</div>
+                                                            : <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>
+                                                                Stock: {item.maxStock} · GST {item.gstRate}%
+                                                                {item.mrp > item.price && <> · MRP <span style={{ textDecoration: "line-through" }}>{fmt(item.mrp)}</span></>}
+                                                              </div>
                                                         }
                                                     </div>
                                                 </div>

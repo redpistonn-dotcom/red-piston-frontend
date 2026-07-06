@@ -52,17 +52,23 @@ export default function AcceptInvitePage() {
 
   const [email, setEmail] = useState(searchParams.get("email") || "");
   const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const canSubmit = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && /^\d{6}$/.test(code);
+  const phoneDigits = phone.replace(/\D/g, "").slice(-10);
+  const canSubmit = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && /^\d{6}$/.test(code)
+    && name.trim().length > 0 && /^[6-9]\d{9}$/.test(phoneDigits);
 
   const handleVerify = async () => {
     if (!canSubmit) return;
     setError(""); setLoading(true);
     try {
-      const data: any = await acceptStaffInvite({ email: email.trim().toLowerCase(), code });
+      const data: any = await acceptStaffInvite({
+        email: email.trim().toLowerCase(), code, name: name.trim(), phone: phoneDigits,
+      });
       setTokens(data.accessToken, data.refreshToken);
       setSuccess(true);
       // Brief pause so the success state is visible before the shell takes over.
@@ -72,6 +78,9 @@ export default function AcceptInvitePage() {
       let msg = e?.data?.error?.message || e?.message || "Could not verify — please try again.";
       if (errCode === "INVITE_NOT_FOUND") msg = "No pending invite found for this email. Ask the shop owner to invite you again.";
       if (errCode === "INVALID_OTP") msg = "That code is incorrect or has expired. Check your email for the latest one.";
+      if (errCode === "MISSING_NAME") msg = "Please enter your name.";
+      if (errCode === "MISSING_PHONE") msg = "Please enter a valid 10-digit mobile number.";
+      if (errCode === "PHONE_IN_USE") msg = "That mobile number is already linked to another account.";
       setError(msg);
     }
     setLoading(false);
@@ -94,7 +103,7 @@ export default function AcceptInvitePage() {
         ) : (
           <>
             <div style={S.heading}>Join your shop on RedPiston</div>
-            <div style={S.sub}>Enter the email your invite was sent to, and the 6-digit code from that email.</div>
+            <div style={S.sub}>Enter the email your invite was sent to, the 6-digit code from that email, and your own details.</div>
 
             {error && <div style={S.error}>{error}</div>}
 
@@ -118,6 +127,26 @@ export default function AcceptInvitePage() {
               onChange={e => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               placeholder="······"
               autoFocus={!!searchParams.get("email")}
+            />
+
+            <label style={S.label}>Your full name</label>
+            <input
+              style={S.input}
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Full name"
+            />
+
+            <label style={S.label}>Your mobile number</label>
+            <input
+              style={S.input}
+              type="tel"
+              inputMode="numeric"
+              value={phone}
+              onChange={e => setPhone(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
+              placeholder="10-digit mobile number"
+              maxLength={10}
             />
 
             <button style={S.btn(!canSubmit || loading)} onClick={handleVerify} disabled={!canSubmit || loading}>
