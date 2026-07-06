@@ -672,6 +672,7 @@ export function InventoryPage() {
                               ["CAT.", "left", 90],
                               ["BUY", "right", 90],
                               ["SELL", "right", 90],
+                              ["MRP", "right", 90],
                               ["MARGIN", "right", 90],
                               ["STOCK", "center", 100],
                               ["RACK", "left", 80],
@@ -730,10 +731,9 @@ export function InventoryPage() {
                                         {/* SELL (+ MRP struck through, when set and higher) */}
                                         <td style={{ padding: tdPad, textAlign: "right" }}>
                                             <div style={{ color: T.t1, fontFamily: FONT.mono, fontSize: 13, fontWeight: 700 }}>{fmt(p.sellPrice)}</div>
-                                            {p.mrp != null && +p.mrp > +p.sellPrice && (
-                                                <div style={{ color: T.t4, fontFamily: FONT.mono, fontSize: 10, textDecoration: "line-through" }}>MRP {fmt(p.mrp)}</div>
-                                            )}
                                         </td>
+                                        {/* MRP */}
+                                        <td style={{ padding: tdPad, textAlign: "right", color: p.mrp != null ? T.t3 : T.t4, fontFamily: FONT.mono, fontSize: 12 }}>{p.mrp != null ? fmt(p.mrp) : "—"}</td>
                                         {/* MARGIN */}
                                         <td style={{ padding: tdPad, textAlign: "right" }}>
                                             <span style={{ fontSize: 12, fontFamily: FONT.mono, fontWeight: 700, color: +mg > 30 ? T.emerald : +mg > 15 ? "#D97706" : T.crimson }}>{mg}%</span>
@@ -772,7 +772,7 @@ export function InventoryPage() {
                                     {/* Expandable Detail Panel */}
                                     {expandedId === p.id && (
                                         <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                                            <td colSpan={9} style={{ padding: 0 }}>
+                                            <td colSpan={10} style={{ padding: 0 }}>
                                                 <div style={{ padding: "16px 24px 20px", animation: "fadeIn 0.2s ease" }}>
                                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                                                         <div style={{ fontSize: 14, fontWeight: 800, color: T.t1, display: "flex", gap: 8, alignItems: "center" }}>

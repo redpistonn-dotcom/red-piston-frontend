@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { fmt, fmtDateTime, margin } from "../utils";
-import { Modal } from "../components/ui";
 import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
 import { PurchaseBills } from "../components/PurchaseBills";
 import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
@@ -91,10 +90,8 @@ export function POSBillingPage() {
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
     const [returnModalOpen, setReturnModalOpen] = useState(false);
 
-    // Bill visibility options — asked once per print/download/share action so the
-    // customer-facing bill never shows OEM/MRP unless the shop explicitly opts in.
-    const [billOptsOpen, setBillOptsOpen] = useState(false);
-    const [pendingBillAction, setPendingBillAction] = useState<null | "print" | "download" | "whatsapp">(null);
+    // Bill visibility toggles — shown inline near the print/share buttons so the
+    // shop can set them once per bill instead of confirming through a popup each time.
     const [showOemOnBill, setShowOemOnBill] = useState(true);
     const [showMrpOnBill, setShowMrpOnBill] = useState(false);
     const [suspendedBill, setSuspendedBill] = useState(() => {
@@ -656,15 +653,27 @@ export function POSBillingPage() {
                 ))}
             </div>
 
+            {/* ── Bill visibility toggles — set once, apply to every action below ── */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 10, marginBottom: 2, flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input type="checkbox" checked={showOemOnBill} onChange={e => setShowOemOnBill(e.target.checked)} style={{ width: 15, height: 15 }} />
+                    <span style={{ fontSize: 11, color: T.t2, fontWeight: 600 }}>Show OEM number on bill</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                    <input type="checkbox" checked={showMrpOnBill} onChange={e => setShowMrpOnBill(e.target.checked)} style={{ width: 15, height: 15 }} />
+                    <span style={{ fontSize: 11, color: T.t2, fontWeight: 600 }}>Show MRP on bill</span>
+                </label>
+            </div>
+
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                <button onClick={() => { setPendingBillAction("print"); setBillOptsOpen(true); }} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
+                <button onClick={() => runBillAction("print", { showOem: showOemOnBill, showMrp: showMrpOnBill })} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
                 <button
-                    onClick={() => { setPendingBillAction("download"); setBillOptsOpen(true); }}
+                    onClick={() => runBillAction("download", { showOem: showOemOnBill, showMrp: showMrpOnBill })}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: syncedInvoiceId ? T.t1 : T.t3, cursor: "pointer", fontFamily: FONT.ui }}>
                     📄 Download PDF
                 </button>
                 <button
-                    onClick={() => { setPendingBillAction("whatsapp"); setBillOptsOpen(true); }}
+                    onClick={() => runBillAction("whatsapp", { showOem: showOemOnBill, showMrp: showMrpOnBill })}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#25D366", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#fff", cursor: "pointer", fontFamily: FONT.ui }}>
                     💬 Share WhatsApp
                 </button>
@@ -692,31 +701,6 @@ export function POSBillingPage() {
                     }}
                 />
             )}
-            <Modal open={billOptsOpen} onClose={() => setBillOptsOpen(false)} title="Before you continue" width={380}>
-                <div style={{ fontSize: 13, color: T.t2, marginBottom: 16 }}>
-                    Choose what the customer's bill should show.
-                </div>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}>
-                    <input type="checkbox" checked={showOemOnBill} onChange={e => setShowOemOnBill(e.target.checked)} style={{ width: 18, height: 18 }} />
-                    <span style={{ fontSize: 14, color: T.t1 }}>Show OEM number on the bill</span>
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", cursor: "pointer" }}>
-                    <input type="checkbox" checked={showMrpOnBill} onChange={e => setShowMrpOnBill(e.target.checked)} style={{ width: 18, height: 18 }} />
-                    <span style={{ fontSize: 14, color: T.t1 }}>Show MRP on the bill</span>
-                </label>
-                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-                    <button onClick={() => setBillOptsOpen(false)} style={{ flex: 1, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>Cancel</button>
-                    <button
-                        onClick={() => {
-                            const action = pendingBillAction;
-                            setBillOptsOpen(false);
-                            if (action) runBillAction(action, { showOem: showOemOnBill, showMrp: showMrpOnBill });
-                        }}
-                        style={{ flex: 1, height: 42, background: T.amber, border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700, color: "#FFFFFF", cursor: "pointer", fontFamily: FONT.ui }}>
-                        Continue
-                    </button>
-                </div>
-            </Modal>
         </div>
     );
 

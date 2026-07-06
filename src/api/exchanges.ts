@@ -38,8 +38,14 @@ export const getExchangePdfUrl = (id: number | string) => {
 };
 
 // Fetches the Exchange Invoice PDF as a blob (carrying the auth header) and
-// opens it in a new tab. Throws on failure so callers can show their own
-// error toast — this deliberately does NOT swallow errors silently.
+// saves it via a named <a download>. Throws on failure so callers can show
+// their own error toast — this deliberately does NOT swallow errors silently.
+//
+// WHY <a download> and not window.open(blob:...): a blob: URL handed to an
+// external/mobile PDF viewer can go stale before that viewer finishes
+// reading it, producing "Failed to load PDF document" even though the
+// fetch succeeded. A real download with a filename always leaves a
+// complete file on disk (see the same fix in POSBillingPage/HistoryPage).
 export const openExchangeInvoicePdf = async (id: number | string) => {
   const res = await fetch(getExchangePdfUrl(id), {
     headers: { Authorization: `Bearer ${getAccessToken()}` },
@@ -48,6 +54,11 @@ export const openExchangeInvoicePdf = async (id: number | string) => {
   if (!res.ok) throw new Error(`Could not load the exchange invoice (server returned ${res.status})`);
   const blob = await res.blob();
   const objUrl = URL.createObjectURL(blob);
-  window.open(objUrl, '_blank');
-  setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = `exchange-invoice-${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
 };

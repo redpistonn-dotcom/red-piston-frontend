@@ -64,8 +64,9 @@ export function SupplierAutocomplete({
   const load = async () => {
     if (loaded) return;
     try {
-      const data = await getParties('SUPPLIER');
-      setParties(Array.isArray(data) ? data : []);
+      const res: any = await getParties('SUPPLIER');
+      const list = Array.isArray(res) ? res : (res?.parties || []);
+      setParties(Array.isArray(list) ? list : []);
     } catch { /* stay empty — field still works as free text */ }
     setLoaded(true);
   };
@@ -89,8 +90,8 @@ export function SupplierAutocomplete({
     if (!value.trim() || creating) return;
     setCreating(true);
     try {
-      const created = await createParty({ name: value.trim(), type: 'SUPPLIER' });
-      const party: Party = created || { name: value.trim() };
+      const res: any = await createParty({ name: value.trim(), type: 'SUPPLIER' });
+      const party: Party = res?.party || res || { name: value.trim() };
       setParties(prev => [...prev, party]);
       onSelect({ name: value.trim(), phone: party.phone || '', gstin: party.gstin || '' });
       toast?.(`"${value.trim()}" added as a new supplier`, 'success');
