@@ -47,7 +47,6 @@ const NAV_ITEMS = [
   { key: "gstr",        path: "/gstr",               icon: "receipt_long",   label: "GSTR-1 Export"  },
   { key: "audit",       path: "/audit",              icon: "manage_search",  label: "Audit Log"      },
   { key: "staff",       path: "/staff",              icon: "group",          label: "Staff"          },
-  { key: "shop-settings", path: "/shop-settings",   icon: "store",          label: "Shop Settings"  },
   { key: "returns",     path: "/returns",            icon: "assignment_return", label: "Returns & Exchange" },
   { key: "purchase-returns", path: "/purchase-returns", icon: "unarchive",  label: "Purchase Returns" },
   { key: "warranty",    path: "/warranty",           icon: "verified",       label: "Warranty"       },
