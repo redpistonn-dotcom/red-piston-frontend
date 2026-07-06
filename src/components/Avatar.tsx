@@ -20,11 +20,12 @@ function getInitials(name) {
   return name
     .trim()
     .split(" ")
+    .filter(Boolean)
     .slice(0, 2)
     .map((w) => {
       const ch = w[0];
       // Only use Latin letters and digits for initials
-      if (/[a-zA-Z0-9]/.test(ch)) return ch.toUpperCase();
+      if (ch && /[a-zA-Z0-9]/.test(ch)) return ch.toUpperCase();
       return "";
     })
     .join("") || "?";
