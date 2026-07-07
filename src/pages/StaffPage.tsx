@@ -26,6 +26,16 @@ export function StaffPage() {
     const [invites, setInvites] = useState<StaffInvite[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Per-action loading state, keyed by "actionName-id" — lets each button
+    // show its own spinner/disabled state independently (e.g. clicking
+    // "Resend" on one invite doesn't grey out "Cancel" on a different one).
+    const [pending, setPending] = useState<Record<string, boolean>>({});
+    const isPending = (key: string) => !!pending[key];
+    const runPending = async (key: string, fn: () => Promise<void>) => {
+        setPending(p => ({ ...p, [key]: true }));
+        try { await fn(); } finally { setPending(p => ({ ...p, [key]: false })); }
+    };
+
     // Section-edit inline state: staffId → draft section list (pending confirm)
     const [editingSections, setEditingSections] = useState<Record<number, string[]>>({});
     const [editingRoleLabel, setEditingRoleLabel] = useState<Record<number, string>>({});
@@ -47,32 +57,36 @@ export function StaffPage() {
 
     const handleToggleActive = async (member: StaffMember) => {
         const name = member.user?.name || "Staff";
-        try {
-            if (member.isActive) {
-                if (!window.confirm(`Revoke ${name}'s access? They won't be able to use the shop.`)) return;
-                await deactivateStaff(member.id);
-                setStaff(prev => prev.map(m => m.id === member.id ? { ...m, isActive: false } : m));
-                toast?.(`${name}'s access revoked`, "success");
-            } else {
-                await reactivateStaff(member.id);
-                setStaff(prev => prev.map(m => m.id === member.id ? { ...m, isActive: true } : m));
-                toast?.(`${name} reactivated`, "success");
+        if (member.isActive && !window.confirm(`Revoke ${name}'s access? They won't be able to use the shop.`)) return;
+        await runPending(`toggle-${member.id}`, async () => {
+            try {
+                if (member.isActive) {
+                    await deactivateStaff(member.id);
+                    setStaff(prev => prev.map(m => m.id === member.id ? { ...m, isActive: false } : m));
+                    toast?.(`${name}'s access revoked`, "success");
+                } else {
+                    await reactivateStaff(member.id);
+                    setStaff(prev => prev.map(m => m.id === member.id ? { ...m, isActive: true } : m));
+                    toast?.(`${name} reactivated`, "success");
+                }
+            } catch (e: any) {
+                toast?.(e?.data?.error?.message || e?.message || "Failed", "error");
             }
-        } catch (e: any) {
-            toast?.(e?.data?.error?.message || e?.message || "Failed", "error");
-        }
+        });
     };
 
     const handleRemove = async (member: StaffMember) => {
         const name = member.user?.name || "this staff member";
         if (!window.confirm(`Permanently remove ${name}? This cannot be undone.`)) return;
-        try {
-            await removeStaff(member.id);
-            setStaff(prev => prev.filter(m => m.id !== member.id));
-            toast?.(`${name} removed`, "success");
-        } catch (e: any) {
-            toast?.(e?.data?.error?.message || e?.message || "Failed", "error");
-        }
+        await runPending(`remove-${member.id}`, async () => {
+            try {
+                await removeStaff(member.id);
+                setStaff(prev => prev.filter(m => m.id !== member.id));
+                toast?.(`${name} removed`, "success");
+            } catch (e: any) {
+                toast?.(e?.data?.error?.message || e?.message || "Failed", "error");
+            }
+        });
     };
 
     const startEditingSections = (member: StaffMember) => {
@@ -100,36 +114,42 @@ export function StaffPage() {
             toast?.(noSections ? "At least one section is required" : "A role label is required", "error");
             return;
         }
-        try {
-            await updateStaffAccess(member.id, { sections, roleLabel });
-            setStaff(prev => prev.map(m => m.id === member.id ? { ...m, sections, roleLabel } : m));
-            setEditingSections(prev => { const next = { ...prev }; delete next[member.id]; return next; });
-            setEditingRoleLabel(prev => { const next = { ...prev }; delete next[member.id]; return next; });
-            setSectionsInvalid(prev => ({ ...prev, [member.id]: false }));
-            setRoleLabelInvalid(prev => ({ ...prev, [member.id]: false }));
-            toast?.("Access updated", "success");
-        } catch (e: any) {
-            toast?.(e?.data?.error?.message || e?.message || "Failed to update access", "error");
-        }
+        await runPending(`save-${member.id}`, async () => {
+            try {
+                await updateStaffAccess(member.id, { sections, roleLabel });
+                setStaff(prev => prev.map(m => m.id === member.id ? { ...m, sections, roleLabel } : m));
+                setEditingSections(prev => { const next = { ...prev }; delete next[member.id]; return next; });
+                setEditingRoleLabel(prev => { const next = { ...prev }; delete next[member.id]; return next; });
+                setSectionsInvalid(prev => ({ ...prev, [member.id]: false }));
+                setRoleLabelInvalid(prev => ({ ...prev, [member.id]: false }));
+                toast?.("Access updated", "success");
+            } catch (e: any) {
+                toast?.(e?.data?.error?.message || e?.message || "Failed to update access", "error");
+            }
+        });
     };
 
     const handleResendInvite = async (invite: StaffInvite) => {
-        try {
-            await resendStaffInvite(invite.id);
-            toast?.("Verification code resent", "success");
-        } catch (e: any) {
-            toast?.(e?.data?.error?.message || e?.message || "Failed to resend", "error");
-        }
+        await runPending(`resend-${invite.id}`, async () => {
+            try {
+                await resendStaffInvite(invite.id);
+                toast?.("Verification code resent", "success");
+            } catch (e: any) {
+                toast?.(e?.data?.error?.message || e?.message || "Failed to resend", "error");
+            }
+        });
     };
 
     const handleCancelInvite = async (invite: StaffInvite) => {
         if (!window.confirm(`Cancel the invite to ${invite.email}?`)) return;
-        try {
-            await cancelStaffInvite(invite.id);
-            setInvites(prev => prev.filter(i => i.id !== invite.id));
-        } catch (e: any) {
-            toast?.(e?.data?.error?.message || e?.message || "Failed to cancel", "error");
-        }
+        await runPending(`cancelinv-${invite.id}`, async () => {
+            try {
+                await cancelStaffInvite(invite.id);
+                setInvites(prev => prev.filter(i => i.id !== invite.id));
+            } catch (e: any) {
+                toast?.(e?.data?.error?.message || e?.message || "Failed to cancel", "error");
+            }
+        });
     };
 
     return (
@@ -156,8 +176,8 @@ export function StaffPage() {
                                 </div>
                                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                                     <span style={{ fontSize: 11, fontWeight: 700, color: T.amber, background: `${T.amber}18`, padding: "3px 9px", borderRadius: 99 }}>Awaiting verification</span>
-                                    <button onClick={() => handleResendInvite(inv)} style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", cursor: "pointer", color: T.t2 }}>Resend</button>
-                                    <button onClick={() => handleCancelInvite(inv)} style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.crimson}33`, background: "#fff", cursor: "pointer", color: T.crimson }}>Cancel</button>
+                                    <button onClick={() => handleResendInvite(inv)} disabled={isPending(`resend-${inv.id}`) || isPending(`cancelinv-${inv.id}`)} style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", cursor: isPending(`resend-${inv.id}`) ? "default" : "pointer", color: T.t2, opacity: isPending(`resend-${inv.id}`) || isPending(`cancelinv-${inv.id}`) ? 0.6 : 1 }}>{isPending(`resend-${inv.id}`) ? "Resending…" : "Resend"}</button>
+                                    <button onClick={() => handleCancelInvite(inv)} disabled={isPending(`resend-${inv.id}`) || isPending(`cancelinv-${inv.id}`)} style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.crimson}33`, background: "#fff", cursor: isPending(`cancelinv-${inv.id}`) ? "default" : "pointer", color: T.crimson, opacity: isPending(`resend-${inv.id}`) || isPending(`cancelinv-${inv.id}`) ? 0.6 : 1 }}>{isPending(`cancelinv-${inv.id}`) ? "Cancelling…" : "Cancel"}</button>
                                 </div>
                             </div>
                         ))}
@@ -248,8 +268,8 @@ export function StaffPage() {
                                                         ))}
                                                     </div>
                                                     {sectionsInvalid[m.id] && <div style={{ fontSize: 10, color: T.crimson, fontWeight: 600, marginBottom: 6 }}>↑ Pick at least one section</div>}
-                                                    <button onClick={() => handleSaveSections(m)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "none", background: T.emerald, color: "#fff", cursor: "pointer", fontWeight: 700, marginRight: 6 }}>Save</button>
-                                                    <button onClick={() => { setEditingSections(p => { const n = { ...p }; delete n[m.id]; return n; }); setEditingRoleLabel(p => { const n = { ...p }; delete n[m.id]; return n; }); setSectionsInvalid(p => ({ ...p, [m.id]: false })); setRoleLabelInvalid(p => ({ ...p, [m.id]: false })); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", color: T.t3, cursor: "pointer" }}>Cancel</button>
+                                                    <button onClick={() => handleSaveSections(m)} disabled={isPending(`save-${m.id}`)} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: "none", background: T.emerald, color: "#fff", cursor: isPending(`save-${m.id}`) ? "default" : "pointer", fontWeight: 700, marginRight: 6, opacity: isPending(`save-${m.id}`) ? 0.7 : 1 }}>{isPending(`save-${m.id}`) ? "Saving…" : "Save"}</button>
+                                                    <button disabled={isPending(`save-${m.id}`)} onClick={() => { setEditingSections(p => { const n = { ...p }; delete n[m.id]; return n; }); setEditingRoleLabel(p => { const n = { ...p }; delete n[m.id]; return n; }); setSectionsInvalid(p => ({ ...p, [m.id]: false })); setRoleLabelInvalid(p => ({ ...p, [m.id]: false })); }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", color: T.t3, cursor: isPending(`save-${m.id}`) ? "default" : "pointer", opacity: isPending(`save-${m.id}`) ? 0.7 : 1 }}>Cancel</button>
                                                 </div>
                                             ) : (
                                                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -275,15 +295,17 @@ export function StaffPage() {
                                                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                                     <button
                                                         onClick={() => handleToggleActive(m)}
-                                                        style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", cursor: "pointer", color: T.t2, fontFamily: FONT.ui, whiteSpace: "nowrap" }}
+                                                        disabled={isPending(`toggle-${m.id}`) || isPending(`remove-${m.id}`)}
+                                                        style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#fff", cursor: isPending(`toggle-${m.id}`) ? "default" : "pointer", color: T.t2, fontFamily: FONT.ui, whiteSpace: "nowrap", opacity: isPending(`toggle-${m.id}`) || isPending(`remove-${m.id}`) ? 0.6 : 1 }}
                                                     >
-                                                        {m.isActive !== false ? "Revoke Access" : "Reactivate"}
+                                                        {isPending(`toggle-${m.id}`) ? "Working…" : (m.isActive !== false ? "Revoke Access" : "Reactivate")}
                                                     </button>
                                                     <button
                                                         onClick={() => handleRemove(m)}
-                                                        style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.crimson}33`, background: "#fff", cursor: "pointer", color: T.crimson, fontFamily: FONT.ui, whiteSpace: "nowrap" }}
+                                                        disabled={isPending(`toggle-${m.id}`) || isPending(`remove-${m.id}`)}
+                                                        style={{ fontSize: 11, padding: "5px 12px", borderRadius: 7, border: `1px solid ${T.crimson}33`, background: "#fff", cursor: isPending(`remove-${m.id}`) ? "default" : "pointer", color: T.crimson, fontFamily: FONT.ui, whiteSpace: "nowrap", opacity: isPending(`toggle-${m.id}`) || isPending(`remove-${m.id}`) ? 0.6 : 1 }}
                                                     >
-                                                        Remove
+                                                        {isPending(`remove-${m.id}`) ? "Removing…" : "Remove"}
                                                     </button>
                                                 </div>
                                             )}
