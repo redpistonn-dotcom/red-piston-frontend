@@ -263,7 +263,11 @@ export function ERPShell({ children }: ERPShellProps) {
   }, [movements, activeShopId]);
 
   // ── User display ──────────────────────────────────────────────────────
-  const userName  = currentUser?.displayName || currentUser?.email?.split("@")[0] || "User";
+  // .name is the field every other view of this user (Staff page, invite
+  // list, etc.) shows — displayName doesn't exist on the user object at all,
+  // so this used to always skip straight to deriving something from email
+  // (or "User" with no email), never showing the actual name on file.
+  const userName  = currentUser?.name || currentUser?.displayName || currentUser?.email?.split("@")[0] || "User";
   const userInitials = userName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
 
   const currentPath = location.pathname;

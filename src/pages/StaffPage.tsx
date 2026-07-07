@@ -1,19 +1,15 @@
 /**
- * StaffPage — Manage existing shop staff members + pending invites.
- *
- * Inviting NEW staff happens on the Profile page (name/email/phone/role/
- * sections form + email verification) — this page is the list/manage view:
- * change a member's sections, revoke/reactivate access, remove them, or
- * resend/cancel a pending invite.
+ * StaffPage — the single place to invite, list, and manage shop staff.
+ * Inviting, editing access/sections, revoking/reactivating, removing, and
+ * resending/cancelling a pending invite all live here.
  */
 import { useState, useEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
 import { T, FONT, SHADOWS } from "../theme";
 import { Btn, Skeleton } from "../components/ui";
 import { AppCtx } from "../AppCtx";
 import {
   getStaff, deactivateStaff, reactivateStaff, removeStaff, updateStaffAccess,
-  getStaffInvites, resendStaffInvite, cancelStaffInvite,
+  getStaffInvites, resendStaffInvite, cancelStaffInvite, createStaffInvite,
   SECTION_OPTIONS, type StaffMember, type StaffInvite,
 } from "../api/staff";
 
@@ -21,7 +17,6 @@ const ROLE_COLOR = { OWNER: "#D97706", STAFF: "#0EA5E9" } as Record<string, stri
 
 export function StaffPage() {
     const { toast } = useContext(AppCtx);
-    const navigate = useNavigate();
     const [staff, setStaff] = useState<StaffMember[]>([]);
     const [invites, setInvites] = useState<StaffInvite[]>([]);
     const [loading, setLoading] = useState(true);
@@ -39,6 +34,44 @@ export function StaffPage() {
     // Section-edit inline state: staffId → draft section list (pending confirm)
     const [editingSections, setEditingSections] = useState<Record<number, string[]>>({});
     const [editingRoleLabel, setEditingRoleLabel] = useState<Record<number, string>>({});
+
+    // Invite form — collapsed by default, opened by "+ Invite Staff"
+    const [showInviteForm, setShowInviteForm] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteRoleLabel, setInviteRoleLabel] = useState("");
+    const [inviteSections, setInviteSections] = useState<string[]>([]);
+    const [inviteFieldErrors, setInviteFieldErrors] = useState({ email: false, roleLabel: false, sections: false });
+    const [inviting, setInviting] = useState(false);
+
+    const toggleInviteSection = (key: string) =>
+        setInviteSections(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+
+    const handleInviteStaff = async () => {
+        const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim());
+        const errors = {
+            email: !inviteEmail.trim() || !emailValid,
+            roleLabel: !inviteRoleLabel.trim(),
+            sections: inviteSections.length === 0,
+        };
+        setInviteFieldErrors(errors);
+        if (errors.email || errors.roleLabel || errors.sections) {
+            toast?.(!inviteEmail.trim() ? "Email is required" : errors.email ? "Enter a valid email address" : errors.roleLabel ? "A role is required" : "Pick at least one section", "error");
+            return;
+        }
+        setInviting(true);
+        try {
+            await createStaffInvite({ email: inviteEmail.trim(), roleLabel: inviteRoleLabel.trim(), sections: inviteSections });
+            const sentTo = inviteEmail.trim();
+            setInviteEmail(""); setInviteRoleLabel(""); setInviteSections([]);
+            setInviteFieldErrors({ email: false, roleLabel: false, sections: false });
+            setShowInviteForm(false);
+            toast?.(`Invite sent to ${sentTo} — they'll get a verification code by email`, "success");
+            load();
+        } catch (e: any) {
+            toast?.(e?.data?.error?.message || e?.message || "Failed to invite staff", "error");
+        }
+        setInviting(false);
+    };
 
     const load = async () => {
         setLoading(true);
@@ -158,10 +191,65 @@ export function StaffPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div>
                     <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: T.t1, fontFamily: FONT.display, letterSpacing: "-0.03em" }}>Staff</h2>
-                    <p style={{ margin: "4px 0 0", fontSize: 13, color: T.t3 }}>Manage your team's access. Invite new members from your profile.</p>
+                    <p style={{ margin: "4px 0 0", fontSize: 13, color: T.t3 }}>Manage your team's access — invite, edit sections, or revoke access.</p>
                 </div>
-                <Btn onClick={() => navigate("/profile")}>Invite from Profile →</Btn>
+                <Btn onClick={() => setShowInviteForm(v => !v)}>{showInviteForm ? "Cancel" : "+ Invite Staff"}</Btn>
             </div>
+
+            {/* Invite form */}
+            {showInviteForm && (
+                <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 14, padding: 16, boxShadow: SHADOWS.xs }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.t2, marginBottom: 10 }}>Invite Staff Member</div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                        <div style={{ flex: "1 1 220px", minWidth: 220 }}>
+                            <input
+                                style={{ width: "100%", boxSizing: "border-box", height: 38, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, color: T.t1, outline: "none", border: `1.5px solid ${inviteFieldErrors.email ? T.crimson : T.border}`, boxShadow: inviteFieldErrors.email ? `0 0 0 3px ${T.crimson}22` : "none" }}
+                                type="email" value={inviteEmail}
+                                onChange={e => { setInviteEmail(e.target.value); setInviteFieldErrors(p => ({ ...p, email: false })); }}
+                                placeholder="Their email (verification code sent here)"
+                            />
+                            {inviteFieldErrors.email && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginTop: 4 }}>↑ {inviteEmail.trim() ? "Enter a valid email address" : "Email is required"}</div>}
+                        </div>
+                        <div style={{ flex: "1 1 160px", minWidth: 160 }}>
+                            <input
+                                style={{ width: "100%", boxSizing: "border-box", height: 38, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, color: T.t1, outline: "none", border: `1.5px solid ${inviteFieldErrors.roleLabel ? T.crimson : T.border}`, boxShadow: inviteFieldErrors.roleLabel ? `0 0 0 3px ${T.crimson}22` : "none" }}
+                                value={inviteRoleLabel}
+                                onChange={e => { setInviteRoleLabel(e.target.value); setInviteFieldErrors(p => ({ ...p, roleLabel: false })); }}
+                                placeholder="Role, e.g. Mechanic"
+                            />
+                            {inviteFieldErrors.roleLabel && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginTop: 4 }}>↑ Required</div>}
+                        </div>
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, marginBottom: 8 }}>Sections they can access</div>
+                    <div style={{
+                        display: "flex", flexWrap: "wrap", gap: 8, marginBottom: inviteFieldErrors.sections ? 4 : 12,
+                        padding: inviteFieldErrors.sections ? 8 : 0, borderRadius: 10,
+                        border: inviteFieldErrors.sections ? `1.5px solid ${T.crimson}` : "none",
+                    }}>
+                        {SECTION_OPTIONS.map(s => (
+                            <label key={s.key} style={{
+                                display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
+                                border: `1.5px solid ${inviteSections.includes(s.key) ? T.amber : T.border}`,
+                                background: inviteSections.includes(s.key) ? `${T.amber}18` : "transparent",
+                                cursor: "pointer", fontSize: 12, fontWeight: inviteSections.includes(s.key) ? 700 : 400,
+                                color: inviteSections.includes(s.key) ? T.amber : T.t2,
+                            }}>
+                                <input type="checkbox" checked={inviteSections.includes(s.key)} onChange={() => { toggleInviteSection(s.key); setInviteFieldErrors(p => ({ ...p, sections: false })); }} style={{ width: 14, height: 14 }} />
+                                {s.label}
+                            </label>
+                        ))}
+                    </div>
+                    {inviteFieldErrors.sections && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginBottom: 12 }}>↑ Pick at least one section</div>}
+                    <button
+                        onClick={handleInviteStaff}
+                        disabled={inviting}
+                        style={{ height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: inviting ? T.amberDim : T.amber, color: "#fff", fontSize: 13, fontWeight: 700, cursor: inviting ? "default" : "pointer", fontFamily: FONT.ui }}
+                    >
+                        {inviting ? "Sending…" : "Send Invite"}
+                    </button>
+                    <div style={{ fontSize: 11, color: T.t3, marginTop: 8 }}>They'll get a verification code by email, and fill in their own name + mobile number when they enter it — access activates only then.</div>
+                </div>
+            )}
 
             {/* Pending invites */}
             {invites.length > 0 && (

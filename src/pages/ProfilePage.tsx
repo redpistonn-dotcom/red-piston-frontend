@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
-import { createStaffInvite, getStaffInvites, resendStaffInvite, cancelStaffInvite, SECTION_OPTIONS, type StaffInvite } from "../api/staff";
 import { T, FONT } from "../theme.js";
 import { Avatar } from "../components/Avatar.jsx";
 
@@ -79,11 +78,6 @@ const PROVIDER_META = {
   EMAIL: { icon: "✉️", label: "Email" },
   PHONE: { icon: "📱", label: "Phone" },
   GOOGLE: { icon: "🔵", label: "Google" },
-};
-
-const STAFF_ROLE_COLORS = {
-  OWNER: T.amber, MANAGER: "#8B5CF6", CASHIER: T.sky,
-  MECHANIC: T.emerald, DELIVERY: "#F97316",
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -220,7 +214,6 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
   const [customerProfile, setCustomerProfile] = useState(null);
   const [addresses, setAddresses] = useState([]);
   const [garageVehicles, setGarageVehicles] = useState([]);
-  const [shopStaff, setShopStaff] = useState([]);
   const [shopMetrics, setShopMetrics] = useState<{ inventoryCount: number; invoiceCount: number; activeStaffCount: number } | null>(null);
 
   // UI states
@@ -228,12 +221,6 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
   const [editingAddress, setEditingAddress] = useState(null);
   const [showGarageForm, setShowGarageForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRoleLabel, setInviteRoleLabel] = useState("");
-  const [inviteSections, setInviteSections] = useState<string[]>([]);
-  const [inviting, setInviting] = useState(false);
-  const [pendingInvites, setPendingInvites] = useState<StaffInvite[]>([]);
-  const [inviteFieldErrors, setInviteFieldErrors] = useState({ email: false, roleLabel: false, sections: false });
 
   // Editable fields
   const [name, setName] = useState("");
@@ -272,7 +259,6 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
   }, [user]);
 
   useEffect(() => { loadProfile(); }, []);
-  useEffect(() => { if (user?.role === "SHOP_OWNER") loadPendingInvites(); }, [user?.role]);
 
   const loadProfile = async () => {
     try {
@@ -289,7 +275,6 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
       if (data.customerProfile) setCustomerProfile(data.customerProfile);
       if (data.addresses) setAddresses(data.addresses);
       if (data.garageVehicles) setGarageVehicles(data.garageVehicles);
-      if (data.shopStaff) setShopStaff(data.shopStaff);
       if (data.shopMetrics) setShopMetrics(data.shopMetrics);
     } catch (e) {
       // Non-fatal: we already have the user prop — just note the refresh failed
@@ -489,88 +474,6 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
       setGarageVehicles(res.data || res);
     } catch (e) {
       setError(e.data?.error?.message || e.message || "Failed to set default vehicle");
-    }
-  };
-
-  // ── Staff invite handlers ─────────────────────────────────────────────────────
-  const loadPendingInvites = async () => {
-    try {
-      const res = await getStaffInvites();
-      setPendingInvites(res.data || []);
-    } catch (e) {
-      console.warn("[Profile] Could not load pending invites:", e.message);
-    }
-  };
-
-  const toggleInviteSection = (key: string) =>
-    setInviteSections(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
-
-  const handleInviteStaff = async () => {
-    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim());
-    const errors = {
-      email: !emailValid,
-      roleLabel: !inviteRoleLabel.trim(),
-      sections: inviteSections.length === 0,
-    };
-    setInviteFieldErrors(errors);
-    if (errors.email || errors.roleLabel || errors.sections) {
-      setError(!inviteEmail.trim() ? "Email is required" : errors.email ? "Enter a valid email address" : errors.roleLabel ? "A role is required" : "Pick at least one section");
-      return;
-    }
-    setInviting(true); setError("");
-    try {
-      await createStaffInvite({
-        email: inviteEmail.trim(), roleLabel: inviteRoleLabel.trim(), sections: inviteSections,
-      });
-      const sentTo = inviteEmail.trim();
-      setInviteEmail(""); setInviteRoleLabel(""); setInviteSections([]);
-      setInviteFieldErrors({ email: false, roleLabel: false, sections: false });
-      showToast(`Invite sent to ${sentTo} — they'll get a verification code by email`);
-      loadPendingInvites();
-    } catch (e) {
-      setError(e.data?.error?.message || e.message || "Failed to invite staff");
-    }
-    setInviting(false);
-  };
-
-  const handleResendInvite = async (id: number) => {
-    try {
-      await resendStaffInvite(id);
-      showToast("Verification code resent");
-    } catch (e) {
-      setError(e.data?.error?.message || e.message || "Failed to resend");
-    }
-  };
-
-  const handleCancelInvite = async (id: number) => {
-    if (!window.confirm("Cancel this invite?")) return;
-    try {
-      await cancelStaffInvite(id);
-      setPendingInvites(prev => prev.filter(i => i.id !== id));
-    } catch (e) {
-      setError(e.data?.error?.message || e.message || "Failed to cancel");
-    }
-  };
-
-  const handleDeactivateStaff = async (staffId) => {
-    if (!window.confirm("Deactivate this staff member? They will lose shop access.")) return;
-    try {
-      await api.patch(`/api/shop/staff/${staffId}/deactivate`, {});
-      setShopStaff(prev => prev.map(s => s.id === staffId ? { ...s, isActive: false } : s));
-      showToast("Staff access revoked");
-    } catch (e) {
-      setError(e.data?.error?.message || e.message || "Failed to deactivate");
-    }
-  };
-
-  const handleReactivateStaff = async (staffId) => {
-    try {
-      const res = await api.patch(`/api/shop/staff/${staffId}/reactivate`, {});
-      const updated = res.data || res;
-      setShopStaff(prev => prev.map(s => s.id === staffId ? { ...s, ...updated } : s));
-      showToast("Staff reactivated");
-    } catch (e) {
-      setError(e.data?.error?.message || e.message || "Failed to reactivate");
     }
   };
 
@@ -847,122 +750,16 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
           </div>
         )}
 
-        {/* ─── Shop Owner: Staff Management ─── */}
+        {/* ─── Shop Owner: Staff Management — inviting, editing access, and the
+             staff/pending-invite lists all live on the Staff page now; this is
+             just a pointer over there instead of duplicating that flow here. ─── */}
         {role === "SHOP_OWNER" && (
           <div style={S.section}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={S.sectionTitle}>👥 Staff Management</div>
-              <button onClick={() => navigate("/staff")} style={{ background: "none", border: "none", color: T.amber, cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: FONT.ui }}>Edit access & roles →</button>
+              <button onClick={() => navigate("/staff")} style={{ ...S.btn("primary"), padding: "8px 16px", fontSize: 13 }}>Manage Team →</button>
             </div>
-
-            {/* Invite form */}
-            <div style={{ ...S.card, marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: T.t2, marginBottom: 10 }}>Invite Staff Member</div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-                <div style={{ flex: "1 1 220px", minWidth: 220 }}>
-                  <input
-                    style={{ ...S.input, border: inviteFieldErrors.email ? `1.5px solid ${T.crimson}` : S.input.border, boxShadow: inviteFieldErrors.email ? `0 0 0 3px ${T.crimson}22` : "none" }}
-                    type="email" value={inviteEmail}
-                    onChange={e => { setInviteEmail(e.target.value); setInviteFieldErrors(p => ({ ...p, email: false })); }}
-                    placeholder="Their email (verification code sent here)"
-                  />
-                  {inviteFieldErrors.email && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginTop: 4 }}>↑ {inviteEmail.trim() ? "Enter a valid email address" : "Email is required"}</div>}
-                </div>
-                <div style={{ flex: "1 1 160px", minWidth: 160 }}>
-                  <input
-                    style={{ ...S.input, border: inviteFieldErrors.roleLabel ? `1.5px solid ${T.crimson}` : S.input.border, boxShadow: inviteFieldErrors.roleLabel ? `0 0 0 3px ${T.crimson}22` : "none" }}
-                    value={inviteRoleLabel}
-                    onChange={e => { setInviteRoleLabel(e.target.value); setInviteFieldErrors(p => ({ ...p, roleLabel: false })); }}
-                    placeholder="Role, e.g. Mechanic"
-                  />
-                  {inviteFieldErrors.roleLabel && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginTop: 4 }}>↑ Required</div>}
-                </div>
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, marginBottom: 8 }}>Sections they can access</div>
-              <div style={{
-                display: "flex", flexWrap: "wrap", gap: 8, marginBottom: inviteFieldErrors.sections ? 4 : 12,
-                padding: inviteFieldErrors.sections ? 8 : 0, borderRadius: 10,
-                border: inviteFieldErrors.sections ? `1.5px solid ${T.crimson}` : "none",
-              }}>
-                {SECTION_OPTIONS.map(s => (
-                  <label key={s.key} style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
-                    border: `1.5px solid ${inviteSections.includes(s.key) ? T.amber : T.border}`,
-                    background: inviteSections.includes(s.key) ? `${T.amber}18` : "transparent",
-                    cursor: "pointer", fontSize: 12, fontWeight: inviteSections.includes(s.key) ? 700 : 400,
-                    color: inviteSections.includes(s.key) ? T.amber : T.t2,
-                  }}>
-                    <input type="checkbox" checked={inviteSections.includes(s.key)} onChange={() => { toggleInviteSection(s.key); setInviteFieldErrors(p => ({ ...p, sections: false })); }} style={{ width: 14, height: 14 }} />
-                    {s.label}
-                  </label>
-                ))}
-              </div>
-              {inviteFieldErrors.sections && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginBottom: 12 }}>↑ Pick at least one section</div>}
-              <button
-                style={{ ...S.btn("primary"), whiteSpace: "nowrap" }}
-                onClick={handleInviteStaff}
-                disabled={inviting}
-              >
-                {inviting ? "Sending…" : "Send Invite"}
-              </button>
-              <div style={{ fontSize: 11, color: T.t3, marginTop: 8 }}>They'll get a verification code by email, and fill in their own name + mobile number when they enter it — access activates only then.</div>
-            </div>
-
-            {/* Pending invites */}
-            {pendingInvites.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, marginBottom: 8 }}>Pending Invites</div>
-                {pendingInvites.map(inv => (
-                  <div key={inv.id} style={{ ...S.card, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{inv.email} <span style={{ fontWeight: 400, color: T.t3 }}>· {inv.roleLabel}</span></div>
-                      <div style={{ fontSize: 12, color: T.t3 }}>Waiting for them to verify and fill in their details</div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={S.badge(T.amber)}>Awaiting verification</span>
-                      <button style={{ ...S.btn("secondary"), padding: "4px 12px", fontSize: 12 }} onClick={() => handleResendInvite(inv.id)}>Resend</button>
-                      <button style={{ ...S.btn("danger"), padding: "4px 12px", fontSize: 12 }} onClick={() => handleCancelInvite(inv.id)}>Cancel</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Staff list */}
-            {shopStaff.length === 0 ? (
-              <div style={{ color: T.t3, fontSize: 13, padding: "8px 0" }}>No staff members yet.</div>
-            ) : (
-              shopStaff.map(s => (
-                <div key={s.id} style={{ ...S.card, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center",
-                      justifyContent: "center", fontSize: 16, fontWeight: 800,
-                      background: `${STAFF_ROLE_COLORS[s.role] || T.t3}22`,
-                      color: STAFF_ROLE_COLORS[s.role] || T.t3,
-                    }}>
-                      {(s.user?.name || "?")[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{s.user?.name || "—"}</div>
-                      <div style={{ fontSize: 12, color: T.t3 }}>{s.user?.phone || s.user?.email || "—"}</div>
-                      {Array.isArray(s.sections) && s.sections.length > 0 && (
-                        <div style={{ fontSize: 11, color: T.t3, marginTop: 2 }}>{s.sections.join(", ")}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={S.badge(STAFF_ROLE_COLORS[s.role] || T.t3)}>{s.roleLabel || s.role}</span>
-                    {!s.isActive && <span style={S.badge(T.crimson)}>Inactive</span>}
-                    {s.role !== "OWNER" && (
-                      s.isActive
-                        ? <button style={{ ...S.btn("danger"), padding: "4px 12px", fontSize: 12 }} onClick={() => handleDeactivateStaff(s.id)}>Revoke Access</button>
-                        : <button style={{ ...S.btn("secondary"), padding: "4px 12px", fontSize: 12 }} onClick={() => handleReactivateStaff(s.id)}>Reactivate</button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
+            <div style={{ fontSize: 13, color: T.t3, marginTop: 8 }}>Invite staff, edit access, and revoke or remove members from the Staff page.</div>
           </div>
         )}
 
