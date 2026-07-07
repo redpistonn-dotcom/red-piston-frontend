@@ -188,7 +188,16 @@ function requireRole(user, role, element) {
 function requireSection(user, sectionKey, element) {
   const role = getUserRole(user);
   if (role === "SHOP_OWNER" || role === "PLATFORM_ADMIN") return element;
-  if (role === "SHOP_STAFF" && (!sectionKey || (user?.sections || []).includes(sectionKey))) return element;
+  if (role === "SHOP_STAFF") {
+    const sections = user?.sections || [];
+    // Dashboard used to be unconditionally granted ("!sectionKey" passed for
+    // everyone). It's now a real section like any other — except when staff
+    // has been granted NOTHING at all, in which case letting them see the
+    // (empty) dashboard beats an infinite redirect loop back to itself.
+    if (sectionKey ? sections.includes(sectionKey) : (sections.includes("dashboard") || sections.length === 0)) {
+      return element;
+    }
+  }
   return <Navigate to={user ? getDefaultRoute(user) : "/login"} replace />;
 }
 

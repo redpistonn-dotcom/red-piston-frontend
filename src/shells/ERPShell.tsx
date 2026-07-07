@@ -160,16 +160,18 @@ export function ERPShell({ children }: ERPShellProps) {
   const location = useLocation();
 
   // SHOP_OWNER/PLATFORM_ADMIN see everything; SHOP_STAFF only the sections they
-  // were granted at invite time (see App.tsx requireSection for the matching
-  // route-level gate — this just keeps the sidebar from listing pages they'd
-  // get redirected away from). "dashboard" is always visible, matching the
-  // route guard's null-section special case.
+  // were granted (see App.tsx requireSection for the matching route-level
+  // gate — this just keeps the sidebar from listing pages they'd get
+  // redirected away from). "dashboard" is gated like any other section now —
+  // except when staff has been granted nothing at all, where it's the one
+  // thing requireSection still lets through rather than looping forever.
   const visibleNavItems = useMemo(() => {
     if (currentUser?.role !== "SHOP_STAFF") return NAV_ITEMS;
     const sections = currentUser?.sections || [];
+    if (sections.length === 0) return NAV_ITEMS.filter(n => n.key === "dashboard");
     // "credit-notes" rides on the "returns" permission (see App.tsx's matching
     // requireSection gate) rather than its own section key — it's the same data.
-    return NAV_ITEMS.filter(n => n.key === "dashboard" || sections.includes(n.key === "credit-notes" ? "returns" : n.key));
+    return NAV_ITEMS.filter(n => sections.includes(n.key === "credit-notes" ? "returns" : n.key));
   }, [currentUser]);
 
 
