@@ -51,6 +51,7 @@ interface BackendMasterPart {
   imageUrl?: string | null;
   oemNumbers?: string | null;
   oemNumber?: string | null;
+  primaryOemNumber?: string | null;
   barcodes?: string | string[] | null;
   specifications?: Record<string, unknown>;
 }
@@ -105,7 +106,10 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
   const mp = inv.masterPart;
   // Priority: shop's Cloudinary photo → shop's emoji override → master part image → category emoji
   const imageVal = inv.imageUrl || inv.customIcon || mp?.imageUrl || getCategoryEmoji(inv.customCategoryL1 || mp?.categoryL1);
-  const oemStr = (Array.isArray(mp?.oemNumbers) ? mp?.oemNumbers[0] : mp?.oemNumbers) || mp?.oemNumber || '';
+  // primaryOemNumber is the actual singular field on MasterPart — there is no
+  // plain "oemNumber"; oemNumbers[0] is only a fallback for parts that only
+  // ever got the array populated (e.g. some catalog imports).
+  const oemStr = mp?.primaryOemNumber || (Array.isArray(mp?.oemNumbers) ? mp?.oemNumbers[0] : mp?.oemNumbers) || '';
   const barcodesArr = mp?.barcodes
     ? (Array.isArray(mp.barcodes) ? mp.barcodes : [mp.barcodes])
     : [];

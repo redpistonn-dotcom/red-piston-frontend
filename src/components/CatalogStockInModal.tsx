@@ -709,7 +709,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
   // When re-editing a cart item, prefill with its saved form; otherwise blank.
   const [f, setF] = useState(initialForm || {
     buyPrice: "", sellPrice: "", mrp: "", stockQty: "0",
-    rackLocation: "", minStockAlert: "5",
+    rackLocation: "", minStockAlert: "5", nickname: "",
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
   const [errors, setErrors] = useState({});
@@ -768,8 +768,8 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
               )}
             </div>
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 11 }}>
-              {part.oemNumber && (
-                <span><span style={{ color: T.t4 }}>OEM: </span><span style={{ fontFamily: FONT.mono, color: T.amber, fontWeight: 700 }}>{part.oemNumber}</span></span>
+              {part.primaryOemNumber && (
+                <span><span style={{ color: T.t4 }}>OEM: </span><span style={{ fontFamily: FONT.mono, color: T.amber, fontWeight: 700 }}>{part.primaryOemNumber}</span></span>
               )}
               {part.oemNumbers?.length > 1 && (
                 <span style={{ color: T.t3 }}>+{part.oemNumbers.length - 1} cross refs</span>
@@ -831,6 +831,11 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
           <div style={{ gridColumn: "span 2" }}>
             <Field label="Rack / Storage Location" hint="e.g. Rack A-12, Shelf 3B">
               <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" maxLength={50} />
+            </Field>
+          </div>
+          <div style={{ gridColumn: "span 2" }}>
+            <Field label="Shop Nickname (optional)" hint="Shown instead of the catalog name in your Inventory and POS billing — e.g. call it what your staff actually asks for">
+              <Input value={f.nickname} onChange={set("nickname")} placeholder={part.partName} maxLength={200} />
             </Field>
           </div>
         </div>
@@ -1194,6 +1199,7 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
               stockQty:      parseInt(form.stockQty) || 0,
               rackLocation:  form.rackLocation || null,
               minStockAlert: parseInt(form.minStockAlert) || 5,
+              nickname:      form.nickname || undefined,
               supplierName:  supplier.name || undefined,
               supplierGstin: supplier.gstin || undefined,
               supplierPhone: supplier.phone || undefined,
@@ -1206,7 +1212,8 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
               inventoryId:    inv.inventoryId,
               masterPartId:   part.masterPartId,
               globalSku:      part.masterPartId,
-              name:           part.partName,
+              name:           form.nickname || part.partName,
+              nickname:       form.nickname || null,
               oemNumber:      part.oemNumber || (part.oemNumbers && part.oemNumbers[0]) || "",
               oemNumbers:     part.oemNumbers || [],
               barcodes:       part.barcodes  || [],

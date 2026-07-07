@@ -1134,7 +1134,10 @@ export function POSBillingPage() {
                                 </div>
                             )}
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: T.t2 }}>
-                                <span>Taxes (GST avg {grandTotal > 0 ? Math.round(grandGst / grandTotal * 100) : 18}%)</span>
+                                {/* grandTotal is tax-INCLUSIVE, so grandGst/grandTotal understates the
+                                    rate (e.g. an 18%-rate item shows as ~15%, since 18/118 ≈ 15%). The
+                                    actual weighted rate is tax / (tax-exclusive base) — base = total - tax. */}
+                                <span>Taxes (GST avg {(grandTotal - grandGst) > 0 ? Math.round(grandGst / (grandTotal - grandGst) * 100) : 18}%)</span>
                                 <span style={{ fontFamily: FONT.mono, fontWeight: 600 }}>{fmt(grandGst)} <span style={{ fontSize: 10, color: T.t3 }}>inc.</span></span>
                             </div>
                             {/* Additional Discount */}
