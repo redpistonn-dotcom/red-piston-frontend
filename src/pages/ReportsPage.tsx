@@ -95,6 +95,7 @@ export function ReportsPage() {
 
         let totalSales = 0, monthSales = 0, totalPurchases = 0;
         let pnl = 0;
+        let salesCount = 0, purchaseCount = 0, adjCount = 0;
         const catSales: Record<string, number> = {};
         const customerSet = new Set<string>();
 
@@ -102,6 +103,7 @@ export function ReportsPage() {
             if (m.type === "SALE") {
                 totalSales += m.total;
                 pnl += m.profit || 0;
+                salesCount++;
                 if (m.date >= monthStart) {
                     monthSales += m.total;
                     if (m.customerName) customerSet.add(m.customerName);
@@ -111,6 +113,9 @@ export function ReportsPage() {
                 catSales[cat] = (catSales[cat] || 0) + m.total;
             } else if (m.type === "PURCHASE") {
                 totalPurchases += m.total;
+                purchaseCount++;
+            } else if (!["ESTIMATE", "RECEIPT", "PAYMENT"].includes(m.type)) {
+                adjCount++;
             }
         });
 
@@ -120,6 +125,7 @@ export function ReportsPage() {
 
         return {
             monthSales, totalSales, totalPurchases, pnl,
+            salesCount, purchaseCount, adjCount,
             topCat, topCatSales,
             activeCustomers: customerSet.size,
             invValue,
@@ -308,6 +314,34 @@ export function ReportsPage() {
                     trend="-2.1% ↓"
                     trendUp={false}
                     icon="📦"
+                />
+            </div>
+
+            {/* ── KPI CARDS (moved from History — all-time totals) ── */}
+            <div className="kpi-grid-4" style={{ display: "grid" }}>
+                <KpiCard
+                    label="Total Purchases"
+                    value={fmt(stats.totalPurchases)}
+                    sub={`${stats.purchaseCount} entries found`}
+                    icon="📥"
+                />
+                <KpiCard
+                    label="Total Sales"
+                    value={fmt(stats.totalSales)}
+                    sub={`${stats.salesCount} transactions`}
+                    icon="📤"
+                />
+                <KpiCard
+                    label="Total Profit"
+                    value={fmt(stats.pnl)}
+                    sub={pct(stats.pnl, stats.totalSales) + " margin"}
+                    icon="📈"
+                />
+                <KpiCard
+                    label="Adjustments"
+                    value={String(stats.adjCount)}
+                    sub="Returns, damages, audits"
+                    icon="⚖️"
                 />
             </div>
 

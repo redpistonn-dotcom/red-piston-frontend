@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { T, FONT, SHADOWS } from "../theme";
-import { fmt, pct, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV, inDateRange } from "../utils";
+import { fmt, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV, inDateRange } from "../utils";
 import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 import { useJobCardHistory } from "../hooks/useJobCardHistory";
@@ -276,20 +276,6 @@ function SingleRow({ m, isExpanded, onToggle, isLast }: any) {
     );
 }
 
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, icon, iconBg }: { label: string; value: string; sub: string; icon: string; iconBg: string }) {
-    return (
-        <div className="card-hover" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, padding: "20px 20px 16px", display: "flex", flexDirection: "column", gap: 4, boxShadow: SHADOWS.xs }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT.ui }}>{label}</span>
-                <span style={{ width: 34, height: 34, borderRadius: 9, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>{icon}</span>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: T.t1, fontFamily: FONT.mono, letterSpacing: "-0.03em", lineHeight: 1 }}>{value}</div>
-            <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui, marginTop: 3 }}>{sub}</div>
-        </div>
-    );
-}
-
 // ─── Period helpers ───────────────────────────────────────────────────────────
 type Period = "7D" | "30D" | "3M" | "6M" | "1Y";
 const PERIODS: { key: Period; label: string }[] = [
@@ -433,29 +419,12 @@ export function HistoryPage() {
 
     const groups = useMemo(() => groupMovements(filtered), [filtered]);
 
-    // KPI totals — always from full shopMovements in selected period
-    const kpi = useMemo(() => {
-        const inPeriod = shopMovements.filter(m => m.date >= cutoff);
-        const purchases = inPeriod.filter(m => m.type === "PURCHASE");
-        const sales     = inPeriod.filter(m => m.type === "SALE");
-        const adj       = inPeriod.filter(m => !["PURCHASE","SALE","ESTIMATE","RECEIPT","PAYMENT"].includes(m.type));
-        return {
-            purchaseTotal: purchases.reduce((s, m) => s + (m.total || 0), 0),
-            purchaseCount: purchases.length,
-            salesTotal:    sales.reduce((s, m) => s + (m.total || 0), 0),
-            salesCount:    sales.length,
-            profit:        sales.reduce((s, m) => s + (m.profit || 0), 0),
-            salesTot:      sales.reduce((s, m) => s + (m.total || 0), 0),
-            adjCount:      adj.length,
-        };
-    }, [shopMovements, cutoff]);
-
     const VERSION = "V4.6.1-STABLE";
 
     // First-load skeleton: show while the direct API fetch is in flight.
     // histLoading starts as true, flips to false once fetchMovements() resolves.
     if (histLoading) {
-        return <Skeleton.Page kpis={4} cols={10} />;
+        return <Skeleton.Page kpis={0} cols={10} />;
     }
 
     return (
@@ -469,14 +438,6 @@ export function HistoryPage() {
                 <button onClick={() => setHistRetry(k => k + 1)} style={{ background: "#DC2626", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui }}>Retry</button>
               </div>
             )}
-
-            {/* ── 4 KPI CARDS ── */}
-            <div className="kpi-grid-4" style={{ display: "grid", gap: 14 }}>
-                <KpiCard label="Total Purchases" value={fmt(kpi.purchaseTotal)} sub={`${kpi.purchaseCount} entries found`}  icon="📥" iconBg={T.skyBg} />
-                <KpiCard label="Total Sales"     value={fmt(kpi.salesTotal)}    sub={`${kpi.salesCount} transactions`}     icon="📤" iconBg={T.amberGlow} />
-                <KpiCard label="Total Profit"    value={fmt(kpi.profit)}        sub={pct(kpi.profit, kpi.salesTot) + " margin"} icon="📈" iconBg={T.emeraldBg} />
-                <KpiCard label="Adjustments"     value={String(kpi.adjCount)}   sub="Returns, damages, audits"              icon="⚖️" iconBg={T.violetBg} />
-            </div>
 
             {/* ── AUDIT TRAIL BANNER ── */}
             <div style={{
