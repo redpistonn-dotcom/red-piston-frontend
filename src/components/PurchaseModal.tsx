@@ -103,10 +103,6 @@ export function PurchaseModal({ open, onClose, product, products, onSave, toast 
                 <Field label="New Selling Price / Unit" hint={sel ? `Current: ${fmt(sel.sellPrice)}` : ""}>
                     <Input type="number" value={f.newSellPrice} onChange={set("newSellPrice")} placeholder={String(sel?.sellPrice || "")} prefix="₹" />
                 </Field>
-                <Field label="GST Rate">
-                    <Select value={String(f.gst)} onChange={set("gst")} options={["0", "5", "12", "18", "28"].map(v => ({ value: v, label: v + "% GST" }))} />
-                </Field>
-
                 <Divider label="Supplier Details" />
                 <div style={{ gridColumn: "span 2" }} />
 

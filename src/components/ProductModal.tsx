@@ -239,7 +239,6 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
                 <Field label="Buying Price (₹)" required error={errors.buyPrice}><Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" invalid={!!errors.buyPrice} /></Field>
                 <Field label="Selling Price (₹)" required error={errors.sellPrice}><Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" invalid={!!errors.sellPrice} /></Field>
                 <Field label="MRP (₹)" hint="Maximum Retail Price"><Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" /></Field>
-                <Field label="GST Rate"><Select value={String(f.gstRate)} onChange={set("gstRate")} options={["0", "5", "12", "18", "28"].map(v => ({ value: v, label: v + "% GST" }))} /></Field>
 
                 {profit !== null && (
                     <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

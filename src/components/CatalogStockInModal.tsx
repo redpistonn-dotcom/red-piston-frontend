@@ -34,7 +34,6 @@ const EMOJI_BY_CATEGORY = {
 };
 const catEmoji = (cat) => EMOJI_BY_CATEGORY[cat] || "🔧";
 
-const GST_RATES = ["0", "5", "12", "18", "28"];
 const UNIT_OPTIONS = ["Piece", "Set", "Pair", "Litre", "Kg", "Metre", "Box", "Roll"];
 
 // ─── sub-component: PartImage ────────────────────────────────────────────────
@@ -993,9 +992,6 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
         </div>
         <Field label="HSN Code">
           <Input value={f.hsnCode} onChange={e => set("hsnCode")(e.replace(/[^\d]/g, "").slice(0, 8))} placeholder="87083000" maxLength={8} inputMode="numeric" />
-        </Field>
-        <Field label="GST Rate">
-          <Select value={f.gstRate} onChange={set("gstRate")} options={GST_RATES.map((r) => ({ value: r, label: r + "% GST" }))} />
         </Field>
         <Field label="Buying Price (₹)" required error={errors.buyPrice}>
           <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
