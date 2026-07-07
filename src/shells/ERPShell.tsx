@@ -18,6 +18,7 @@ import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { api } from "../api/client.js";
 import { fetchInventory, fetchMovements, fetchParties } from '../api/sync.js';
+import { getMe } from '../api/auth';
 import { Toast } from "../components/ui";
 import { ProfileDropdown } from "../components/ProfileDropdown";
 import { ProductModal } from "../components/ProductModal";
@@ -360,6 +361,37 @@ export function ERPShell({ children }: ERPShellProps) {
     const id = setInterval(ping, 9 * 60 * 1000);
     return () => clearInterval(id);
   }, [currentUser?.shopId]);
+
+  // Staff permissions (sections) are cached in currentUser/localStorage at login —
+  // if the owner edits them afterward, a logged-in staff member's sidebar/routes
+  // stay stuck on the old sections until they log out and back in. Refresh from
+  // /api/auth/me on mount and whenever the tab regains focus, so a change the
+  // owner makes shows up next time the staff member switches back to the app
+  // (no separate polling loop, just piggyback on the natural focus event).
+  useEffect(() => {
+    if (currentUser?.role !== 'SHOP_STAFF') return;
+    const refreshSections = async () => {
+      try {
+        const res: any = await getMe();
+        const fresh = res?.data;
+        if (!fresh) return;
+        setCurrentUser((prev: any) => {
+          if (!prev) return prev;
+          const updated = { ...prev, sections: fresh.sections, roleLabel: fresh.roleLabel, shopUserRole: fresh.shopUserRole };
+          try { localStorage.setItem('as_user', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+      } catch { /* offline/expired — keep showing the last-known sections */ }
+    };
+    refreshSections();
+    const onFocus = () => { if (document.visibilityState === 'visible') refreshSections(); };
+    window.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [currentUser?.role, currentUser?.userId, setCurrentUser]);
 
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false); }, [currentPath]);
