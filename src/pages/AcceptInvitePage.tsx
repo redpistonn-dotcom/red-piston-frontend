@@ -1,9 +1,10 @@
 import { useState, useContext } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { setTokens } from "../api/client.js";
+import { setTokens, api } from "../api/client.js";
 import { acceptStaffInvite } from "../api/staff";
 import { T, FONT } from "../theme.js";
 import { AppCtx } from "../AppCtx.js";
+import { BrandHeader } from "../components/BrandHeader";
 
 const S = {
   page: { display: "flex", minHeight: "100vh", background: T.bg, fontFamily: FONT.ui, alignItems: "center", justifyContent: "center" },
@@ -12,8 +13,6 @@ const S = {
     borderRadius: 20, border: `1px solid ${T.border}`, boxShadow: "0 12px 40px rgba(0,0,0,0.4)",
   },
   logo: { display: "flex", alignItems: "center", gap: 10, marginBottom: 32 },
-  logoMark: { width: 40, height: 40, borderRadius: 10, background: T.amber, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 },
-  logoText: { fontSize: 20, fontWeight: 800, color: T.t1, letterSpacing: "-0.5px" },
   heading: { fontSize: 22, fontWeight: 800, color: T.t1, marginBottom: 6 },
   sub: { fontSize: 14, color: T.t2, marginBottom: 28, lineHeight: 1.5 },
   label: { fontSize: 13, fontWeight: 600, color: T.t2, marginBottom: 6, display: "block" },
@@ -60,6 +59,34 @@ export default function AcceptInvitePage() {
   const [success, setSuccess] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({ email: false, code: false, name: false, phone: false });
 
+  // Shown right after OTP verification succeeds, before handing off to the
+  // dashboard — lets them set a password in the same flow (Google sign-in
+  // already works with this email regardless; this is the other option).
+  const [showSetPassword, setShowSetPassword] = useState(false);
+  const [verifiedUser, setVerifiedUser] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const finishLogin = (user: any) => {
+    setSuccess(true);
+    setTimeout(() => ctx?.handleLogin?.(user), 900);
+  };
+
+  const handleSetPassword = async () => {
+    if (!newPassword || newPassword.length < 8) { setPwError("Password must be at least 8 characters"); return; }
+    if (newPassword !== confirmPassword) { setPwError("Passwords do not match"); return; }
+    setPwError(""); setPwLoading(true);
+    try {
+      await api.post("/api/auth/set-password", { email: email.trim().toLowerCase(), newPassword });
+      finishLogin(verifiedUser);
+    } catch (e: any) {
+      setPwError(e?.data?.error?.message || e?.message || "Could not set password — you can still do this later from your profile.");
+    }
+    setPwLoading(false);
+  };
+
   const phoneDigits = phone.replace(/\D/g, "").slice(-10);
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const codeValid = /^\d{6}$/.test(code);
@@ -80,9 +107,8 @@ export default function AcceptInvitePage() {
         email: email.trim().toLowerCase(), code, name: name.trim(), phone: phoneDigits,
       });
       setTokens(data.accessToken, data.refreshToken);
-      setSuccess(true);
-      // Brief pause so the success state is visible before the shell takes over.
-      setTimeout(() => ctx?.handleLogin?.(data.user), 900);
+      setVerifiedUser(data.user);
+      setShowSetPassword(true);
     } catch (e: any) {
       const errCode = e?.data?.error?.code;
       let msg = e?.data?.error?.message || e?.message || "Could not verify — please try again.";
@@ -100,8 +126,7 @@ export default function AcceptInvitePage() {
     <div style={S.page}>
       <div style={S.card}>
         <div style={S.logo}>
-          <div style={S.logoMark}>⚙️</div>
-          <span style={S.logoText}>RedPiston</span>
+          <BrandHeader subtitle="Join Your Shop" logoSize={40} />
         </div>
 
         {success ? (
@@ -110,6 +135,41 @@ export default function AcceptInvitePage() {
             <div style={{ fontSize: 16, fontWeight: 700, color: T.emerald, marginBottom: 6 }}>You're in!</div>
             <div style={{ fontSize: 13, color: T.t2, lineHeight: 1.5 }}>Taking you to your dashboard…</div>
           </div>
+        ) : showSetPassword ? (
+          <>
+            <div style={S.heading}>Set a password (optional)</div>
+            <div style={S.sub}>
+              You're verified — Google sign-in with <strong>{email.trim()}</strong> already works. Want a password too, so you can log in either way? You can always add one later from your profile instead.
+            </div>
+
+            {pwError && <div style={S.error}>{pwError}</div>}
+
+            <label style={S.label}>New password</label>
+            <input
+              style={S.input}
+              type="password"
+              value={newPassword}
+              onChange={e => { setNewPassword(e.target.value); setPwError(""); }}
+              placeholder="Min. 8 characters"
+              autoFocus
+            />
+
+            <label style={S.label}>Confirm password</label>
+            <input
+              style={S.input}
+              type="password"
+              value={confirmPassword}
+              onChange={e => { setConfirmPassword(e.target.value); setPwError(""); }}
+              placeholder="Re-enter your password"
+              onKeyDown={e => e.key === "Enter" && handleSetPassword()}
+            />
+
+            <button style={S.btn(pwLoading)} onClick={handleSetPassword} disabled={pwLoading}>
+              {pwLoading ? "Saving…" : "Set Password & Continue"}
+            </button>
+
+            <button style={S.link} onClick={() => finishLogin(verifiedUser)}>Skip for now →</button>
+          </>
         ) : (
           <>
             <div style={S.heading}>Join your shop on RedPiston</div>
