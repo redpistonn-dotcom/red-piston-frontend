@@ -150,13 +150,7 @@ function BackButton({ onClick, label = "Back to search" }) {
 
 // ─── sub-component: CartPanel ─────────────────────────────────────────────────
 function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSupplier, toast }) {
-  const [triedSave, setTriedSave] = useState(false);
-  const nameErr    = triedSave && !supplier.name.trim();
-  const invoiceErr = triedSave && !supplier.invoiceNo.trim();
-
   function handleSave() {
-    setTriedSave(true);
-    if (!supplier.name.trim() || !supplier.invoiceNo.trim()) return;
     onSaveAll();
   }
 
@@ -283,7 +277,7 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
       {cart.length > 0 && (
         <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 12, marginBottom: 12 }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
-            Supplier Details <span style={{ color: T.crimson }}>*</span>
+            Supplier Details <span style={{ color: T.t4, fontWeight: 500, textTransform: "none" }}>(optional)</span>
           </div>
           <div style={{ fontSize: 10, color: T.t4, marginBottom: 10 }}>
             Applied to all {cart.length} item{cart.length !== 1 ? "s" : ""}
@@ -301,20 +295,17 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
                     gstin: gstin || s.gstin,
                   }))
                 }
-                error={nameErr}
                 toast={toast}
               />
-              {nameErr && <div style={{ fontSize: 10, color: T.crimson, marginTop: 2 }}>Supplier name is required</div>}
             </div>
             <div>
               <input
                 value={supplier.invoiceNo}
                 onChange={e => setSupplier(s => ({ ...s, invoiceNo: e.target.value }))}
-                placeholder="Invoice No *"
+                placeholder="Invoice No"
                 maxLength={50}
-                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${invoiceErr ? T.crimson : T.border}`, borderRadius: 7, padding: "7px 9px", fontSize: 11, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
+                style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 7, padding: "7px 9px", fontSize: 11, fontFamily: FONT.ui, color: T.t1, background: T.card, outline: "none" }}
               />
-              {invoiceErr && <div style={{ fontSize: 10, color: T.crimson, marginTop: 2 }}>Required</div>}
             </div>
             <input
               value={supplier.gstin}
@@ -1182,7 +1173,6 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
   // ── Save All: process every cart item and call the API ────────────────────
   const handleSaveAll = useCallback(async () => {
     if (cart.length === 0) return;
-    if (!supplier.name.trim() || !supplier.invoiceNo.trim()) return;
     setSaving(true);
     let savedCount = 0;
     // All items in this batch share one reference so they group together in History.
