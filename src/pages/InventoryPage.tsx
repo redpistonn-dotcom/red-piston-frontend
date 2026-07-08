@@ -86,8 +86,16 @@ export function InventoryPage() {
     const [showCatalog, setShowCatalog] = useState(false);
     const [catalogQuery, setCatalogQuery] = useState("");
     const [catalogResults, setCatalogResults] = useState<any[]>([]);
+    const [catalogTotal, setCatalogTotal] = useState(0);
     const [catalogLoading, setCatalogLoading] = useState(false);
+    const [catalogPage, setCatalogPage] = useState(0);
+    const [catalogLetter, setCatalogLetter] = useState("");
+    const CATALOG_PAGE_SIZE = 50;
     const debouncedCatalogQuery = useDebounce(catalogQuery, 400);
+
+    // Typing a search or picking a letter both restart pagination — otherwise
+    // page 3 of an old filter would silently apply to the new one.
+    useEffect(() => { setCatalogPage(0); }, [debouncedCatalogQuery, catalogLetter]);
 
     // Batch search state
     const [batchSearch, setBatchSearch] = useState("");
@@ -119,16 +127,17 @@ export function InventoryPage() {
       return () => { cancelled = true; };
     }, [debouncedBatchSearch]);
 
-    // Catalog search — loads all items on open; filters when user types
+    // Catalog search — loads all items on open (alphabetical, paginated);
+    // filters when user types or picks a letter from the A-Z strip.
     useEffect(() => {
       if (!showCatalog) return;
       let cancelled = false;
       setCatalogLoading(true);
-      searchCatalog(debouncedCatalogQuery.trim(), 50)
-        .then(data => { if (!cancelled) setCatalogResults(data); })
+      searchCatalog(debouncedCatalogQuery.trim(), { limit: CATALOG_PAGE_SIZE, offset: catalogPage * CATALOG_PAGE_SIZE, letter: catalogLetter })
+        .then(({ products, total }) => { if (!cancelled) { setCatalogResults(products); setCatalogTotal(total); } })
         .finally(() => { if (!cancelled) setCatalogLoading(false); });
       return () => { cancelled = true; };
-    }, [debouncedCatalogQuery, showCatalog]);
+    }, [debouncedCatalogQuery, catalogLetter, catalogPage, showCatalog]);
 
     // Vehicle data via TanStack Query — auto-cached, no manual useEffect needed
     const { data: mfgData } = useVehicleManufacturers();
@@ -584,7 +593,7 @@ export function InventoryPage() {
                   />
                   {catalogLoading && <span style={{ fontSize: 12, color: "#7C3AED", fontFamily: FONT.ui }}>Loading…</span>}
                   <span style={{ fontSize: 11, color: "#6D28D9", fontFamily: FONT.ui, flexShrink: 0 }}>
-                    Showing first 50 — type to filter
+                    {catalogTotal > 0 ? `${catalogPage * CATALOG_PAGE_SIZE + 1}–${Math.min((catalogPage + 1) * CATALOG_PAGE_SIZE, catalogTotal)} of ${catalogTotal}` : "Sorted A–Z"}
                   </span>
                 </div>
 
@@ -638,9 +647,53 @@ export function InventoryPage() {
 
                 {!catalogLoading && catalogResults.length === 0 && (
                   <div style={{ padding: "40px 20px", textAlign: "center", color: T.t3, fontSize: 13, fontFamily: FONT.ui }}>
-                    {debouncedCatalogQuery ? `No parts found for "${debouncedCatalogQuery}"` : "No catalog items found"}
+                    {debouncedCatalogQuery ? `No parts found for "${debouncedCatalogQuery}"` : catalogLetter ? `No parts starting with "${catalogLetter}"` : "No catalog items found"}
                   </div>
                 )}
+
+                {/* Pagination */}
+                {catalogTotal > CATALOG_PAGE_SIZE && (
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, padding: "12px 16px", borderTop: `1px solid #EDE9FE` }}>
+                    <button
+                      onClick={() => setCatalogPage(p => Math.max(0, p - 1))}
+                      disabled={catalogPage === 0}
+                      style={{ height: 32, padding: "0 14px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 12, fontWeight: 700, cursor: catalogPage === 0 ? "default" : "pointer", opacity: catalogPage === 0 ? 0.4 : 1, fontFamily: FONT.ui }}
+                    >← Prev</button>
+                    <span style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
+                      Page {catalogPage + 1} of {Math.ceil(catalogTotal / CATALOG_PAGE_SIZE)}
+                    </span>
+                    <button
+                      onClick={() => setCatalogPage(p => (p + 1) * CATALOG_PAGE_SIZE < catalogTotal ? p + 1 : p)}
+                      disabled={(catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal}
+                      style={{ height: 32, padding: "0 14px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 12, fontWeight: 700, cursor: (catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal ? "default" : "pointer", opacity: (catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal ? 0.4 : 1, fontFamily: FONT.ui }}
+                    >Next →</button>
+                  </div>
+                )}
+
+                {/* A-Z jump filter */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, padding: "10px 16px", borderTop: `1px solid #EDE9FE`, background: "#FAFAFF" }}>
+                  <button
+                    onClick={() => setCatalogLetter("")}
+                    style={{
+                      height: 26, padding: "0 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, fontFamily: FONT.ui, cursor: "pointer",
+                      border: `1px solid ${catalogLetter === "" ? "#7C3AED" : T.border}`,
+                      background: catalogLetter === "" ? "#7C3AED" : "#FFFFFF",
+                      color: catalogLetter === "" ? "#FFFFFF" : T.t3,
+                    }}
+                  >All</button>
+                  {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(letter => (
+                    <button
+                      key={letter}
+                      onClick={() => setCatalogLetter(letter)}
+                      style={{
+                        width: 26, height: 26, borderRadius: 6, fontSize: 11, fontWeight: 700, fontFamily: FONT.ui, cursor: "pointer",
+                        border: `1px solid ${catalogLetter === letter ? "#7C3AED" : T.border}`,
+                        background: catalogLetter === letter ? "#7C3AED" : "#FFFFFF",
+                        color: catalogLetter === letter ? "#FFFFFF" : T.t3,
+                      }}
+                    >{letter}</button>
+                  ))}
+                </div>
               </div>
             )}
 

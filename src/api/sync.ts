@@ -257,14 +257,21 @@ interface CatalogSearchResponse {
 
 // Search across ALL shop inventory (including zero-priced seeded catalog items).
 // Used by the "Parts Catalog" tab to let the shop owner find and configure parts.
-export async function searchCatalog(query: string, limit = 50): Promise<Product[]> {
+// Sorted alphabetically by default, with offset-based pagination and an
+// optional single-letter jump filter for the catalog's A-Z strip.
+export async function searchCatalog(
+  query: string,
+  opts: { limit?: number; offset?: number; letter?: string } = {}
+): Promise<{ products: Product[]; total: number }> {
+  const { limit = 50, offset = 0, letter = '' } = opts;
   try {
-    const qp = new URLSearchParams({ all: 'true', search: query, limit: String(limit) });
+    const qp = new URLSearchParams({ all: 'true', search: query, limit: String(limit), offset: String(offset), sort: 'name' });
+    if (letter) qp.set('letter', letter);
     const data = await api.get<CatalogSearchResponse>(`/api/shop/inventory?${qp}`);
-    return (data.inventory || []).map(mapInventoryToProduct);
+    return { products: (data.inventory || []).map(mapInventoryToProduct), total: data.total || 0 };
   } catch (err: unknown) {
     console.warn('[Sync] Catalog search failed:', (err as Error).message);
-    return [];
+    return { products: [], total: 0 };
   }
 }
 
