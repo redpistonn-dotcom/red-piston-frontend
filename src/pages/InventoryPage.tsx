@@ -591,14 +591,30 @@ export function InventoryPage() {
                       fontFamily: FONT.ui, outline: "none",
                     }}
                   />
-                  {catalogLoading && <span style={{ fontSize: 12, color: "#7C3AED", fontFamily: FONT.ui }}>Loading…</span>}
                   <span style={{ fontSize: 11, color: "#6D28D9", fontFamily: FONT.ui, flexShrink: 0 }}>
                     {catalogTotal > 0 ? `${catalogPage * CATALOG_PAGE_SIZE + 1}–${Math.min((catalogPage + 1) * CATALOG_PAGE_SIZE, catalogTotal)} of ${catalogTotal}` : "Sorted A–Z"}
                   </span>
                 </div>
 
                 {/* Results */}
-                {catalogResults.length > 0 && (
+                {catalogLoading && (
+                  <div>
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderBottom: `1px solid ${T.border}` }}>
+                        <Skeleton width={36} height={36} radius={8} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <Skeleton width="45%" height={13} style={{ marginBottom: 6 }} />
+                          <Skeleton width="25%" height={11} />
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <Skeleton width={70} height={12} style={{ marginBottom: 6 }} />
+                          <Skeleton width={64} height={26} radius={8} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!catalogLoading && catalogResults.length > 0 && (
                   <div>
                     {catalogResults.map(p => {
                       const isConfigured = p.sellPrice > 0 || p.stock > 0;
@@ -659,15 +675,8 @@ export function InventoryPage() {
                       disabled={catalogPage === 0 || catalogLoading}
                       style={{ height: 32, padding: "0 14px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 12, fontWeight: 700, cursor: (catalogPage === 0 || catalogLoading) ? "default" : "pointer", opacity: (catalogPage === 0 || catalogLoading) ? 0.4 : 1, fontFamily: FONT.ui }}
                     >← Prev</button>
-                    <span style={{ fontSize: 12, color: catalogLoading ? "#7C3AED" : T.t3, fontFamily: FONT.ui, fontWeight: catalogLoading ? 700 : 400, display: "flex", alignItems: "center", gap: 6, minWidth: 130, justifyContent: "center" }}>
-                      {catalogLoading && (
-                        <span style={{
-                          width: 12, height: 12, borderRadius: "50%",
-                          border: "2px solid #DDD6FE", borderTopColor: "#7C3AED",
-                          display: "inline-block", animation: "spin 0.7s linear infinite",
-                        }} />
-                      )}
-                      {catalogLoading ? "Loading page…" : `Page ${catalogPage + 1} of ${Math.ceil(catalogTotal / CATALOG_PAGE_SIZE)}`}
+                    <span style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui, minWidth: 130, textAlign: "center" }}>
+                      {`Page ${catalogPage + 1} of ${Math.ceil(catalogTotal / CATALOG_PAGE_SIZE)}`}
                     </span>
                     <button
                       onClick={() => setCatalogPage(p => (p + 1) * CATALOG_PAGE_SIZE < catalogTotal ? p + 1 : p)}

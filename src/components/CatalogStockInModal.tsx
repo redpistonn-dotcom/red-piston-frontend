@@ -707,9 +707,12 @@ function SearchStep({ onSelect, onManual, initialQuery }) {
 function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm }) {
   const catalogImage = part.imageUrl || (part.images && part.images[0]) || "";
   // When re-editing a cart item, prefill with its saved form; otherwise blank.
+  // Nickname starts as the catalog name itself (a real, editable value, not
+  // just a placeholder) — the owner can backspace and rename it, or leave it
+  // as-is and it's saved exactly like any other nickname.
   const [f, setF] = useState(initialForm || {
     buyPrice: "", sellPrice: "", mrp: "", stockQty: "0",
-    rackLocation: "", minStockAlert: "5", nickname: "",
+    rackLocation: "", minStockAlert: "5", nickname: part.partName || "",
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
   const [errors, setErrors] = useState({});
@@ -813,8 +816,13 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
         {/* Photo is added later at marketplace "Go Live" — not required here. */}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div style={{ gridColumn: "span 2" }}>
+            <Field label="Part Name in Your Shop" hint="Starts as the catalog name — backspace and rename it to whatever your staff actually calls it, or leave as-is">
+              <Input value={f.nickname} onChange={set("nickname")} placeholder={part.partName} maxLength={200} autoFocus />
+            </Field>
+          </div>
           <Field label="Buying Price (₹)" required error={errors.buyPrice}>
-            <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" autoFocus min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
+            <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
           </Field>
           <Field label="Selling Price (₹)" required error={errors.sellPrice}>
             <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.sellPrice} />
@@ -831,11 +839,6 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
           <div style={{ gridColumn: "span 2" }}>
             <Field label="Rack / Storage Location" hint="e.g. Rack A-12, Shelf 3B">
               <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" maxLength={50} />
-            </Field>
-          </div>
-          <div style={{ gridColumn: "span 2" }}>
-            <Field label="Shop Nickname (optional)" hint="Shown instead of the catalog name in your Inventory and POS billing — e.g. call it what your staff actually asks for">
-              <Input value={f.nickname} onChange={set("nickname")} placeholder={part.partName} maxLength={200} />
             </Field>
           </div>
         </div>
