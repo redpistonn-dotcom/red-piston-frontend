@@ -656,16 +656,23 @@ export function InventoryPage() {
                   <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, padding: "12px 16px", borderTop: `1px solid #EDE9FE` }}>
                     <button
                       onClick={() => setCatalogPage(p => Math.max(0, p - 1))}
-                      disabled={catalogPage === 0}
-                      style={{ height: 32, padding: "0 14px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 12, fontWeight: 700, cursor: catalogPage === 0 ? "default" : "pointer", opacity: catalogPage === 0 ? 0.4 : 1, fontFamily: FONT.ui }}
+                      disabled={catalogPage === 0 || catalogLoading}
+                      style={{ height: 32, padding: "0 14px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 12, fontWeight: 700, cursor: (catalogPage === 0 || catalogLoading) ? "default" : "pointer", opacity: (catalogPage === 0 || catalogLoading) ? 0.4 : 1, fontFamily: FONT.ui }}
                     >← Prev</button>
-                    <span style={{ fontSize: 12, color: T.t3, fontFamily: FONT.ui }}>
-                      Page {catalogPage + 1} of {Math.ceil(catalogTotal / CATALOG_PAGE_SIZE)}
+                    <span style={{ fontSize: 12, color: catalogLoading ? "#7C3AED" : T.t3, fontFamily: FONT.ui, fontWeight: catalogLoading ? 700 : 400, display: "flex", alignItems: "center", gap: 6, minWidth: 130, justifyContent: "center" }}>
+                      {catalogLoading && (
+                        <span style={{
+                          width: 12, height: 12, borderRadius: "50%",
+                          border: "2px solid #DDD6FE", borderTopColor: "#7C3AED",
+                          display: "inline-block", animation: "spin 0.7s linear infinite",
+                        }} />
+                      )}
+                      {catalogLoading ? "Loading page…" : `Page ${catalogPage + 1} of ${Math.ceil(catalogTotal / CATALOG_PAGE_SIZE)}`}
                     </span>
                     <button
                       onClick={() => setCatalogPage(p => (p + 1) * CATALOG_PAGE_SIZE < catalogTotal ? p + 1 : p)}
-                      disabled={(catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal}
-                      style={{ height: 32, padding: "0 14px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 12, fontWeight: 700, cursor: (catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal ? "default" : "pointer", opacity: (catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal ? 0.4 : 1, fontFamily: FONT.ui }}
+                      disabled={(catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal || catalogLoading}
+                      style={{ height: 32, padding: "0 14px", borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 12, fontWeight: 700, cursor: ((catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal || catalogLoading) ? "default" : "pointer", opacity: ((catalogPage + 1) * CATALOG_PAGE_SIZE >= catalogTotal || catalogLoading) ? 0.4 : 1, fontFamily: FONT.ui }}
                     >Next →</button>
                   </div>
                 )}

@@ -950,7 +950,7 @@ export function POSBillingPage() {
                                                                     maxLength={100}
                                                                     style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name && item.name !== "Custom Item" ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                                                    <span style={{ fontSize: 10, color: T.t3 }}>Cost ₹</span>
+                                                                    <span style={{ fontSize: 10, color: T.t3 }}>Buy Price ₹</span>
                                                                     <input type="number" value={item.buyPrice || ""} min="0" placeholder="0"
                                                                         onFocus={e => e.target.select()}
                                                                         onChange={e => updateItem(idx, "buyPrice", e.target.value === "" ? 0 : Math.max(0, +e.target.value))}
