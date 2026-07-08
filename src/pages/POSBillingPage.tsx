@@ -952,7 +952,8 @@ export function POSBillingPage() {
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                                                     <span style={{ fontSize: 10, color: T.t3 }}>Cost ₹</span>
                                                                     <input type="number" value={item.buyPrice || ""} min="0" placeholder="0"
-                                                                        onChange={e => updateItem(idx, "buyPrice", Math.max(0, +e.target.value))}
+                                                                        onFocus={e => e.target.select()}
+                                                                        onChange={e => updateItem(idx, "buyPrice", e.target.value === "" ? 0 : Math.max(0, +e.target.value))}
                                                                         style={{ width: 64, height: 22, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", color: T.t3, fontFamily: FONT.mono, fontSize: 11, outline: "none" }} />
                                                                     <span style={{ fontSize: 9, color: T.t3 }}>(for profit)</span>
                                                                 </div>
@@ -983,15 +984,16 @@ export function POSBillingPage() {
                                                 </div>
                                             </td>
                                             <td style={{ padding: "12px 10px", textAlign: "right" }}>
-                                                <input type="number" value={item.price} min="0" max="10000000" step="0.01"
-                                                    onChange={e => updateItem(idx, "price", Math.max(0, +e.target.value))}
+                                                <input type="number" value={item.price === 0 ? "" : item.price} min="0" max="10000000" step="0.01" placeholder="0"
+                                                    onFocus={e => e.target.select()}
+                                                    onChange={e => updateItem(idx, "price", e.target.value === "" ? 0 : Math.max(0, +e.target.value))}
                                                     style={{ width: 82, height: 34, background: T.bg, border: `1px solid ${item.price !== item.originalPrice ? T.amber : T.border}`, borderRadius: 7, padding: "0 8px", color: T.t1, fontFamily: FONT.mono, fontSize: 13, textAlign: "right", outline: "none" }} />
                                             </td>
                                             <td style={{ padding: "12px 10px", textAlign: "right" }}>
                                                 <div style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
-                                                    <input type="number" value={item.discount} min="0"
+                                                    <input type="number" value={item.discount === 0 ? "" : item.discount} min="0" placeholder="0"
                                                         onFocus={e => e.target.select()}
-                                                        onChange={e => updateItem(idx, "discount", Math.max(0, +e.target.value))}
+                                                        onChange={e => updateItem(idx, "discount", e.target.value === "" ? 0 : Math.max(0, +e.target.value))}
                                                         style={{ width: 46, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: "7px 0 0 7px", borderRight: "none", padding: "0 6px", color: T.t1, fontFamily: FONT.mono, fontSize: 12, textAlign: "center", outline: "none" }} />
                                                     <select value={item.discountType} onChange={e => updateItem(idx, "discountType", e.target.value)}
                                                         title="Discount type: percentage or fixed amount"
