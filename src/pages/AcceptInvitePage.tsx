@@ -82,7 +82,7 @@ export default function AcceptInvitePage() {
       await api.post("/api/auth/set-password", { email: email.trim().toLowerCase(), newPassword });
       finishLogin(verifiedUser);
     } catch (e: any) {
-      setPwError(e?.data?.error?.message || e?.message || "Could not set password — you can still do this later from your profile.");
+      setPwError(e?.data?.error?.message || e?.message || "Could not set password — please try again.");
     }
     setPwLoading(false);
   };
@@ -137,9 +137,9 @@ export default function AcceptInvitePage() {
           </div>
         ) : showSetPassword ? (
           <>
-            <div style={S.heading}>Set a password (optional)</div>
+            <div style={S.heading}>Set your password</div>
             <div style={S.sub}>
-              You're verified — Google sign-in with <strong>{email.trim()}</strong> already works. Want a password too, so you can log in either way? You can always add one later from your profile instead.
+              You're verified — set a password for <strong>{email.trim()}</strong> to finish setting up your account. You'll still be able to sign in with Google too.
             </div>
 
             {pwError && <div style={S.error}>{pwError}</div>}
@@ -167,8 +167,6 @@ export default function AcceptInvitePage() {
             <button style={S.btn(pwLoading)} onClick={handleSetPassword} disabled={pwLoading}>
               {pwLoading ? "Saving…" : "Set Password & Continue"}
             </button>
-
-            <button style={S.link} onClick={() => finishLogin(verifiedUser)}>Skip for now →</button>
           </>
         ) : (
           <>

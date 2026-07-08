@@ -269,6 +269,9 @@ export function ERPShell({ children }: ERPShellProps) {
   // (or "User" with no email), never showing the actual name on file.
   const userName  = currentUser?.name || currentUser?.displayName || currentUser?.email?.split("@")[0] || "User";
   const userInitials = userName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+  // Staff get their owner-assigned roleLabel (e.g. "Mechanic"); only the actual
+  // account owner is "Shop Owner" — this used to be hardcoded to "Shop Owner" for everyone.
+  const userRoleLabel = currentUser?.role === "SHOP_STAFF" ? (currentUser?.roleLabel || "Staff") : "Shop Owner";
 
   const currentPath = location.pathname;
   const navActiveKey = resolveActiveNavKey(currentPath);
@@ -579,7 +582,7 @@ export function ERPShell({ children }: ERPShellProps) {
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               fontFamily: FONT.ui,
             }}>{userName}</div>
-            <div style={{ fontSize: 11, color: T.t3, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>SHOP OWNER</div>
+            <div style={{ fontSize: 11, color: T.t3, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{userRoleLabel}</div>
           </div>
 
           {/* Logout button — maroon border (Stitch style) */}
@@ -685,7 +688,7 @@ export function ERPShell({ children }: ERPShellProps) {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: T.t1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{userName}</div>
-            <div style={{ fontSize: 11, color: T.t3 }}>Shop Owner</div>
+            <div style={{ fontSize: 11, color: T.t3 }}>{userRoleLabel}</div>
           </div>
           <button onClick={handleLogout} style={{
             background: "transparent", border: `1px solid #8B1E1E`, borderRadius: 8,

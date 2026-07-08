@@ -242,8 +242,9 @@ export function StaffPage() {
                     {inviteFieldErrors.sections && <div style={{ fontSize: 11, color: T.crimson, fontWeight: 600, marginBottom: 12 }}>↑ Pick at least one section</div>}
                     <button
                         onClick={handleInviteStaff}
-                        disabled={inviting}
-                        style={{ height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: inviting ? T.amberDim : T.amber, color: "#fff", fontSize: 13, fontWeight: 700, cursor: inviting ? "default" : "pointer", fontFamily: FONT.ui }}
+                        disabled={inviting || inviteSections.length === 0}
+                        title={inviteSections.length === 0 ? "Pick at least one section first" : undefined}
+                        style={{ height: 38, padding: "0 18px", borderRadius: 9, border: "none", background: (inviting || inviteSections.length === 0) ? T.amberDim : T.amber, color: "#fff", fontSize: 13, fontWeight: 700, cursor: (inviting || inviteSections.length === 0) ? "default" : "pointer", opacity: inviteSections.length === 0 ? 0.6 : 1, fontFamily: FONT.ui }}
                     >
                         {inviting ? "Sending…" : "Send Invite"}
                     </button>
