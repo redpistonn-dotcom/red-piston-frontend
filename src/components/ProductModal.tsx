@@ -212,7 +212,8 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
             </div>
 
             <div className="inner-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div style={{ gridColumn: "span 2" }}><Field label="Product Name" required error={errors.name}><Input value={f.name} onChange={set("name")} placeholder="Bosch Brake Pad Set — Front" invalid={!!errors.name} /></Field></div>
+                <Field label="Part Name" required error={errors.name} style={{ gridColumn: "span 1" }}><Input value={f.name} onChange={set("name")} placeholder="Bosch Brake Pad Set — Front" invalid={!!errors.name} /></Field>
+                <Field label="OEM Part Number" hint="Original Equipment Manufacturer number"><Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="e.g. 04465-02220" /></Field>
                 <Field label="SKU / Code" required error={errors.sku}><Input value={f.sku} onChange={set("sku")} placeholder="BRK-F-0042" invalid={!!errors.sku} /></Field>
                 <Field label="HSN / SAC Code" hint="For GST filing"><Input value={f.hsnCode} onChange={set("hsnCode")} placeholder="87083000" /></Field>
                 <Field label="Category"><Select value={f.category} onChange={set("category")} options={CATEGORIES.map(c => ({ value: c, label: c }))} /></Field>
@@ -228,7 +229,6 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
 
                 <Divider label="Automobile Specs" />
                 <div style={{ gridColumn: "span 2" }} />
-                <div style={{ gridColumn: "span 2" }}><Field label="OEM Part Number" hint="Original Equipment Manufacturer number"><Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="e.g. 04465-02220" /></Field></div>
                 <Field label="Position"><Select value={f.position} onChange={set("position")} options={[{ value: "", label: "— None —" }, ...POSITIONS.map(v => ({ value: v, label: v }))]} /></Field>
                 <Field label="Engine Type"><Select value={f.engineType} onChange={set("engineType")} options={[{ value: "", label: "— None —" }, ...ENGINE_TYPES.map(v => ({ value: v, label: v }))]} /></Field>
                 <Field label="Transmission"><Select value={f.transmission} onChange={set("transmission")} options={[{ value: "", label: "— None —" }, ...TRANSMISSIONS.map(v => ({ value: v, label: v }))]} /></Field>

@@ -68,6 +68,7 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [bills, setBills] = useState<BillRow[]>([]);
   const [loadingBills, setLoadingBills] = useState(true);
+  const [pdfLoading, setPdfLoading] = useState<Set<number>>(new Set());
   const [error, setError] = useState("");
 
   const loadBills = useCallback(async () => {
@@ -95,7 +96,8 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
   // delivery for PDFs isn't reliably public (account security settings can
   // block it), so every bill goes through pdf-proxy, which falls back to a
   // signed private_download_url when direct delivery is blocked.
-  const openPdf = useCallback(async (fileUrl: string) => {
+  const openPdf = useCallback(async (billId: number, fileUrl: string) => {
+    setPdfLoading(prev => new Set(prev).add(billId));
     try {
       const token = getAccessToken();
       const proxyUrl = `${BASE_URL}/api/shop/purchase-bills/pdf-proxy?url=${encodeURIComponent(fileUrl)}`;
@@ -110,6 +112,8 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
     } catch (err) {
       console.error("[openPdf]", err);
       toast?.("Could not open PDF — try again", "error");
+    } finally {
+      setPdfLoading(prev => { const s = new Set(prev); s.delete(billId); return s; });
     }
   }, [toast]);
   useEffect(() => { loadBills(); }, [loadBills]);
@@ -346,9 +350,17 @@ export function PurchaseBills({ toast }: { toast?: (msg: string, variant?: strin
                   <td style={{ padding: "10px 12px", borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>
                     {b.fileUrl && (
                       <button
-                        onClick={() => openPdf(b.fileUrl!)}
-                        style={{ fontSize: 12, color: T.amber, fontWeight: 700, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: FONT.ui }}
-                      >View PDF ↗</button>
+                        onClick={() => !pdfLoading.has(b.billId) && openPdf(b.billId, b.fileUrl!)}
+                        disabled={pdfLoading.has(b.billId)}
+                        style={{ fontSize: 12, color: pdfLoading.has(b.billId) ? T.t3 : T.amber, fontWeight: 700, background: "none", border: "none", cursor: pdfLoading.has(b.billId) ? "default" : "pointer", padding: 0, fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 5 }}
+                      >
+                        {pdfLoading.has(b.billId) ? (
+                          <>
+                            <span style={{ display: "inline-block", width: 12, height: 12, border: `2px solid ${T.t3}`, borderTopColor: T.amber, borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                            Loading…
+                          </>
+                        ) : "View PDF ↗"}
+                      </button>
                     )}
                   </td>
                 </tr>
