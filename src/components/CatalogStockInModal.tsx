@@ -711,7 +711,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
   // just a placeholder) — the owner can backspace and rename it, or leave it
   // as-is and it's saved exactly like any other nickname.
   const [f, setF] = useState(initialForm || {
-    buyPrice: "", sellPrice: "", mrp: "", stockQty: "0",
+    buyPrice: "", sellPrice: "", mrp: "", stockQty: "0", description: "",
     rackLocation: "", minStockAlert: "5", nickname: part.partName || "",
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
@@ -839,6 +839,11 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
           <div style={{ gridColumn: "span 2" }}>
             <Field label="Rack / Storage Location" hint="e.g. Rack A-12, Shelf 3B">
               <Input value={f.rackLocation} onChange={set("rackLocation")} placeholder="Rack A-12" maxLength={50} />
+            </Field>
+          </div>
+          <div style={{ gridColumn: "span 2" }}>
+            <Field label="Part Description (optional)" hint="Shown in your Inventory — e.g. fitment notes, condition, what makes this one different">
+              <Input value={f.description} onChange={set("description")} placeholder="e.g. Ceramic brake pads for front axle…" maxLength={500} />
             </Field>
           </div>
         </div>
@@ -1203,6 +1208,7 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
               rackLocation:  form.rackLocation || null,
               minStockAlert: parseInt(form.minStockAlert) || 5,
               nickname:      form.nickname || undefined,
+              shopSpecificNotes: form.description || undefined,
               supplierName:  supplier.name || undefined,
               supplierGstin: supplier.gstin || undefined,
               supplierPhone: supplier.phone || undefined,
@@ -1319,6 +1325,7 @@ export function CatalogStockInModal({ open, onClose, onSave, onMovementSaved, to
                 buyingPrice:   parseFloat(form.buyPrice),
                 mrp:           form.mrp ? parseFloat(form.mrp) : undefined,
                 nickname:      form.nickname || undefined,
+                shopSpecificNotes: form.description || undefined,
                 stockQty:      parseInt(form.stockQty) || 0,
                 rackLocation:  form.rackLocation || null,
                 minStockAlert: parseInt(form.minStockAlert) || 5,

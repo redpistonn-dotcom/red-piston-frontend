@@ -18,7 +18,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
     const [catalogLoading, setCatalogLoading] = useState(false);
 
     useEffect(() => {
-        setF(product ? { ...product, buyPrice: String(product.buyPrice), sellPrice: String(product.sellPrice), mrp: String(product.mrp || ""), stock: String(product.stock), minStock: String(product.minStock), maxStock: String(product.maxStock || 1000), reorderQty: String(product.reorderQty || 20), gstRate: String(product.gstRate || product.gst || 18), hsnCode: product.hsnCode || "", trackBatch: !!product.trackBatch, batchNumber: product.batchNumber || "", expiryDate: product.expiryDate || "", vehicles: product.vehicles || (product.compatibleVehicles || []).join(", "), oemNumber: product.oemNumber || "", position: product.position || "", engineType: product.engineType || "", transmission: product.transmission || "", condition: product.condition || "New", warranty: product.warranty || "", globalSku: product.globalSku || null } : blank);
+        setF(product ? { ...product, buyPrice: String(product.buyPrice), sellPrice: String(product.sellPrice), mrp: String(product.mrp || ""), stock: String(product.stock), minStock: String(product.minStock), maxStock: String(product.maxStock || 1000), reorderQty: String(product.reorderQty || 20), gstRate: String(product.gstRate || product.gst || 18), hsnCode: product.hsnCode || "", trackBatch: !!product.trackBatch, batchNumber: product.batchNumber || "", expiryDate: product.expiryDate || "", vehicles: product.vehicles || (product.compatibleVehicles || []).join(", "), oemNumber: product.oemNumber || "", position: product.position || "", engineType: product.engineType || "", transmission: product.transmission || "", condition: product.condition || "New", warranty: product.warranty || "", globalSku: product.globalSku || null, notes: product.description || "" } : blank);
         setErrors({});
         setShowCatalogSearch(false);
         setCatalogSearch("");
@@ -101,7 +101,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
             batchNumber: f.batchNumber || "", expiryDate: f.expiryDate || "", oemNumber: f.oemNumber || "",
             position: f.position || "", engineType: f.engineType || "", transmission: f.transmission || "",
             condition: f.condition || "New", warranty: f.warranty || "", globalSku: f.globalSku,
-            inventoryId: product?.inventoryId,
+            inventoryId: product?.inventoryId, description: f.notes || null,
         };
 
         // EDIT: onSave → saveProducts → syncProductSave PUTs price/stock/image.
@@ -135,6 +135,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
                 sellingPrice: +f.sellPrice, buyingPrice: +f.buyPrice, mrp: +f.mrp || undefined,
                 stockQty: +f.stock || 0, rackLocation: f.location || null,
                 minStockAlert: +f.minStock || 5,
+                shopSpecificNotes: f.notes || undefined,
                 supplierName: f.supplier || undefined,
             });
             const inventoryId = inv?.item?.inventoryId ?? inv?.inventoryId ?? null;

@@ -790,6 +790,9 @@ export function InventoryPage() {
                                                     return null;
                                                 })()}
                                             </div>
+                                            {p.description && (
+                                                <div title={p.description} style={{ fontSize: 10.5, color: T.t3, marginTop: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 220 }}>{p.description}</div>
+                                            )}
                                         </td>
                                         {/* CAT. */}
                                         <td style={{ padding: tdPad }}>
@@ -908,6 +911,12 @@ export function InventoryPage() {
                                                             })()}
                                                         </div>
                                                     </div>
+                                                    {p.description && (
+                                                        <div style={{ marginTop: 12, padding: "12px 14px", background: T.card, border: `1px solid ${T.border}`, borderRadius: 10 }}>
+                                                            <div style={{ fontSize: 9, color: T.t4, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Description</div>
+                                                            <div style={{ fontSize: 12.5, color: T.t1, lineHeight: 1.5 }}>{p.description}</div>
+                                                        </div>
+                                                    )}
                                                     {/* Location + Stock Details strip */}
                                                     <div style={{ display: "flex", gap: 16, marginTop: 12, padding: "10px 14px", background: T.card, borderRadius: 8, border: `1px solid ${T.border}`, alignItems: "center", fontSize: 12, flexWrap: "wrap" }}>
                                                         <div><span style={{ color: T.t3, fontWeight: 600 }}>📍 Location: </span><span style={{ fontFamily: FONT.mono, color: T.t1, fontWeight: 700 }}>{p.location || "—"}</span></div>

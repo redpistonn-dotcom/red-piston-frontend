@@ -21,6 +21,7 @@ interface BackendInventory {
   mrp?: number | string | null;
   nickname?: string | null;
   customPartName?: string | null;
+  shopSpecificNotes?: string | null;
   stockQty?: number;
   computedStock?: number;
   minStockAlert?: number;
@@ -128,7 +129,7 @@ export function mapInventoryToProduct(inv: BackendInventory): Product {
     hsnCode: mp?.hsnCode || null,
     gstRate: parseFloat(String(mp?.gstRate ?? 18)),
     unitOfSale: mp?.unitOfSale || null,
-    description: mp?.description || null,
+    description: inv.shopSpecificNotes || mp?.description || null,
     sellPrice: parseFloat(String(inv.sellingPrice ?? 0)),
     buyPrice: parseFloat(String(inv.buyingPrice ?? 0)),
     mrp: inv.mrp != null ? parseFloat(String(inv.mrp)) : null,
@@ -377,7 +378,7 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
         maxStockLevel: product.maxStock ?? undefined,
         // customPartName lets a shop override the catalog part name locally
         customPartName: product.name ?? undefined,
-        shopSpecificNotes: product.notes ?? undefined,
+        shopSpecificNotes: product.description ?? undefined,
         isMarketplaceListed: product.isMarketplaceListed,
         // Cloudinary photo — save as imageUrl; emoji icons save separately as customIcon
         ...(typeof product.image === 'string' && product.image.startsWith('http') && { imageUrl: product.image }),
