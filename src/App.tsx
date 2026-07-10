@@ -631,7 +631,7 @@ function AppContent() {
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined,
         upiReference: data.upiRef || undefined,
-        notes: [data.vehicleReg ? `Vehicle Reg: ${data.vehicleReg}` : null, data.notes].filter(Boolean).join(' | ') || undefined,
+        notes: data.notes || undefined,
         appliedCreditNoteId: data.appliedCreditNoteId || undefined,
         appliedCreditAmount: data.appliedCreditAmount || undefined,
       }).then(({ ok, error }) => {

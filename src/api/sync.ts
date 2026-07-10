@@ -447,6 +447,7 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: bool
       partyPhone: params.partyPhone || undefined,
       partyGstin: params.partyGstin || undefined,
       billingAddress: params.billingAddress || undefined,
+      vehicleReg: params.vehicleReg || undefined,
       upiReference: params.upiReference || undefined,
       paymentMode: params.paymentMode || 'CASH',
       // Do not forward cashAmount/upiAmount in the default case — the frontend uses
