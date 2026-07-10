@@ -125,6 +125,11 @@ export function POSBillingPage() {
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
     const [returnModalOpen, setReturnModalOpen] = useState(false);
 
+    // Bill visibility toggles — shown inline near the print/share buttons so the
+    // shop can set them once per bill instead of confirming through a popup each time.
+    const [showOemOnBill, setShowOemOnBill] = useState(true);
+    const [showMrpOnBill, setShowMrpOnBill] = useState(false);
+
     // PDF preview modal state
     const [pdfPreview, setPdfPreview] = useState<{ url: string | null; loading: boolean; error: string | null } | null>(null);
 
@@ -132,7 +137,7 @@ export function POSBillingPage() {
         if (!syncedInvoiceId) return;
         setPdfPreview({ url: null, loading: true, error: null });
         try {
-            const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
+            const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, { showOem: showOemOnBill, showMrp: showMrpOnBill }), {
                 headers: { Authorization: `Bearer ${getAccessToken()}` },
                 credentials: 'include',
             });
@@ -143,7 +148,7 @@ export function POSBillingPage() {
         } catch (e: any) {
             setPdfPreview({ url: null, loading: false, error: e?.message || 'Could not load PDF' });
         }
-    }, [syncedInvoiceId]);
+    }, [syncedInvoiceId, showOemOnBill, showMrpOnBill]);
 
     const closePdfPreview = useCallback(() => {
         setPdfPreview(prev => {
@@ -182,10 +187,6 @@ export function POSBillingPage() {
         }
     }, [showInvoice, syncedInvoiceId, printFormat, showOemOnBill, showMrpOnBill, items]);
 
-    // Bill visibility toggles — shown inline near the print/share buttons so the
-    // shop can set them once per bill instead of confirming through a popup each time.
-    const [showOemOnBill, setShowOemOnBill] = useState(true);
-    const [showMrpOnBill, setShowMrpOnBill] = useState(false);
     const [suspendedBill, setSuspendedBill] = useState(() => {
         try {
             const raw = JSON.parse(localStorage.getItem("vl_suspended_bill") || "null");
@@ -451,7 +452,7 @@ export function POSBillingPage() {
 
     // Build the GST invoice as a jsPDF doc from the on-screen bill (jsPDF lazy-loaded).
     // Shared by "Download PDF" and "Share WhatsApp" (so WhatsApp can attach the file).
-    const buildBillPdf = async (opts?: { showOem?: boolean; showMrp?: boolean }) => {
+    async function buildBillPdf(opts?: { showOem?: boolean; showMrp?: boolean }) {
         const showOem = !!opts?.showOem, showMrp = !!opts?.showMrp;
         const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
         const autoTable = autoTableMod.default;
@@ -512,7 +513,7 @@ export function POSBillingPage() {
 
     // Runs the actual print/download/share action once the shop has confirmed
     // whether OEM number and MRP should appear on the bill.
-    const runBillAction = async (action: "print" | "download" | "whatsapp", opts: { showOem: boolean; showMrp: boolean }) => {
+    async function runBillAction(action: "print" | "download" | "whatsapp", opts: { showOem: boolean; showMrp: boolean }) {
         if (action === "print") {
             if (printFormat === "a4") {
                 let blobUrl = inlinePdfUrl;
