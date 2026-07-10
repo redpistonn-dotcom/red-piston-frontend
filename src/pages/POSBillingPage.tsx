@@ -714,15 +714,26 @@ export function POSBillingPage() {
         const text = `*${shopName}*\n${billType === "Sale" ? "Tax Invoice" : "Quotation"} ${invoiceNo}\nItems: ${items.length}\nTotal: ₹${finalTotal.toFixed(2)}\n\nThank you for your business! 🙏`;
         let pdfDownloaded = false;
         try {
-            const doc = await buildBillPdf(opts);
-            const blob = doc.output("blob");
+            let blob: Blob;
+            if (syncedInvoiceId) {
+                // Use the same backend PDF as the preview so both look identical
+                const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, opts), {
+                    headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                });
+                blob = res.ok ? await res.blob() : (await buildBillPdf(opts)).output("blob");
+            } else {
+                blob = (await buildBillPdf(opts)).output("blob");
+            }
             const file = new File([blob], `${invoiceNo || "invoice"}.pdf`, { type: "application/pdf" });
             const nav: any = navigator;
             if (nav.canShare && nav.canShare({ files: [file] })) {
                 try { await nav.share({ files: [file], text, title: `Invoice ${invoiceNo}` }); return; }
                 catch (e: any) { if (e?.name === "AbortError") return; /* else fall through */ }
             }
-            doc.save(`${invoiceNo || "invoice"}.pdf`);
+            const blobUrl2 = URL.createObjectURL(blob);
+            const a2 = document.createElement("a"); a2.href = blobUrl2; a2.download = `${invoiceNo || "invoice"}.pdf`;
+            document.body.appendChild(a2); a2.click(); a2.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl2), 30000);
             pdfDownloaded = true;
         } catch { /* PDF unavailable — still send the text */ }
         const ph = customerPhone.replace(/\D/g, "");
