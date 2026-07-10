@@ -78,13 +78,42 @@ const MKT_NEXT_STATUS: Record<string, { next: string; label: string }> = {
 };
 
 // ─── Derive orders from movements ────────────────────────────────────────────
-function movementToOrder(m: any) {
+// A single bill/invoice creates ONE movement row per product. We group those
+// movements by their shared invoice so the Orders list shows one order per
+// invoice — not one per product — and every line item shares one Order ID.
+function groupMovementsToOrders(movements: any[]) {
+    const groups = new Map<string, any[]>();
+    for (const m of movements) {
+        const isSale     = m.type === "SALE";
+        const isPurchase = m.type === "PURCHASE";
+        const isOpening  = m.type === "OPENING";
+        if (!isSale && !isPurchase && !isOpening) continue;
+
+        // Collapse all line items of one bill under a single key. Sales/purchases
+        // carry a shared invoiceNo/invoiceId; opening-stock and any movement without
+        // an invoice stays on its own row (keyed by its unique movement id).
+        const invKey = m.invoiceNo || (m.invoiceId != null ? String(m.invoiceId) : null);
+        const key = invKey ? `inv:${invKey}` : `mov:${m.id}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(m);
+    }
+
+    const orders: any[] = [];
+    for (const items of groups.values()) {
+        const order = movementGroupToOrder(items);
+        if (order) orders.push(order);
+    }
+    return orders;
+}
+
+function movementGroupToOrder(items: any[]) {
+    const m = items[0];
     const isSale     = m.type === "SALE";
     const isPurchase = m.type === "PURCHASE";
     const isOpening  = m.type === "OPENING";  // inventory addition by shop owner
     if (!isSale && !isPurchase && !isOpening) return null;
 
-    // Derive status
+    // Derive status (all line items of one bill share payment mode/status)
     let status: OrderStatus = "Pending";
     if (isOpening) {
         status = "Stock Added" as OrderStatus; // opening stock added directly to inventory
@@ -98,15 +127,21 @@ function movementToOrder(m: any) {
         status = isSale ? "Shipped" : "Processing";
     }
 
-    // Generate order ID: SO-XXXXX for sales, PO-XXXXX / OS-XXXXX for purchases/opening
-    const numId   = String(m.id || "").slice(-5).padStart(5, "0");
+    // Order ID is derived from the shared invoice (not the per-product movement id)
+    // so all items of one bill collapse to a single #SO-/#PO-/#OS- identifier.
+    const idBasis = m.invoiceId != null ? String(m.invoiceId) : String(m.id || "");
+    const numId   = idBasis.slice(-5).padStart(5, "0");
     const orderId = isSale ? `#SO-${numId}` : isOpening ? `#OS-${numId}` : `#PO-${numId}`;
-    const partyId = isSale
-        ? `PT-${String(m.id || "").slice(-5).padStart(5, "0")}`
-        : `SP-${String(m.id || "").slice(-5).padStart(5, "0")}`;
+    const partyId = isSale ? `PT-${numId}` : `SP-${numId}`;
+
+    const amount = items.reduce((s, it) => s + (Number(it.total) || 0), 0);
+    const names  = items.map(it => it.productName).filter(Boolean);
+    const product = names.length > 1 ? `${names[0]} +${names.length - 1} more` : (names[0] || "");
 
     return {
-        id: m.id,
+        // Sales use the real invoiceId so the PDF preview fetches the right invoice;
+        // non-sales fall back to the movement id (existing behaviour).
+        id: (isSale && m.invoiceId != null) ? m.invoiceId : m.id,
         orderId,
         date: m.date,
         partyName: isSale
@@ -115,8 +150,9 @@ function movementToOrder(m: any) {
         partyId,
         type: isSale ? "Sale" : "Purchase" as "Sale" | "Purchase",
         status,
-        amount: m.total,
-        product: m.productName || "",
+        amount,
+        product,
+        itemCount: items.length,
         cancelled: status === "Cancelled",
     };
 }
@@ -480,9 +516,7 @@ export function OrdersPage() {
 
     // Convert movements → orders table data
     const allOrders = useMemo(() => {
-        const fromMovements = shopMovements
-            .map(movementToOrder)
-            .filter((o): o is NonNullable<ReturnType<typeof movementToOrder>> => o !== null)
+        const fromMovements = groupMovementsToOrders(shopMovements)
             .sort((a, b) => b.date - a.date);
 
         // Real backend marketplace orders (GET /api/marketplace/orders/shop)
