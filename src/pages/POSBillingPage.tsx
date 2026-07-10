@@ -531,7 +531,8 @@ export function POSBillingPage() {
         if (notes) { doc.text(`Remarks : ${notes}`, M + 6, by); }
 
         // Table
-        const head = ["Sl No.", "Description of Goods", ...(showOem ? ["OEM No."] : []), "Qty", "Rate", ...(showMrp ? ["MRP"] : []), "Disc", "GST", "Amount"];
+        const head = ["Sl No.", "Description of Goods", "HSN/SAC", ...(showOem ? ["OEM No."] : []), "Qty", "Rate (Incl. Tax)", "Rate", ...(showMrp ? ["MRP"] : []), "Disc %", "Amount"];
+        const totalQty = items.reduce((s: number, it: any) => s + Number(it.qty || 0), 0);
         autoTable(doc, {
             startY: buyY + buyH + 8,
             head: [head],
@@ -539,14 +540,24 @@ export function POSBillingPage() {
                 const lc = lineCalcs[i];
                 return [
                     String(i + 1), it.name,
+                    "8708",
                     ...(showOem ? [it.oemNumber || "—"] : []),
-                    String(it.qty), rs(it.price),
+                    `${it.qty} NOS`, rs(it.price), rs(it.price),
                     ...(showMrp ? [it.mrp ? rs(it.mrp) : "—"] : []),
-                    lc.discAmt > 0 ? `-${rs(lc.discAmt)}` : "-", rs(lc.gstAmt), rs(lc.afterDisc),
+                    lc.discAmt > 0 ? `${Math.round((lc.discAmt / (it.price * it.qty)) * 100)}%` : "—", rs(lc.afterDisc),
                 ];
             }),
+            foot: [
+                [
+                    { content: "Total", colSpan: 3 + (showOem ? 1 : 0), styles: { fontStyle: "bold", halign: "left" } },
+                    { content: `${totalQty} NOS`, styles: { fontStyle: "bold", halign: "center" } },
+                    "", "", ...(showMrp ? [""] : []), "",
+                    { content: rs(finalTotal), styles: { fontStyle: "bold", halign: "right" } }
+                ]
+            ],
             styles: { fontSize: 8, cellPadding: 4, textColor: [0, 0, 0], lineWidth: 0.5, lineColor: [0, 0, 0] },
             headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.5, lineColor: [0, 0, 0] },
+            footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.5, lineColor: [0, 0, 0] },
             margin: { left: M, right: M },
         });
 
@@ -563,9 +574,31 @@ export function POSBillingPage() {
         doc.line(lx, fy, R, fy);
         fy += 16;
         trow("TOTAL AMOUNT", rs(finalTotal), true);
-        fy += 6;
+        fy += 8;
+
+        // Amount in words matching Screenshot 1
         doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(80, 80, 80);
-        doc.text(`Paid via ${paymentMode} - computer-generated ${billType === "Sale" ? "tax invoice" : "quotation"}.`, M, fy);
+        doc.text("Amount Chargeable (in words)", M, fy);
+        doc.setFont("helvetica", "italic").setFontSize(9).setTextColor(0, 0, 0);
+        doc.text(`INR ${Math.round(finalTotal).toLocaleString("en-IN")} Only`, M, fy + 12);
+        doc.text("E. & O.E", R, fy + 12, { align: "right" });
+
+        // Declaration & Signature Boxes matching Screenshot 1 exactly
+        fy += 26;
+        const decH = 65, midBox = M + (W * 0.55);
+        doc.rect(M, fy, W, decH);
+        doc.line(midBox, fy, midBox, fy + decH);
+
+        doc.setFont("helvetica", "bold").setFontSize(8);
+        doc.text("Declaration", M + 6, fy + 14);
+        doc.setFont("helvetica", "italic").setFontSize(7).setTextColor(80, 80, 80);
+        doc.text("1. GOODS ONCE SOLD NOT TAKEN BACK", M + 6, fy + 26);
+        doc.text(`We declare that this ${billType === "Sale" ? "tax invoice" : "quotation"} shows the actual value of\ngoods and that all particulars are true and correct.`, M + 6, fy + 38);
+
+        doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(0, 0, 0);
+        doc.text(`for ${shopName || "Shri Mahesh Automobiles"}`, R - 6, fy + 14, { align: "right" });
+        doc.text("Authorised Signatory", R - 6, fy + decH - 10, { align: "right" });
+
         return doc;
     };
 

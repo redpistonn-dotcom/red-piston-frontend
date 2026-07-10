@@ -276,28 +276,119 @@ export function OrdersPage() {
             const autoTable = autoTableMod.default;
             const doc = new jsPDF({ unit: "pt", format: "a4" });
             const M = 40, R = 555, W = R - M;
+            const rs = (n: number) => "Rs. " + Math.round(Number(n) || 0).toLocaleString("en-IN");
             doc.setDrawColor(0, 0, 0).setLineWidth(0.5);
-            doc.setFont("helvetica", "bold").setFontSize(12);
-            doc.text(order.type === "Sale" ? "TAX INVOICE" : order.type === "Purchase" ? "PURCHASE ORDER" : "STOCK ORDER", M + W / 2, 45, { align: "center" });
-            doc.rect(M, 55, W, 90);
-            doc.setFontSize(10);
-            doc.text(`Order ID: ${order.orderId}`, M + 10, 80);
-            doc.setFont("helvetica", "normal").setFontSize(9);
-            doc.text(`Party: ${order.partyName || "—"}`, M + 10, 100);
-            doc.text(`Date: ${new Date(order.date).toLocaleDateString("en-IN")}`, M + 10, 120);
+
+            // Document Title
+            doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(0, 0, 0);
+            const docTitle = order.type === "Sale" ? "TAX INVOICE" : order.type === "Purchase" ? "PURCHASE ORDER" : "STOCK ORDER";
+            doc.text(docTitle, M + W / 2, 45, { align: "center" });
+
+            // Top Header Box (55 to 155)
+            const topY = 55, hdrH = 100;
+            doc.rect(M, topY, W, hdrH);
+            const midX = M + 210;
+            doc.line(midX, topY, midX, topY + hdrH);
+
+            // Seller Block (Left)
+            doc.setFont("helvetica", "bold").setFontSize(10);
+            doc.text(SHOP.name || "Shri Mahesh Automobiles", M + 6, topY + 16);
+            doc.setFont("helvetica", "normal").setFontSize(8);
+            let sy = topY + 30;
+            if (SHOP.address) {
+                const lines = doc.splitTextToSize(String(SHOP.address), midX - M - 12);
+                doc.text(lines, M + 6, sy); sy += lines.length * 10;
+            }
+            if (SHOP.phone) { doc.text(`Ph : ${SHOP.phone}`, M + 6, sy); sy += 11; }
+            if (SHOP.gstin) { doc.text(`GSTIN/UIN : ${SHOP.gstin}`, M + 6, sy); sy += 11; }
+            if (SHOP.state) { doc.text(`State Name : ${SHOP.state}`, M + 6, sy); }
+
+            // Order/Invoice Fields (Right)
+            const rowH = hdrH / 4;
+            for (let i = 1; i < 4; i++) doc.line(midX, topY + i * rowH, R, topY + i * rowH);
+            const valX = midX + 80;
+            doc.line(valX, topY, valX, topY + hdrH);
+
+            const drawField = (idx: number, label: string, val: string) => {
+                const fy = topY + idx * rowH + 16;
+                doc.setFont("helvetica", "bold").setFontSize(8); doc.text(label, midX + 6, fy);
+                doc.setFont("helvetica", "normal"); doc.text(val || "—", valX + 6, fy);
+            };
+            drawField(0, order.type === "Purchase" ? "PO No." : "Invoice No.", order.orderId || "—");
+            drawField(1, "Dated", new Date(order.date).toLocaleDateString("en-IN"));
+            drawField(2, "Status", order.status || "Completed");
+            drawField(3, "Mode of Pay", "ONLINE / CASH");
+
+            // Buyer (Bill to) Box (155 to 215)
+            const buyY = topY + hdrH, buyH = 60;
+            doc.rect(M, buyY, W, buyH);
+            doc.setFont("helvetica", "bold").setFontSize(8);
+            doc.text(order.type === "Purchase" ? "Supplier / Vendor Details :" : "Customer (Bill to) Details :", M + 6, buyY + 14);
+            doc.setFont("helvetica", "normal").setFontSize(8);
+            doc.text(`Name : ${order.partyName || (order.type === "Purchase" ? "Supplier" : "Walk-in Customer")}`, M + 6, buyY + 28);
+            doc.text(`Remarks / Product Summary : ${order.product || "—"}`, M + 6, buyY + 42);
+
+            // Table matching Screenshot 1 exactly
+            const qtyNum = Number(order.qty || 1) || 1;
+            const amtNum = Number(order.amount || 0);
+            const unitRate = qtyNum > 0 ? amtNum / qtyNum : amtNum;
+
             autoTable(doc, {
-                startY: 160,
-                head: [["Item Description", "Amount"]],
-                body: [[order.product || "Order Items", `Rs. ${Number(order.amount || 0).toLocaleString("en-IN")}`]],
-                styles: { fontSize: 9, cellPadding: 6, textColor: [0, 0, 0], lineWidth: 0.5, lineColor: [0, 0, 0] },
+                startY: buyY + buyH + 10,
+                head: [["Sl No.", "Description of Goods", "HSN/SAC", "Quantity", "Rate (Incl. of Tax)", "Rate", "per", "Disc. %", "Amount"]],
+                body: [
+                    [
+                        "1",
+                        order.product || "Order Item",
+                        "8708",
+                        `${qtyNum} NOS`,
+                        unitRate.toFixed(2),
+                        unitRate.toFixed(2),
+                        "NOS",
+                        "—",
+                        amtNum.toFixed(2),
+                    ],
+                ],
+                foot: [
+                    [
+                        { content: "Total", colSpan: 3, styles: { fontStyle: "bold", halign: "left" } },
+                        { content: `${qtyNum} NOS`, styles: { fontStyle: "bold", halign: "center" } },
+                        "", "", "", "",
+                        { content: rs(amtNum), styles: { fontStyle: "bold", halign: "right" } }
+                    ]
+                ],
+                styles: { fontSize: 8, cellPadding: 5, textColor: [0, 0, 0], lineWidth: 0.5, lineColor: [0, 0, 0] },
                 headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.5, lineColor: [0, 0, 0] },
+                footStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.5, lineColor: [0, 0, 0] },
                 margin: { left: M, right: M },
             });
-            let fy = ((doc as any).lastAutoTable?.finalY || 220) + 20;
-            doc.setFont("helvetica", "bold").setFontSize(11);
-            doc.text("TOTAL AMOUNT:", 340, fy);
-            doc.text(`Rs. ${Number(order.amount || 0).toLocaleString("en-IN")}`, R, fy, { align: "right" });
-            setOrderPdfPreview({ url: URL.createObjectURL(doc.output("blob")), loading: false, title: `Order ${order.orderId}`, filename: `${order.orderId}.pdf`, error: null });
+
+            let fy = ((doc as any).lastAutoTable?.finalY || 280) + 16;
+            
+            // Amount in words
+            doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(80, 80, 80);
+            doc.text("Amount Chargeable (in words)", M, fy);
+            doc.setFont("helvetica", "italic").setFontSize(9).setTextColor(0, 0, 0);
+            doc.text(`INR ${Math.round(amtNum).toLocaleString("en-IN")} Only`, M, fy + 12);
+            doc.text("E. & O.E", R, fy + 12, { align: "right" });
+
+            // Declaration & Signature Boxes
+            fy += 26;
+            const decH = 65, midBox = M + (W * 0.55);
+            doc.rect(M, fy, W, decH);
+            doc.line(midBox, fy, midBox, fy + decH);
+
+            doc.setFont("helvetica", "bold").setFontSize(8);
+            doc.text("Declaration", M + 6, fy + 14);
+            doc.setFont("helvetica", "italic").setFontSize(7).setTextColor(80, 80, 80);
+            doc.text("1. GOODS ONCE SOLD NOT TAKEN BACK", M + 6, fy + 26);
+            doc.text("We declare that this invoice/order shows the actual value of\ngoods and that all particulars are true and correct.", M + 6, fy + 38);
+
+            doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(0, 0, 0);
+            doc.text(`for ${SHOP.name || "Shri Mahesh Automobiles"}`, R - 6, fy + 14, { align: "right" });
+            doc.text("Authorised Signatory", R - 6, fy + decH - 10, { align: "right" });
+
+            setOrderPdfPreview({ url: URL.createObjectURL(doc.output("blob")), loading: false, title: `${docTitle} ${order.orderId}`, filename: `${order.orderId}.pdf`, error: null });
         } catch (err: any) {
             setOrderPdfPreview({ url: null, loading: false, title: `Order ${order.orderId}`, error: err?.message || "Could not load PDF" });
         }
