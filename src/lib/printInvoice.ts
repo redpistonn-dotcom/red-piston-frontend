@@ -173,6 +173,23 @@ function a4Html(p: PrintInvoiceParams): string {
   const totalCgst    = totals.grandGst / 2;
   const totalSgst    = totals.grandGst / 2;
 
+  // GST tax-analysis table: group taxable/CGST/SGST by rate slab
+  const n2 = (x: number) => x.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const slabMap = new Map<number, { taxable: number; cgst: number; sgst: number }>();
+  lineData.forEach(l => {
+    const r = l.gstRatePct || 0;
+    const cur = slabMap.get(r) || { taxable: 0, cgst: 0, sgst: 0 };
+    cur.taxable += l.taxableAmt; cur.cgst += l.cgst; cur.sgst += l.sgst;
+    slabMap.set(r, cur);
+  });
+  let sumTax = 0, sumC = 0, sumS = 0;
+  const taxSlabRows = [...slabMap.keys()].sort((a, b) => a - b).map(r => {
+    const s = slabMap.get(r)!; sumTax += s.taxable; sumC += s.cgst; sumS += s.sgst;
+    const half = fmtPct(r / 2);
+    return `<tr><td class="tr-num">${n2(s.taxable)}</td><td class="tr-c">${half}%</td><td class="tr-num">${n2(s.cgst)}</td><td class="tr-c">${half}%</td><td class="tr-num">${n2(s.sgst)}</td><td class="tr-num">${n2(s.cgst + s.sgst)}</td></tr>`;
+  }).join("");
+  const taxWords = toWords(sumC + sumS);
+
   const rows = items.map((item, i) => {
     const d = lineData[i];
     return `
@@ -229,6 +246,12 @@ function a4Html(p: PrintInvoiceParams): string {
   .summary-table .grand{font-size:15px;font-weight:900}
   .words-box{margin-top:10px;padding:8px 10px;background:#faf9f7;border:1px solid #e8e3dc;border-radius:4px;font-size:11px}
   .words-box .wlabel{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+  .tax-table{width:100%;margin-top:12px;border-collapse:collapse}
+  .tax-table th,.tax-table td{border:1px solid #333;padding:4px 6px;font-size:10px}
+  .tax-table th{background:#f3f4f6;text-align:center;font-weight:700}
+  .tax-table .tr-num{text-align:right;font-family:monospace;white-space:nowrap}
+  .tax-table .tr-c{text-align:center}
+  .tax-table .tax-total td{font-weight:700}
   .decl-box{display:flex;gap:0;margin-top:18px;border:1px solid #e8e3dc;border-radius:4px;font-size:10px}
   .decl-left{flex:1;padding:10px 12px;border-right:1px solid #e8e3dc;color:#555;line-height:1.6}
   .decl-right{width:220px;padding:10px 12px;text-align:right;color:#555;line-height:1.8}
@@ -289,12 +312,8 @@ ${invoice.notes ? `<div class="meta-row"><span class="muted">Remarks</span><span
       <td class="val">${rs(totalTaxable)}</td>
     </tr>
     <tr>
-      <td class="label">CGST${totalTaxable > 0 ? ` @ ${fmtPct((totalCgst / totalTaxable) * 100)}%` : ""}</td>
-      <td class="val">${rs(totalCgst)}</td>
-    </tr>
-    <tr>
-      <td class="label">SGST${totalTaxable > 0 ? ` @ ${fmtPct((totalSgst / totalTaxable) * 100)}%` : ""}</td>
-      <td class="val">${rs(totalSgst)}</td>
+      <td class="label">Total Tax (CGST + SGST)</td>
+      <td class="val">${rs(totalCgst + totalSgst)}</td>
     </tr>
     <tr class="sep">
       <td class="grand">Grand Total</td>
@@ -306,6 +325,34 @@ ${invoice.notes ? `<div class="meta-row"><span class="muted">Remarks</span><span
 <div class="words-box">
   <div class="wlabel">Amount Chargeable (in words)</div>
   <div><b>INR ${amountWords} Only</b></div>
+</div>
+
+<table class="tax-table">
+  <thead>
+    <tr>
+      <th rowspan="2">Taxable Value</th>
+      <th colspan="2">CGST</th>
+      <th colspan="2">SGST/UTGST</th>
+      <th rowspan="2">Total Tax Amount</th>
+    </tr>
+    <tr><th>Rate</th><th>Amount</th><th>Rate</th><th>Amount</th></tr>
+  </thead>
+  <tbody>
+    ${taxSlabRows}
+    <tr class="tax-total">
+      <td class="tr-num">${n2(sumTax)}</td>
+      <td class="tr-c">Total</td>
+      <td class="tr-num">${n2(sumC)}</td>
+      <td></td>
+      <td class="tr-num">${n2(sumS)}</td>
+      <td class="tr-num">${n2(sumC + sumS)}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="words-box">
+  <div class="wlabel">Tax Amount (in words)</div>
+  <div><b>INR ${taxWords} Only</b></div>
 </div>
 
 <div class="decl-box">
