@@ -215,7 +215,10 @@ function a4Html(p: PrintInvoiceParams): string {
     ? `<img src="${esc(shop.logoUrl)}" alt="${esc(shop.name)}" style="height:52px;max-width:120px;object-fit:contain;margin-bottom:6px">`
     : `<div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(145deg,#1e3a5f,#0f2040);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:900">${esc(shop.name.charAt(0).toUpperCase())}</div>`;
 
-  const amountWords = toWords(totals.finalTotal);
+  // Round the grand total to the nearest rupee (Tally-style Round Off)
+  const roundedTotal = Math.round(totals.finalTotal);
+  const roundOff     = +(roundedTotal - totals.finalTotal).toFixed(2);
+  const amountWords  = toWords(roundedTotal);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(invoice.invoiceNo)}</title>
 <style>
@@ -315,9 +318,10 @@ ${invoice.notes ? `<div class="meta-row"><span class="muted">Remarks</span><span
       <td class="label">Total Tax (CGST + SGST)</td>
       <td class="val">${rs(totalCgst + totalSgst)}</td>
     </tr>
+    ${roundOff !== 0 ? `<tr><td class="label">Round Off</td><td class="val">${roundOff < 0 ? "&#x2212;" : ""}${rs(Math.abs(roundOff))}</td></tr>` : ""}
     <tr class="sep">
       <td class="grand">Grand Total</td>
-      <td class="val grand" style="color:${accentColor}">${rs(totals.finalTotal)}</td>
+      <td class="val grand" style="color:${accentColor}">${rs(roundedTotal)}</td>
     </tr>
   </tbody>
 </table>
@@ -408,6 +412,8 @@ function thermalHtml(p: PrintInvoiceParams): string {
   const totalSgst = totals.grandGst / 2;
   const thermalTaxable = totals.finalTotal - totals.grandGst;
   const thermalPct = thermalTaxable > 0 ? fmtPct((totalCgst / thermalTaxable) * 100) : "";
+  const thermalRounded = Math.round(totals.finalTotal);
+  const thermalRoundOff = +(thermalRounded - totals.finalTotal).toFixed(2);
   const dashes    = "------------------------------------------------";
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(invoice.invoiceNo)}</title>
@@ -473,9 +479,10 @@ ${totals.additionalDisc > 0 ? `<div class="total-row"><span>Extra Disc</span><sp
 <div class="total-row"><span>Taxable Amt</span><span>${rs(totals.finalTotal - totals.grandGst)}</span></div>
 <div class="total-row"><span>CGST${thermalPct ? ` @ ${thermalPct}%` : ""}</span><span>${rs(totalCgst)}</span></div>
 <div class="total-row"><span>SGST${thermalPct ? ` @ ${thermalPct}%` : ""}</span><span>${rs(totalSgst)}</span></div>
+${thermalRoundOff !== 0 ? `<div class="total-row"><span>Round Off</span><span>${thermalRoundOff < 0 ? "&#x2212;" : ""}${rs(Math.abs(thermalRoundOff))}</span></div>` : ""}
 
 <div class="dashes">${dashes}</div>
-<div class="grand-row"><span>TOTAL</span><span>${rs(totals.finalTotal)}</span></div>
+<div class="grand-row"><span>TOTAL</span><span>${rs(thermalRounded)}</span></div>
 <div class="dashes">${dashes}</div>
 
 <div class="footer">
