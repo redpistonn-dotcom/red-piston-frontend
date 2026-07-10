@@ -442,7 +442,7 @@ export function POSBillingPage() {
             appliedCreditNoteId: appliedCreditNoteId || undefined,
             appliedCreditAmount: appliedCreditAmount || undefined,
             paymentMode, subtotal: grandSubtotal, discount: grandDiscount + additionalDisc,
-            total: finalTotal, gstAmount: grandGst, profit: grandProfit, date: ts,
+            additionalDisc, total: finalTotal, gstAmount: grandGst, profit: grandProfit, date: ts,
         });
         if (safeOverride) setBillType(safeOverride);
         localStorage.removeItem(draftKey); // clear draft on successful save

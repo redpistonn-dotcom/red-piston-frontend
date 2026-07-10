@@ -339,6 +339,8 @@ export interface SaleLineItem {
   sellPrice: number;
   total: number;
   gstAmount?: number;
+  gstRate?: number;
+  buyPrice?: number;
   profit?: number;
   discount?: number;
   priceOverride?: PriceOverride;
@@ -348,17 +350,26 @@ export interface MultiSaleData {
   type?: string;
   items: SaleLineItem[];
   total: number;
+  subtotal?: number;
+  discount?: number;
+  additionalDisc?: number;
+  gstAmount?: number;
+  profit?: number;
   customerName?: string;
   customerPhone?: string;
   customerAddress?: string;
+  customerGstin?: string;
   billingAddress?: string;
   vehicleReg?: string;
   mechanic?: string;
   notes?: string;
+  upiRef?: string;
   invoiceNo: string;
   partyId?: string;
   paymentMode?: string;
   payments?: Record<string, number>;
+  appliedCreditNoteId?: number;
+  appliedCreditAmount?: number;
   date: number;
 }
 

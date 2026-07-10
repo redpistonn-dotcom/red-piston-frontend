@@ -609,18 +609,39 @@ function AppContent() {
     toast(isQuote ? `Quotation: ${data.items.length} items · ${fmt(data.total)}` : `Sale recorded: ${data.items.length} items · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : `Invoice ${data.invoiceNo}`);
     if (!isQuote) {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
+      // Apportion the bill-level "Additional Discount" across line items so it
+      // reduces each line's taxable value (and therefore GST) — the GST-correct
+      // way to apply a whole-bill discount. It is shared proportionally to each
+      // line's inclusive total, then converted from a post-tax share back to a
+      // pre-tax (taxable-value) reduction so the final total drops by exactly the
+      // entered amount. The result is a PER-UNIT discount, which is what the
+      // backend expects (taxable = (unitPrice - discount) * qty) — this also
+      // corrects multi-qty lines where a whole-line discount was previously sent
+      // as if it were per-unit.
+      const bulkDisc = Number(data.additionalDisc) || 0;
+      const grandInclusive = data.items.reduce((s, it) => s + (Number(it.total) || 0), 0);
+      const perUnitDiscount = data.items.map(item => {
+        const qty     = Math.max(1, Number(item.qty) || 0);
+        const ownDisc = Number(item.discount) || 0;                 // whole-line discount (pre-tax)
+        const rate    = Number(item.gstRate) || 0;
+        const lineIncl = Number(item.total) || 0;                   // this line's GST-inclusive total
+        const postShare = grandInclusive > 0 ? bulkDisc * (lineIncl / grandInclusive) : 0;
+        const taxableReduction = postShare / (1 + rate / 100);      // convert post-tax share → taxable-value cut
+        return (ownDisc + taxableReduction) / qty;                  // per-unit, pre-tax
+      });
       const customItemsForSync = data.items
-        .filter(item => String(item.productId || '').startsWith('custom_'))
-        .map(item => ({
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => String(item.productId || '').startsWith('custom_'))
+        .map(({ item, idx }) => ({
           name: String(item.name || 'Custom Item'),
           qty: item.qty,
           unitPrice: item.sellPrice,
-          discount: item.discount || 0,
+          discount: perUnitDiscount[idx],
           gstRate: item.gstRate || 0,
           buyingPrice: item.buyPrice || 0,
         }));
       syncInvoice({
-        items: data.items.map(item => ({ inventoryId: item.productId, qty: item.qty, unitPrice: item.sellPrice, discount: item.discount || 0 })),
+        items: data.items.map((item, idx) => ({ inventoryId: item.productId, qty: item.qty, unitPrice: item.sellPrice, discount: perUnitDiscount[idx] })),
         customItems: customItemsForSync.length > 0 ? customItemsForSync : undefined,
         partyName: data.customerName || undefined, partyPhone: data.customerPhone || undefined,
         partyGstin: data.customerGstin || undefined,
