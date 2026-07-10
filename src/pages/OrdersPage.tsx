@@ -7,6 +7,8 @@ import { AppCtx } from "../AppCtx";
 import { fmt, fmtDate, downloadCSV, generateCSV, uid } from "../utils";
 import { MobileCard, MobileCardList, useIsMobile, Skeleton } from "../components/ui";
 import PdfPreviewModal from "../components/PdfPreviewModal";
+import { getInvoicePdfUrl } from "../api/billing";
+import { getAccessToken } from "../api/client";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 type OrderStatus = "Shipped" | "Pending" | "Delivered" | "Cancelled" | "Processing" | "Stock Added";
@@ -236,9 +238,22 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function OrdersPage() {
-    const { movements, products, orders: mktOrders, saveOrders, activeShopId } = useStore();
-    const { toast } = useContext(AppCtx);
+    const { movements, products, orders: mktOrders, saveOrders, activeShopId, shops } = useStore();
+    const { toast, currentUser } = useContext(AppCtx);
     const isMobile = useIsMobile();
+
+    // Shop info for fallback PDF generation
+    const shop = useMemo(() => {
+        const fromStore = (shops || []).find((s: any) => s.id === activeShopId || s.shopId === activeShopId);
+        if (fromStore) return fromStore;
+        if ((currentUser as any)?.shop) return (currentUser as any).shop;
+        return {} as any;
+    }, [shops, activeShopId, currentUser]);
+    const shopName    = shop?.name    || shop?.shopName || "Shri Mahesh Automobiles";
+    const shopAddress = [shop?.address, shop?.city, shop?.pincode].filter(Boolean).join(", ") || "";
+    const shopGstin   = shop?.gstNo   || shop?.gstin || "";
+    const shopPhone   = shop?.phone   || "";
+    const shopState   = shop?.state   || "";
 
     const [statusFilter, setStatusFilter] = useState<string>("All");
     const [typeFilter, setTypeFilter] = useState<string>("All");
@@ -254,8 +269,6 @@ export function OrdersPage() {
         setOrderPdfPreview({ url: null, loading: true, title: `Order ${order.orderId}`, filename: `order-${order.id}.pdf`, error: null });
         try {
             if (order.type === "Sale" && order.id) {
-                const { getInvoicePdfUrl } = await import("../api/billing");
-                const { getAccessToken } = await import("../api/client");
                 const res = await fetch(getInvoicePdfUrl(order.id, { showOem: true, showMrp: true }), {
                     headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
                 });
@@ -292,16 +305,16 @@ export function OrdersPage() {
 
             // Seller Block (Left)
             doc.setFont("helvetica", "bold").setFontSize(10);
-            doc.text(SHOP.name || "Shri Mahesh Automobiles", M + 6, topY + 16);
+            doc.text(shopName, M + 6, topY + 16);
             doc.setFont("helvetica", "normal").setFontSize(8);
             let sy = topY + 30;
-            if (SHOP.address) {
-                const lines = doc.splitTextToSize(String(SHOP.address), midX - M - 12);
+            if (shopAddress) {
+                const lines = doc.splitTextToSize(String(shopAddress), midX - M - 12);
                 doc.text(lines, M + 6, sy); sy += lines.length * 10;
             }
-            if (SHOP.phone) { doc.text(`Ph : ${SHOP.phone}`, M + 6, sy); sy += 11; }
-            if (SHOP.gstin) { doc.text(`GSTIN/UIN : ${SHOP.gstin}`, M + 6, sy); sy += 11; }
-            if (SHOP.state) { doc.text(`State Name : ${SHOP.state}`, M + 6, sy); }
+            if (shopPhone) { doc.text(`Ph : ${shopPhone}`, M + 6, sy); sy += 11; }
+            if (shopGstin) { doc.text(`GSTIN/UIN : ${shopGstin}`, M + 6, sy); sy += 11; }
+            if (shopState) { doc.text(`State Name : ${shopState}`, M + 6, sy); }
 
             // Order/Invoice Fields (Right)
             const rowH = hdrH / 4;
@@ -385,7 +398,7 @@ export function OrdersPage() {
             doc.text("We declare that this invoice/order shows the actual value of\ngoods and that all particulars are true and correct.", M + 6, fy + 38);
 
             doc.setFont("helvetica", "bold").setFontSize(8).setTextColor(0, 0, 0);
-            doc.text(`for ${SHOP.name || "Shri Mahesh Automobiles"}`, R - 6, fy + 14, { align: "right" });
+            doc.text(`for ${shopName}`, R - 6, fy + 14, { align: "right" });
             doc.text("Authorised Signatory", R - 6, fy + decH - 10, { align: "right" });
 
             setOrderPdfPreview({ url: URL.createObjectURL(doc.output("blob")), loading: false, title: `${docTitle} ${order.orderId}`, filename: `${order.orderId}.pdf`, error: null });
@@ -752,7 +765,7 @@ export function OrdersPage() {
                                                         style={{ height: 30, padding: "0 11px", borderRadius: 20, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.crimson, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>Cancel</button>
                                                 </>
                                             )}
-                                            <button title="View" onClick={() => setViewOrder(order)} style={iconBtnStyle}>👁</button>
+                                            <button title="View Invoice" onClick={() => { if (!isCancelled) printOrder(order); }} style={iconBtnStyle}>👁</button>
                                             <button title={isCancelled ? "Restore" : "Print"} onClick={() => { if (!isCancelled) printOrder(order); }} style={iconBtnStyle}>{isCancelled ? "↺" : "🖨"}</button>
                                             <div style={{ position: "relative" }}>
                                                 <button title="More options" style={iconBtnStyle} onClick={e => { e.stopPropagation(); setDropdownOrder(dropdownOrder === (order as any).id ? null : (order as any).id); }}>⋯</button>
@@ -841,7 +854,7 @@ export function OrdersPage() {
                                                                 style={{ height: 26, padding: "0 11px", borderRadius: 20, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.crimson, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>Cancel</button>
                                                         </>
                                                     )}
-                                                    <button title="View order details" onClick={() => setViewOrder(order)} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
+                                                    <button title="View Invoice" onClick={() => { if (!isCancelled) printOrder(order); }} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
                                                         onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
                                                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
                                                         👁

@@ -136,6 +136,7 @@ export function POSBillingPage() {
 
     const openPdfPreview = useCallback(async () => {
         setPdfPreview({ url: null, loading: true, error: null });
+        // Always prefer backend-generated PDF (formal boxed format)
         if (syncedInvoiceId) {
             try {
                 const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, { showOem: showOemOnBill, showMrp: showMrpOnBill }), {
@@ -150,14 +151,20 @@ export function POSBillingPage() {
                 }
             } catch {}
         }
-        try {
-            const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
-            const url = URL.createObjectURL(doc.output("blob"));
-            setPdfPreview({ url, loading: false, error: null });
-        } catch (e: any) {
-            setPdfPreview({ url: null, loading: false, error: e?.message || 'Could not load PDF' });
+        // Only fall back to client-side PDF for Quotations (no backend save)
+        if (billType !== "Sale") {
+            try {
+                const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
+                const url = URL.createObjectURL(doc.output("blob"));
+                setPdfPreview({ url, loading: false, error: null });
+            } catch (e: any) {
+                setPdfPreview({ url: null, loading: false, error: e?.message || 'Could not load PDF' });
+            }
+        } else {
+            // Sale but no syncedInvoiceId yet — show loading state until backend responds
+            setPdfPreview({ url: null, loading: true, error: null });
         }
-    }, [syncedInvoiceId, showOemOnBill, showMrpOnBill, buildBillPdf]);
+    }, [syncedInvoiceId, showOemOnBill, showMrpOnBill, buildBillPdf, billType]);
 
     const closePdfPreview = useCallback(() => {
         setPdfPreview(prev => {
@@ -173,6 +180,8 @@ export function POSBillingPage() {
         if (showInvoice && printFormat === 'a4') {
             let cancelled = false;
             const updatePdf = async () => {
+                // For Sales, ALWAYS use the backend-generated PDF (matches Screenshot 5 format)
+                // Wait for syncedInvoiceId — don't fall back to client-side jsPDF which has different format
                 if (syncedInvoiceId) {
                     try {
                         const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, { showOem: showOemOnBill, showMrp: showMrpOnBill }), {
@@ -186,15 +195,19 @@ export function POSBillingPage() {
                         }
                     } catch {}
                 }
-                try {
-                    const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
-                    if (!cancelled) setInlinePdfUrl(URL.createObjectURL(doc.output("blob")));
-                } catch {}
+                // Only use client-side PDF for Quotations (they don't save to backend)
+                // For Sales without syncedInvoiceId yet, don't render — the effect will re-fire when syncedInvoiceId arrives
+                if (billType !== "Sale") {
+                    try {
+                        const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
+                        if (!cancelled) setInlinePdfUrl(URL.createObjectURL(doc.output("blob")));
+                    } catch {}
+                }
             };
             updatePdf();
             return () => { cancelled = true; };
         }
-    }, [showInvoice, syncedInvoiceId, printFormat, showOemOnBill, showMrpOnBill, items]);
+    }, [showInvoice, syncedInvoiceId, printFormat, showOemOnBill, showMrpOnBill, billType]);
 
     const [suspendedBill, setSuspendedBill] = useState(() => {
         try {
