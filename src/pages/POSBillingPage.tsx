@@ -533,7 +533,7 @@ export function POSBillingPage() {
         };
         drawField(0, "Invoice No.", invoiceNo || "—");
         drawField(1, "Dated", invoiceAt ? fmtDateTime(invoiceAt) : fmtDate(Date.now()));
-        drawField(2, "Order ID", `#SO-${invoiceNo || ""}`);
+        drawField(2, "Order ID", invoiceNo || "—");
         drawField(3, "Mode of Payment", paymentMode || "CASH");
 
         // Buyer Block (Bill to) Box (Top 155 to 220)

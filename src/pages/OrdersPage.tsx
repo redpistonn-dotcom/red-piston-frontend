@@ -131,7 +131,7 @@ function movementGroupToOrder(items: any[]) {
     // so all items of one bill collapse to a single #SO-/#PO-/#OS- identifier.
     const idBasis = m.invoiceId != null ? String(m.invoiceId) : String(m.id || "");
     const numId   = idBasis.slice(-5).padStart(5, "0");
-    const orderId = isSale ? `#SO-${numId}` : isOpening ? `#OS-${numId}` : `#PO-${numId}`;
+    const orderId = isSale ? `RED-SO-${numId}` : isOpening ? `RED-OS-${numId}` : `RED-PO-${numId}`;
     const partyId = isSale ? `PT-${numId}` : `SP-${numId}`;
 
     const amount = items.reduce((s, it) => s + (Number(it.total) || 0), 0);
@@ -190,7 +190,7 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
         if (!form.party) { toast?.("Enter a party name to create this order", "warning"); return; }
         if (!selectedProd) { toast?.("Select a product from your inventory", "warning"); return; }
         const numId = Math.floor(Math.random() * 90000) + 10000;
-        const newId = `#${form.type === "Sale" ? "SO" : "PO"}-${numId}`;
+        const newId = `RED-${form.type === "Sale" ? "SO" : "PO"}-${numId}`;
         const qty = Math.max(1, parseInt(form.qty) || 1);
         const unitPrice = Number(selectedProd.sellPrice) || 0;
         const total = parseFloat(String(form.amount).replace(/,/g, "")) || unitPrice * qty;
@@ -528,7 +528,7 @@ export function OrdersPage() {
         const backendIdSet = new Set(shopApiOrders.map(o => Number(o.orderId)));
         const fromBackendMkt = shopApiOrders.map(o => ({
             id: `mkt-${o.orderId}`,
-            orderId: `#MO-${String(o.orderId).padStart(5, "0")}`,
+            orderId: `RED-MO-${String(o.orderId).padStart(5, "0")}`,
             date: o.createdAt ? new Date(o.createdAt).getTime() : Date.now(),
             partyName: o.customerName || o.customer?.name || "Customer",
             partyId: `PT-${String(o.orderId).padStart(5, "0")}`,
@@ -550,7 +550,7 @@ export function OrdersPage() {
                 const isPurchase = !!o.supplier;
                 return {
                     id: o.id,
-                    orderId: `#${isPurchase ? "PO" : "SO"}-${String(o.id).slice(-5).padStart(5, "0")}`,
+                    orderId: `RED-${isPurchase ? "PO" : "SO"}-${String(o.id).slice(-5).padStart(5, "0")}`,
                     date: o.time || o.date || Date.now(),
                     partyName: o.customer || o.supplier || "Customer",
                     partyId: `PT-${String(o.id).slice(-5).padStart(5, "0")}`,
