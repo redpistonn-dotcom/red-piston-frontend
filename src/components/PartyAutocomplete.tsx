@@ -8,6 +8,8 @@ interface Party {
   name: string;
   phone?: string;
   gstin?: string;
+  address?: string;
+  shopVehicles?: { registrationNumber?: string | null }[];
 }
 
 export interface PartySelection {
@@ -15,6 +17,8 @@ export interface PartySelection {
   name: string;
   phone: string;
   gstin: string;
+  address: string;
+  vehicleReg: string;
 }
 
 interface Props {
@@ -86,7 +90,14 @@ export function PartyAutocomplete({
   const showDropdown = open && loaded;
 
   const pick = (p: Party) => {
-    onSelect({ partyId: p.partyId ?? p.id ?? null, name: p.name, phone: p.phone || '', gstin: p.gstin || '' });
+    onSelect({
+      partyId: p.partyId ?? p.id ?? null,
+      name: p.name,
+      phone: p.phone || '',
+      gstin: p.gstin || '',
+      address: p.address || '',
+      vehicleReg: p.shopVehicles?.[0]?.registrationNumber || '',
+    });
     setOpen(false);
   };
 
@@ -97,7 +108,7 @@ export function PartyAutocomplete({
       const res: any = await createParty({ name: value.trim(), type });
       const party: Party = res?.party || res || { name: value.trim() };
       setParties(prev => [...prev, party]);
-      onSelect({ partyId: party.partyId ?? party.id ?? null, name: value.trim(), phone: party.phone || '', gstin: party.gstin || '' });
+      onSelect({ partyId: party.partyId ?? party.id ?? null, name: value.trim(), phone: party.phone || '', gstin: party.gstin || '', address: party.address || '', vehicleReg: '' });
       toast?.(`"${value.trim()}" added as a new ${noun}`, 'success');
     } catch {
       toast?.(`Could not save ${noun} — try again`, 'error');

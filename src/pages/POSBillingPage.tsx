@@ -1243,11 +1243,13 @@ export function POSBillingPage() {
                                 type="CUSTOMER"
                                 value={customerName}
                                 onChange={name => { setCustomerName(name); setPartyId(null); }}
-                                onSelect={({ partyId: pid, name, phone, billingAddress }) => {
+                                onSelect={({ partyId: pid, name, phone, gstin, address, vehicleReg: veh }) => {
                                     setCustomerName(name);
                                     setPartyId(pid);
                                     if (phone) setCustomerPhone(phone);
-                                    if (billingAddress) setCustomerAddress(billingAddress);
+                                    if (address) setCustomerAddress(address);
+                                    if (gstin) setCustomerGstin(gstin);
+                                    if (veh) setVehicleReg(veh);
                                 }}
                                 placeholder="Name or garage"
                                 inputStyle={{ height: 34, fontSize: 12 }}
