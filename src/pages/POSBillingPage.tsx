@@ -406,6 +406,7 @@ export function POSBillingPage() {
         const effectiveBillType = safeOverride ?? billType;
         setSaving(true);
         setSyncedInvoiceId(null); // new sale — previous backend invoice no longer applies
+        setInlinePdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
         await new Promise(r => setTimeout(r, 50));
         const ts = Date.now();
         const inv = `${effectiveBillType === "Sale" ? "INV" : "EST"}-${ts.toString(36).toUpperCase()}`;
@@ -444,6 +445,8 @@ export function POSBillingPage() {
         setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
         setAppliedCreditNoteId(null); setAppliedCreditAmount(0);
         setInvoiceAt(null); setBillType("Sale");
+        setInlinePdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+        setSyncedInvoiceId(null);
         setTimeout(() => searchRef.current?.focus(), 50);
     };
 
