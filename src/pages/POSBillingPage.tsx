@@ -343,10 +343,13 @@ export function POSBillingPage() {
     // Line calculations — memoized so they don't recompute on every render
     const { lineCalcs, grandSubtotal, grandDiscount, grandGst, grandProfit, grandTotal } = useMemo(() => {
         const calcs = items.map(item => {
-            const subtotal = item.price * item.qty;
+            // Prices are GST-EXCLUSIVE: the entered price is the taxable value and
+            // GST is added on top (standard tax-invoice format, matches the backend).
+            const subtotal = item.price * item.qty;                     // taxable, before discount
             const discAmt = item.discountType === "%" ? subtotal * item.discount / 100 : item.discount;
-            const afterDisc = subtotal - discAmt;
-            const gstAmt = (afterDisc * item.gstRate) / (100 + item.gstRate);
+            const taxable = subtotal - discAmt;                         // taxable value after discount
+            const gstAmt = (taxable * item.gstRate) / 100;              // GST added on top
+            const afterDisc = taxable + gstAmt;                         // GST-inclusive line total (Amount)
             const profit = (item.price - item.buyPrice) * item.qty - discAmt;
             return { subtotal, discAmt, afterDisc, gstAmt, profit };
         });
@@ -569,7 +572,7 @@ export function POSBillingPage() {
                     String(i + 1), it.name,
                     "8708",
                     ...(showOem ? [it.oemNumber || "—"] : []),
-                    `${it.qty} NOS`, rs(it.price), rs(it.price),
+                    `${it.qty} NOS`, rs(it.price * (1 + (Number(it.gstRate) || 0) / 100)), rs(it.price),
                     ...(showMrp ? [it.mrp ? rs(it.mrp) : "—"] : []),
                     lc.discAmt > 0 ? `${Math.round((lc.discAmt / (it.price * it.qty)) * 100)}%` : "—", rs(lc.afterDisc),
                 ];
@@ -596,7 +599,7 @@ export function POSBillingPage() {
         };
         if (grandDiscount > 0) trow("Item Discounts", `-${rs(grandDiscount)}`);
         if (additionalDisc > 0) trow("Additional Discount", `-${rs(additionalDisc)}`);
-        trow("GST (Inclusive)", rs(grandGst));
+        trow("Add: GST", rs(grandGst));
         fy += 4;
         doc.line(lx, fy, R, fy);
         fy += 16;
@@ -833,7 +836,7 @@ export function POSBillingPage() {
 
                     {grandDiscount > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginBottom: 2 }}><span>Discounts</span><span>−{fmt(grandDiscount)}</span></div>}
                     {additionalDisc > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginBottom: 2 }}><span>Extra Disc</span><span>−{fmt(additionalDisc)}</span></div>}
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginBottom: 4 }}><span>GST (Incl.)</span><span>{fmt(grandGst)}</span></div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#666", marginBottom: 4 }}><span>Add: GST</span><span>{fmt(grandGst)}</span></div>
 
                     <div style={{ color: "#999", margin: "4px 0", fontSize: 10 }}>{dashes}</div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900, fontSize: 15 }}><span>TOTAL</span><span>{fmt(finalTotal)}</span></div>
@@ -1339,11 +1342,10 @@ export function POSBillingPage() {
                                 </div>
                             )}
                             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: T.t2 }}>
-                                {/* grandTotal is tax-INCLUSIVE, so grandGst/grandTotal understates the
-                                    rate (e.g. an 18%-rate item shows as ~15%, since 18/118 ≈ 15%). The
-                                    actual weighted rate is tax / (tax-exclusive base) — base = total - tax. */}
+                                {/* GST is added on top (exclusive pricing): base = grandTotal - grandGst
+                                    = the taxable value, so grandGst/base is the exact weighted rate. */}
                                 <span>Taxes (GST avg {(grandTotal - grandGst) > 0 ? Math.round(grandGst / (grandTotal - grandGst) * 100) : 18}%)</span>
-                                <span style={{ fontFamily: FONT.mono, fontWeight: 600 }}>{fmt(grandGst)} <span style={{ fontSize: 10, color: T.t3 }}>inc.</span></span>
+                                <span style={{ fontFamily: FONT.mono, fontWeight: 600 }}>+{fmt(grandGst)}</span>
                             </div>
                             {/* Additional Discount */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
