@@ -114,7 +114,7 @@ export function buildInvoice(job: any, user: AppUser | null): InvoiceModel {
 
   return {
     invoiceNo: invoiceNoForJob(job?.jobNumber, job?.id),
-    dateStr: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    dateStr: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }),
     shop: {
       name: shop.name || "—",
       address: [shop.address, shop.city, shop.pincode].filter(Boolean).join(", ") || "—",

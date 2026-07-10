@@ -143,6 +143,8 @@ function movementGroupToOrder(items: any[]) {
         // non-sales fall back to the movement id (existing behaviour).
         id: (isSale && m.invoiceId != null) ? m.invoiceId : m.id,
         orderId,
+        // Real invoice number (e.g. S2-202607-0042) for consistent PDF filenames.
+        invoiceNo: m.invoiceNo || null,
         date: m.date,
         partyName: isSale
             ? (m.customerName || "Walk-in Customer")
@@ -302,7 +304,10 @@ export function OrdersPage() {
     const [orderPdfPreview, setOrderPdfPreview] = useState<{ url: string | null; loading: boolean; title?: string; filename?: string; error?: string | null } | null>(null);
 
     const printOrder = async (order: any) => {
-        setOrderPdfPreview({ url: null, loading: true, title: `Order ${order.orderId}`, filename: `order-${order.id}.pdf`, error: null });
+        // Consistent filename = invoice number (fallback to the order id), sanitized
+        // of characters that are invalid in filenames (#, spaces, slashes).
+        const fileBase = String(order.invoiceNo || order.orderId || "invoice").replace(/[#\s/\\]+/g, "");
+        setOrderPdfPreview({ url: null, loading: true, title: `Order ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
         try {
             if (order.type === "Sale" && order.id) {
                 const res = await fetch(getInvoicePdfUrl(order.id, { showOem: true, showMrp: true }), {
@@ -310,13 +315,13 @@ export function OrdersPage() {
                 });
                 if (res.ok) {
                     const blob = await res.blob();
-                    setOrderPdfPreview({ url: URL.createObjectURL(blob), loading: false, title: `Invoice ${order.orderId}`, filename: `invoice-${order.id}.pdf`, error: null });
+                    setOrderPdfPreview({ url: URL.createObjectURL(blob), loading: false, title: `Invoice ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
                     return;
                 }
             } else if (order.type === "Purchase" && order.id) {
                 const { previewPurchaseOrderPdf } = await import("../api/purchaseOrders");
                 const url = await previewPurchaseOrderPdf(order.id);
-                setOrderPdfPreview({ url, loading: false, title: `Purchase Order ${order.orderId}`, filename: `po-${order.id}.pdf`, error: null });
+                setOrderPdfPreview({ url, loading: false, title: `Purchase Order ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
                 return;
             }
         } catch {}
@@ -437,7 +442,7 @@ export function OrdersPage() {
             doc.text(`for ${shopName}`, R - 6, fy + 14, { align: "right" });
             doc.text("Authorised Signatory", R - 6, fy + decH - 10, { align: "right" });
 
-            setOrderPdfPreview({ url: URL.createObjectURL(doc.output("blob")), loading: false, title: `${docTitle} ${order.orderId}`, filename: `${order.orderId}.pdf`, error: null });
+            setOrderPdfPreview({ url: URL.createObjectURL(doc.output("blob")), loading: false, title: `${docTitle} ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
         } catch (err: any) {
             setOrderPdfPreview({ url: null, loading: false, title: `Order ${order.orderId}`, error: err?.message || "Could not load PDF" });
         }

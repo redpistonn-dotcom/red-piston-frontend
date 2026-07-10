@@ -109,11 +109,11 @@ export const gstAmt = (price, qty, gstRate) => ((price * qty) * gstRate) / 100;
 
 export const fmtDate = ts => {
     const d = new Date(ts);
-    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 };
 export const fmtTime = ts => {
     const d = new Date(ts);
-    return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+    return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
 };
 export const fmtDateTime = ts => `${fmtDate(ts)}, ${fmtTime(ts)}`;
 export const daysAgo = ts => {

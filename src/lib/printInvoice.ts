@@ -92,6 +92,12 @@ function rs(n: number): string {
   return `&#x20B9;${n.toFixed(2)}`;
 }
 
+// Format a GST percentage cleanly: 9 not 9.00, 2.5 stays 2.5.
+function fmtPct(n: number): string {
+  const v = Number(n) || 0;
+  return Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/\.?0+$/, "");
+}
+
 // ─── Indian number-to-words (handles 0 – 99,99,999) ──────────────────────────
 function toWords(n: number): string {
   const ones = [
@@ -283,11 +289,11 @@ ${invoice.notes ? `<div class="meta-row"><span class="muted">Remarks</span><span
       <td class="val">${rs(totalTaxable)}</td>
     </tr>
     <tr>
-      <td class="label">CGST</td>
+      <td class="label">CGST${totalTaxable > 0 ? ` @ ${fmtPct((totalCgst / totalTaxable) * 100)}%` : ""}</td>
       <td class="val">${rs(totalCgst)}</td>
     </tr>
     <tr>
-      <td class="label">SGST</td>
+      <td class="label">SGST${totalTaxable > 0 ? ` @ ${fmtPct((totalSgst / totalTaxable) * 100)}%` : ""}</td>
       <td class="val">${rs(totalSgst)}</td>
     </tr>
     <tr class="sep">
@@ -353,6 +359,8 @@ function thermalHtml(p: PrintInvoiceParams): string {
 
   const totalCgst = totals.grandGst / 2;
   const totalSgst = totals.grandGst / 2;
+  const thermalTaxable = totals.finalTotal - totals.grandGst;
+  const thermalPct = thermalTaxable > 0 ? fmtPct((totalCgst / thermalTaxable) * 100) : "";
   const dashes    = "------------------------------------------------";
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(invoice.invoiceNo)}</title>
@@ -416,8 +424,8 @@ ${rows}
 ${totals.grandDiscount  > 0 ? `<div class="total-row"><span>Discounts</span><span>&#x2212;${rs(totals.grandDiscount)}</span></div>` : ""}
 ${totals.additionalDisc > 0 ? `<div class="total-row"><span>Extra Disc</span><span>&#x2212;${rs(totals.additionalDisc)}</span></div>` : ""}
 <div class="total-row"><span>Taxable Amt</span><span>${rs(totals.finalTotal - totals.grandGst)}</span></div>
-<div class="total-row"><span>CGST</span><span>${rs(totalCgst)}</span></div>
-<div class="total-row"><span>SGST</span><span>${rs(totalSgst)}</span></div>
+<div class="total-row"><span>CGST${thermalPct ? ` @ ${thermalPct}%` : ""}</span><span>${rs(totalCgst)}</span></div>
+<div class="total-row"><span>SGST${thermalPct ? ` @ ${thermalPct}%` : ""}</span><span>${rs(totalSgst)}</span></div>
 
 <div class="dashes">${dashes}</div>
 <div class="grand-row"><span>TOTAL</span><span>${rs(totals.finalTotal)}</span></div>
