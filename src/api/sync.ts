@@ -411,6 +411,8 @@ interface SyncInvoiceParams {
   partyId?: string;
   partyName?: string;
   partyPhone?: string;
+  billingAddress?: string;
+  vehicleReg?: string;
   paymentMode?: string;
   cashAmount?: number;
   upiAmount?: number;
@@ -441,6 +443,7 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: bool
       partyId: params.partyId || undefined,
       partyName: params.partyName || undefined,
       partyPhone: params.partyPhone || undefined,
+      billingAddress: params.billingAddress || undefined,
       paymentMode: params.paymentMode || 'CASH',
       // Do not forward cashAmount/upiAmount in the default case — the frontend uses
       // GST-inclusive totals while the backend recomputes GST-exclusive, so the

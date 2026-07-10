@@ -624,9 +624,12 @@ function AppContent() {
         customItems: customItemsForSync.length > 0 ? customItemsForSync : undefined,
         partyName: data.customerName || undefined, partyPhone: data.customerPhone || undefined,
         partyId: data.partyId || undefined,
+        billingAddress: data.customerAddress || data.billingAddress || undefined,
+        vehicleReg: data.vehicleReg || undefined,
         paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
-        creditAmount: data.payments?.Credit || undefined, notes: data.notes || undefined,
+        creditAmount: data.payments?.Credit || undefined,
+        notes: [data.vehicleReg ? `Vehicle Reg: ${data.vehicleReg}` : null, data.notes].filter(Boolean).join(' | ') || undefined,
         appliedCreditNoteId: data.appliedCreditNoteId || undefined,
         appliedCreditAmount: data.appliedCreditAmount || undefined,
       }).then(({ ok, error }) => {

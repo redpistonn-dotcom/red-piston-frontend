@@ -72,6 +72,7 @@ export function POSBillingPage() {
     const [notes, setNotes]         = useState(draft?.notes || "");
     const [customerName, setCustomerName] = useState(draft?.customerName || "");
     const [customerPhone, setCustomerPhone] = useState(draft?.customerPhone || "");
+    const [customerAddress, setCustomerAddress] = useState(draft?.customerAddress || "");
     const [vehicleReg, setVehicleReg]   = useState(draft?.vehicleReg || "");
     const [partyId, setPartyId]     = useState<string | number | null>(draft?.partyId || null);
     const [showInvoice, setShowInvoice] = useState(false);
@@ -207,12 +208,12 @@ export function POSBillingPage() {
             if (items.length === 0) { localStorage.removeItem(draftKey); return; }
             localStorage.setItem(draftKey, JSON.stringify({
                 items, billType, paymentMode, additionalDisc,
-                notes, customerName, customerPhone, vehicleReg, partyId,
+                notes, customerName, customerPhone, customerAddress, vehicleReg, partyId,
                 expiresAt: Date.now() + 24 * 60 * 60 * 1000,
             }));
         }, 600);
         return () => clearTimeout(t);
-    }, [items, billType, paymentMode, additionalDisc, notes, customerName, customerPhone, vehicleReg, partyId, showInvoice, draftKey]);
+    }, [items, billType, paymentMode, additionalDisc, notes, customerName, customerPhone, customerAddress, vehicleReg, partyId, showInvoice, draftKey]);
 
     useEffect(() => { searchRef.current?.focus(); }, []);
 
@@ -396,7 +397,7 @@ export function POSBillingPage() {
                 discount: lineCalcs[idx].discAmt, total: lineCalcs[idx].afterDisc,
                 gstAmount: lineCalcs[idx].gstAmt, profit: lineCalcs[idx].profit, gstRate: item.gstRate,
             })),
-            customerName, customerPhone, vehicleReg, notes,
+            customerName, customerPhone, customerAddress, vehicleReg, notes,
             partyId: partyId || undefined,
             // amountDue (finalTotal minus any applied store credit) is what's actually
             // collected via the chosen payment method — the credit portion is reported
@@ -418,7 +419,7 @@ export function POSBillingPage() {
 
     const newBill = () => {
         localStorage.removeItem(draftKey);
-        setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setVehicleReg("");
+        setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setCustomerAddress(""); setVehicleReg("");
         setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
         setAppliedCreditNoteId(null); setAppliedCreditAmount(0);
         setInvoiceAt(null); setBillType("Sale");
@@ -428,7 +429,7 @@ export function POSBillingPage() {
     const SUSPEND_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
     const handleSuspend = () => {
         if (items.length === 0) return;
-        const draft = { items, customerName, customerPhone, vehicleReg, notes, billType, additionalDisc, paymentMode, timestamp: Date.now(), expiresAt: Date.now() + SUSPEND_TTL_MS };
+        const draft = { items, customerName, customerPhone, customerAddress, vehicleReg, notes, billType, additionalDisc, paymentMode, timestamp: Date.now(), expiresAt: Date.now() + SUSPEND_TTL_MS };
         localStorage.setItem("vl_suspended_bill", JSON.stringify(draft));
         setSuspendedBill(draft); newBill();
         toast?.("Bill suspended — resume from the POS banner.", "info");
@@ -440,6 +441,7 @@ export function POSBillingPage() {
         setItems(suspendedBill.items || []);
         setCustomerName(suspendedBill.customerName || "");
         setCustomerPhone(suspendedBill.customerPhone || "");
+        setCustomerAddress(suspendedBill.customerAddress || "");
         setVehicleReg(suspendedBill.vehicleReg || "");
         setNotes(suspendedBill.notes || "");
         setBillType(suspendedBill.billType || "Sale");
@@ -471,8 +473,21 @@ export function POSBillingPage() {
         doc.text(`No: ${invoiceNo}`, R, 64, { align: "right" });
         if (invoiceAt) doc.text(String(fmtDateTime(invoiceAt)), R, 76, { align: "right" });
         y = Math.max(y, 90);
-        if (customerName) { doc.text(`Customer: ${customerName}`, M, y); y += 12; }
+        if (customerName) {
+            doc.text(`Customer: ${customerName}${customerPhone ? ` (${customerPhone})` : ""}`, M, y);
+            y += 12;
+        }
+        if (customerAddress) {
+            const splitAddr = doc.splitTextToSize(`Address: ${customerAddress}`, R - M);
+            doc.text(splitAddr, M, y);
+            y += splitAddr.length * 12;
+        }
         if (vehicleReg) { doc.text(`Vehicle: ${vehicleReg}`, M, y); y += 12; }
+        if (notes) {
+            const splitNotes = doc.splitTextToSize(`Remarks: ${notes}`, R - M);
+            doc.text(splitNotes, M, y);
+            y += splitNotes.length * 12;
+        }
         const head = ["#", "Item", ...(showOem ? ["OEM No."] : []), "Qty", "Rate", ...(showMrp ? ["MRP"] : []), "Disc", "GST", "Amount"];
         autoTable(doc, {
             startY: y + 8,
@@ -552,6 +567,9 @@ export function POSBillingPage() {
                     invoiceAt: invoiceAt ? fmtDateTime(invoiceAt) : undefined,
                     isInvoice: billType === "Sale",
                     customerName: customerName || undefined,
+                    customerPhone: customerPhone || undefined,
+                    customerAddress: customerAddress || undefined,
+                    billingAddress: customerAddress || undefined,
                     vehicleReg: vehicleReg || undefined,
                     paymentMode: paymentMode || undefined,
                     notes: notes || undefined,
@@ -1113,10 +1131,11 @@ export function POSBillingPage() {
                                 type="CUSTOMER"
                                 value={customerName}
                                 onChange={name => { setCustomerName(name); setPartyId(null); }}
-                                onSelect={({ partyId: pid, name, phone }) => {
+                                onSelect={({ partyId: pid, name, phone, billingAddress }) => {
                                     setCustomerName(name);
                                     setPartyId(pid);
                                     if (phone) setCustomerPhone(phone);
+                                    if (billingAddress) setCustomerAddress(billingAddress);
                                 }}
                                 placeholder="Name or garage"
                                 inputStyle={{ height: 34, fontSize: 12 }}
@@ -1140,13 +1159,22 @@ export function POSBillingPage() {
                                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
                                 onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
                         </div>
+                        <div>
+                            <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>Customer Address</label>
+                            <input value={customerAddress} onChange={e => setCustomerAddress(e.target.value)}
+                                placeholder="Billing / Delivery Address" maxLength={200}
+                                style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box" }}
+                                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
+                        </div>
                     </div>
 
                     {/* Notes textarea */}
                     <div style={{ padding: "12px 16px" }}>
+                        <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>Remarks / Special Instructions</label>
                         <textarea value={notes} onChange={e => setNotes(e.target.value)} maxLength={500}
-                            placeholder="Special instructions for shipping or installation..."
-                            rows={5}
+                            placeholder="Special instructions for shipping, warranty, or installation..."
+                            rows={3}
                             style={{ width: "100%", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 12px", color: T.t1, fontSize: 13, fontFamily: FONT.ui, outline: "none", resize: "vertical", boxSizing: "border-box", lineHeight: 1.6 }}
                             onFocus={e => { (e.target as HTMLTextAreaElement).style.borderColor = T.amber; }}
                             onBlur={e => { (e.target as HTMLTextAreaElement).style.borderColor = T.border; }}

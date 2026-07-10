@@ -24,6 +24,8 @@ interface InvoiceInfo {
   isInvoice: boolean;       // true = TAX INVOICE, false = ESTIMATE/QUOTATION
   customerName?: string;
   customerPhone?: string;
+  customerAddress?: string;
+  billingAddress?: string;
   vehicleReg?: string;
   paymentMode?: string;
   notes?: string;
@@ -151,9 +153,10 @@ function a4Html(p: PrintInvoiceParams): string {
   </div>
 </div>
 
-${invoice.customerName ? `<div class="meta-row"><span class="muted">Customer</span><b>${esc(invoice.customerName)}</b></div>` : ""}
+${invoice.customerName ? `<div class="meta-row"><span class="muted">Customer</span><b>${esc(invoice.customerName)}</b>${invoice.customerPhone ? ` <span class="muted">(${esc(invoice.customerPhone)})</span>` : ""}</div>` : ""}
+${(invoice.customerAddress || invoice.billingAddress) ? `<div class="meta-row"><span class="muted">Address</span><span>${esc(invoice.customerAddress || invoice.billingAddress)}</span></div>` : ""}
 ${invoice.vehicleReg ? `<div class="meta-row"><span class="muted">Vehicle</span><b style="color:${accentColor};font-family:monospace">${esc(invoice.vehicleReg)}</b></div>` : ""}
-${invoice.notes ? `<div class="meta-row"><span class="muted">Notes</span><span>${esc(invoice.notes)}</span></div>` : ""}
+${invoice.notes ? `<div class="meta-row"><span class="muted">Remarks</span><span>${esc(invoice.notes)}</span></div>` : ""}
 
 <table>
   <thead><tr>${["#","Item", ...(showOem ? ["OEM No."] : []), "Qty","Rate", ...(showMrp ? ["MRP"] : []), "Disc","GST","Amount"].map(h=>`<th${["#","Item","OEM No."].includes(h) ? ' class="left"' : ""}>${h}</th>`).join("")}</tr></thead>
@@ -247,9 +250,11 @@ ${invoice.invoiceAt ? `<div class="shop-sub">${esc(invoice.invoiceAt)}</div>` : 
 <div class="dashes">${dashes}</div>
 
 ${invoice.customerName ? `<div class="kv"><span>Customer</span><span>${esc(invoice.customerName)}</span></div>` : ""}
+${invoice.customerPhone ? `<div class="kv"><span>Phone</span><span>${esc(invoice.customerPhone)}</span></div>` : ""}
+${(invoice.customerAddress || invoice.billingAddress) ? `<div class="kv"><span>Address</span><span>${esc(invoice.customerAddress || invoice.billingAddress)}</span></div>` : ""}
 ${invoice.vehicleReg   ? `<div class="kv"><span>Vehicle</span><span><b>${esc(invoice.vehicleReg)}</b></span></div>` : ""}
 ${invoice.paymentMode  ? `<div class="kv"><span>Payment</span><span>${esc(invoice.paymentMode)}</span></div>` : ""}
-${invoice.notes        ? `<div class="kv"><span>Notes</span><span>${esc(invoice.notes)}</span></div>` : ""}
+${invoice.notes        ? `<div class="kv"><span>Remarks</span><span>${esc(invoice.notes)}</span></div>` : ""}
 
 <div class="dashes">${dashes}</div>
 <div class="kv bold"><span>Item</span><span>Amt</span></div>

@@ -350,6 +350,8 @@ export interface MultiSaleData {
   total: number;
   customerName?: string;
   customerPhone?: string;
+  customerAddress?: string;
+  billingAddress?: string;
   vehicleReg?: string;
   mechanic?: string;
   notes?: string;
