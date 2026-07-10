@@ -62,3 +62,16 @@ export const openExchangeInvoicePdf = async (id: number | string) => {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
 };
+
+// Fetches the Exchange PDF and returns a blob URL for iframe preview.
+// The caller is responsible for revoking the URL when done (URL.revokeObjectURL).
+export const previewExchangePdf = async (id: number | string): Promise<string> => {
+  const res = await fetch(getExchangePdfUrl(id), {
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(`Could not load the exchange invoice (server returned ${res.status})`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+};
+

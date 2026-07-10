@@ -7,6 +7,7 @@ import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
 import { PurchaseBills } from "../components/PurchaseBills";
 import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
 import { PartyAutocomplete } from "../components/PartyAutocomplete";
+import PdfPreviewModal from "../components/PdfPreviewModal";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { getAccessToken } from "../api/client";
@@ -123,6 +124,33 @@ export function POSBillingPage() {
     // Backend invoice id once the sale syncs — enables PDF download + WhatsApp share
     const [syncedInvoiceId, setSyncedInvoiceId] = useState<number | null>(null);
     const [returnModalOpen, setReturnModalOpen] = useState(false);
+
+    // PDF preview modal state
+    const [pdfPreview, setPdfPreview] = useState<{ url: string | null; loading: boolean; error: string | null } | null>(null);
+
+    const openPdfPreview = useCallback(async () => {
+        if (!syncedInvoiceId) return;
+        setPdfPreview({ url: null, loading: true, error: null });
+        try {
+            const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
+                headers: { Authorization: `Bearer ${getAccessToken()}` },
+                credentials: 'include',
+            });
+            if (!res.ok) throw new Error(`Server returned ${res.status}`);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            setPdfPreview({ url, loading: false, error: null });
+        } catch (e: any) {
+            setPdfPreview({ url: null, loading: false, error: e?.message || 'Could not load PDF' });
+        }
+    }, [syncedInvoiceId]);
+
+    const closePdfPreview = useCallback(() => {
+        setPdfPreview(prev => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return null;
+        });
+    }, []);
 
     // Bill visibility toggles — shown inline near the print/share buttons so the
     // shop can set them once per bill instead of confirming through a popup each time.
@@ -714,6 +742,15 @@ export function POSBillingPage() {
 
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
                 <button onClick={() => runBillAction("print", { showOem: showOemOnBill, showMrp: showMrpOnBill })} style={{ flex: 1, minWidth: 110, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: T.t2, cursor: "pointer", fontFamily: FONT.ui }}>🖨 Print</button>
+                {syncedInvoiceId && (
+                    <button
+                        id="pos-preview-pdf-btn"
+                        onClick={openPdfPreview}
+                        style={{ flex: 1, minWidth: 140, height: 42, background: T.amber, border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: FONT.ui }}
+                    >
+                        👁 Preview PDF
+                    </button>
+                )}
                 <button
                     onClick={() => runBillAction("download", { showOem: showOemOnBill, showMrp: showMrpOnBill })}
                     style={{ flex: 1, minWidth: 140, height: 42, background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 10, fontSize: 13, fontWeight: 600, color: syncedInvoiceId ? T.t1 : T.t3, cursor: "pointer", fontFamily: FONT.ui }}>
@@ -748,8 +785,20 @@ export function POSBillingPage() {
                     }}
                 />
             )}
+            {/* PDF Preview Modal */}
+            {pdfPreview && (
+                <PdfPreviewModal
+                    url={pdfPreview.url}
+                    loading={pdfPreview.loading}
+                    error={pdfPreview.error}
+                    title={`Invoice ${invoiceNo}`}
+                    filename={`${invoiceNo || 'invoice'}.pdf`}
+                    onClose={closePdfPreview}
+                />
+            )}
         </div>
     );
+
 
     // ─── Main POS UI ───────────────────────────────────────────────────────────
     return (

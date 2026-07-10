@@ -66,3 +66,10 @@ export const getSalesReturns = (params?: Record<string, string>) =>
 
 export const getSalesReturn = (id: number | string) =>
   api.get(`/api/shop/returns/${id}`);
+
+// Returns the URL for the printable Credit Note / Return Invoice PDF.
+// The caller must fetch this with an Authorization header.
+export const getReturnPdfUrl = (id: number | string) => {
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  return `${base}/api/shop/returns/${id}/pdf`;
+};

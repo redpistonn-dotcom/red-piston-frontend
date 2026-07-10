@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from "react";
 import { T, FONT } from "../theme";
 import { Modal, Btn, Field, Input, Select, QtyStepper } from "./ui";
 import { PartyAutocomplete } from "./PartyAutocomplete";
+import PdfPreviewModal from "./PdfPreviewModal";
 import { useStore } from "../store";
 import { getInvoices } from "../api/billing";
 import { getEligibleReturnItems, createSalesReturn, createWalkInSalesReturn, type ReturnableItem } from "../api/returns";
-import { createExchange, openExchangeInvoicePdf } from "../api/exchanges";
+import { createExchange, previewExchangePdf } from "../api/exchanges";
 import { useDebounce } from "../utils";
+
 
 // Same reason list drives both a plain return and an exchange — the customer's
 // complaint doesn't change based on what the shop does about it afterward.
@@ -85,6 +87,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
   const [selectionError, setSelectionError] = useState(false);
   const [completedExchangeId, setCompletedExchangeId] = useState<number | null>(null);
   const [openingInvoice, setOpeningInvoice] = useState(false);
+  const [exchangePdfPreview, setExchangePdfPreview] = useState<{ url: string | null; loading: boolean; error: string | null } | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -292,6 +295,7 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
     : "Walk-in — no invoice on file";
 
   return (
+    <>
     <Modal open={open} onClose={onClose} title="Return / Exchange" subtitle={subtitle} width={680}>
       {/* ── Exchange completed — offer the Exchange Invoice right away ── */}
       {completedExchangeId != null ? (
@@ -308,15 +312,22 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
               loading={openingInvoice}
               onClick={async () => {
                 setOpeningInvoice(true);
-                try { await openExchangeInvoicePdf(completedExchangeId); }
-                catch (e: any) { toast(e?.message || "Could not open the exchange invoice", "error"); }
+                setExchangePdfPreview({ url: null, loading: true, error: null });
+                try {
+                  const url = await previewExchangePdf(completedExchangeId);
+                  setExchangePdfPreview({ url, loading: false, error: null });
+                } catch (e: any) {
+                  setExchangePdfPreview({ url: null, loading: false, error: e?.message || 'Could not load invoice' });
+                  toast(e?.message || "Could not open the exchange invoice", "error");
+                }
                 setOpeningInvoice(false);
               }}
             >
-              🖨 View Exchange Invoice
+              👁 Preview Exchange Invoice
             </Btn>
           </div>
         </div>
+
       ) : (
       <>
       {/* ── Step 1: find invoice ── */}
@@ -643,5 +654,20 @@ export function NewReturnExchangeModal({ open, onClose, onCreated, toast, initia
       </>
       )}
     </Modal>
+    {/* Exchange PDF Preview — rendered outside the modal so it overlays it */}
+    {exchangePdfPreview && (
+      <PdfPreviewModal
+        url={exchangePdfPreview.url}
+        loading={exchangePdfPreview.loading}
+        error={exchangePdfPreview.error}
+        title="Exchange Invoice"
+        filename={`exchange-invoice-${completedExchangeId}.pdf`}
+        onClose={() => {
+          if (exchangePdfPreview.url) URL.revokeObjectURL(exchangePdfPreview.url);
+          setExchangePdfPreview(null);
+        }}
+      />
+    )}
+    </>
   );
 }
