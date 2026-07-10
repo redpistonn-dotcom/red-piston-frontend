@@ -156,20 +156,31 @@ export function POSBillingPage() {
     const [inlinePdfUrl, setInlinePdfUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        if (showInvoice && syncedInvoiceId && printFormat === 'a4' && !inlinePdfUrl) {
+        if (showInvoice && printFormat === 'a4') {
             let cancelled = false;
-            fetch(getInvoicePdfUrl(syncedInvoiceId), {
-                headers: { Authorization: `Bearer ${getAccessToken()}` },
-                credentials: 'include',
-            })
-            .then(res => res.ok ? res.blob() : Promise.reject())
-            .then(blob => {
-                if (!cancelled) setInlinePdfUrl(URL.createObjectURL(blob));
-            })
-            .catch(() => {});
+            const updatePdf = async () => {
+                if (syncedInvoiceId) {
+                    try {
+                        const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, { showOem: showOemOnBill, showMrp: showMrpOnBill }), {
+                            headers: { Authorization: `Bearer ${getAccessToken()}` },
+                            credentials: 'include',
+                        });
+                        if (res.ok) {
+                            const blob = await res.blob();
+                            if (!cancelled) setInlinePdfUrl(URL.createObjectURL(blob));
+                            return;
+                        }
+                    } catch {}
+                }
+                try {
+                    const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
+                    if (!cancelled) setInlinePdfUrl(URL.createObjectURL(doc.output("blob")));
+                } catch {}
+            };
+            updatePdf();
             return () => { cancelled = true; };
         }
-    }, [showInvoice, syncedInvoiceId, printFormat, inlinePdfUrl]);
+    }, [showInvoice, syncedInvoiceId, printFormat, showOemOnBill, showMrpOnBill, items]);
 
     // Bill visibility toggles — shown inline near the print/share buttons so the
     // shop can set them once per bill instead of confirming through a popup each time.
@@ -503,6 +514,35 @@ export function POSBillingPage() {
     // whether OEM number and MRP should appear on the bill.
     const runBillAction = async (action: "print" | "download" | "whatsapp", opts: { showOem: boolean; showMrp: boolean }) => {
         if (action === "print") {
+            if (printFormat === "a4") {
+                let blobUrl = inlinePdfUrl;
+                if (!blobUrl && syncedInvoiceId) {
+                    try {
+                        const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, opts), {
+                            headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                        });
+                        if (res.ok) blobUrl = URL.createObjectURL(await res.blob());
+                    } catch {}
+                }
+                if (!blobUrl) {
+                    try {
+                        const doc = await buildBillPdf(opts);
+                        blobUrl = URL.createObjectURL(doc.output("blob"));
+                    } catch {}
+                }
+                if (blobUrl) {
+                    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+                    if (isMobileDevice) {
+                        const a = document.createElement("a");
+                        a.href = blobUrl;
+                        a.target = "_blank";
+                        a.click();
+                    } else {
+                        setPdfPreview({ url: blobUrl, loading: false, error: null });
+                    }
+                    return;
+                }
+            }
             printInvoice({
                 format: printFormat,
                 shop: { name: shopName, address: shopAddress, gstin: shopGst, phone: shopPhone, logoUrl: (shop as any)?.logoUrl || (shop as any)?.photoUrl || undefined },
@@ -527,11 +567,9 @@ export function POSBillingPage() {
         }
 
         if (action === "download") {
-            // Server-rendered PDF has no OEM/MRP toggle, so only use it when neither
-            // extra field was requested; otherwise always build client-side.
-            if (syncedInvoiceId && !opts.showOem && !opts.showMrp) {
+            if (syncedInvoiceId) {
                 try {
-                    const res = await fetch(getInvoicePdfUrl(syncedInvoiceId), {
+                    const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, opts), {
                         headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
                     });
                     if (res.ok) {
