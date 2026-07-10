@@ -108,66 +108,98 @@ async function buildInvoiceDoc(m: InvoiceModel) {
   ]);
   const autoTable = autoTableMod.default;
   const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const M = 40;
-  const R = 555;
+  const M = 40, R = 555, W = R - M;
+  doc.setDrawColor(0, 0, 0).setLineWidth(0.5);
 
-  doc.setFont("helvetica", "bold").setFontSize(18).setTextColor(139, 30, 30);
-  doc.text(m.shop.name, M, 50);
-  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(80);
-  let y = 66;
-  doc.text(m.shop.address, M, y);
-  if (m.shop.gstin) { y += 12; doc.text(`GSTIN: ${m.shop.gstin}`, M, y); }
-  if (m.shop.phone) { y += 12; doc.text(`Ph: ${m.shop.phone}`, M, y); }
+  // Title row
+  doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(0, 0, 0);
+  doc.text("TAX INVOICE", M + W / 2, 45, { align: "center" });
 
-  doc.setFont("helvetica", "bold").setFontSize(15).setTextColor(20);
-  doc.text("TAX INVOICE", R, 50, { align: "right" });
-  doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(80);
-  doc.text(`Invoice No: ${m.invoiceNo}`, R, 66, { align: "right" });
-  doc.text(`Date: ${m.dateStr}`, R, 78, { align: "right" });
+  // Main Header Box (Top 55 to 155)
+  const topY = 55, hdrH = 100;
+  doc.rect(M, topY, W, hdrH);
+  const midX = M + 210;
+  doc.line(midX, topY, midX, topY + hdrH);
 
-  y = Math.max(y, 78) + 24;
-  doc.setFont("helvetica", "bold").setFontSize(9).setTextColor(120);
-  doc.text("BILL TO", M, y);
-  doc.setFont("helvetica", "normal").setFontSize(10).setTextColor(20);
-  y += 14; doc.text(m.customer.name, M, y);
-  y += 12; doc.text(`Vehicle: ${m.customer.vehicle}`, M, y);
-  if (m.jobNumber) { y += 12; doc.text(`Job Card: ${m.jobNumber}`, M, y); }
+  // Left Seller Info
+  doc.setFont("helvetica", "bold").setFontSize(10);
+  doc.text(m.shop.name || "Shri Mahesh Automobiles", M + 6, topY + 16);
+  doc.setFont("helvetica", "normal").setFontSize(8);
+  let sy = topY + 30;
+  if (m.shop.address) {
+    const lines = doc.splitTextToSize(String(m.shop.address), midX - M - 12);
+    doc.text(lines, M + 6, sy); sy += lines.length * 10;
+  }
+  if (m.shop.phone) { doc.text(`Ph : ${m.shop.phone}`, M + 6, sy); sy += 11; }
+  if (m.shop.gstin) { doc.text(`GSTIN/UIN : ${m.shop.gstin}`, M + 6, sy); sy += 11; }
 
+  // Right Invoice Fields Grid (4 rows inside right box)
+  const rowH = hdrH / 4;
+  for (let i = 1; i < 4; i++) {
+    doc.line(midX, topY + i * rowH, R, topY + i * rowH);
+  }
+  const valX = midX + 80;
+  doc.line(valX, topY, valX, topY + hdrH);
+
+  const drawField = (idx: number, label: string, val: string) => {
+    const fy = topY + idx * rowH + 16;
+    doc.setFont("helvetica", "bold").setFontSize(8);
+    doc.text(label, midX + 6, fy);
+    doc.setFont("helvetica", "normal");
+    doc.text(val || "—", valX + 6, fy);
+  };
+  drawField(0, "Invoice No.", m.invoiceNo || "—");
+  drawField(1, "Dated", m.dateStr || "—");
+  drawField(2, "Job Card No.", m.jobNumber ? `#JC-${m.jobNumber}` : "—");
+  drawField(3, "Mode of Payment", "CASH / UPI / CARD");
+
+  // Buyer Block (Bill to) Box (Top 155 to 220)
+  const buyY = topY + hdrH, buyH = 65;
+  doc.rect(M, buyY, W, buyH);
+  doc.setFont("helvetica", "bold").setFontSize(8);
+  doc.text("Buyer (Bill to) / Customer Details :", M + 6, buyY + 14);
+  doc.setFont("helvetica", "normal").setFontSize(8);
+  let by = buyY + 26;
+  if (m.customer.name) {
+    doc.text(`Name : ${m.customer.name}${m.customer.phone ? `  (Ph: ${m.customer.phone})` : ""}`, M + 6, by); by += 11;
+  }
+  if (m.customer.address) {
+    const alines = doc.splitTextToSize(`Address : ${m.customer.address}`, W - 12);
+    doc.text(alines, M + 6, by); by += alines.length * 10;
+  }
+  if (m.customer.vehicle) { doc.text(`Vehicle No : ${m.customer.vehicle}`, M + 6, by); by += 11; }
+
+  // Table
   autoTable(doc, {
-    startY: y + 16,
-    head: [["#", "Description", "Qty", "Rate", "Amount"]],
+    startY: buyY + buyH + 8,
+    head: [["Sl No.", "Description of Goods / Services", "Qty", "Rate", "Amount"]],
     body: m.lines.map((l, i) => [String(i + 1), l.description, String(l.qty), pdfINR(l.rate), pdfINR(l.amount)]),
-    styles: { fontSize: 9, cellPadding: 6 },
-    headStyles: { fillColor: [139, 30, 30], halign: "left" },
-    columnStyles: { 0: { cellWidth: 26, halign: "center" }, 2: { halign: "center", cellWidth: 44 }, 3: { halign: "right", cellWidth: 80 }, 4: { halign: "right", cellWidth: 90 } },
+    styles: { fontSize: 8, cellPadding: 4, textColor: [0, 0, 0], lineWidth: 0.5, lineColor: [0, 0, 0] },
+    headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.5, lineColor: [0, 0, 0] },
     margin: { left: M, right: M },
   });
 
-  let fy = ((doc as any).lastAutoTable?.finalY || y + 40) + 18;
-  const lx = 360;
+  let fy = ((doc as any).lastAutoTable?.finalY || (buyY + buyH + 40)) + 12;
+  const lx = 340;
   const totLine = (label: string, val: string, bold = false) => {
-    doc.setFont("helvetica", bold ? "bold" : "normal").setFontSize(bold ? 12 : 10).setTextColor(bold ? 139 : 40, bold ? 30 : 40, bold ? 30 : 40);
-    doc.text(label, lx, fy);
-    doc.text(val, R, fy, { align: "right" });
-    fy += bold ? 18 : 15;
+    doc.setFont("helvetica", bold ? "bold" : "normal").setFontSize(bold ? 11 : 9).setTextColor(0, 0, 0);
+    doc.text(label, lx, fy); doc.text(val, R, fy, { align: "right" }); fy += bold ? 16 : 13;
   };
   totLine("Subtotal", pdfINR(m.subTotal));
   totLine(`CGST (${m.gstRate / 2}%)`, pdfINR(m.cgst));
   totLine(`SGST (${m.gstRate / 2}%)`, pdfINR(m.sgst));
-  // Divider sits in a clear gap ABOVE the Total row — previously drawn at fy-6,
-  // which fell inside the bold Total text and crossed through the value.
   fy += 4;
-  doc.setDrawColor(139, 30, 30).line(lx, fy, R, fy);
-  fy += 18;
-  totLine("Total", pdfINR(m.total), true);
+  doc.line(lx, fy, R, fy);
+  fy += 16;
+  totLine("TOTAL AMOUNT", pdfINR(m.total), true);
 
   fy += 6;
-  doc.setFont("helvetica", "italic").setFontSize(8).setTextColor(100);
+  doc.setFont("helvetica", "italic").setFontSize(8).setTextColor(80, 80, 80);
   doc.text(`Amount in words: ${m.amountWords}`, M, fy, { maxWidth: R - M });
-
-  doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(140);
-  doc.text("This is a computer-generated invoice.", M, 800);
-  doc.text("Authorised Signatory", R, 800, { align: "right" });
+  fy += 16;
+  doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(80, 80, 80);
+  doc.text("This is a computer-generated tax invoice.", M, fy);
+  doc.text("Authorised Signatory", R, fy, { align: "right" });
 
   return doc;
 }

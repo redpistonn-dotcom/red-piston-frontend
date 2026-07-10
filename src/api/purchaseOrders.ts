@@ -1,4 +1,4 @@
-import { api } from './client.js';
+import { api, BASE_URL } from './client.js';
 
 export const getPurchaseOrders = (params?: { status?: string; partyId?: number }) =>
   api.get('/api/shop/purchase-orders', params as Record<string, string>);
@@ -31,4 +31,15 @@ export const sendPurchaseOrderByEmail = (id: number) =>
   api.post(`/api/shop/purchase-orders/${id}/send-email`, {});
 
 export const getPurchaseOrderPdfUrl = (id: number) =>
-  `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/shop/purchase-orders/${id}/pdf`;
+  `${BASE_URL}/api/shop/purchase-orders/${id}/pdf`;
+
+export const previewPurchaseOrderPdf = async (id: number | string): Promise<string> => {
+  const { getAccessToken } = await import('./client.js');
+  const res = await fetch(getPurchaseOrderPdfUrl(Number(id)), {
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(`Could not load the PO PDF (server returned ${res.status})`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+};

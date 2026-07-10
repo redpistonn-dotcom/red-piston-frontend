@@ -9,6 +9,7 @@
 import { useState, useEffect, useMemo, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import * as XLSX from "xlsx";
+import PdfPreviewModal from "./PdfPreviewModal";
 import { T, FONT } from "../theme";
 import { fmt } from "../utils";
 import { getParties } from "../api/parties.js";
@@ -82,16 +83,24 @@ function downloadPoExcel(po: any, shopName: string) {
   XLSX.writeFile(wb, `${po.poNumber}.xlsx`);
 }
 
-async function downloadPoPdf(po: any, toast?: (m: string, t?: string) => void) {
+async function downloadPoPdf(po: any, toast?: (m: string, t?: string) => void, setPoPreview?: (s: any) => void) {
+  if (setPoPreview) {
+    setPoPreview({ url: null, loading: true, title: `Purchase Order ${po.poNumber || po.poId || ""}`, filename: `${po.poNumber || "po"}.pdf`, error: null });
+  }
   try {
-    const res = await fetch(getPurchaseOrderPdfUrl(po.poId), {
-      headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
-    });
-    if (!res.ok) throw new Error("pdf fetch failed");
-    const url = URL.createObjectURL(await res.blob());
-    window.open(url, "_blank");
-  } catch {
-    toast?.("Could not fetch the PDF — check your connection", "warning");
+    const { previewPurchaseOrderPdf } = await import("../api/purchaseOrders");
+    const url = await previewPurchaseOrderPdf(po.poId);
+    if (setPoPreview) {
+      setPoPreview({ url, loading: false, title: `Purchase Order ${po.poNumber || po.poId || ""}`, filename: `${po.poNumber || "po"}.pdf`, error: null });
+    } else {
+      window.open(url, "_blank");
+    }
+  } catch (err: any) {
+    if (setPoPreview) {
+      setPoPreview({ url: null, loading: false, title: `Purchase Order ${po.poNumber || ""}`, filename: `${po.poNumber || "po"}.pdf`, error: err?.message || "Could not load the PO PDF" });
+    } else {
+      toast?.("Could not fetch the PDF — check your connection", "warning");
+    }
   }
 }
 
@@ -354,6 +363,7 @@ export function PurchaseOrderModal({ open, onClose, products, preselectedIds, sh
   const [linkBillFor, setLinkBillFor] = useState<any>(null);
   const [emailSending, setEmailSending] = useState<number | null>(null);
   const [priceHistory, setPriceHistory] = useState<Record<number, Array<{ price: number; qty: number; date: string; poNumber: string }>> | null>(null);
+  const [poPreview, setPoPreview] = useState<{ url: string | null; loading: boolean; title?: string; filename?: string; error?: string | null } | null>(null);
 
   const supplier = suppliers.find(s => (s.partyId ?? s.id) === supplierId) || null;
 
@@ -748,7 +758,7 @@ export function PurchaseOrderModal({ open, onClose, products, preselectedIds, sh
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 14 }}>
                 <button style={{ ...actBtn, height: 38 }} onClick={() => downloadPoExcel(createdPo, shopName)}>📊 Excel</button>
-                <button style={{ ...actBtn, height: 38 }} onClick={() => downloadPoPdf(createdPo, toast)}>📄 PDF</button>
+                <button style={{ ...actBtn, height: 38 }} onClick={() => downloadPoPdf(createdPo, toast, setPoPreview)}>📄 PDF</button>
                 <button style={{ ...actBtn, height: 38, background: "#25D366", color: "#fff", border: "none", fontWeight: 700 }} onClick={() => sharePoWhatsApp(createdPo, shopName)}>💬 WhatsApp</button>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
@@ -790,7 +800,7 @@ export function PurchaseOrderModal({ open, onClose, products, preselectedIds, sh
                             </button>
                           )}
                           <button style={actBtn} title="Excel" onClick={() => downloadPoExcel(po, shopName)}>📊</button>
-                          <button style={actBtn} title="PDF"   onClick={() => downloadPoPdf(po, toast)}>📄</button>
+                          <button style={actBtn} title="PDF"   onClick={() => downloadPoPdf(po, toast, setPoPreview)}>📄</button>
                           <button style={{ ...actBtn, background: "#25D366", color: "#fff", border: "none" }} title="WhatsApp" onClick={() => sharePoWhatsApp(po, shopName)}>💬</button>
                           {po.status === "APPROVED" && (
                             <button
@@ -845,6 +855,19 @@ export function PurchaseOrderModal({ open, onClose, products, preselectedIds, sh
           )}
         </div>
       </div>
+      {poPreview && (
+        <PdfPreviewModal
+          url={poPreview.url}
+          loading={poPreview.loading}
+          error={poPreview.error}
+          title={poPreview.title}
+          filename={poPreview.filename}
+          onClose={() => {
+            if (poPreview.url) URL.revokeObjectURL(poPreview.url);
+            setPoPreview(null);
+          }}
+        />
+      )}
     </>,
     document.body
   );

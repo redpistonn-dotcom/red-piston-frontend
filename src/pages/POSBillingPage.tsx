@@ -467,38 +467,73 @@ export function POSBillingPage() {
         const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
         const autoTable = autoTableMod.default;
         const doc = new jsPDF({ unit: "pt", format: "a4" });
-        const M = 40, R = 555;
+        const M = 40, R = 555, W = R - M;
         const rs = (n: number) => "Rs. " + Math.round(Number(n) || 0).toLocaleString("en-IN");
-        doc.setFont("helvetica", "bold").setFontSize(16).setTextColor(20);
-        doc.text(shopName || "—", M, 50);
-        doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
-        let y = 64;
-        if (shopAddress) { doc.text(String(shopAddress), M, y); y += 12; }
-        if (shopGst) { doc.text(`GSTIN: ${shopGst}`, M, y); y += 12; }
-        doc.setFont("helvetica", "bold").setFontSize(13).setTextColor(20);
-        doc.text(billType === "Sale" ? "TAX INVOICE" : "QUOTATION", R, 50, { align: "right" });
-        doc.setFont("helvetica", "normal").setFontSize(9).setTextColor(90);
-        doc.text(`No: ${invoiceNo}`, R, 64, { align: "right" });
-        if (invoiceAt) doc.text(String(fmtDateTime(invoiceAt)), R, 76, { align: "right" });
-        y = Math.max(y, 90);
+        doc.setDrawColor(0, 0, 0).setLineWidth(0.5);
+
+        // Title row
+        doc.setFont("helvetica", "bold").setFontSize(12).setTextColor(0, 0, 0);
+        doc.text(billType === "Sale" ? "TAX INVOICE" : "QUOTATION", M + W / 2, 45, { align: "center" });
+
+        // Main Header Box (Top 55 to 155)
+        const topY = 55, hdrH = 100;
+        doc.rect(M, topY, W, hdrH);
+        const midX = M + 210;
+        doc.line(midX, topY, midX, topY + hdrH);
+
+        // Left Seller Info
+        doc.setFont("helvetica", "bold").setFontSize(10);
+        doc.text(shopName || "Shri Mahesh Automobiles", M + 6, topY + 16);
+        doc.setFont("helvetica", "normal").setFontSize(8);
+        let sy = topY + 30;
+        if (shopAddress) {
+            const lines = doc.splitTextToSize(String(shopAddress), midX - M - 12);
+            doc.text(lines, M + 6, sy); sy += lines.length * 10;
+        }
+        if (shopPhone) { doc.text(`Ph : ${shopPhone}`, M + 6, sy); sy += 11; }
+        if (shopGst) { doc.text(`GSTIN/UIN : ${shopGst}`, M + 6, sy); sy += 11; }
+
+        // Right Invoice Fields Grid (4 rows inside right box)
+        const rowH = hdrH / 4;
+        for (let i = 1; i < 4; i++) {
+            doc.line(midX, topY + i * rowH, R, topY + i * rowH);
+        }
+        const valX = midX + 80;
+        doc.line(valX, topY, valX, topY + hdrH);
+
+        const drawField = (idx: number, label: string, val: string) => {
+            const fy = topY + idx * rowH + 16;
+            doc.setFont("helvetica", "bold").setFontSize(8);
+            doc.text(label, midX + 6, fy);
+            doc.setFont("helvetica", "normal");
+            doc.text(val || "—", valX + 6, fy);
+        };
+        drawField(0, "Invoice No.", invoiceNo || "—");
+        drawField(1, "Dated", invoiceAt ? fmtDateTime(invoiceAt) : fmtDate(Date.now()));
+        drawField(2, "Order ID", `#SO-${invoiceNo || ""}`);
+        drawField(3, "Mode of Payment", paymentMode || "CASH");
+
+        // Buyer Block (Bill to) Box (Top 155 to 220)
+        const buyY = topY + hdrH, buyH = 65;
+        doc.rect(M, buyY, W, buyH);
+        doc.setFont("helvetica", "bold").setFontSize(8);
+        doc.text("Buyer (Bill to) / Customer Details :", M + 6, buyY + 14);
+        doc.setFont("helvetica", "normal").setFontSize(8);
+        let by = buyY + 26;
         if (customerName) {
-            doc.text(`Customer: ${customerName}${customerPhone ? ` (${customerPhone})` : ""}`, M, y);
-            y += 12;
+            doc.text(`Name : ${customerName}${customerPhone ? `  (Ph: ${customerPhone})` : ""}`, M + 6, by); by += 11;
         }
         if (customerAddress) {
-            const splitAddr = doc.splitTextToSize(`Address: ${customerAddress}`, R - M);
-            doc.text(splitAddr, M, y);
-            y += splitAddr.length * 12;
+            const alines = doc.splitTextToSize(`Address : ${customerAddress}`, W - 12);
+            doc.text(alines, M + 6, by); by += alines.length * 10;
         }
-        if (vehicleReg) { doc.text(`Vehicle: ${vehicleReg}`, M, y); y += 12; }
-        if (notes) {
-            const splitNotes = doc.splitTextToSize(`Remarks: ${notes}`, R - M);
-            doc.text(splitNotes, M, y);
-            y += splitNotes.length * 12;
-        }
-        const head = ["#", "Item", ...(showOem ? ["OEM No."] : []), "Qty", "Rate", ...(showMrp ? ["MRP"] : []), "Disc", "GST", "Amount"];
+        if (vehicleReg) { doc.text(`Vehicle No : ${vehicleReg}`, M + 6, by); by += 11; }
+        if (notes) { doc.text(`Remarks : ${notes}`, M + 6, by); }
+
+        // Table
+        const head = ["Sl No.", "Description of Goods", ...(showOem ? ["OEM No."] : []), "Qty", "Rate", ...(showMrp ? ["MRP"] : []), "Disc", "GST", "Amount"];
         autoTable(doc, {
-            startY: y + 8,
+            startY: buyY + buyH + 8,
             head: [head],
             body: items.map((it: any, i: number) => {
                 const lc = lineCalcs[i];
@@ -510,26 +545,26 @@ export function POSBillingPage() {
                     lc.discAmt > 0 ? `-${rs(lc.discAmt)}` : "-", rs(lc.gstAmt), rs(lc.afterDisc),
                 ];
             }),
-            styles: { fontSize: 9, cellPadding: 5 },
-            headStyles: { fillColor: [31, 41, 55] },
+            styles: { fontSize: 8, cellPadding: 4, textColor: [0, 0, 0], lineWidth: 0.5, lineColor: [0, 0, 0] },
+            headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.5, lineColor: [0, 0, 0] },
             margin: { left: M, right: M },
         });
-        let fy = ((doc as any).lastAutoTable?.finalY || y + 40) + 16;
-        const lx = 360;
+
+        let fy = ((doc as any).lastAutoTable?.finalY || (buyY + buyH + 40)) + 12;
+        const lx = 340;
         const trow = (l: string, v: string, b = false) => {
-            doc.setFont("helvetica", b ? "bold" : "normal").setFontSize(b ? 13 : 10).setTextColor(b ? 31 : 40, b ? 41 : 40, b ? 55 : 40);
-            doc.text(l, lx, fy); doc.text(v, R, fy, { align: "right" }); fy += b ? 18 : 15;
+            doc.setFont("helvetica", b ? "bold" : "normal").setFontSize(b ? 11 : 9).setTextColor(0, 0, 0);
+            doc.text(l, lx, fy); doc.text(v, R, fy, { align: "right" }); fy += b ? 16 : 13;
         };
         if (grandDiscount > 0) trow("Item Discounts", `-${rs(grandDiscount)}`);
         if (additionalDisc > 0) trow("Additional Discount", `-${rs(additionalDisc)}`);
         trow("GST (Inclusive)", rs(grandGst));
-        // Divider in a clear gap above TOTAL (was fy-6, which crossed the bold text).
         fy += 4;
-        doc.setDrawColor(31, 41, 55).line(lx, fy, R, fy);
-        fy += 18;
-        trow("TOTAL", rs(finalTotal), true);
-        fy += 8;
-        doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(120);
+        doc.line(lx, fy, R, fy);
+        fy += 16;
+        trow("TOTAL AMOUNT", rs(finalTotal), true);
+        fy += 6;
+        doc.setFont("helvetica", "normal").setFontSize(8).setTextColor(80, 80, 80);
         doc.text(`Paid via ${paymentMode} - computer-generated ${billType === "Sale" ? "tax invoice" : "quotation"}.`, M, fy);
         return doc;
     };
@@ -539,8 +574,8 @@ export function POSBillingPage() {
     async function runBillAction(action: "print" | "download" | "whatsapp", opts: { showOem: boolean; showMrp: boolean }) {
         if (action === "print") {
             if (printFormat === "a4") {
-                let blobUrl = inlinePdfUrl;
-                if (!blobUrl && syncedInvoiceId) {
+                let blobUrl: string | null = null;
+                if (syncedInvoiceId) {
                     try {
                         const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, opts), {
                             headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
@@ -548,6 +583,7 @@ export function POSBillingPage() {
                         if (res.ok) blobUrl = URL.createObjectURL(await res.blob());
                     } catch {}
                 }
+                if (!blobUrl && inlinePdfUrl) blobUrl = inlinePdfUrl;
                 if (!blobUrl) {
                     try {
                         const doc = await buildBillPdf(opts);

@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { AppCtx } from "../AppCtx";
 import { fmt, fmtDate, downloadCSV, generateCSV, uid } from "../utils";
 import { MobileCard, MobileCardList, useIsMobile, Skeleton } from "../components/ui";
+import PdfPreviewModal from "../components/PdfPreviewModal";
 
 // ─── Status config ────────────────────────────────────────────────────────────
 type OrderStatus = "Shipped" | "Pending" | "Delivered" | "Cancelled" | "Processing" | "Stock Added";
@@ -247,23 +248,59 @@ export function OrdersPage() {
     const [shopApiOrders, setShopApiOrders] = useState<any[]>([]);
     const [viewOrder, setViewOrder] = useState<any>(null);
     const [dropdownOrder, setDropdownOrder] = useState<string | null>(null);
+    const [orderPdfPreview, setOrderPdfPreview] = useState<{ url: string | null; loading: boolean; title?: string; filename?: string; error?: string | null } | null>(null);
 
-    const printOrder = (order: any) => {
-        const w = window.open("", "_blank", "width=480,height=600");
-        if (!w) return;
-        w.document.write(`<!DOCTYPE html><html><head><title>Order ${order.orderId}</title>
-<style>body{font-family:sans-serif;padding:24px;font-size:13px;color:#1c1b1b}h2{margin:0 0 16px;font-size:17px}table{width:100%;border-collapse:collapse}td{padding:8px 0;border-bottom:1px solid #e5e0d8}td:first-child{color:#6b7280;width:110px}@media print{button{display:none}}</style></head><body>
-<h2>${order.orderId}</h2>
-<table>
-<tr><td>Type</td><td>${order.type}</td></tr>
-<tr><td>Party</td><td>${order.partyName || "—"}</td></tr>
-<tr><td>Amount</td><td>${fmt(order.amount)}</td></tr>
-<tr><td>Status</td><td>${order.status}</td></tr>
-<tr><td>Date</td><td>${new Date(order.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td></tr>
-${order.product ? `<tr><td>Product</td><td>${order.product}</td></tr>` : ""}
-</table>
-<br/><button onclick="window.print()">🖨 Print</button></body></html>`);
-        w.document.close();
+    const printOrder = async (order: any) => {
+        setOrderPdfPreview({ url: null, loading: true, title: `Order ${order.orderId}`, filename: `order-${order.id}.pdf`, error: null });
+        try {
+            if (order.type === "Sale" && order.id) {
+                const { getInvoicePdfUrl } = await import("../api/billing");
+                const { getAccessToken } = await import("../api/client");
+                const res = await fetch(getInvoicePdfUrl(order.id, { showOem: true, showMrp: true }), {
+                    headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    setOrderPdfPreview({ url: URL.createObjectURL(blob), loading: false, title: `Invoice ${order.orderId}`, filename: `invoice-${order.id}.pdf`, error: null });
+                    return;
+                }
+            } else if (order.type === "Purchase" && order.id) {
+                const { previewPurchaseOrderPdf } = await import("../api/purchaseOrders");
+                const url = await previewPurchaseOrderPdf(order.id);
+                setOrderPdfPreview({ url, loading: false, title: `Purchase Order ${order.orderId}`, filename: `po-${order.id}.pdf`, error: null });
+                return;
+            }
+        } catch {}
+        try {
+            const [{ jsPDF }, autoTableMod] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+            const autoTable = autoTableMod.default;
+            const doc = new jsPDF({ unit: "pt", format: "a4" });
+            const M = 40, R = 555, W = R - M;
+            doc.setDrawColor(0, 0, 0).setLineWidth(0.5);
+            doc.setFont("helvetica", "bold").setFontSize(12);
+            doc.text(order.type === "Sale" ? "TAX INVOICE" : order.type === "Purchase" ? "PURCHASE ORDER" : "STOCK ORDER", M + W / 2, 45, { align: "center" });
+            doc.rect(M, 55, W, 90);
+            doc.setFontSize(10);
+            doc.text(`Order ID: ${order.orderId}`, M + 10, 80);
+            doc.setFont("helvetica", "normal").setFontSize(9);
+            doc.text(`Party: ${order.partyName || "—"}`, M + 10, 100);
+            doc.text(`Date: ${new Date(order.date).toLocaleDateString("en-IN")}`, M + 10, 120);
+            autoTable(doc, {
+                startY: 160,
+                head: [["Item Description", "Amount"]],
+                body: [[order.product || "Order Items", `Rs. ${Number(order.amount || 0).toLocaleString("en-IN")}`]],
+                styles: { fontSize: 9, cellPadding: 6, textColor: [0, 0, 0], lineWidth: 0.5, lineColor: [0, 0, 0] },
+                headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: "bold", lineWidth: 0.5, lineColor: [0, 0, 0] },
+                margin: { left: M, right: M },
+            });
+            let fy = ((doc as any).lastAutoTable?.finalY || 220) + 20;
+            doc.setFont("helvetica", "bold").setFontSize(11);
+            doc.text("TOTAL AMOUNT:", 340, fy);
+            doc.text(`Rs. ${Number(order.amount || 0).toLocaleString("en-IN")}`, R, fy, { align: "right" });
+            setOrderPdfPreview({ url: URL.createObjectURL(doc.output("blob")), loading: false, title: `Order ${order.orderId}`, filename: `${order.orderId}.pdf`, error: null });
+        } catch (err: any) {
+            setOrderPdfPreview({ url: null, loading: false, title: `Order ${order.orderId}`, error: err?.message || "Could not load PDF" });
+        }
     };
 
     useEffect(() => {
@@ -805,6 +842,20 @@ ${order.product ? `<tr><td>Product</td><td>${order.product}</td></tr>` : ""}
 
             {/* Create Order Modal */}
             {showCreate && <CreateOrderModal onClose={() => setShowCreate(false)} onCreated={handleCreated} activeShopId={activeShopId} />}
+
+            {orderPdfPreview && (
+                <PdfPreviewModal
+                    url={orderPdfPreview.url}
+                    loading={orderPdfPreview.loading}
+                    error={orderPdfPreview.error}
+                    title={orderPdfPreview.title}
+                    filename={orderPdfPreview.filename}
+                    onClose={() => {
+                        if (orderPdfPreview.url) URL.revokeObjectURL(orderPdfPreview.url);
+                        setOrderPdfPreview(null);
+                    }}
+                />
+            )}
         </div>
     );
 }
