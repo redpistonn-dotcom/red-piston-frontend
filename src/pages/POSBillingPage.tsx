@@ -135,21 +135,29 @@ export function POSBillingPage() {
     const [pdfPreview, setPdfPreview] = useState<{ url: string | null; loading: boolean; error: string | null } | null>(null);
 
     const openPdfPreview = useCallback(async () => {
-        if (!syncedInvoiceId) return;
         setPdfPreview({ url: null, loading: true, error: null });
+        if (syncedInvoiceId) {
+            try {
+                const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, { showOem: showOemOnBill, showMrp: showMrpOnBill }), {
+                    headers: { Authorization: `Bearer ${getAccessToken()}` },
+                    credentials: 'include',
+                });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    setPdfPreview({ url, loading: false, error: null });
+                    return;
+                }
+            } catch {}
+        }
         try {
-            const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, { showOem: showOemOnBill, showMrp: showMrpOnBill }), {
-                headers: { Authorization: `Bearer ${getAccessToken()}` },
-                credentials: 'include',
-            });
-            if (!res.ok) throw new Error(`Server returned ${res.status}`);
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
+            const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
+            const url = URL.createObjectURL(doc.output("blob"));
             setPdfPreview({ url, loading: false, error: null });
         } catch (e: any) {
             setPdfPreview({ url: null, loading: false, error: e?.message || 'Could not load PDF' });
         }
-    }, [syncedInvoiceId, showOemOnBill, showMrpOnBill]);
+    }, [syncedInvoiceId, showOemOnBill, showMrpOnBill, buildBillPdf]);
 
     const closePdfPreview = useCallback(() => {
         setPdfPreview(prev => {
@@ -503,13 +511,13 @@ export function POSBillingPage() {
                 ];
             }),
             styles: { fontSize: 9, cellPadding: 5 },
-            headStyles: { fillColor: [139, 30, 30] },
+            headStyles: { fillColor: [31, 41, 55] },
             margin: { left: M, right: M },
         });
         let fy = ((doc as any).lastAutoTable?.finalY || y + 40) + 16;
         const lx = 360;
         const trow = (l: string, v: string, b = false) => {
-            doc.setFont("helvetica", b ? "bold" : "normal").setFontSize(b ? 13 : 10).setTextColor(b ? 139 : 40, b ? 30 : 40, b ? 30 : 40);
+            doc.setFont("helvetica", b ? "bold" : "normal").setFontSize(b ? 13 : 10).setTextColor(b ? 31 : 40, b ? 41 : 40, b ? 55 : 40);
             doc.text(l, lx, fy); doc.text(v, R, fy, { align: "right" }); fy += b ? 18 : 15;
         };
         if (grandDiscount > 0) trow("Item Discounts", `-${rs(grandDiscount)}`);
@@ -517,7 +525,7 @@ export function POSBillingPage() {
         trow("GST (Inclusive)", rs(grandGst));
         // Divider in a clear gap above TOTAL (was fy-6, which crossed the bold text).
         fy += 4;
-        doc.setDrawColor(139, 30, 30).line(lx, fy, R, fy);
+        doc.setDrawColor(31, 41, 55).line(lx, fy, R, fy);
         fy += 18;
         trow("TOTAL", rs(finalTotal), true);
         fy += 8;
@@ -547,15 +555,7 @@ export function POSBillingPage() {
                     } catch {}
                 }
                 if (blobUrl) {
-                    const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
-                    if (isMobileDevice) {
-                        const a = document.createElement("a");
-                        a.href = blobUrl;
-                        a.target = "_blank";
-                        a.click();
-                    } else {
-                        setPdfPreview({ url: blobUrl, loading: false, error: null });
-                    }
+                    setPdfPreview({ url: blobUrl, loading: false, error: null });
                     return;
                 }
             }

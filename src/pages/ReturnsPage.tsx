@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import { T, FONT } from "../theme";
 import { useAppCtx } from "../AppCtx";
 import { Btn, Select, DataTable, TC, TCMono, type Column } from "../components/ui";
-import { getSalesReturns } from "../api/returns";
-import { openExchangeInvoicePdf } from "../api/exchanges";
+import { getSalesReturns, openReturnInvoicePdf, previewReturnInvoicePdf } from "../api/returns";
+import { openExchangeInvoicePdf, previewExchangePdf } from "../api/exchanges";
 import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
+import PdfPreviewModal from "../components/PdfPreviewModal";
 
 // One unified list: a SalesReturn with no exchangeOrder is a plain Return; one
 // with an exchangeOrder attached renders as an Exchange — same underlying record,
@@ -70,12 +71,28 @@ export function ReturnsPage() {
   const [reasonFilter, setReasonFilter] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [openingInvoiceId, setOpeningInvoiceId] = useState<number | null>(null);
+  const [pdfPreview, setPdfPreview] = useState<{ url: string | null; loading: boolean; title: string; filename: string } | null>(null);
 
-  const viewExchangeInvoice = async (exchangeId: number) => {
-    setOpeningInvoiceId(exchangeId);
-    try { await openExchangeInvoicePdf(exchangeId); }
-    catch (e: any) { toast(e?.message || "Could not open the exchange invoice", "error"); }
-    setOpeningInvoiceId(null);
+  const viewExchangeInvoice = async (exchangeId: number, exchangeNo?: string) => {
+    setPdfPreview({ url: null, loading: true, title: `Exchange Invoice ${exchangeNo || exchangeId}`, filename: `exchange-${exchangeNo || exchangeId}.pdf` });
+    try {
+      const url = await previewExchangePdf(exchangeId);
+      setPdfPreview({ url, loading: false, title: `Exchange Invoice ${exchangeNo || exchangeId}`, filename: `exchange-${exchangeNo || exchangeId}.pdf` });
+    } catch (e: any) {
+      setPdfPreview(null);
+      toast(e?.message || "Could not open the exchange invoice", "error");
+    }
+  };
+
+  const viewReturnInvoice = async (returnId: number, returnNo?: string) => {
+    setPdfPreview({ url: null, loading: true, title: `Return Invoice ${returnNo || returnId}`, filename: `return-${returnNo || returnId}.pdf` });
+    try {
+      const url = await previewReturnInvoicePdf(returnId);
+      setPdfPreview({ url, loading: false, title: `Return Invoice ${returnNo || returnId}`, filename: `return-${returnNo || returnId}.pdf` });
+    } catch (e: any) {
+      setPdfPreview(null);
+      toast(e?.message || "Could not open the return invoice", "error");
+    }
   };
 
   const load = useCallback(() => {
@@ -156,16 +173,13 @@ export function ReturnsPage() {
               <td style={TC}>{isExchange ? settlementBadge(row.exchangeOrder.settlementType) : refundModeBadge(row.refundMode)}</td>
               <td style={{ ...TCMono, textAlign: "right" }}>₹{rowValue(row).toFixed(0)}</td>
               <td style={TC}>
-                {isExchange && (
-                  <button
-                    onClick={() => viewExchangeInvoice(row.exchangeOrder.exchangeId)}
-                    disabled={openingInvoiceId === row.exchangeOrder.exchangeId}
-                    title="View Exchange Invoice"
-                    style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 7, padding: "4px 8px", cursor: "pointer", fontSize: 12, color: T.t2 }}
-                  >
-                    {openingInvoiceId === row.exchangeOrder.exchangeId ? "…" : "🖨"}
-                  </button>
-                )}
+                <button
+                  onClick={() => isExchange ? viewExchangeInvoice(row.exchangeOrder.exchangeId, row.exchangeOrder.exchangeNo) : viewReturnInvoice(row.returnId, row.returnNo)}
+                  title={isExchange ? "View Exchange Invoice" : "View Return Invoice / Credit Note"}
+                  style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 7, padding: "4px 8px", cursor: "pointer", fontSize: 12, color: T.t2 }}
+                >
+                  🖨
+                </button>
               </td>
             </tr>
           );
@@ -178,6 +192,19 @@ export function ReturnsPage() {
         onCreated={load}
         toast={toast}
       />
+
+      {pdfPreview && (
+        <PdfPreviewModal
+          url={pdfPreview.url}
+          loading={pdfPreview.loading}
+          title={pdfPreview.title}
+          filename={pdfPreview.filename}
+          onClose={() => {
+            if (pdfPreview?.url) URL.revokeObjectURL(pdfPreview.url);
+            setPdfPreview(null);
+          }}
+        />
+      )}
     </div>
   );
 }

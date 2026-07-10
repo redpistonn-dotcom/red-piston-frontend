@@ -76,7 +76,7 @@ export function Modal({ open, onClose, title, subtitle, width = 560, children }:
                 position: "fixed",
                 inset: 0,
                 background: isMobile ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.72)",
-                zIndex: 1000,
+                zIndex: 2147483640,
                 display: "flex",
                 alignItems: isMobile ? "flex-end" : "center",
                 justifyContent: isMobile ? "stretch" : "center",

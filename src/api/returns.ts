@@ -73,3 +73,32 @@ export const getReturnPdfUrl = (id: number | string) => {
   const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   return `${base}/api/shop/returns/${id}/pdf`;
 };
+
+export const openReturnInvoicePdf = async (id: number | string) => {
+  const { getAccessToken } = await import('./client.js');
+  const res = await fetch(getReturnPdfUrl(id), {
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(`Could not load the return invoice (server returned ${res.status})`);
+  const blob = await res.blob();
+  const objUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objUrl;
+  a.download = `return-invoice-${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
+};
+
+export const previewReturnInvoicePdf = async (id: number | string): Promise<string> => {
+  const { getAccessToken } = await import('./client.js');
+  const res = await fetch(getReturnPdfUrl(id), {
+    headers: { Authorization: `Bearer ${getAccessToken()}` },
+    credentials: 'include',
+  });
+  if (!res.ok) throw new Error(`Could not load the return invoice (server returned ${res.status})`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+};
