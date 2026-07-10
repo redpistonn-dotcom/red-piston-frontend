@@ -8,6 +8,7 @@ import { useJobCardHistory } from "../hooks/useJobCardHistory";
 import { fetchMovements } from "../api/sync";
 import { getInvoicePdfUrl } from "../api/billing";
 import { getAccessToken } from "../api/client";
+import PdfPreviewModal from "../components/PdfPreviewModal";
 
 // ─── View/download a saved invoice PDF ─────────────────────────────────────────
 // Saves via a named <a download> rather than window.open(blob:…) — a blob: URL
@@ -688,67 +689,17 @@ export function HistoryPage() {
                 </span>
             </div>
 
-
+            {/* ── Invoice PDF Preview ── */}
             {invoicePreview && (
-                <div
-                    onClick={closeInvoicePreview}
-                    style={{ position: "fixed", inset: 0, background: "rgba(17,24,39,0.62)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 10 : 24 }}
-                >
-                    <div
-                        onClick={e => e.stopPropagation()}
-                        style={{ width: "min(980px, 100%)", height: isMobile ? "92vh" : "88vh", background: "#FFFFFF", borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: SHADOWS.lg }}
-                    >
-                        <div style={{ height: 54, padding: "0 14px 0 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
-                            <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: 14, fontWeight: 800, color: T.t1 }}>Invoice Preview</div>
-                                <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{invoicePreview.no || `#${invoicePreview.id}`}</div>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                                <button
-                                    disabled={!invoicePreview.url}
-                                    onClick={() => invoicePreview.url && downloadInvoiceBlob(invoicePreview.url, invoicePreview.no)}
-                                    style={{ height: 34, padding: "0 13px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", color: invoicePreview.url ? T.t2 : T.t4, fontSize: 12, fontWeight: 700, fontFamily: FONT.ui, cursor: invoicePreview.url ? "pointer" : "default" }}
-                                >
-                                    Download
-                                </button>
-                                <button
-                                    disabled={!invoicePreview.url}
-                                    onClick={() => {
-                                        const frame = document.getElementById("invoice-preview-frame") as HTMLIFrameElement | null;
-                                        frame?.contentWindow?.focus();
-                                        frame?.contentWindow?.print();
-                                    }}
-                                    style={{ height: 34, padding: "0 13px", borderRadius: 8, border: "none", background: invoicePreview.url ? T.amber : T.surfaceContainerLow, color: invoicePreview.url ? "#FFFFFF" : T.t4, fontSize: 12, fontWeight: 800, fontFamily: FONT.ui, cursor: invoicePreview.url ? "pointer" : "default" }}
-                                >
-                                    Print
-                                </button>
-                                <button
-                                    onClick={closeInvoicePreview}
-                                    aria-label="Close invoice preview"
-                                    style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 18, lineHeight: 1, cursor: "pointer" }}
-                                >
-                                    x
-                                </button>
-                            </div>
-                        </div>
-                        <div style={{ flex: 1, background: T.bg, minHeight: 0 }}>
-                            {invoicePreview.loading && (
-                                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: T.t3, fontSize: 13, fontWeight: 700 }}>
-                                    Loading invoice preview...
-                                </div>
-                            )}
-                            {invoicePreview.url && (
-                                <iframe
-                                    id="invoice-preview-frame"
-                                    title="Invoice preview"
-                                    src={invoicePreview.url}
-                                    style={{ width: "100%", height: "100%", border: "none", background: "#FFFFFF" }}
-                                />
-                            )}
-                        </div>
-                    </div>
-                </div>
+                <PdfPreviewModal
+                    url={invoicePreview.url}
+                    loading={invoicePreview.loading}
+                    title={`Invoice ${invoicePreview.no || `#${invoicePreview.id}`}`}
+                    filename={`${invoicePreview.no || 'invoice'}.pdf`}
+                    onClose={closeInvoicePreview}
+                />
             )}
+
         </div>
     );
 }
