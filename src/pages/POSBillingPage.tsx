@@ -248,6 +248,10 @@ export function POSBillingPage() {
         const handler = (e: Event) => {
             const d = (e as CustomEvent).detail;
             if (d?.invoiceId) setSyncedInvoiceId(d.invoiceId);
+            // Replace the temporary local number (INV-<base36>) with the real
+            // backend invoice number so downloads/shares are named consistently
+            // (e.g. RED-S2-202607-0042.pdf) and the preview shows the true number.
+            if (d?.invoiceNumber) setInvoiceNo(d.invoiceNumber);
         };
         window.addEventListener("invoice:synced", handler);
         return () => window.removeEventListener("invoice:synced", handler);
