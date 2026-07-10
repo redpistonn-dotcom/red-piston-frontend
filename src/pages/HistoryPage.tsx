@@ -13,26 +13,22 @@ import { getAccessToken } from "../api/client";
 // Saves via a named <a download> rather than window.open(blob:…) — a blob: URL
 // handed to an external PDF viewer (common on mobile) can go stale before that
 // viewer reads it, producing "Failed to load PDF document" even on success.
-async function viewInvoicePdf(invoiceId: number, invoiceNo?: string | null) {
-    try {
-        const res = await fetch(getInvoicePdfUrl(invoiceId), {
-            headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
-        });
-        if (!res.ok) throw new Error("failed");
-        const blobUrl = URL.createObjectURL(await res.blob());
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = `${invoiceNo || "invoice"}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
-    } catch {
-        window.alert("Could not load this invoice's PDF. It may not have finished syncing yet.");
-    }
+async function fetchInvoicePdfBlobUrl(invoiceId: number) {
+    const res = await fetch(getInvoicePdfUrl(invoiceId), {
+        headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+    });
+    if (!res.ok) throw new Error("failed");
+    return URL.createObjectURL(await res.blob());
 }
 
-// ─── Group movements that share the same invoiceNo or batchId ─────────────────
+function downloadInvoiceBlob(blobUrl: string, invoiceNo?: string | null) {
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `${invoiceNo || "invoice"}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
 function groupMovements(filtered: any[]) {
     const result: any[] = [];
     const seen = new Map<string, number>();
@@ -50,7 +46,7 @@ function groupMovements(filtered: any[]) {
 }
 
 // ─── Group row (multi-item invoice) ──────────────────────────────────────────
-function GroupRow({ group, isExpanded, onToggle, isLast }: any) {
+function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice }: any) {
     const first = group.items[0];
     const cfg = getMovementConfig(first.type);
     const totalAmt = group.items.reduce((s: number, m: any) => s + (m.total || 0), 0);
@@ -88,8 +84,8 @@ function GroupRow({ group, isExpanded, onToggle, isLast }: any) {
                 </td>
                 <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>
                     {first.invoiceId ? (
-                        <button onClick={e => { e.stopPropagation(); viewInvoicePdf(first.invoiceId, first.invoiceNo); }}
-                            title="View / download invoice PDF"
+                        <button onClick={e => { e.stopPropagation(); onPreviewInvoice(first.invoiceId, first.invoiceNo); }}
+                            title="Preview invoice PDF"
                             style={{ background: "none", border: "none", padding: 0, color: T.sky, fontFamily: FONT.mono, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
                             {invoiceDisplay}
                         </button>
@@ -162,7 +158,7 @@ function GroupRow({ group, isExpanded, onToggle, isLast }: any) {
 }
 
 // ─── Single row ───────────────────────────────────────────────────────────────
-function SingleRow({ m, isExpanded, onToggle, isLast }: any) {
+function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice }: any) {
     const cfg = getMovementConfig(m.type);
     return (
         <React.Fragment>
@@ -189,8 +185,8 @@ function SingleRow({ m, isExpanded, onToggle, isLast }: any) {
                 </td>
                 <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>
                     {m.invoiceId ? (
-                        <button onClick={e => { e.stopPropagation(); viewInvoicePdf(m.invoiceId, m.invoiceNo); }}
-                            title="View / download invoice PDF"
+                        <button onClick={e => { e.stopPropagation(); onPreviewInvoice(m.invoiceId, m.invoiceNo); }}
+                            title="Preview invoice PDF"
                             style={{ background: "none", border: "none", padding: 0, color: T.sky, fontFamily: FONT.mono, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
                             {m.invoiceNo || "View"}
                         </button>
@@ -311,12 +307,38 @@ export function HistoryPage() {
     const [dateFrom, setDateFrom]   = useState("");
     const [dateTo, setDateTo]       = useState("");
     const [visibleCount, setVisibleCount] = useState(50);
+    const [invoicePreview, setInvoicePreview] = useState<{ id: number; no?: string | null; url?: string; loading: boolean } | null>(null);
 
     // Local movements fetched directly from the API (server-first).
     const [apiMovements, setApiMovements] = useState<any[]>([]);
     const [histLoading, setHistLoading] = useState(true);
     const [histError, setHistError] = useState<string | null>(null);
     const [histRetry, setHistRetry] = useState(0);
+
+    const closeInvoicePreview = () => {
+        setInvoicePreview(prev => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return null;
+        });
+    };
+
+    const previewInvoice = async (invoiceId: number, invoiceNo?: string | null) => {
+        setInvoicePreview(prev => {
+            if (prev?.url) URL.revokeObjectURL(prev.url);
+            return { id: invoiceId, no: invoiceNo, loading: true };
+        });
+        try {
+            const url = await fetchInvoicePdfBlobUrl(invoiceId);
+            setInvoicePreview(prev => (prev?.id === invoiceId ? { id: invoiceId, no: invoiceNo, url, loading: false } : prev));
+        } catch {
+            setInvoicePreview(null);
+            window.alert("Could not load this invoice's PDF. It may not have finished syncing yet.");
+        }
+    };
+
+    useEffect(() => () => {
+        if (invoicePreview?.url) URL.revokeObjectURL(invoicePreview.url);
+    }, [invoicePreview?.url]);
 
     useEffect(() => {
         let cancelled = false;
@@ -562,6 +584,16 @@ export function HistoryPage() {
                                     <CardField label="Profit" value={totalProfit ? (totalProfit > 0 ? "+" : "") + fmt(totalProfit) : "—"} color={totalProfit > 0 ? T.emerald : totalProfit < 0 ? T.crimson : T.t4} mono />
                                     <CardField label="Party" value={partyName} />
                                     {invoiceDisplay !== "—" && <CardField label="Invoice" value={invoiceDisplay} mono />}
+                                    {first.invoiceId && (
+                                        <CardActions>
+                                            <button
+                                                onClick={() => previewInvoice(first.invoiceId, first.invoiceNo)}
+                                                style={{ height: 34, padding: "0 14px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.sky, fontSize: 12, fontWeight: 700, fontFamily: FONT.ui }}
+                                            >
+                                                Preview Invoice
+                                            </button>
+                                        </CardActions>
+                                    )}
                                 </MobileCard>
                             );
                         })}
@@ -618,8 +650,8 @@ export function HistoryPage() {
                                                 </tr>
                                             )}
                                             {group.items.length > 1
-                                                ? <GroupRow group={group} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} />
-                                                : <SingleRow m={group.items[0]} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} />
+                                                ? <GroupRow group={group} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} />
+                                                : <SingleRow m={group.items[0]} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} />
                                             }
                                         </React.Fragment>
                                     );
@@ -656,6 +688,67 @@ export function HistoryPage() {
                 </span>
             </div>
 
+
+            {invoicePreview && (
+                <div
+                    onClick={closeInvoicePreview}
+                    style={{ position: "fixed", inset: 0, background: "rgba(17,24,39,0.62)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: isMobile ? 10 : 24 }}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: "min(980px, 100%)", height: isMobile ? "92vh" : "88vh", background: "#FFFFFF", borderRadius: 10, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: SHADOWS.lg }}
+                    >
+                        <div style={{ height: 54, padding: "0 14px 0 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 }}>
+                            <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 14, fontWeight: 800, color: T.t1 }}>Invoice Preview</div>
+                                <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.mono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{invoicePreview.no || `#${invoicePreview.id}`}</div>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                                <button
+                                    disabled={!invoicePreview.url}
+                                    onClick={() => invoicePreview.url && downloadInvoiceBlob(invoicePreview.url, invoicePreview.no)}
+                                    style={{ height: 34, padding: "0 13px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", color: invoicePreview.url ? T.t2 : T.t4, fontSize: 12, fontWeight: 700, fontFamily: FONT.ui, cursor: invoicePreview.url ? "pointer" : "default" }}
+                                >
+                                    Download
+                                </button>
+                                <button
+                                    disabled={!invoicePreview.url}
+                                    onClick={() => {
+                                        const frame = document.getElementById("invoice-preview-frame") as HTMLIFrameElement | null;
+                                        frame?.contentWindow?.focus();
+                                        frame?.contentWindow?.print();
+                                    }}
+                                    style={{ height: 34, padding: "0 13px", borderRadius: 8, border: "none", background: invoicePreview.url ? T.amber : T.surfaceContainerLow, color: invoicePreview.url ? "#FFFFFF" : T.t4, fontSize: 12, fontWeight: 800, fontFamily: FONT.ui, cursor: invoicePreview.url ? "pointer" : "default" }}
+                                >
+                                    Print
+                                </button>
+                                <button
+                                    onClick={closeInvoicePreview}
+                                    aria-label="Close invoice preview"
+                                    style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.t2, fontSize: 18, lineHeight: 1, cursor: "pointer" }}
+                                >
+                                    x
+                                </button>
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, background: T.bg, minHeight: 0 }}>
+                            {invoicePreview.loading && (
+                                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: T.t3, fontSize: 13, fontWeight: 700 }}>
+                                    Loading invoice preview...
+                                </div>
+                            )}
+                            {invoicePreview.url && (
+                                <iframe
+                                    id="invoice-preview-frame"
+                                    title="Invoice preview"
+                                    src={invoicePreview.url}
+                                    style={{ width: "100%", height: "100%", border: "none", background: "#FFFFFF" }}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
