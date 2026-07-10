@@ -73,8 +73,12 @@ export function POSBillingPage() {
     const [customerName, setCustomerName] = useState(draft?.customerName || "");
     const [customerPhone, setCustomerPhone] = useState(draft?.customerPhone || "");
     const [customerAddress, setCustomerAddress] = useState(draft?.customerAddress || "");
+    const [customerGstin, setCustomerGstin] = useState(draft?.customerGstin || "");
     const [vehicleReg, setVehicleReg]   = useState(draft?.vehicleReg || "");
     const [partyId, setPartyId]     = useState<string | number | null>(draft?.partyId || null);
+    // Cash tendered (for change-due calc) and UPI reference
+    const [cashTendered, setCashTendered] = useState<number | "">(0);
+    const [upiRef, setUpiRef]         = useState("");
     const [showInvoice, setShowInvoice] = useState(false);
     const [saving, setSaving]       = useState(false);
 
@@ -229,7 +233,7 @@ export function POSBillingPage() {
             if (items.length === 0) { localStorage.removeItem(draftKey); return; }
             localStorage.setItem(draftKey, JSON.stringify({
                 items, billType, paymentMode, additionalDisc,
-                notes, customerName, customerPhone, customerAddress, vehicleReg, partyId,
+                notes, customerName, customerPhone, customerAddress, customerGstin, vehicleReg, partyId,
                 expiresAt: Date.now() + 24 * 60 * 60 * 1000,
             }));
         }, 600);
@@ -419,7 +423,8 @@ export function POSBillingPage() {
                 discount: lineCalcs[idx].discAmt, total: lineCalcs[idx].afterDisc,
                 gstAmount: lineCalcs[idx].gstAmt, profit: lineCalcs[idx].profit, gstRate: item.gstRate,
             })),
-            customerName, customerPhone, customerAddress, vehicleReg, notes,
+            customerName, customerPhone, customerAddress, customerGstin: customerGstin || undefined,
+            vehicleReg, notes, upiRef: upiRef || undefined,
             partyId: partyId || undefined,
             // amountDue (finalTotal minus any applied store credit) is what's actually
             // collected via the chosen payment method — the credit portion is reported
@@ -441,10 +446,12 @@ export function POSBillingPage() {
 
     const newBill = () => {
         localStorage.removeItem(draftKey);
-        setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setCustomerAddress(""); setVehicleReg("");
+        setItems([]); setNotes(""); setCustomerName(""); setCustomerPhone(""); setCustomerAddress("");
+        setCustomerGstin(""); setVehicleReg("");
         setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
         setAppliedCreditNoteId(null); setAppliedCreditAmount(0);
         setInvoiceAt(null); setBillType("Sale");
+        setCashTendered(0); setUpiRef("");
         setInlinePdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
         setSyncedInvoiceId(null);
         setTimeout(() => searchRef.current?.focus(), 50);
@@ -654,14 +661,16 @@ export function POSBillingPage() {
                     customerName: customerName || undefined,
                     customerPhone: customerPhone || undefined,
                     customerAddress: customerAddress || undefined,
+                    customerGstin: customerGstin || undefined,
                     billingAddress: customerAddress || undefined,
                     vehicleReg: vehicleReg || undefined,
                     paymentMode: paymentMode || undefined,
+                    upiRef: upiRef || undefined,
                     notes: notes || undefined,
                 },
                 items: items.map((item, idx) => {
                     const lc = lineCalcs[idx];
-                    return { name: item.name, sku: item.sku, oemNumber: item.oemNumber, mrp: item.mrp, qty: item.qty, price: item.price, discAmt: lc.discAmt, gstAmt: lc.gstAmt, afterDisc: lc.afterDisc };
+                    return { name: item.name, sku: item.sku, oemNumber: item.oemNumber, hsnCode: item.hsnCode, mrp: item.mrp, qty: item.qty, price: item.price, gstRate: item.gstRate, discAmt: lc.discAmt, gstAmt: lc.gstAmt, afterDisc: lc.afterDisc };
                 }),
                 totals: { grandDiscount, additionalDisc, grandGst, finalTotal },
                 showOem: opts.showOem,
@@ -1252,6 +1261,16 @@ export function POSBillingPage() {
                                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
                                 onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
                         </div>
+                        <div style={{ gridColumn: "span 2" }}>
+                            <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>
+                                Customer GSTIN <span style={{ color: T.t4, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(for B2B — required for buyer's ITC claim)</span>
+                            </label>
+                            <input value={customerGstin} onChange={e => setCustomerGstin(e.target.value.toUpperCase().slice(0, 15))}
+                                placeholder="e.g. 27AABCU9603R1ZX" maxLength={15}
+                                style={{ width: "100%", height: 34, background: T.bg, border: `1.5px solid ${customerGstin.length === 15 ? T.emerald : T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box", letterSpacing: "0.04em" }}
+                                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = customerGstin.length === 15 ? T.emerald : T.border; }} />
+                        </div>
                     </div>
 
                     {/* Notes textarea */}
@@ -1350,6 +1369,40 @@ export function POSBillingPage() {
                                 <PayBtn label="CARD/UPI" icon="💳" active={paymentMode === "Card/UPI"} onClick={() => setPaymentMode("Card/UPI")} />
                                 <PayBtn label="UDHAAR"   icon="📋" active={paymentMode === "Udhaar"}   onClick={() => setPaymentMode("Udhaar")} />
                             </div>
+                            {/* Cash: tendered + change due */}
+                            {paymentMode === "Cash" && amountDue > 0 && (
+                                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <label style={{ fontSize: 11, fontWeight: 700, color: T.t2, whiteSpace: "nowrap", fontFamily: FONT.ui }}>Cash received ₹</label>
+                                        <input type="number" min={0} step="0.01" value={cashTendered === 0 ? "" : cashTendered}
+                                            placeholder={amountDue.toFixed(2)}
+                                            onChange={e => setCashTendered(e.target.value === "" ? 0 : Math.max(0, +e.target.value))}
+                                            style={{ flex: 1, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontFamily: FONT.mono, fontSize: 13, outline: "none", textAlign: "right" }} />
+                                    </div>
+                                    {cashTendered > 0 && cashTendered >= amountDue && (
+                                        <div style={{ background: T.emeraldBg, border: `1px solid rgba(16,185,129,0.3)`, borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700 }}>
+                                            <span style={{ color: T.emerald }}>Change due</span>
+                                            <span style={{ fontFamily: FONT.mono, color: T.emerald }}>{fmt((+cashTendered) - amountDue)}</span>
+                                        </div>
+                                    )}
+                                    {cashTendered > 0 && cashTendered < amountDue && (
+                                        <div style={{ background: `${T.crimson}10`, border: `1px solid ${T.crimson}44`, borderRadius: 8, padding: "7px 12px", fontSize: 11, color: T.crimson, fontWeight: 600 }}>
+                                            Short by {fmt(amountDue - (+cashTendered))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {/* UPI: reference / transaction ID */}
+                            {(paymentMode === "Card/UPI") && (
+                                <div style={{ marginTop: 10 }}>
+                                    <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>UPI / Transaction Ref</label>
+                                    <input value={upiRef} onChange={e => setUpiRef(e.target.value.slice(0, 50))}
+                                        placeholder="UTR or transaction ID (optional)"
+                                        style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" }}
+                                        onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
+                                        onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
+                                </div>
+                            )}
                             {paymentMode === "Udhaar" && (
                                 <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
                                     {/* Party selector */}

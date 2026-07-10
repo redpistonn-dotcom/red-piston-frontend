@@ -411,12 +411,14 @@ interface SyncInvoiceParams {
   partyId?: string;
   partyName?: string;
   partyPhone?: string;
+  partyGstin?: string;
   billingAddress?: string;
   vehicleReg?: string;
   paymentMode?: string;
   cashAmount?: number;
   upiAmount?: number;
   creditAmount?: number;
+  upiReference?: string;
   notes?: string;
   /** Redeem an existing store-credit note against this sale — requires cashAmount
    *  or upiAmount to also be forwarded for the remainder (see syncInvoice). */
@@ -443,7 +445,9 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: bool
       partyId: params.partyId || undefined,
       partyName: params.partyName || undefined,
       partyPhone: params.partyPhone || undefined,
+      partyGstin: params.partyGstin || undefined,
       billingAddress: params.billingAddress || undefined,
+      upiReference: params.upiReference || undefined,
       paymentMode: params.paymentMode || 'CASH',
       // Do not forward cashAmount/upiAmount in the default case — the frontend uses
       // GST-inclusive totals while the backend recomputes GST-exclusive, so the

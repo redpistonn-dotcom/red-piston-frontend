@@ -1,5 +1,5 @@
 /**
- * printInvoice.ts — two print templates: A4 (professional) and Thermal (80mm receipt).
+ * printInvoice.ts — two print templates: A4 (professional, GST-compliant) and Thermal (80mm receipt).
  *
  * Usage:
  *   printInvoice({ format, shop, invoice, items, lineCalcs, totals });
@@ -20,14 +20,16 @@ interface ShopInfo {
 
 interface InvoiceInfo {
   invoiceNo: string;
-  invoiceAt?: string;       // formatted date-time string
-  isInvoice: boolean;       // true = TAX INVOICE, false = ESTIMATE/QUOTATION
+  invoiceAt?: string;
+  isInvoice: boolean;
   customerName?: string;
   customerPhone?: string;
   customerAddress?: string;
+  customerGstin?: string;
   billingAddress?: string;
   vehicleReg?: string;
   paymentMode?: string;
+  upiRef?: string;
   notes?: string;
 }
 
@@ -40,7 +42,9 @@ interface LineItem {
   price: number;
   discAmt: number;
   gstAmt: number;
-  afterDisc: number;        // line total
+  afterDisc: number;        // line total (taxable + gst)
+  gstRate?: number;         // e.g. 18 for 18% GST; used for display column
+  hsnCode?: string;         // HSN / SAC code for GST compliance
 }
 
 interface Totals {
@@ -66,7 +70,7 @@ export function printInvoice(p: PrintInvoiceParams): void {
   const w = window.open(
     "",
     "_blank",
-    p.format === "thermal" ? "width=340,height=700" : "width=720,height=960"
+    p.format === "thermal" ? "width=340,height=700" : "width=900,height=960"
   );
   if (!w) return;
   const html = p.format === "thermal" ? thermalHtml(p) : a4Html(p);
@@ -88,52 +92,144 @@ function rs(n: number): string {
   return `&#x20B9;${n.toFixed(2)}`;
 }
 
-// ─── A4 template ─────────────────────────────────────────────────────────────
+// ─── Indian number-to-words (handles 0 – 99,99,999) ──────────────────────────
+function toWords(n: number): string {
+  const ones = [
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    "Seventeen", "Eighteen", "Nineteen",
+  ];
+  const tens = [
+    "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety",
+  ];
+
+  function twoDigits(num: number): string {
+    if (num === 0) return "";
+    if (num < 20) return ones[num];
+    return tens[Math.floor(num / 10)] + (num % 10 !== 0 ? " " + ones[num % 10] : "");
+  }
+
+  function threeDigits(num: number): string {
+    const h = Math.floor(num / 100);
+    const rest = num % 100;
+    let result = "";
+    if (h > 0) result += ones[h] + " Hundred";
+    if (rest > 0) result += (result ? " " : "") + twoDigits(rest);
+    return result;
+  }
+
+  const rupees = Math.floor(Math.abs(n));
+  const paise  = Math.round((Math.abs(n) - rupees) * 100);
+
+  if (rupees === 0 && paise === 0) return "Zero";
+
+  let result = "";
+  const crore = Math.floor(rupees / 10000000);
+  const lakh  = Math.floor((rupees % 10000000) / 100000);
+  const thou  = Math.floor((rupees % 100000) / 1000);
+  const rem   = rupees % 1000;
+
+  if (crore > 0) result += twoDigits(crore) + " Crore ";
+  if (lakh  > 0) result += twoDigits(lakh)  + " Lakh ";
+  if (thou  > 0) result += twoDigits(thou)  + " Thousand ";
+  if (rem   > 0) result += threeDigits(rem);
+
+  result = result.trim();
+  if (paise > 0) result += " and " + twoDigits(paise) + " Paise";
+
+  return result;
+}
+
+// ─── A4 GST-compliant template ────────────────────────────────────────────────
 function a4Html(p: PrintInvoiceParams): string {
-  const { shop, invoice, items, totals, showOem, showMrp } = p;
-  const label = invoice.isInvoice ? "TAX INVOICE" : "ESTIMATE / QUOTATION";
+  const { shop, invoice, items, totals, showOem } = p;
+  const label       = invoice.isInvoice ? "TAX INVOICE" : "ESTIMATE / QUOTATION";
   const accentColor = invoice.isInvoice ? "#d97706" : "#2563eb";
 
-  const rows = items.map((item, i) => `
+  // Per-line GST computations
+  const lineData = items.map(item => {
+    const taxableAmt = item.afterDisc - item.gstAmt;
+    const cgst       = item.gstAmt / 2;
+    const sgst       = item.gstAmt / 2;
+    // Derive gstRate% from amounts when not supplied
+    const gstRatePct = item.gstRate != null
+      ? item.gstRate
+      : taxableAmt > 0
+        ? Math.round((item.gstAmt / taxableAmt) * 100)
+        : 0;
+    // Rate per unit excluding GST
+    const rateExcl = item.qty > 0 ? taxableAmt / item.qty : 0;
+    return { taxableAmt, cgst, sgst, gstRatePct, rateExcl };
+  });
+
+  // Footer totals
+  const totalTaxable = lineData.reduce((s, l) => s + l.taxableAmt, 0);
+  const totalCgst    = totals.grandGst / 2;
+  const totalSgst    = totals.grandGst / 2;
+
+  const rows = items.map((item, i) => {
+    const d = lineData[i];
+    return `
     <tr>
       <td class="num">${i + 1}</td>
-      <td>${esc(item.name)}</td>
-      ${showOem ? `<td class="mono muted">${esc(item.oemNumber) || "—"}</td>` : ""}
+      <td class="left-td">
+        ${esc(item.name)}
+        ${showOem && item.oemNumber ? `<div class="sub-line">OEM: ${esc(item.oemNumber)}</div>` : ""}
+        ${item.sku ? `<div class="sub-line">SKU: ${esc(item.sku)}</div>` : ""}
+      </td>
+      <td class="num mono">${esc(item.hsnCode) || "—"}</td>
       <td class="num">${item.qty}</td>
-      <td class="num">${rs(item.price)}</td>
-      ${showMrp ? `<td class="num muted">${item.mrp ? rs(item.mrp) : "—"}</td>` : ""}
-      <td class="num red">${item.discAmt > 0 ? `−${rs(item.discAmt)}` : "—"}</td>
-      <td class="num muted">${rs(item.gstAmt)}</td>
+      <td class="num">${rs(d.rateExcl)}</td>
+      <td class="num">${rs(d.taxableAmt)}</td>
+      <td class="num">${d.gstRatePct}%</td>
+      <td class="num">${rs(d.cgst)}</td>
+      <td class="num">${rs(d.sgst)}</td>
       <td class="num bold">${rs(item.afterDisc)}</td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
 
   const logoHtml = shop.logoUrl
     ? `<img src="${esc(shop.logoUrl)}" alt="${esc(shop.name)}" style="height:52px;max-width:120px;object-fit:contain;margin-bottom:6px">`
     : `<div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(145deg,#1e3a5f,#0f2040);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:900">${esc(shop.name.charAt(0).toUpperCase())}</div>`;
 
+  const amountWords = toWords(totals.finalTotal);
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(invoice.invoiceNo)}</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1b1b;padding:32px 36px;font-size:13px}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:18px;border-bottom:3px solid ${accentColor};margin-bottom:18px}
-  .shop-name{font-size:20px;font-weight:900;margin:6px 0 2px}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#1c1b1b;padding:28px 32px;font-size:12px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:16px;border-bottom:3px solid ${accentColor};margin-bottom:16px}
+  .shop-name{font-size:19px;font-weight:900;margin:6px 0 2px}
   .shop-meta{font-size:10px;color:#888;line-height:1.6}
   .label-badge{font-size:10px;font-weight:800;letter-spacing:.12em;color:${accentColor}}
   .inv-no{font-family:monospace;font-weight:700;margin-top:5px;font-size:13px}
   .muted{color:#888}
   .red{color:#dc2626}
-  table{width:100%;border-collapse:collapse;margin-top:10px}
-  th{padding:7px 6px;text-align:right;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #f3f0eb}
-  th.left{text-align:left}
-  td{padding:7px 6px;border-bottom:1px solid #f3f0eb}
-  .num{text-align:right;font-family:monospace}
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
+  th{padding:6px 5px;text-align:right;color:#666;font-size:9px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #e8e3dc;border-top:1px solid #e8e3dc;background:#faf9f7;white-space:nowrap}
+  th.left-th{text-align:left}
+  td{padding:6px 5px;border-bottom:1px solid #f0ece6;vertical-align:top}
+  .left-td{text-align:left}
+  .num{text-align:right;font-family:monospace;white-space:nowrap}
   .bold{font-weight:700}
   .mono{font-family:monospace;font-size:10px}
+  .sub-line{font-size:9px;color:#999;margin-top:2px}
   .meta-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px}
-  .total-row{border-top:1px solid #e5e0d8;padding:7px 4px;font-size:11px;color:#888;display:flex;justify-content:space-between}
-  .grand{font-size:17px;font-weight:900;padding-top:9px;border-top:1px solid #e5e0d8;display:flex;justify-content:space-between}
-  .footer{margin-top:18px;padding-top:12px;border-top:1px solid #e5e0d8;font-size:10px;color:#aaa;text-align:center;line-height:1.7}
-  @media print{button{display:none}@page{size:A4;margin:12mm}}
+  .summary-table{width:100%;margin-top:14px;border-collapse:collapse}
+  .summary-table td{padding:5px 6px;font-size:11px;border:none}
+  .summary-table .label{color:#666}
+  .summary-table .val{text-align:right;font-family:monospace;white-space:nowrap}
+  .summary-table .sep{border-top:1px solid #e5e0d8}
+  .summary-table .grand{font-size:15px;font-weight:900}
+  .words-box{margin-top:10px;padding:8px 10px;background:#faf9f7;border:1px solid #e8e3dc;border-radius:4px;font-size:11px}
+  .words-box .wlabel{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+  .decl-box{display:flex;gap:0;margin-top:18px;border:1px solid #e8e3dc;border-radius:4px;font-size:10px}
+  .decl-left{flex:1;padding:10px 12px;border-right:1px solid #e8e3dc;color:#555;line-height:1.6}
+  .decl-right{width:220px;padding:10px 12px;text-align:right;color:#555;line-height:1.8}
+  .decl-right .auth-name{font-weight:700;font-size:11px;color:#1c1b1b}
+  .sig-space{height:40px;border-bottom:1px dashed #bbb;margin-top:4px;width:100%}
+  .footer{margin-top:14px;padding-top:10px;border-top:1px solid #e5e0d8;font-size:10px;color:#aaa;text-align:center;line-height:1.7}
+  @media print{button{display:none}@page{size:A4;margin:10mm}}
 </style></head><body>
 
 <div class="header">
@@ -141,43 +237,91 @@ function a4Html(p: PrintInvoiceParams): string {
     ${logoHtml}
     <div>
       <div class="shop-name">${esc(shop.name)}</div>
-      <div class="shop-meta">${esc(shop.address) || ""}</div>
-      ${shop.phone ? `<div class="shop-meta">${esc(shop.phone)}</div>` : ""}
+      ${shop.address ? `<div class="shop-meta">${esc(shop.address)}</div>` : ""}
+      ${shop.phone   ? `<div class="shop-meta">Ph: ${esc(shop.phone)}</div>` : ""}
+      ${shop.gstin   ? `<div class="shop-meta" style="margin-top:4px">GSTIN: <b>${esc(shop.gstin)}</b></div>` : ""}
     </div>
   </div>
   <div style="text-align:right">
     <div class="label-badge">${label}</div>
     <div class="inv-no">${esc(invoice.invoiceNo)}</div>
     ${invoice.invoiceAt ? `<div class="shop-meta" style="margin-top:3px">${esc(invoice.invoiceAt)}</div>` : ""}
-    ${shop.gstin ? `<div class="shop-meta" style="margin-top:5px">GSTIN: <b>${esc(shop.gstin)}</b></div>` : ""}
   </div>
 </div>
 
-${invoice.customerName ? `<div class="meta-row"><span class="muted">Customer</span><b>${esc(invoice.customerName)}</b>${invoice.customerPhone ? ` <span class="muted">(${esc(invoice.customerPhone)})</span>` : ""}</div>` : ""}
+${invoice.customerName ? `<div class="meta-row"><span class="muted">Bill To</span><b>${esc(invoice.customerName)}${invoice.customerPhone ? ` <span class="muted" style="font-weight:400">(${esc(invoice.customerPhone)})</span>` : ""}</b></div>` : ""}
 ${(invoice.customerAddress || invoice.billingAddress) ? `<div class="meta-row"><span class="muted">Address</span><span>${esc(invoice.customerAddress || invoice.billingAddress)}</span></div>` : ""}
+${invoice.customerGstin ? `<div class="meta-row"><span class="muted">Buyer GSTIN</span><b style="font-family:monospace">${esc(invoice.customerGstin)}</b></div>` : ""}
 ${invoice.vehicleReg ? `<div class="meta-row"><span class="muted">Vehicle</span><b style="color:${accentColor};font-family:monospace">${esc(invoice.vehicleReg)}</b></div>` : ""}
+${invoice.paymentMode ? `<div class="meta-row"><span class="muted">Payment</span><span>${esc(invoice.paymentMode)}${invoice.upiRef ? ` — Ref: <span style="font-family:monospace">${esc(invoice.upiRef)}</span>` : ""}</span></div>` : ""}
 ${invoice.notes ? `<div class="meta-row"><span class="muted">Remarks</span><span>${esc(invoice.notes)}</span></div>` : ""}
 
 <table>
-  <thead><tr>${["#","Item", ...(showOem ? ["OEM No."] : []), "Qty","Rate", ...(showMrp ? ["MRP"] : []), "Disc","GST","Amount"].map(h=>`<th${["#","Item","OEM No."].includes(h) ? ' class="left"' : ""}>${h}</th>`).join("")}</tr></thead>
+  <thead>
+    <tr>
+      <th class="left-th">#</th>
+      <th class="left-th">Description</th>
+      <th>HSN/SAC</th>
+      <th>Qty</th>
+      <th>Rate (Excl. GST)</th>
+      <th>Taxable Amt</th>
+      <th>GST%</th>
+      <th>CGST</th>
+      <th>SGST</th>
+      <th>Total</th>
+    </tr>
+  </thead>
   <tbody>${rows}</tbody>
 </table>
 
-<div style="margin-top:14px">
-  ${totals.grandDiscount > 0 ? `<div class="total-row"><span>Item Discounts</span><span class="red">−${rs(totals.grandDiscount)}</span></div>` : ""}
-  ${totals.additionalDisc > 0 ? `<div class="total-row"><span>Additional Discount</span><span class="red">−${rs(totals.additionalDisc)}</span></div>` : ""}
-  <div class="total-row"><span>GST (Inclusive)</span><span>${rs(totals.grandGst)}</span></div>
-  <div class="grand"><span>TOTAL</span><span style="color:${accentColor}">${rs(totals.finalTotal)}</span></div>
+<table class="summary-table">
+  <tbody>
+    ${totals.grandDiscount > 0 ? `<tr><td class="label">Item Discounts</td><td class="val red">&#x2212;${rs(totals.grandDiscount)}</td></tr>` : ""}
+    ${totals.additionalDisc > 0 ? `<tr><td class="label">Additional Discount</td><td class="val red">&#x2212;${rs(totals.additionalDisc)}</td></tr>` : ""}
+    <tr class="sep">
+      <td class="label">Taxable Amount</td>
+      <td class="val">${rs(totalTaxable)}</td>
+    </tr>
+    <tr>
+      <td class="label">CGST</td>
+      <td class="val">${rs(totalCgst)}</td>
+    </tr>
+    <tr>
+      <td class="label">SGST</td>
+      <td class="val">${rs(totalSgst)}</td>
+    </tr>
+    <tr class="sep">
+      <td class="grand">Grand Total</td>
+      <td class="val grand" style="color:${accentColor}">${rs(totals.finalTotal)}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="words-box">
+  <div class="wlabel">Amount Chargeable (in words)</div>
+  <div><b>INR ${amountWords} Only</b></div>
+</div>
+
+<div class="decl-box">
+  <div class="decl-left">
+    <b>Declaration</b><br>
+    We declare that this invoice shows the actual price of the goods / services described and that all particulars are true and correct.
+  </div>
+  <div class="decl-right">
+    <div>For <span class="auth-name">${esc(shop.name)}</span></div>
+    <div class="sig-space"></div>
+    <div style="font-size:9px;color:#aaa;margin-top:4px">Authorised Signatory</div>
+  </div>
 </div>
 
 <div class="footer">
-  ${invoice.paymentMode ? `Paid via ${esc(invoice.paymentMode)} · ` : ""}Computer-generated ${invoice.isInvoice ? "tax invoice" : "quotation"}.<br>
+  ${invoice.paymentMode ? `Paid via ${esc(invoice.paymentMode)} &middot; ` : ""}Computer-generated ${invoice.isInvoice ? "tax invoice" : "quotation"}. Subject to jurisdiction.<br>
   Thank you for your business!
 </div>
 
 <br>
 <button onclick="window.print()" style="padding:8px 22px;background:${accentColor};color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
-  🖨&nbsp; Print
+  &#x1F5A8;&nbsp; Print
 </button>
 </body></html>`;
 }
@@ -187,25 +331,29 @@ function thermalHtml(p: PrintInvoiceParams): string {
   const { shop, invoice, items, totals, showOem, showMrp } = p;
   const label = invoice.isInvoice ? "TAX INVOICE" : "QUOTATION";
 
-  // Build item rows — narrow, right-aligned amounts
   const rows = items.map(item => {
-    const lineTotal = item.afterDisc.toFixed(2);
-    const rateDisc  = item.discAmt > 0
+    const taxableAmt = item.afterDisc - item.gstAmt;
+    const cgst       = item.gstAmt / 2;
+    const sgst       = item.gstAmt / 2;
+    const rateDisc   = item.discAmt > 0
       ? `${rs(item.price)} - ${rs(item.discAmt)} disc`
       : `${rs(item.price)}`;
     const extras = [
-      showOem && item.oemNumber ? `OEM: ${esc(item.oemNumber)}` : "",
-      showMrp && item.mrp ? `MRP: ${rs(item.mrp)}` : "",
+      showOem && item.oemNumber  ? `OEM: ${esc(item.oemNumber)}` : "",
+      showMrp && item.mrp        ? `MRP: ${rs(item.mrp)}` : "",
+      item.hsnCode               ? `HSN: ${esc(item.hsnCode)}` : "",
     ].filter(Boolean).join(" | ");
     return `
 <div class="item-row">
   <div class="item-name">${item.qty} x ${esc(item.name)}</div>
   <div class="item-right">${rs(item.afterDisc)}</div>
 </div>
-<div class="item-sub">${rateDisc}${extras ? ` | ${extras}` : ""}</div>`;
+<div class="item-sub">${rateDisc} | Taxable: ${rs(taxableAmt)} | CGST: ${rs(cgst)} | SGST: ${rs(sgst)}${extras ? ` | ${extras}` : ""}</div>`;
   }).join("");
 
-  const dashes = "------------------------------------------------";
+  const totalCgst = totals.grandGst / 2;
+  const totalSgst = totals.grandGst / 2;
+  const dashes    = "------------------------------------------------";
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(invoice.invoiceNo)}</title>
 <style>
@@ -238,8 +386,8 @@ ${shop.logoUrl
 
 <div class="shop-name">${esc(shop.name)}</div>
 ${shop.address ? `<div class="shop-sub">${esc(shop.address)}</div>` : ""}
-${shop.gstin  ? `<div class="shop-sub">GSTIN: ${esc(shop.gstin)}</div>` : ""}
-${shop.phone  ? `<div class="shop-sub">Ph: ${esc(shop.phone)}</div>` : ""}
+${shop.gstin   ? `<div class="shop-sub">GSTIN: ${esc(shop.gstin)}</div>` : ""}
+${shop.phone   ? `<div class="shop-sub">Ph: ${esc(shop.phone)}</div>` : ""}
 
 <div class="dashes">${dashes}</div>
 
@@ -249,12 +397,13 @@ ${invoice.invoiceAt ? `<div class="shop-sub">${esc(invoice.invoiceAt)}</div>` : 
 
 <div class="dashes">${dashes}</div>
 
-${invoice.customerName ? `<div class="kv"><span>Customer</span><span>${esc(invoice.customerName)}</span></div>` : ""}
+${invoice.customerName  ? `<div class="kv"><span>Customer</span><span>${esc(invoice.customerName)}</span></div>` : ""}
 ${invoice.customerPhone ? `<div class="kv"><span>Phone</span><span>${esc(invoice.customerPhone)}</span></div>` : ""}
 ${(invoice.customerAddress || invoice.billingAddress) ? `<div class="kv"><span>Address</span><span>${esc(invoice.customerAddress || invoice.billingAddress)}</span></div>` : ""}
-${invoice.vehicleReg   ? `<div class="kv"><span>Vehicle</span><span><b>${esc(invoice.vehicleReg)}</b></span></div>` : ""}
-${invoice.paymentMode  ? `<div class="kv"><span>Payment</span><span>${esc(invoice.paymentMode)}</span></div>` : ""}
-${invoice.notes        ? `<div class="kv"><span>Remarks</span><span>${esc(invoice.notes)}</span></div>` : ""}
+${invoice.customerGstin ? `<div class="kv"><span>Buyer GSTIN</span><span style="font-family:monospace">${esc(invoice.customerGstin)}</span></div>` : ""}
+${invoice.vehicleReg    ? `<div class="kv"><span>Vehicle</span><span><b>${esc(invoice.vehicleReg)}</b></span></div>` : ""}
+${invoice.paymentMode   ? `<div class="kv"><span>Payment</span><span>${esc(invoice.paymentMode)}${invoice.upiRef ? ` | Ref: ${esc(invoice.upiRef)}` : ""}</span></div>` : ""}
+${invoice.notes         ? `<div class="kv"><span>Remarks</span><span>${esc(invoice.notes)}</span></div>` : ""}
 
 <div class="dashes">${dashes}</div>
 <div class="kv bold"><span>Item</span><span>Amt</span></div>
@@ -264,9 +413,11 @@ ${rows}
 
 <div class="dashes">${dashes}</div>
 
-${totals.grandDiscount > 0 ? `<div class="total-row"><span>Discounts</span><span>−${rs(totals.grandDiscount)}</span></div>` : ""}
-${totals.additionalDisc > 0 ? `<div class="total-row"><span>Extra Disc</span><span>−${rs(totals.additionalDisc)}</span></div>` : ""}
-<div class="total-row"><span>GST (Incl.)</span><span>${rs(totals.grandGst)}</span></div>
+${totals.grandDiscount  > 0 ? `<div class="total-row"><span>Discounts</span><span>&#x2212;${rs(totals.grandDiscount)}</span></div>` : ""}
+${totals.additionalDisc > 0 ? `<div class="total-row"><span>Extra Disc</span><span>&#x2212;${rs(totals.additionalDisc)}</span></div>` : ""}
+<div class="total-row"><span>Taxable Amt</span><span>${rs(totals.finalTotal - totals.grandGst)}</span></div>
+<div class="total-row"><span>CGST</span><span>${rs(totalCgst)}</span></div>
+<div class="total-row"><span>SGST</span><span>${rs(totalSgst)}</span></div>
 
 <div class="dashes">${dashes}</div>
 <div class="grand-row"><span>TOTAL</span><span>${rs(totals.finalTotal)}</span></div>
@@ -279,7 +430,7 @@ ${totals.additionalDisc > 0 ? `<div class="total-row"><span>Extra Disc</span><sp
 
 <br>
 <button onclick="window.print()" style="width:100%;padding:7px;background:#000;color:#fff;border:none;cursor:pointer;font-size:12px;font-family:monospace;font-weight:700;border-radius:4px">
-  🖨 PRINT
+  &#x1F5A8; PRINT
 </button>
 </body></html>`;
 }
