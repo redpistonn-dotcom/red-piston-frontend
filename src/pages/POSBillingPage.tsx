@@ -681,8 +681,10 @@ export function POSBillingPage() {
                     customerGstin: customerGstin || undefined,
                     billingAddress: customerAddress || undefined,
                     vehicleReg: vehicleReg || undefined,
-                    paymentMode: paymentMode || undefined,
+                    paymentMode: paymentMode === "Split" ? "Cash+UPI" : (paymentMode || undefined),
                     upiRef: upiRef || undefined,
+                    cashAmount: paymentMode === "Split" ? splitCashClamped : undefined,
+                    upiAmount: paymentMode === "Split" ? splitUpi : undefined,
                     notes: notes || undefined,
                 },
                 items: items.map((item, idx) => {

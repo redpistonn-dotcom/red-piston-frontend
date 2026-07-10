@@ -30,6 +30,8 @@ interface InvoiceInfo {
   vehicleReg?: string;
   paymentMode?: string;
   upiRef?: string;
+  cashAmount?: number;   // split payment: cash portion
+  upiAmount?: number;    // split payment: UPI/card portion
   notes?: string;
 }
 
@@ -286,6 +288,7 @@ ${(invoice.customerAddress || invoice.billingAddress) ? `<div class="meta-row"><
 ${invoice.customerGstin ? `<div class="meta-row"><span class="muted">Buyer GSTIN</span><b style="font-family:monospace">${esc(invoice.customerGstin)}</b></div>` : ""}
 ${invoice.vehicleReg ? `<div class="meta-row"><span class="muted">Vehicle</span><b style="color:${accentColor};font-family:monospace">${esc(invoice.vehicleReg)}</b></div>` : ""}
 ${invoice.paymentMode ? `<div class="meta-row"><span class="muted">Payment</span><span>${esc(invoice.paymentMode)}${invoice.upiRef ? ` — Ref: <span style="font-family:monospace">${esc(invoice.upiRef)}</span>` : ""}</span></div>` : ""}
+${(invoice.cashAmount || 0) > 0 && (invoice.upiAmount || 0) > 0 ? `<div class="meta-row"><span class="muted">Paid</span><span>Cash ${rs(invoice.cashAmount!)} &middot; UPI/Card ${rs(invoice.upiAmount!)}</span></div>` : ""}
 ${invoice.notes ? `<div class="meta-row"><span class="muted">Remarks</span><span>${esc(invoice.notes)}</span></div>` : ""}
 
 <table>
@@ -464,6 +467,7 @@ ${(invoice.customerAddress || invoice.billingAddress) ? `<div class="kv"><span>A
 ${invoice.customerGstin ? `<div class="kv"><span>Buyer GSTIN</span><span style="font-family:monospace">${esc(invoice.customerGstin)}</span></div>` : ""}
 ${invoice.vehicleReg    ? `<div class="kv"><span>Vehicle</span><span><b>${esc(invoice.vehicleReg)}</b></span></div>` : ""}
 ${invoice.paymentMode   ? `<div class="kv"><span>Payment</span><span>${esc(invoice.paymentMode)}${invoice.upiRef ? ` | Ref: ${esc(invoice.upiRef)}` : ""}</span></div>` : ""}
+${(invoice.cashAmount || 0) > 0 && (invoice.upiAmount || 0) > 0 ? `<div class="kv"><span>Cash</span><span>${rs(invoice.cashAmount!)}</span></div><div class="kv"><span>UPI/Card</span><span>${rs(invoice.upiAmount!)}</span></div>` : ""}
 ${invoice.notes         ? `<div class="kv"><span>Remarks</span><span>${esc(invoice.notes)}</span></div>` : ""}
 
 <div class="dashes">${dashes}</div>
