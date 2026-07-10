@@ -152,6 +152,25 @@ export function POSBillingPage() {
         });
     }, []);
 
+    // Inline PDF state for the success screen (A4 view)
+    const [inlinePdfUrl, setInlinePdfUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (showInvoice && syncedInvoiceId && printFormat === 'a4' && !inlinePdfUrl) {
+            let cancelled = false;
+            fetch(getInvoicePdfUrl(syncedInvoiceId), {
+                headers: { Authorization: `Bearer ${getAccessToken()}` },
+                credentials: 'include',
+            })
+            .then(res => res.ok ? res.blob() : Promise.reject())
+            .then(blob => {
+                if (!cancelled) setInlinePdfUrl(URL.createObjectURL(blob));
+            })
+            .catch(() => {});
+            return () => { cancelled = true; };
+        }
+    }, [showInvoice, syncedInvoiceId, printFormat, inlinePdfUrl]);
+
     // Bill visibility toggles — shown inline near the print/share buttons so the
     // shop can set them once per bill instead of confirming through a popup each time.
     const [showOemOnBill, setShowOemOnBill] = useState(true);
@@ -573,69 +592,18 @@ export function POSBillingPage() {
                     <div style={{ fontSize: 13, color: T.t3, marginTop: 2 }}>{items.length} item{items.length > 1 ? "s" : ""} · {invoiceNo}</div>
                 </div>
             </div>
-            {/* ── A4 Preview ─────────────────────────────────────────────────── */}
+            {/* ── A4 Preview (Inline PDF) ────────────────────────────────────── */}
             {printFormat === "a4" && (
-            <div data-print-area className="invoice-print-root" style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, padding: "22px 26px", fontFamily: FONT.ui }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, paddingBottom: 16, borderBottom: `2px solid ${T.amber}`, marginBottom: 16 }}>
-                    <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                        {((shop as any)?.logoUrl || (shop as any)?.photoUrl)
-                            ? <img src={(shop as any).logoUrl || (shop as any).photoUrl} alt={shopName} style={{ width: 52, height: 52, borderRadius: 10, objectFit: "contain", border: `1px solid ${T.border}` }} />
-                            : <div style={{ width: 52, height: 52, borderRadius: 12, background: "linear-gradient(145deg,#1e3a5f,#0f2040)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 22, fontWeight: 900 }}>{shopName.charAt(0).toUpperCase()}</div>
-                        }
-                        <div>
-                            <div style={{ fontSize: 17, fontWeight: 900, color: T.t1, letterSpacing: "-0.02em" }}>{shopName}</div>
-                            <div style={{ fontSize: 11, color: T.t3, marginTop: 4, lineHeight: 1.45 }}>{shopAddress}</div>
-                            {shopPhone && <div style={{ fontSize: 11, color: T.t3 }}>{shopPhone}</div>}
+                <div style={{ height: 800, width: "100%", background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", fontFamily: FONT.ui }}>
+                    {inlinePdfUrl ? (
+                        <iframe src={inlinePdfUrl} style={{ width: "100%", height: "100%", border: "none", display: "block" }} title="A4 Invoice" />
+                    ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center", justifyContent: "center", height: "100%", color: T.t3 }}>
+                            <div style={{ width: 28, height: 28, border: `3px solid ${T.border}`, borderTop: `3px solid ${T.amber}`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>Loading A4 Preview...</span>
                         </div>
-                    </div>
-                    <div style={{ textAlign: "right", minWidth: 160 }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: T.amber }}>{billType === "Sale" ? "TAX INVOICE" : "ESTIMATE / QUOTATION"}</div>
-                        <div style={{ fontSize: 12, fontFamily: FONT.mono, fontWeight: 700, color: T.t1, marginTop: 6 }}>{invoiceNo}</div>
-                        <div style={{ fontSize: 11, color: T.t3, marginTop: 4 }}>{invoiceAt ? fmtDateTime(invoiceAt) : "—"}</div>
-                        {shopGst && <div style={{ fontSize: 10, color: T.t3, marginTop: 6 }}>GSTIN: <span style={{ fontFamily: FONT.mono, color: T.t1, fontWeight: 700 }}>{shopGst}</span></div>}
-                    </div>
+                    )}
                 </div>
-                {customerName && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}><span style={{ color: T.t3 }}>Customer</span><span style={{ fontWeight: 600 }}>{customerName}</span></div>}
-                {vehicleReg && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 8 }}><span style={{ color: T.t3 }}>Vehicle</span><span style={{ fontFamily: FONT.mono, color: T.amber, fontWeight: 700 }}>{vehicleReg}</span></div>}
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 4 }}>
-                    <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
-                        <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                            {["#","Item","SKU","Qty","Rate","Disc","GST","Amount"].map(h => (
-                                <th key={h} style={{ padding: "8px 6px", textAlign: h === "Item" || h === "SKU" ? "left" : "right", color: T.t3, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items.map((item, idx) => {
-                            const lc = lineCalcs[idx];
-                            return (
-                                <tr key={idx} style={{ borderBottom: `1px solid ${T.border}` }}>
-                                    <td style={{ padding: "8px 6px", fontFamily: FONT.mono, color: T.t3 }}>{idx + 1}</td>
-                                    <td style={{ padding: "8px 6px", fontWeight: 600, color: T.t1 }}>{item.name}</td>
-                                    <td style={{ padding: "8px 6px", fontFamily: FONT.mono, fontSize: 10, color: T.t3 }}>{item.sku || "—"}</td>
-                                    <td style={{ padding: "8px 6px", fontFamily: FONT.mono, textAlign: "right" }}>{item.qty}</td>
-                                    <td style={{ padding: "8px 6px", fontFamily: FONT.mono, textAlign: "right" }}>{fmt(item.price)}</td>
-                                    <td style={{ padding: "8px 6px", fontFamily: FONT.mono, textAlign: "right", color: T.crimson }}>{lc.discAmt > 0 ? `-${fmt(lc.discAmt)}` : "—"}</td>
-                                    <td style={{ padding: "8px 6px", fontFamily: FONT.mono, textAlign: "right", color: T.t3 }}>{fmt(lc.gstAmt)}</td>
-                                    <td style={{ padding: "8px 6px", fontFamily: FONT.mono, fontWeight: 800, textAlign: "right" }}>{fmt(lc.afterDisc)}</td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-                <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 10, marginTop: 6 }}>
-                    {grandDiscount > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: T.crimson, marginBottom: 4 }}><span>Item Discounts</span><span>−{fmt(grandDiscount)}</span></div>}
-                    {additionalDisc > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: T.crimson, marginBottom: 4 }}><span>Additional Discount</span><span>−{fmt(additionalDisc)}</span></div>}
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: T.t3, marginBottom: 4 }}><span>GST (Inclusive)</span><span>{fmt(grandGst)}</span></div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 900, color: T.t1, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
-                        <span>TOTAL</span><span style={{ fontFamily: FONT.mono, color: T.amber }}>{fmt(finalTotal)}</span>
-                    </div>
-                </div>
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}`, fontSize: 10, color: T.t4, textAlign: "center", lineHeight: 1.5 }}>
-                    Paid via {paymentMode} · Computer-generated {billType === "Sale" ? "tax invoice" : "quotation"}.
-                    <br />Thank you for your business!
-                </div>
-            </div>
             )}
 
             {/* ── Thermal Receipt Preview ─────────────────────────────────────── */}
