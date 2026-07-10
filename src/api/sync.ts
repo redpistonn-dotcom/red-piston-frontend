@@ -433,6 +433,8 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: bool
   const hasCustom = (params.customItems?.length ?? 0) > 0;
   // Bail only when there is truly nothing to sync (no real inventory items AND no custom items).
   if (!realItems?.length && !hasCustom) return { ok: false, error: 'No valid items to sync' };
+  // Genuine Cash+UPI split — both portions are present, so forward the breakdown.
+  const isSplitPayment = (params.cashAmount || 0) > 0 && (params.upiAmount || 0) > 0;
   try {
     const res = await api.post<{ success: boolean; invoice?: { invoiceId: number; invoiceNumber: string } }>('/api/billing/invoice', {
       items: (realItems ?? []).map(item => ({
@@ -450,22 +452,18 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: bool
       vehicleReg: params.vehicleReg || undefined,
       upiReference: params.upiReference || undefined,
       paymentMode: params.paymentMode || 'CASH',
-      // Do not forward cashAmount/upiAmount in the default case — the frontend uses
-      // GST-inclusive totals while the backend recomputes GST-exclusive, so the
-      // amounts never match exactly and the backend's payment-breakdown check
-      // returns 400. paymentMode is sufficient for the backend to record how the
-      // customer paid. creditAmount IS needed so the backend can write the
-      // party-ledger debit on credit (Udhaar) sales.
-      //
-      // EXCEPTION: once a store-credit note is applied, the backend's breakdown
-      // check activates unconditionally (appliedAmt > 0 triggers it) and needs
-      // cash/upi to reconcile the remainder — so forward it only in that case,
-      // relying on the backend's ±₹1 rounding tolerance.
+      // For a single-mode sale we send only paymentMode (no cash/upi split) — the
+      // frontend and backend totals now reconcile within the backend's ±₹1
+      // rounding tolerance, but there's no need to trigger the breakdown check.
+      // Forward cashAmount/upiAmount when:
+      //   • it's a genuine Cash+UPI split (both > 0), or
+      //   • a store-credit note is applied (the backend's breakdown check then
+      //     activates unconditionally and needs cash/upi to reconcile the remainder).
       creditAmount: params.creditAmount || undefined,
       appliedCreditNoteId: params.appliedCreditNoteId || undefined,
       appliedCreditAmount: params.appliedCreditAmount || undefined,
-      cashAmount: params.appliedCreditAmount ? (params.cashAmount || undefined) : undefined,
-      upiAmount: params.appliedCreditAmount ? (params.upiAmount || undefined) : undefined,
+      cashAmount: (isSplitPayment || params.appliedCreditAmount) ? (params.cashAmount || undefined) : undefined,
+      upiAmount: (isSplitPayment || params.appliedCreditAmount) ? (params.upiAmount || undefined) : undefined,
       notes: params.notes || undefined,
     });
     // Tell the POS page which backend invoice this sale became so it can offer

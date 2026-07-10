@@ -79,6 +79,9 @@ export function POSBillingPage() {
     // Cash tendered (for change-due calc) and UPI reference
     const [cashTendered, setCashTendered] = useState<number | "">(0);
     const [upiRef, setUpiRef]         = useState("");
+    // Split payment (Cash + UPI on one bill): splitCash is the source of truth,
+    // the UPI portion is derived as the remainder of the rounded amount due.
+    const [splitCash, setSplitCash]   = useState<number>(0);
     const [showInvoice, setShowInvoice] = useState(false);
     const [saving, setSaving]       = useState(false);
 
@@ -368,6 +371,11 @@ export function POSBillingPage() {
         if (appliedCreditAmount > finalTotal) applyCreditAmount(finalTotal, finalTotal);
     }, [finalTotal]); // eslint-disable-line react-hooks/exhaustive-deps
     const amountDue = Math.max(0, finalTotal - appliedCreditAmount);
+    // Split payment: work off the rounded amount (what the customer actually pays),
+    // so cash + UPI always reconciles with the backend's rupee-rounded total.
+    const roundedDue = Math.round(amountDue);
+    const splitCashClamped = Math.max(0, Math.min(roundedDue, splitCash));
+    const splitUpi = Math.max(0, roundedDue - splitCashClamped);
 
     // Credit limit check for Udhaar
     const selectedParty = useMemo(() => (parties || []).find((p: any) => String(p.id) === String(partyId)), [parties, partyId]);
@@ -438,7 +446,9 @@ export function POSBillingPage() {
             // separately below so the backend can redeem the credit note. Keys here must
             // match what handleMultiItemSale reads (data.payments?.Cash/.UPI/.Credit) —
             // paymentMode's *display* label ("Card/UPI") does not equal "UPI", so map it.
-            payments: { [paymentMode === "Udhaar" ? "Credit" : paymentMode === "Card/UPI" ? "UPI" : "Cash"]: amountDue },
+            payments: paymentMode === "Split"
+                ? { Cash: splitCashClamped, UPI: splitUpi }
+                : { [paymentMode === "Udhaar" ? "Credit" : paymentMode === "Card/UPI" ? "UPI" : "Cash"]: amountDue },
             appliedCreditNoteId: appliedCreditNoteId || undefined,
             appliedCreditAmount: appliedCreditAmount || undefined,
             paymentMode, subtotal: grandSubtotal, discount: grandDiscount + additionalDisc,
@@ -458,7 +468,7 @@ export function POSBillingPage() {
         setPaymentMode("Cash"); setAdditionalDisc(0); setPartyId(null); setShowInvoice(false); setSearch("");
         setAppliedCreditNoteId(null); setAppliedCreditAmount(0);
         setInvoiceAt(null); setBillType("Sale");
-        setCashTendered(0); setUpiRef("");
+        setCashTendered(0); setUpiRef(""); setSplitCash(0);
         setInlinePdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
         setSyncedInvoiceId(null);
         setTimeout(() => searchRef.current?.focus(), 50);
@@ -1387,7 +1397,36 @@ export function POSBillingPage() {
                                 <PayBtn label="CASH"     icon="💵" active={paymentMode === "Cash"}     onClick={() => setPaymentMode("Cash")} />
                                 <PayBtn label="CARD/UPI" icon="💳" active={paymentMode === "Card/UPI"} onClick={() => setPaymentMode("Card/UPI")} />
                                 <PayBtn label="UDHAAR"   icon="📋" active={paymentMode === "Udhaar"}   onClick={() => setPaymentMode("Udhaar")} />
+                                <PayBtn label="SPLIT"    icon="🔀" active={paymentMode === "Split"}    onClick={() => { setPaymentMode("Split"); setSplitCash(Math.round(roundedDue / 2)); }} />
                             </div>
+                            {/* Split: cash + UPI on one bill; UPI auto-fills the balance */}
+                            {paymentMode === "Split" && amountDue > 0 && (
+                                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <label style={{ fontSize: 11, fontWeight: 700, color: T.t2, width: 70, fontFamily: FONT.ui }}>Cash ₹</label>
+                                        <input type="number" min={0} max={roundedDue} step="1" value={splitCashClamped === 0 ? "" : splitCashClamped}
+                                            placeholder="0"
+                                            onChange={e => setSplitCash(e.target.value === "" ? 0 : Math.max(0, Math.min(roundedDue, Math.round(+e.target.value))))}
+                                            onFocus={e => e.target.select()}
+                                            style={{ flex: 1, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontFamily: FONT.mono, fontSize: 13, outline: "none", textAlign: "right" }} />
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                        <label style={{ fontSize: 11, fontWeight: 700, color: T.t2, width: 70, fontFamily: FONT.ui }}>UPI ₹</label>
+                                        <input type="number" min={0} max={roundedDue} step="1" value={splitUpi === 0 ? "" : splitUpi}
+                                            placeholder="0"
+                                            onChange={e => { const u = e.target.value === "" ? 0 : Math.max(0, Math.min(roundedDue, Math.round(+e.target.value))); setSplitCash(roundedDue - u); }}
+                                            onFocus={e => e.target.select()}
+                                            style={{ flex: 1, height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontFamily: FONT.mono, fontSize: 13, outline: "none", textAlign: "right" }} />
+                                    </div>
+                                    <div style={{ background: T.emeraldBg, border: `1px solid rgba(16,185,129,0.3)`, borderRadius: 8, padding: "7px 12px", display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}>
+                                        <span style={{ color: T.emerald }}>Cash {fmt(splitCashClamped)} + UPI {fmt(splitUpi)}</span>
+                                        <span style={{ color: T.emerald, fontFamily: FONT.mono }}>✓ {fmt(roundedDue)}</span>
+                                    </div>
+                                    <input value={upiRef} onChange={e => setUpiRef(e.target.value.slice(0, 50))}
+                                        placeholder="UPI / transaction ref (optional)"
+                                        style={{ width: "100%", height: 32, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" }} />
+                                </div>
+                            )}
                             {/* Cash: tendered + change due */}
                             {paymentMode === "Cash" && amountDue > 0 && (
                                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>

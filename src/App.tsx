@@ -648,7 +648,7 @@ function AppContent() {
         partyId: data.partyId || undefined,
         billingAddress: data.customerAddress || data.billingAddress || undefined,
         vehicleReg: data.vehicleReg || undefined,
-        paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : (data.paymentMode || "CASH"),
+        paymentMode: data.paymentMode === "Udhaar" ? "CREDIT" : data.paymentMode === "Split" ? "Cash+UPI" : (data.paymentMode || "CASH"),
         cashAmount: data.payments?.Cash || undefined, upiAmount: data.payments?.UPI || undefined,
         creditAmount: data.payments?.Credit || undefined,
         upiReference: data.upiRef || undefined,
