@@ -3,6 +3,7 @@ import { T, FONT } from "../theme";
 import { uid, CATEGORIES, POSITIONS, ENGINE_TYPES, TRANSMISSIONS, EMOJIS, fmt } from "../utils";
 import { searchCatalog, addInventory, contributePart } from "../api/inventory";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
+import { cleanHsn } from "../utils/validators";
 
 export function ProductModal({ open, onClose, product, products, onSave, toast, activeShopId }) {
     const isEdit = !!product;
@@ -215,7 +216,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
                 <Field label="Part Name" required error={errors.name} style={{ gridColumn: "span 1" }}><Input value={f.name} onChange={set("name")} placeholder="Bosch Brake Pad Set — Front" invalid={!!errors.name} /></Field>
                 <Field label="OEM Part Number" hint="Original Equipment Manufacturer number"><Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="e.g. 04465-02220" /></Field>
                 <Field label="SKU / Code" required error={errors.sku}><Input value={f.sku} onChange={set("sku")} placeholder="BRK-F-0042" invalid={!!errors.sku} /></Field>
-                <Field label="HSN / SAC Code" hint="For GST filing"><Input value={f.hsnCode} onChange={set("hsnCode")} placeholder="87083000" /></Field>
+                <Field label="HSN / SAC Code" hint="For GST filing"><Input value={f.hsnCode} onChange={(v: string) => set("hsnCode")(cleanHsn(v))} placeholder="87083000" /></Field>
                 <Field label="Category"><Select value={f.category} onChange={set("category")} options={CATEGORIES.map(c => ({ value: c, label: c }))} /></Field>
                 <Field label="Brand / Manufacturer"><Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK…" /></Field>
                 <Field label="Supplier"><Input value={f.supplier} onChange={set("supplier")} placeholder="Supplier name" /></Field>

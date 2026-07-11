@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { T, FONT } from "../theme";
 import { fmt, fmtDateTime } from "../utils";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
+import { cleanMobile } from "../utils/validators";
 
 export function SaleModal({ open, onClose, product, products, onSave, toast }) {
     const blank = {
@@ -229,7 +230,7 @@ export function SaleModal({ open, onClose, product, products, onSave, toast }) {
                     <Input value={f.customerName} onChange={set("customerName")} placeholder="Raj Garage, Walk-in…" icon="👤" />
                 </Field>
                 <Field label="Phone Number">
-                    <Input value={f.customerPhone} onChange={set("customerPhone")} placeholder="+91 98765 43210" icon="📞" />
+                    <Input value={f.customerPhone} onChange={(v: string) => set("customerPhone")(cleanMobile(v))} placeholder="10-digit mobile" icon="📞" />
                 </Field>
                 <Field label="Vehicle Registration" hint="For warranty / reference">
                     <Input value={f.vehicleReg} onChange={set("vehicleReg")} placeholder="MH 02 AB 1234" icon="🚗" />

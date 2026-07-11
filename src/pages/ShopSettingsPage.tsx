@@ -2,6 +2,7 @@ import { useState, useEffect, useContext, useCallback } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { Btn, Input, Field, Select, Skeleton } from "../components/ui";
 import { AppCtx } from "../AppCtx";
+import { cleanGstin, isValidGstin, cleanPan, isValidPan, cleanMobile, isValidMobile, isValidEmail, cleanAccountNo, isValidAccountNo, cleanIfsc, isValidIfsc } from "../utils/validators";
 import { getShopProfile, updateShopProfile, updateShopBank } from "../api/shop";
 import { getReturnPolicyWindows, createReturnPolicyWindow, deleteReturnPolicyWindow, type ReturnPolicyWindow } from "../api/returnPolicyWindows";
 
@@ -75,6 +76,10 @@ export function ShopSettingsPage() {
     }, []);
 
     const handleSaveProfile = async () => {
+        if (profile.gstin && !isValidGstin(profile.gstin)) { toast?.("Enter a valid 15-char GSTIN (e.g. 27AABCU9603R1ZX) or clear it", "warning"); return; }
+        if (profile.pan && !isValidPan(profile.pan)) { toast?.("Enter a valid PAN (e.g. ABCDE1234F) or clear it", "warning"); return; }
+        if (profile.email && !isValidEmail(profile.email)) { toast?.("Enter a valid email or clear it", "warning"); return; }
+        if (profile.whatsappNumber && !isValidMobile(profile.whatsappNumber)) { toast?.("Enter a valid 10-digit WhatsApp number or clear it", "warning"); return; }
         setSaving(true);
         try {
             await updateShopProfile(profile);
@@ -87,6 +92,8 @@ export function ShopSettingsPage() {
     };
 
     const handleSaveBank = async () => {
+        if (bank.bankAccountNumber && !isValidAccountNo(bank.bankAccountNumber)) { toast?.("Enter a valid account number (9–18 digits) or clear it", "warning"); return; }
+        if (bank.bankIfsc && !isValidIfsc(bank.bankIfsc)) { toast?.("Enter a valid IFSC (e.g. SBIN0016443) or clear it", "warning"); return; }
         setSavingBank(true);
         try {
             await updateShopBank(bank);
@@ -117,12 +124,12 @@ export function ShopSettingsPage() {
                 <div style={{ maxHeight: profileCollapsed ? 0 : 9999, overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
                     <Field label="Shop Name"><Input value={profile.name || ""} onChange={sf("name")} placeholder="RedPiston Auto" /></Field>
-                    <Field label="GSTIN"><Input value={profile.gstin || profile.gstNo || ""} onChange={sf("gstin")} placeholder="27AAAAA0000A1Z5" /></Field>
-                    <Field label="PAN"><Input value={profile.pan || ""} onChange={sf("pan")} placeholder="AAAAA0000A" /></Field>
+                    <Field label="GSTIN"><Input value={profile.gstin || profile.gstNo || ""} onChange={(v: string) => sf("gstin")(cleanGstin(v))} placeholder="27AAAAA0000A1Z5" /></Field>
+                    <Field label="PAN"><Input value={profile.pan || ""} onChange={(v: string) => sf("pan")(cleanPan(v))} placeholder="ABCDE1234F" /></Field>
                     <Field label="City"><Input value={profile.city || ""} onChange={sf("city")} placeholder="Mumbai" /></Field>
                     <Field label="Address"><Input value={profile.address || ""} onChange={sf("address")} placeholder="123 Workshop Road" /></Field>
                     <Field label="Email"><Input value={profile.email || ""} onChange={sf("email")} placeholder="shop@email.com" type="email" /></Field>
-                    <Field label="WhatsApp Number"><Input value={profile.whatsappNumber || ""} onChange={sf("whatsappNumber")} placeholder="9876543210" /></Field>
+                    <Field label="WhatsApp Number"><Input value={profile.whatsappNumber || ""} onChange={(v: string) => sf("whatsappNumber")(cleanMobile(v))} placeholder="10-digit mobile" /></Field>
                     <Field label="Shop Description"><Input value={profile.shopDescription || ""} onChange={sf("shopDescription")} placeholder="Auto parts and service" /></Field>
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
@@ -138,8 +145,8 @@ export function ShopSettingsPage() {
                 </div>
                 <div style={{ maxHeight: bankCollapsed ? 0 : 9999, overflow: "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
-                    <Field label="Account Number"><Input value={bank.bankAccountNumber} onChange={v => setBank(b => ({ ...b, bankAccountNumber: v }))} placeholder="0001234567890" /></Field>
-                    <Field label="IFSC Code"><Input value={bank.bankIfsc} onChange={v => setBank(b => ({ ...b, bankIfsc: v }))} placeholder="HDFC0001234" /></Field>
+                    <Field label="Account Number"><Input value={bank.bankAccountNumber} onChange={v => setBank(b => ({ ...b, bankAccountNumber: cleanAccountNo(v) }))} placeholder="0001234567890" /></Field>
+                    <Field label="IFSC Code"><Input value={bank.bankIfsc} onChange={v => setBank(b => ({ ...b, bankIfsc: cleanIfsc(v) }))} placeholder="HDFC0001234" /></Field>
                     <Field label="Account Holder Name"><Input value={bank.bankAccountName} onChange={v => setBank(b => ({ ...b, bankAccountName: v }))} placeholder="RedPiston Auto Parts" /></Field>
                 </div>
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>

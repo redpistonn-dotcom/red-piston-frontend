@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useContext, useCallback } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, uid, downloadCSV, generateCSV } from "../utils";
-import { isValidMobile, cleanMobile, isValidGstin, cleanGstin } from "../utils/validators";
+import { isValidMobile, cleanMobile, isValidGstin, cleanGstin, cleanVehicleReg, isValidEmail } from "../utils/validators";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace";
 import { fetchPartyLedger, fetchParties, type LedgerEntry } from "../api/sync";
@@ -463,7 +463,7 @@ export function PartiesPage() {
                                         {["Petrol","Diesel","CNG","Electric","Hybrid"].map(f => <option key={f}>{f}</option>)}
                                     </select>
                                 </Field>
-                                <Field label="Reg. Number *"><Input value={vehForm.registrationNumber} onChange={setVF("registrationNumber")} placeholder="TS09AB1234" /></Field>
+                                <Field label="Reg. Number *"><Input value={vehForm.registrationNumber} onChange={(v: string) => setVF("registrationNumber")(cleanVehicleReg(v))} placeholder="TS09AB1234" /></Field>
                                 <Field label="Owner">
                                     <select value={vehForm.ownerId} onChange={e => setVF("ownerId")(e.target.value)} style={{ width: "100%", background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "9px 12px", color: T.t1, fontSize: 13, fontFamily: FONT.ui, outline: "none" }}>
                                         <option value="">No owner</option>
@@ -919,13 +919,14 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
     const [nameError, setNameError] = useState(false);
     const [phoneError, setPhoneError] = useState("");
     const [gstinError, setGstinError] = useState("");
+    const [emailError, setEmailError] = useState("");
 
     useEffect(() => {
         // Normalize an existing phone to the last 10 digits (drops any +91/country code)
         const phone10 = party?.phone ? String(party.phone).replace(/\D/g, "").slice(-10) : "";
         if (party) setF({ ...party, phone: phone10, creditLimit: String(party.creditLimit || 0), creditDays: String(party.creditDays || 30), loyaltyPoints: String(party.loyaltyPoints || 0), openingBalance: String(party.openingBalance || 0), outstanding: String(party.outstanding || 0), tags: (party.tags || []).join(", ") });
         else setF(blank);
-        setNameError(false); setPhoneError(""); setGstinError("");
+        setNameError(false); setPhoneError(""); setGstinError(""); setEmailError("");
     }, [party, open]);
 
     const set = (k: string) => (v: any) => {
@@ -933,12 +934,14 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
         if (k === "name") setNameError(false);
         if (k === "phone") setPhoneError("");
         if (k === "gstin") setGstinError("");
+        if (k === "email") setEmailError("");
     };
 
     const handleSave = () => {
         if (!f.name.trim()) { setNameError(true); return; }
         if (f.phone.trim() && !isValidMobile(f.phone)) { setPhoneError("Enter a valid 10-digit mobile (starts 6–9)"); return; }
         if (f.gstin.trim() && !isValidGstin(f.gstin)) { setGstinError("Invalid GSTIN — 15 chars like 27AABCU9603R1ZX"); return; }
+        if (f.email.trim() && !isValidEmail(f.email)) { setEmailError("Enter a valid email or clear it"); return; }
         onSave({
             ...f, id: party?.id || (type === "customer" ? "cust" : "sup") + "_" + uid(),
             shopId: party?.shopId || activeShopId, type: party?.type || type,
@@ -955,7 +958,7 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div style={{ gridColumn: "span 2" }}><Field label="Name" required error={nameError ? "Name is required" : undefined}><Input value={f.name} onChange={set("name")} placeholder="Business or person name" invalid={nameError} /></Field></div>
                 <Field label="Phone" error={phoneError || undefined}><Input value={f.phone} onChange={(v: string) => set("phone")(cleanMobile(v))} placeholder="10-digit mobile" invalid={!!phoneError} /></Field>
-                <Field label="Email"><Input value={f.email} onChange={set("email")} placeholder="email@example.com" /></Field>
+                <Field label="Email" error={emailError || undefined}><Input value={f.email} onChange={set("email")} placeholder="email@example.com" invalid={!!emailError} /></Field>
                 <Field label="GSTIN" error={gstinError || undefined}><Input value={f.gstin} onChange={(v: string) => set("gstin")(cleanGstin(v))} placeholder="22AAAAA0000A1Z5" invalid={!!gstinError} /></Field>
                 <Field label="City"><Input value={f.city} onChange={set("city")} placeholder="Hyderabad" /></Field>
                 <div style={{ gridColumn: "span 2" }}><Field label="Address"><Input value={f.address} onChange={set("address")} placeholder="Full address" /></Field></div>

@@ -11,6 +11,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from "react-dom";
 import { T, FONT } from '../theme';
 import { fmt } from '../utils';
+import { cleanMobile } from '../utils/validators';
 import { lookupCatalog, lookupByBarcode, bulkStockIn, contributePart, addInventory } from '../api/inventory';
 import { mapInventoryToProduct } from '../api/sync';
 import { SupplierAutocomplete } from './SupplierAutocomplete';
@@ -521,7 +522,7 @@ function SupplierPhase({ cart, onBack, onSubmit, submitting, toast }) {
             />
           </Field>
           <Field label="Supplier Phone">
-            <Input value={form.supplierPhone} onChange={f('supplierPhone')} placeholder="+91 98765 43210" />
+            <Input value={form.supplierPhone} onChange={(v: string) => f('supplierPhone')(cleanMobile(v))} placeholder="10-digit mobile" />
           </Field>
           <Field label="Invoice Number">
             <Input value={form.invoiceNo} onChange={f('invoiceNo')} placeholder="e.g. INV-2024-001" />

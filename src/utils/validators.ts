@@ -19,3 +19,27 @@ export const cleanGstin = (v: string): string => (v || "").toUpperCase().replace
 
 /** Indian PIN code: exactly 6 digits, not starting with 0. */
 export const isValidPincode = (v: string): boolean => /^[1-9]\d{5}$/.test((v || "").trim());
+/** Keep only digits, cap at 6 — for onChange of a pincode field. */
+export const cleanPincode = (v: string): string => (v || "").replace(/\D/g, "").slice(0, 6);
+
+/** PAN: 5 letters, 4 digits, 1 letter — e.g. ABCDE1234F. */
+export const isValidPan = (v: string): boolean => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test((v || "").trim().toUpperCase());
+export const cleanPan = (v: string): string => (v || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+
+/** IFSC: 4 letters, a 0, then 6 alphanumerics — e.g. SBIN0016443. */
+export const isValidIfsc = (v: string): boolean => /^[A-Z]{4}0[A-Z0-9]{6}$/.test((v || "").trim().toUpperCase());
+export const cleanIfsc = (v: string): string => (v || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 11);
+
+/** Bank account number: 9–18 digits. */
+export const isValidAccountNo = (v: string): boolean => /^\d{9,18}$/.test((v || "").trim());
+export const cleanAccountNo = (v: string): string => (v || "").replace(/\D/g, "").slice(0, 18);
+
+/** Email — basic RFC-ish check. */
+export const isValidEmail = (v: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((v || "").trim());
+
+/** HSN/SAC code: 4–8 digits. */
+export const isValidHsn = (v: string): boolean => /^\d{4,8}$/.test((v || "").trim());
+export const cleanHsn = (v: string): string => (v || "").replace(/\D/g, "").slice(0, 8);
+
+/** Vehicle registration: uppercase alphanumerics + spaces, capped at 15. */
+export const cleanVehicleReg = (v: string): string => (v || "").toUpperCase().replace(/[^A-Z0-9 ]/g, "").slice(0, 15);
