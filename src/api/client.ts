@@ -68,8 +68,16 @@ async function _doRefresh(): Promise<string> {
   }
 
   if (!res.ok) {
-    clearTokens();
-    throw Object.assign(new Error('Session expired. Please login again.'), { code: 'SESSION_EXPIRED' });
+    // Only a genuine auth rejection (401/403 — the refresh token was actually
+    // invalid/expired) should end the session. A 5xx or other transient response
+    // happens when the backend is restarting during a deploy or cold-starting;
+    // logging the user out there is the "refresh → logout after deploy" bug.
+    // Keep the tokens and let the caller retry once the backend is back.
+    if (res.status === 401 || res.status === 403) {
+      clearTokens();
+      throw Object.assign(new Error('Session expired. Please login again.'), { code: 'SESSION_EXPIRED' });
+    }
+    throw Object.assign(new Error('Server is restarting — please try again in a moment.'), { code: 'NETWORK_ERROR' });
   }
 
   const data = await res.json();

@@ -260,6 +260,33 @@ function AppContent() {
     };
   }, []);
 
+  // ── Auto-recover from stale chunks after a deploy ────────────────────────────
+  // After a new deploy the old hashed chunk files are gone; a dynamic import that
+  // isn't triggered during render (route preload, an import() in an event handler)
+  // rejects outside the error boundary, so the user just sees a broken/blank
+  // action. Catch those globally and reload once to pick up the fresh bundle. A
+  // 10s guard prevents a reload loop while still re-arming for the next deploy.
+  useEffect(() => {
+    const reloadOnce = () => {
+      const last = Number(sessionStorage.getItem("rp_chunk_reload_ts") || 0);
+      if (Date.now() - last > 10000) {
+        sessionStorage.setItem("rp_chunk_reload_ts", String(Date.now()));
+        window.location.reload();
+      }
+    };
+    const isChunkMsg = (s: string) => /Failed to fetch dynamically imported module|Loading chunk|ChunkLoad|error loading dynamically imported module/i.test(s);
+    const onPreloadError = () => reloadOnce();
+    const onRejection = (e: PromiseRejectionEvent) => {
+      if (isChunkMsg(String(e?.reason?.message || e?.reason || ""))) reloadOnce();
+    };
+    window.addEventListener("vite:preloadError", onPreloadError as EventListener);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("vite:preloadError", onPreloadError as EventListener);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
   // ── Startup: restore access token from refresh token (page reload) ───────────
   useEffect(() => {
     if (!localStorage.getItem("as_user")) return;

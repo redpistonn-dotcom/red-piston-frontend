@@ -411,8 +411,8 @@ export function POSBillingPage() {
             const isCustom = String(item.productId || "").startsWith("custom_");
             if (!isCustom && item.maxStock <= 0) { toast?.(`"${item.name}" is out of stock (0 available)`, "error"); return false; }
             if (checkType === "Sale" && !isCustom && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
-            if (isCustom && (!item.name || item.name === "Custom Item")) {
-                toast?.("Enter a name for the custom item before submitting", "warning"); return false;
+            if (isCustom && !item.name.trim()) {
+                toast?.("Enter a product name for the custom item before submitting", "warning"); return false;
             }
             if (item.price <= 0) {
                 toast?.(`"${item.name}" has no valid price (₹${item.price}). Set a price before submitting`, "warning"); return false;
@@ -1147,9 +1147,9 @@ export function POSBillingPage() {
                                                     <div>
                                                         {String(item.productId || "").startsWith("custom_") ? (
                                                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                                                <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Item name…"
+                                                                <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Enter Product Name"
                                                                     maxLength={100}
-                                                                    style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name && item.name !== "Custom Item" ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
+                                                                    style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name.trim() ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                                                     <span style={{ fontSize: 10, color: T.t3 }}>Buy Price ₹</span>
                                                                     <input type="number" value={item.buyPrice || ""} min="0" placeholder="0"
@@ -1222,7 +1222,7 @@ export function POSBillingPage() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: items.length > 0 ? `1px solid ${T.border}` : "none" }}>
                     <div style={{ display: "flex", gap: 18 }}>
                         <button onClick={() => {
-                            setItems(prev => [...prev, { productId: `custom_${Date.now()}`, name: "Custom Item", sku: "", image: "📦", qty: 1, price: 0, originalPrice: 0, discount: 0, discountType: "%", gstRate: 18, buyPrice: 0, maxStock: 999 }]);
+                            setItems(prev => [...prev, { productId: `custom_${Date.now()}`, name: "", sku: "", image: "📦", qty: 1, price: 0, originalPrice: 0, discount: 0, discountType: "%", gstRate: 18, buyPrice: 0, maxStock: 999 }]);
                         }} style={{ background: "none", border: "none", fontSize: 12, fontWeight: 700, color: T.amber, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 5, padding: 0 }}>
                             <span style={{ fontSize: 16 }}>⊕</span> ADD CUSTOM ITEM
                         </button>
