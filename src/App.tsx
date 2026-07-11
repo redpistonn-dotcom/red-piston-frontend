@@ -237,6 +237,29 @@ function AppContent() {
     fetch(`${BASE_URL}/health`, { method: 'GET' }).catch(() => {});
   }, []);
 
+  // ── Number inputs: never change on scroll or ↑/↓ keys (ticket 2607012) ───────
+  // A focused <input type="number"> mutates its value on mouse-wheel/trackpad
+  // scroll and on Arrow Up/Down, which silently corrupts prices/quantities while
+  // the user is just scrolling the page. Globally: blur on wheel (so the page
+  // scrolls instead of the value), and swallow the arrow-key increment. Values
+  // can then only be changed by typing.
+  useEffect(() => {
+    const isNumberInput = (el: EventTarget | null): el is HTMLInputElement =>
+      el instanceof HTMLInputElement && el.type === 'number';
+    const onWheel = (e: WheelEvent) => {
+      if (isNumberInput(document.activeElement)) (document.activeElement as HTMLInputElement).blur();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isNumberInput(e.target)) e.preventDefault();
+    };
+    document.addEventListener('wheel', onWheel, { passive: true });
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('wheel', onWheel);
+      document.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, []);
+
   // ── Startup: restore access token from refresh token (page reload) ───────────
   useEffect(() => {
     if (!localStorage.getItem("as_user")) return;

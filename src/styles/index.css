@@ -7,6 +7,18 @@
   padding: 0;
 }
 
+/* Hide the up/down spinner buttons on number inputs — values are entered by
+   typing only (ticket 2607012; scroll/arrow-key changes are blocked in App.tsx). */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* ── Root — warm cream ERP palette (NOT dark) ────────────────────────────── */
 :root {
   color-scheme: light;
