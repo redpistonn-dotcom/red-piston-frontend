@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { fmt, fmtDateTime, margin } from "../utils";
+import { isValidMobile, cleanMobile, isValidGstin, cleanGstin } from "../utils/validators";
 import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
 import { PurchaseBills } from "../components/PurchaseBills";
 import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
@@ -399,6 +400,8 @@ export function POSBillingPage() {
     const validate = (effectiveType?: "Sale" | "Quotation") => {
         const checkType = effectiveType ?? billType;
         if (items.length === 0) { toast?.("Add at least one product", "warning"); return false; }
+        if (customerPhone && !isValidMobile(customerPhone)) { toast?.("Enter a valid 10-digit mobile number, or clear the field", "warning"); return false; }
+        if (customerGstin && !isValidGstin(customerGstin)) { toast?.("Enter a valid 15-character GSTIN (e.g. 27AABCU9603R1ZX), or clear the field", "warning"); return false; }
         if (paymentMode === "Udhaar" && overLimit) {
             toast?.(`Credit limit exceeded — ${selectedParty?.name || "party"}'s outstanding will reach ${fmt(creditAfterSale)} (limit ${fmt(creditLimit)}). Collect a payment first or reduce the sale.`, "error");
             return false;
@@ -1271,11 +1274,14 @@ export function POSBillingPage() {
                         </div>
                         <div>
                             <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>WhatsApp No.</label>
-                            <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value.replace(/[^\d]/g, "").slice(0, 10))}
-                                placeholder="For invoice sharing" type="tel" maxLength={10} inputMode="numeric"
-                                style={{ width: "100%", height: 34, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.ui, outline: "none", boxSizing: "border-box" }}
+                            <input value={customerPhone} onChange={e => setCustomerPhone(cleanMobile(e.target.value))}
+                                placeholder="10-digit mobile" type="tel" maxLength={10} inputMode="numeric"
+                                style={{ width: "100%", height: 34, background: T.bg, border: `1.5px solid ${isValidMobile(customerPhone) ? T.emerald : customerPhone.length > 0 ? T.crimson : T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" }}
                                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
-                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = T.border; }} />
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = isValidMobile(customerPhone) ? T.emerald : customerPhone.length > 0 ? T.crimson : T.border; }} />
+                            {customerPhone.length > 0 && !isValidMobile(customerPhone) && (
+                                <div style={{ fontSize: 10, color: T.crimson, marginTop: 3 }}>Enter a valid 10-digit mobile (starts 6–9)</div>
+                            )}
                         </div>
                         <div>
                             <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>Vehicle Reg.</label>
@@ -1297,11 +1303,14 @@ export function POSBillingPage() {
                             <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>
                                 Customer GSTIN <span style={{ color: T.t4, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(for B2B — required for buyer's ITC claim)</span>
                             </label>
-                            <input value={customerGstin} onChange={e => setCustomerGstin(e.target.value.toUpperCase().slice(0, 15))}
+                            <input value={customerGstin} onChange={e => setCustomerGstin(cleanGstin(e.target.value))}
                                 placeholder="e.g. 27AABCU9603R1ZX" maxLength={15}
-                                style={{ width: "100%", height: 34, background: T.bg, border: `1.5px solid ${customerGstin.length === 15 ? T.emerald : T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box", letterSpacing: "0.04em" }}
+                                style={{ width: "100%", height: 34, background: T.bg, border: `1.5px solid ${isValidGstin(customerGstin) ? T.emerald : customerGstin.length > 0 ? T.crimson : T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box", letterSpacing: "0.04em" }}
                                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
-                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = customerGstin.length === 15 ? T.emerald : T.border; }} />
+                                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = isValidGstin(customerGstin) ? T.emerald : customerGstin.length > 0 ? T.crimson : T.border; }} />
+                            {customerGstin.length > 0 && !isValidGstin(customerGstin) && (
+                                <div style={{ fontSize: 10, color: T.crimson, marginTop: 3 }}>Invalid GSTIN — must be 15 chars like 27AABCU9603R1ZX</div>
+                            )}
                         </div>
                     </div>
 
