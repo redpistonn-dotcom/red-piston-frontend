@@ -1115,7 +1115,7 @@ export function POSBillingPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                                 <tr style={{ background: T.bg, borderBottom: `1px solid ${T.border}` }}>
-                                    {["#","Product","OEM No.","Qty","Price","Disc.","Total","Actions"].map(h => (
+                                    {["#","Product","Brand","OEM No.","Qty","Price","Disc.","Total","Actions"].map(h => (
                                         <th key={h} style={{ padding: "10px 14px", textAlign: h === "Price" || h === "Total" || h === "Disc." ? "right" : "left", fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: FONT.ui, whiteSpace: "nowrap" }}>{h}</th>
                                     ))}
                                 </tr>
@@ -1139,12 +1139,6 @@ export function POSBillingPage() {
                                                                     maxLength={100}
                                                                     style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name.trim() ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                                                                    <span style={{ fontSize: 10, color: T.t3 }}>Brand</span>
-                                                                    <input value={item.brand || ""} placeholder="Brand" maxLength={60}
-                                                                        onChange={e => updateItem(idx, "brand", e.target.value)}
-                                                                        style={{ width: 110, height: 22, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", color: T.t2, fontSize: 11, outline: "none" }} />
-                                                                </div>
-                                                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                                                     <span style={{ fontSize: 10, color: T.t3 }}>Buy Price ₹</span>
                                                                     <input type="number" value={item.buyPrice || ""} min="0" placeholder="0"
                                                                         onFocus={e => e.target.select()}
@@ -1159,12 +1153,20 @@ export function POSBillingPage() {
                                                         {String(item.productId || "").startsWith("custom_")
                                                             ? <div style={{ fontSize: 10, color: T.amber, marginTop: 1, fontWeight: 600 }}>Custom · GST {item.gstRate}%</div>
                                                             : <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>
-                                                                {item.brand && <><span style={{ color: T.t2, fontWeight: 600 }}>{item.brand}</span> · </>}Stock: {item.maxStock} · GST {item.gstRate}%
+                                                                Stock: {item.maxStock} · GST {item.gstRate}%
                                                                 {item.mrp > item.price && <> · MRP <span style={{ textDecoration: "line-through" }}>{fmt(item.mrp)}</span></>}
                                                               </div>
                                                         }
                                                     </div>
                                                 </div>
+                                            </td>
+                                            <td style={{ padding: "12px 14px" }}>
+                                                {String(item.productId || "").startsWith("custom_")
+                                                    ? <input value={item.brand || ""} placeholder="Brand" maxLength={60}
+                                                        onChange={e => updateItem(idx, "brand", e.target.value)}
+                                                        style={{ width: 120, height: 30, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, padding: "0 8px", color: T.t2, fontSize: 12, outline: "none" }} />
+                                                    : <span style={{ fontSize: 12, fontWeight: 600, color: item.brand ? T.t2 : T.t4 }}>{item.brand || "—"}</span>
+                                                }
                                             </td>
                                             <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>{item.oemNumber || "—"}</td>
                                             <td style={{ padding: "12px 10px" }}>
