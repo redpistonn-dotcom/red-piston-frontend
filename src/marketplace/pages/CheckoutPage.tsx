@@ -3,6 +3,7 @@ import { T, FONT } from "../../theme";
 import { useStore } from "../../store";
 import { api } from "../../api/client";
 import { fmt, uid } from "../../utils";
+import { cleanMobile, cleanPincode } from "../../utils/validators";
 import { DELIVERY_SLOTS } from "../api/mockDatabase";
 import { assignDeliveryPartner } from "../api/engine";
 import { PartImage } from "../components/PartImage";
@@ -46,7 +47,8 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
     const gstInclusive = Math.round((totalValue * 18) / 118);
 
     // Pincode → city/state auto-fill (mock lookup)
-    const handlePincodeChange = (pin) => {
+    const handlePincodeChange = (raw) => {
+        const pin = cleanPincode(raw);
         setAddress(a => ({ ...a, pincode: pin }));
         if (pin.length === 6) {
             const cityMap = { "1": "Delhi", "2": "Delhi", "3": "Jaipur", "4": "Mumbai", "5": "Hyderabad", "6": "Chennai", "7": "Kolkata", "8": "Bangalore", "9": "Ahmedabad" };
@@ -263,7 +265,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Phone Number *</label>
-                                    <input value={address.phone} onChange={e => setAddress({ ...address, phone: e.target.value })} style={fieldStyle(errors.phone)} placeholder="9876543210" maxLength={10} />
+                                    <input value={address.phone} onChange={e => setAddress({ ...address, phone: cleanMobile(e.target.value) })} style={fieldStyle(errors.phone)} placeholder="10-digit mobile" maxLength={10} inputMode="numeric" />
                                     {errors.phone && <div style={{ fontSize: 11, color: T.crimson, marginTop: 4 }}>{errors.phone}</div>}
                                 </div>
                             </div>

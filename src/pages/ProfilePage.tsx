@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { T, FONT } from "../theme.js";
+import { cleanMobile, cleanPincode, cleanVehicleReg, cleanGstin } from "../utils/validators";
 import { Avatar } from "../components/Avatar.jsx";
 
 const S = {
@@ -111,7 +112,7 @@ function AddressForm({ initial, onSave, onCancel, saving }) {
       </div>
       <div style={S.field}>
         <label style={S.label}>Phone</label>
-        <input style={S.input} value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+91 XXXXX XXXXX" />
+        <input style={S.input} value={form.phone} onChange={e => set("phone", cleanMobile(e.target.value))} placeholder="10-digit mobile" />
       </div>
       <div style={S.field}>
         <label style={S.label}>Address Line 1</label>
@@ -133,7 +134,7 @@ function AddressForm({ initial, onSave, onCancel, saving }) {
       </div>
       <div style={S.field}>
         <label style={S.label}>Pincode</label>
-        <input style={S.input} value={form.pincode} onChange={e => set("pincode", e.target.value)} placeholder="6-digit pincode" maxLength={6} />
+        <input style={S.input} value={form.pincode} onChange={e => set("pincode", cleanPincode(e.target.value))} placeholder="6-digit pincode" maxLength={6} />
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
         <button style={S.btn("primary")} onClick={() => onSave(form)} disabled={saving}>{saving ? "Saving..." : "Save Address"}</button>
@@ -187,7 +188,7 @@ function GarageForm({ initial, onSave, onCancel, saving }) {
       </div>
       <div style={S.field}>
         <label style={S.label}>Registration Number</label>
-        <input style={S.input} value={form.registrationNo || ""} onChange={e => set("registrationNo", e.target.value.toUpperCase())} placeholder="MH12AB1234" />
+        <input style={S.input} value={form.registrationNo || ""} onChange={e => set("registrationNo", cleanVehicleReg(e.target.value))} placeholder="MH12AB1234" />
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
         <button style={S.btn("primary")} onClick={() => onSave(form)} disabled={saving}>{saving ? "Saving..." : "Save Vehicle"}</button>
@@ -908,7 +909,7 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
             <div className="settings-grid" style={S.row}>
               <div style={S.field}>
                 <label style={S.label}>GSTIN</label>
-                <input style={S.input} value={shopData.gstin || ""} onChange={e => setShopData(p => ({ ...p, gstin: e.target.value.toUpperCase() }))} placeholder="36AABCS1429B1Z1" />
+                <input style={S.input} value={shopData.gstin || ""} onChange={e => setShopData(p => ({ ...p, gstin: cleanGstin(e.target.value) }))} placeholder="36AABCS1429B1Z1" />
               </div>
               <div style={S.field}>
                 <label style={S.label}>Shop Category</label>
@@ -930,13 +931,13 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
               </div>
               <div style={S.field}>
                 <label style={S.label}>Pincode</label>
-                <input style={S.input} value={shopData.pincode || ""} onChange={e => setShopData(p => ({ ...p, pincode: e.target.value }))} placeholder="6-digit pincode" maxLength={6} />
+                <input style={S.input} value={shopData.pincode || ""} onChange={e => setShopData(p => ({ ...p, pincode: cleanPincode(e.target.value) }))} placeholder="6-digit pincode" maxLength={6} />
               </div>
             </div>
             <div className="settings-grid" style={S.row}>
               <div style={S.field}>
                 <label style={S.label}>Contact Number (WhatsApp)</label>
-                <input style={S.input} value={shopData.whatsappNumber || ""} onChange={e => setShopData(p => ({ ...p, whatsappNumber: e.target.value }))} placeholder="+91 9876543210" />
+                <input style={S.input} value={shopData.whatsappNumber || ""} onChange={e => setShopData(p => ({ ...p, whatsappNumber: cleanMobile(e.target.value) }))} placeholder="10-digit mobile" />
               </div>
               <div style={S.field}>
                 <label style={S.label}>Primary Phone</label>
