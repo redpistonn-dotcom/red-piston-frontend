@@ -159,19 +159,10 @@ export function POSBillingPage() {
                 }
             } catch {}
         }
-        // Only fall back to client-side PDF for Quotations (no backend save)
-        if (billType !== "Sale") {
-            try {
-                const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
-                const url = URL.createObjectURL(doc.output("blob"));
-                setPdfPreview({ url, loading: false, error: null });
-            } catch (e: any) {
-                setPdfPreview({ url: null, loading: false, error: e?.message || 'Could not load PDF' });
-            }
-        } else {
-            // Sale but no syncedInvoiceId yet — show loading state until backend responds
-            setPdfPreview({ url: null, loading: true, error: null });
-        }
+        // Sales AND quotations (ESTIMATE) both come from the backend now — show a
+        // loading state until the synced invoice id arrives, so the preview always
+        // uses the server PDF and never the differently-formatted client-side one.
+        setPdfPreview({ url: null, loading: true, error: null });
     }, [syncedInvoiceId, showOemOnBill, showMrpOnBill, buildBillPdf, billType]);
 
     const closePdfPreview = useCallback(() => {
@@ -203,14 +194,11 @@ export function POSBillingPage() {
                         }
                     } catch {}
                 }
-                // Only use client-side PDF for Quotations (they don't save to backend)
-                // For Sales without syncedInvoiceId yet, don't render — the effect will re-fire when syncedInvoiceId arrives
-                if (billType !== "Sale") {
-                    try {
-                        const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
-                        if (!cancelled) setInlinePdfUrl(URL.createObjectURL(doc.output("blob")));
-                    } catch {}
-                }
+                // Both Sales and Quotations now sync to the backend (a quotation is
+                // an ESTIMATE), so we always wait for the server-generated PDF and
+                // never fall back to the differently-formatted client-side jsPDF.
+                // Without syncedInvoiceId yet, don't render — the effect re-fires
+                // when the invoice:synced event delivers the id.
             };
             updatePdf();
             return () => { cancelled = true; };

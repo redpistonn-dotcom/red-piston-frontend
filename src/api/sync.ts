@@ -408,6 +408,8 @@ interface SyncInvoiceCustomItem {
 interface SyncInvoiceParams {
   items: { inventoryId: string | number; qty: number; unitPrice: number; discount?: number }[];
   customItems?: SyncInvoiceCustomItem[];
+  /** RETAIL (default), CREDIT, ESTIMATE (a saved quotation — no stock deduction), etc. */
+  invoiceType?: string;
   partyId?: string;
   partyName?: string;
   partyPhone?: string;
@@ -444,6 +446,7 @@ export async function syncInvoice(params: SyncInvoiceParams): Promise<{ ok: bool
         discount: item.discount || 0,
       })),
       customItems: hasCustom ? params.customItems : undefined,
+      invoiceType: params.invoiceType || undefined,
       partyId: params.partyId || undefined,
       partyName: params.partyName || undefined,
       partyPhone: params.partyPhone || undefined,

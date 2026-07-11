@@ -657,7 +657,10 @@ function AppContent() {
     saveProducts(updatedProducts, true);
     logAudit(isQuote ? "MULTI_QUOTATION_CREATED" : "MULTI_SALE_RECORDED", "movement", data.invoiceNo, `${data.items.length} items · ${fmt(data.total)}${hasOverrides ? " · price override(s)" : ""}`);
     toast(isQuote ? `Quotation: ${data.items.length} items · ${fmt(data.total)}` : `Sale recorded: ${data.items.length} items · ${fmt(data.total)}`, isQuote ? "info" : "success", isQuote ? "Estimate Saved" : `Invoice ${data.invoiceNo}`);
-    if (!isQuote) {
+    // Sync both sales and quotations to the backend — a quotation is saved as an
+    // ESTIMATE invoice (no stock deduction) so it gets the same server-generated
+    // PDF and shows up under Estimates in History.
+    {
       window.dispatchEvent(new CustomEvent("rp:sync", { detail: { delta: 1 } }));
       // Apportion the bill-level "Additional Discount" across line items so it
       // reduces each line's taxable value (and therefore GST) — the GST-correct
@@ -693,6 +696,7 @@ function AppContent() {
       syncInvoice({
         items: data.items.map((item, idx) => ({ inventoryId: item.productId, qty: item.qty, unitPrice: item.sellPrice, discount: perUnitDiscount[idx] })),
         customItems: customItemsForSync.length > 0 ? customItemsForSync : undefined,
+        invoiceType: isQuote ? "ESTIMATE" : undefined,
         partyName: data.customerName || undefined, partyPhone: data.customerPhone || undefined,
         partyGstin: data.customerGstin || undefined,
         partyId: data.partyId || undefined,
