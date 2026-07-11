@@ -687,6 +687,7 @@ function AppContent() {
         .filter(({ item }) => String(item.productId || '').startsWith('custom_'))
         .map(({ item, idx }) => ({
           name: String(item.name || 'Custom Item'),
+          brand: item.brand ? String(item.brand) : undefined,
           qty: item.qty,
           unitPrice: item.sellPrice,
           discount: perUnitDiscount[idx],

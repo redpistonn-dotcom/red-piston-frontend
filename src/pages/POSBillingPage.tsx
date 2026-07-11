@@ -300,7 +300,7 @@ export function POSBillingPage() {
             const existing = prev.find(i => i.productId === p.id);
             if (existing) return prev.map(i => i.productId === p.id ? { ...i, qty: Math.min(i.qty + 1, i.maxStock) } : i);
             return [...prev, {
-                productId: p.id, name: p.name, sku: p.sku || "", oemNumber: p.oemNumber || "", image: p.image || "📦",
+                productId: p.id, name: p.name, brand: p.brand || "", sku: p.sku || "", oemNumber: p.oemNumber || "", image: p.image || "📦",
                 qty: 1, price: p.sellPrice, originalPrice: p.sellPrice, discount: 0, discountType: "%",
                 gstRate: p.gstRate || 18, buyPrice: p.buyPrice, maxStock: p.stock, hsnCode: p.hsnCode || "",
                 mrp: p.mrp || null,
@@ -424,7 +424,7 @@ export function POSBillingPage() {
         onMultiSale({
             type: effectiveBillType, invoiceNo: inv,
             items: items.map((item, idx) => ({
-                productId: item.productId, name: item.name, qty: item.qty,
+                productId: item.productId, name: item.name, brand: item.brand || undefined, qty: item.qty,
                 sellPrice: item.price, buyPrice: item.buyPrice,
                 discount: lineCalcs[idx].discAmt, total: lineCalcs[idx].afterDisc,
                 gstAmount: lineCalcs[idx].gstAmt, profit: lineCalcs[idx].profit, gstRate: item.gstRate,
@@ -1139,6 +1139,12 @@ export function POSBillingPage() {
                                                                     maxLength={100}
                                                                     style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name.trim() ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                                                    <span style={{ fontSize: 10, color: T.t3 }}>Brand</span>
+                                                                    <input value={item.brand || ""} placeholder="Brand" maxLength={60}
+                                                                        onChange={e => updateItem(idx, "brand", e.target.value)}
+                                                                        style={{ width: 110, height: 22, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 5, padding: "0 6px", color: T.t2, fontSize: 11, outline: "none" }} />
+                                                                </div>
+                                                                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                                                     <span style={{ fontSize: 10, color: T.t3 }}>Buy Price ₹</span>
                                                                     <input type="number" value={item.buyPrice || ""} min="0" placeholder="0"
                                                                         onFocus={e => e.target.select()}
@@ -1153,7 +1159,7 @@ export function POSBillingPage() {
                                                         {String(item.productId || "").startsWith("custom_")
                                                             ? <div style={{ fontSize: 10, color: T.amber, marginTop: 1, fontWeight: 600 }}>Custom · GST {item.gstRate}%</div>
                                                             : <div style={{ fontSize: 10, color: T.t3, marginTop: 1 }}>
-                                                                Stock: {item.maxStock} · GST {item.gstRate}%
+                                                                {item.brand && <><span style={{ color: T.t2, fontWeight: 600 }}>{item.brand}</span> · </>}Stock: {item.maxStock} · GST {item.gstRate}%
                                                                 {item.mrp > item.price && <> · MRP <span style={{ textDecoration: "line-through" }}>{fmt(item.mrp)}</span></>}
                                                               </div>
                                                         }
@@ -1210,7 +1216,7 @@ export function POSBillingPage() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderTop: items.length > 0 ? `1px solid ${T.border}` : "none" }}>
                     <div style={{ display: "flex", gap: 18 }}>
                         <button onClick={() => {
-                            setItems(prev => [...prev, { productId: `custom_${Date.now()}`, name: "", sku: "", image: "📦", qty: 1, price: 0, originalPrice: 0, discount: 0, discountType: "%", gstRate: 18, buyPrice: 0, maxStock: 999 }]);
+                            setItems(prev => [...prev, { productId: `custom_${Date.now()}`, name: "", brand: "", sku: "", image: "📦", qty: 1, price: 0, originalPrice: 0, discount: 0, discountType: "%", gstRate: 18, buyPrice: 0, maxStock: 999 }]);
                         }} style={{ background: "none", border: "none", fontSize: 12, fontWeight: 700, color: T.amber, cursor: "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", gap: 5, padding: 0 }}>
                             <span style={{ fontSize: 16 }}>⊕</span> ADD CUSTOM ITEM
                         </button>

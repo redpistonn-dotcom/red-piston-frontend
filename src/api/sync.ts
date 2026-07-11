@@ -398,6 +398,7 @@ export async function syncProductSave(product: Partial<Product>): Promise<void> 
 
 interface SyncInvoiceCustomItem {
   name: string;
+  brand?: string;
   qty: number;
   unitPrice: number;
   discount?: number;
