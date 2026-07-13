@@ -5,7 +5,7 @@ import { searchCatalog, addInventory, contributePart } from "../api/inventory";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 import { cleanHsn } from "../utils/validators";
 
-export function ProductModal({ open, onClose, product, products, onSave, toast, activeShopId }) {
+export function ProductModal({ open, onClose, product, products, onSave, toast, activeShopId, initialValues = null }) {
     const isEdit = !!product;
     const blank = { name: "", sku: "", hsnCode: "", category: "Engine", brand: "", vehicles: "", buyPrice: "", sellPrice: "", mrp: "", stock: "", minStock: "10", maxStock: "1000", reorderQty: "20", location: "", supplier: "", image: "📦", gstRate: "18", trackBatch: false, batchNumber: "", expiryDate: "", notes: "", oemNumber: "", position: "", engineType: "", transmission: "", condition: "New", warranty: "", globalSku: null };
     const [f, setF] = useState(blank);
@@ -19,7 +19,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
     const [catalogLoading, setCatalogLoading] = useState(false);
 
     useEffect(() => {
-        setF(product ? { ...product, buyPrice: String(product.buyPrice), sellPrice: String(product.sellPrice), mrp: String(product.mrp || ""), stock: String(product.stock), minStock: String(product.minStock), maxStock: String(product.maxStock || 1000), reorderQty: String(product.reorderQty || 20), gstRate: String(product.gstRate || product.gst || 18), hsnCode: product.hsnCode || "", trackBatch: !!product.trackBatch, batchNumber: product.batchNumber || "", expiryDate: product.expiryDate || "", vehicles: product.vehicles || (product.compatibleVehicles || []).join(", "), oemNumber: product.oemNumber || "", position: product.position || "", engineType: product.engineType || "", transmission: product.transmission || "", condition: product.condition || "New", warranty: product.warranty || "", globalSku: product.globalSku || null, notes: product.description || "" } : blank);
+        setF(product ? { ...product, buyPrice: String(product.buyPrice), sellPrice: String(product.sellPrice), mrp: String(product.mrp || ""), stock: String(product.stock), minStock: String(product.minStock), maxStock: String(product.maxStock || 1000), reorderQty: String(product.reorderQty || 20), gstRate: String(product.gstRate || product.gst || 18), hsnCode: product.hsnCode || "", trackBatch: !!product.trackBatch, batchNumber: product.batchNumber || "", expiryDate: product.expiryDate || "", vehicles: product.vehicles || (product.compatibleVehicles || []).join(", "), oemNumber: product.oemNumber || "", position: product.position || "", engineType: product.engineType || "", transmission: product.transmission || "", condition: product.condition || "New", warranty: product.warranty || "", globalSku: product.globalSku || null, notes: product.description || "" } : initialValues ? { ...blank, ...initialValues } : blank);
         setErrors({});
         setShowCatalogSearch(false);
         setCatalogSearch("");

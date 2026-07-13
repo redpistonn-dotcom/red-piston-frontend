@@ -155,17 +155,16 @@ function AuthModal({ onClose }: { mode: 'signin' | 'signup'; onClose: () => void
   };
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(26,18,5,0.6)', backdropFilter: 'blur(6px)' }} onClick={onClose} />
-      <div style={{ position: 'relative', width: 'min(92vw, 960px)', height: 'min(640px, 88vh)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 32px 80px rgba(26,18,5,0.3)', border: '1px solid #E0D5C8', display: 'flex', flexDirection: 'column' }}>
-        <button
-          onClick={onClose}
-          style={{ position: 'absolute', top: 12, right: 12, zIndex: 200, width: 34, height: 34, borderRadius: '50%', background: '#FFFFFF', border: '1.5px solid #E0D5C8', color: '#5C4F40', cursor: 'pointer', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(26,18,5,0.15)' }}
-        >✕</button>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <LoginPage onLogin={handleLogin} isModal={true} />
-        </div>
-      </div>
+    // Full-screen login — fills the entire viewport (no floating box).
+    <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: '#FAF6F0', display: 'flex' }}>
+      <button
+        onClick={onClose}
+        aria-label="Close"
+        style={{ position: 'fixed', top: 9, right: 16, zIndex: 200, width: 40, height: 40, borderRadius: '50%', background: '#BE2B1A', border: 'none', color: '#FFFFFF', cursor: 'pointer', fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 12px rgba(190,43,26,0.35)', transition: 'all 0.15s' }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#9B1E10'; e.currentTarget.style.transform = 'scale(1.08)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = '#BE2B1A'; e.currentTarget.style.transform = 'scale(1)'; }}
+      >✕</button>
+      <LoginPage onLogin={handleLogin} isModal={true} />
     </div>,
     document.body
   );

@@ -1,10 +1,11 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect, useContext } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { fmt, fmtDateTime, margin } from "../utils";
 import { isValidMobile, cleanMobile, isValidGstin, cleanGstin } from "../utils/validators";
 import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
+import { ProductModal } from "../components/ProductModal";
 import { PurchaseBills } from "../components/PurchaseBills";
 import { NewReturnExchangeModal } from "../components/NewReturnExchangeModal";
 import { PartyAutocomplete } from "../components/PartyAutocomplete";
@@ -37,6 +38,7 @@ export function POSBillingPage() {
     const { products, activeShopId, shops, parties, movements } = useStore();
     const { handleMultiItemSale: onMultiSale, toast, currentUser } = useContext(AppCtx);
     const navigate = useNavigate();
+    const location = useLocation();
     const shop = useMemo(() => {
         const fromStore = (shops || []).find((s: any) => s.id === activeShopId || s.shopId === activeShopId);
         if (fromStore) return fromStore;
@@ -77,6 +79,20 @@ export function POSBillingPage() {
     const [customerGstin, setCustomerGstin] = useState(draft?.customerGstin || "");
     const [vehicleReg, setVehicleReg]   = useState(draft?.vehicleReg || "");
     const [partyId, setPartyId]     = useState<string | number | null>(draft?.partyId || null);
+    const [quotationBanner, setQuotationBanner] = useState<string | null>(null);
+    const [addToInvItem, setAddToInvItem] = useState<{ idx: number; item: any } | null>(null);
+
+    // Pre-populate cart from a quotation conversion (navigate state set by HistoryPage)
+    useEffect(() => {
+        const q = (location.state as any)?.fromQuotation;
+        if (!q?.items?.length) return;
+        setItems(q.items);
+        setBillType("Sale");
+        setQuotationBanner(`${q.items.length} item${q.items.length !== 1 ? "s" : ""} loaded from quotation${q.invoiceNo ? ` · ${q.invoiceNo}` : ""}`);
+        window.history.replaceState({}, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Cash tendered (for change-due calc) and UPI reference
     const [cashTendered, setCashTendered] = useState<number | "">(0);
     const [upiRef, setUpiRef]         = useState("");
@@ -463,6 +479,25 @@ export function POSBillingPage() {
         setInlinePdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
         setSyncedInvoiceId(null);
         setTimeout(() => searchRef.current?.focus(), 50);
+    };
+
+    const handleAddToInventorySave = (savedProduct: any) => {
+        if (addToInvItem === null) return;
+        const { idx } = addToInvItem;
+        setItems(prev => prev.map((item, i) => {
+            if (i !== idx) return item;
+            const newId = savedProduct.inventoryId || savedProduct.id;
+            return {
+                ...item,
+                productId: newId,
+                name: savedProduct.name || item.name,
+                brand: savedProduct.brand || item.brand,
+                sku: savedProduct.sku || item.sku,
+                maxStock: savedProduct.stock ?? item.maxStock,
+                hsnCode: savedProduct.hsnCode || item.hsnCode,
+            };
+        }));
+        setAddToInvItem(null);
     };
 
     const SUSPEND_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
@@ -944,6 +979,15 @@ export function POSBillingPage() {
     return (
         <div className="page-in" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
+            {/* Quotation conversion banner */}
+            {quotationBanner && (
+                <div style={{ background: "#F0FDF4", border: "1px solid rgba(16,185,129,0.3)", borderLeft: "4px solid #10B981", borderRadius: "0 10px 10px 0", padding: "11px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>✅</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#065F46" }}>{quotationBanner} — edit quantities as needed, then generate invoice</span>
+                    <button onClick={() => setQuotationBanner(null)} style={{ background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>✕</button>
+                </div>
+            )}
+
             {/* POS / Purchase Bills tab switcher */}
             <div style={{ display: "flex", gap: 6 }}>
                 {([["pos", "🧾", "Point of Sale"], ["bills", "📂", "Purchase Bills"]] as const).map(([id, icon, label]) => (
@@ -1202,7 +1246,17 @@ export function POSBillingPage() {
                                             </td>
                                             <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontWeight: 800, fontSize: 14, color: T.t1, textAlign: "right" }}>{fmt(lc.afterDisc)}</td>
                                             <td style={{ padding: "12px 14px" }}>
-                                                <button onClick={() => removeItem(idx)} style={{ width: 30, height: 30, background: "transparent", border: `1px solid ${T.border}`, borderRadius: 7, color: T.crimson, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                                    {String(item.productId || "").startsWith("custom_") && (
+                                                        <button
+                                                            title="Add to Inventory"
+                                                            onClick={() => setAddToInvItem({ idx, item })}
+                                                            style={{ height: 30, padding: "0 8px", background: T.amber + "18", border: `1px solid ${T.amber}`, borderRadius: 7, color: T.amber, cursor: "pointer", fontSize: 10, fontWeight: 700, fontFamily: FONT.ui, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
+                                                            <span>＋</span> Inventory
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => removeItem(idx)} style={{ width: 30, height: 30, background: "transparent", border: `1px solid ${T.border}`, borderRadius: 7, color: T.crimson, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✕</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -1514,6 +1568,29 @@ export function POSBillingPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Add custom item to inventory */}
+            {addToInvItem && (
+                <ProductModal
+                    open={true}
+                    onClose={() => setAddToInvItem(null)}
+                    product={null}
+                    products={shopProducts}
+                    onSave={handleAddToInventorySave}
+                    toast={toast}
+                    activeShopId={activeShopId}
+                    initialValues={{
+                        name: addToInvItem.item.name || "",
+                        brand: addToInvItem.item.brand || "",
+                        gstRate: String(addToInvItem.item.gstRate ?? 18),
+                        buyPrice: String(addToInvItem.item.buyPrice || ""),
+                        sellPrice: String(addToInvItem.item.price || ""),
+                        image: addToInvItem.item.image || "📦",
+                        hsnCode: addToInvItem.item.hsnCode || "",
+                        oemNumber: addToInvItem.item.oemNumber || "",
+                    }}
+                />
+            )}
             </>
             )}
         </div>

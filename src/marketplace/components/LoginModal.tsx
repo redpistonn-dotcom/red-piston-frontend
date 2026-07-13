@@ -32,54 +32,34 @@ export function LoginModal({ onClose, onLogin }) {
   };
 
   return createPortal(
+    // Full-screen login — fills the entire viewport (no floating box).
     <div style={{
       position: "fixed", inset: 0, zIndex: 99999,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: "16px",
+      background: "#FAF6F0", display: "flex",
     }}>
-      {/* Backdrop */}
-      <div
-        style={{ position: "absolute", inset: 0, background: "rgba(26,18,5,0.6)", backdropFilter: "blur(6px)" }}
+      {/* Close button — solid white, clearly visible, pinned to the screen corner */}
+      <button
         onClick={onClose}
-      />
+        aria-label="Close"
+        style={{
+          position: "fixed", top: 9, right: 16, zIndex: 200,
+          width: 40, height: 40, borderRadius: "50%",
+          background: "#BE2B1A",
+          border: "none",
+          color: "#FFFFFF",
+          cursor: "pointer", fontSize: 17, fontWeight: 700,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 2px 12px rgba(190,43,26,0.35)",
+          transition: "all 0.15s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = "#9B1E10"; e.currentTarget.style.transform = "scale(1.08)"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "#BE2B1A"; e.currentTarget.style.transform = "scale(1)"; }}
+      >
+        ✕
+      </button>
 
-      {/* Modal panel — fixed height so no outer scroll */}
-      <div style={{
-        position: "relative",
-        width: "min(92vw, 960px)",
-        height: "min(640px, 88vh)",
-        borderRadius: 20,
-        overflow: "hidden",
-        boxShadow: "0 32px 80px rgba(26,18,5,0.3)",
-        border: "1px solid #E0D5C8",
-        display: "flex",
-        flexDirection: "column",
-      }}>
-        {/* Close button — solid white, clearly visible */}
-        <button
-          onClick={onClose}
-          style={{
-            position: "absolute", top: 12, right: 12, zIndex: 200,
-            width: 34, height: 34, borderRadius: "50%",
-            background: "#FFFFFF",
-            border: "1.5px solid #E0D5C8",
-            color: "#5C4F40",
-            cursor: "pointer", fontSize: 14, fontWeight: 700,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 2px 8px rgba(26,18,5,0.15)",
-            transition: "all 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = "#BE2B1A"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "#BE2B1A"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "#FFFFFF"; e.currentTarget.style.color = "#5C4F40"; e.currentTarget.style.borderColor = "#E0D5C8"; }}
-        >
-          ✕
-        </button>
-
-        {/* LoginPage — fills the fixed-height panel, right panel scrolls internally if needed */}
-        <div style={{ flex: 1, overflow: "hidden" }}>
-          <LoginPage onLogin={handleLogin} isModal={true} />
-        </div>
-      </div>
+      {/* LoginPage — fills the whole screen; scrolls internally on tall steps */}
+      <LoginPage onLogin={handleLogin} isModal={true} />
     </div>,
     document.body
   );

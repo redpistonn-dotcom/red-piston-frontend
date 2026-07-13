@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { T, FONT, SHADOWS } from "../theme";
 import { fmt, fmtDate, fmtTime, getMovementConfig, exportMovementsCSV, inDateRange } from "../utils";
@@ -6,7 +7,7 @@ import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 import { useJobCardHistory } from "../hooks/useJobCardHistory";
 import { fetchMovements } from "../api/sync";
-import { getInvoicePdfUrl } from "../api/billing";
+import { getInvoicePdfUrl, getInvoice } from "../api/billing";
 import { getAccessToken } from "../api/client";
 import PdfPreviewModal from "../components/PdfPreviewModal";
 
@@ -47,7 +48,7 @@ function groupMovements(filtered: any[]) {
 }
 
 // ─── Group row (multi-item invoice) ──────────────────────────────────────────
-function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice }: any) {
+function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice, onConvertToPOS, convertingId }: any) {
     const first = group.items[0];
     const cfg = getMovementConfig(first.type);
     const totalAmt = group.items.reduce((s: number, m: any) => s + (m.total || 0), 0);
@@ -108,9 +109,19 @@ function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice }: any
                 <tr style={{ background: T.bg }}>
                     <td colSpan={10} style={{ padding: 0, borderBottom: `1px solid ${T.border}` }}>
                         <div style={{ padding: "14px 20px 18px", animation: "fadeIn 0.15s ease" }}>
-                            <div style={{ fontSize: 11, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>
-                                <span style={{ color: T.amber }}>{group.items.length} Line Items</span>
-                                {first.invoiceNo && <span style={{ color: T.sky, fontFamily: FONT.mono }}> · {first.invoiceNo}</span>}
+                            <div style={{ fontSize: 11, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                <span>
+                                    <span style={{ color: T.amber }}>{group.items.length} Line Items</span>
+                                    {first.invoiceNo && <span style={{ color: T.sky, fontFamily: FONT.mono }}> · {first.invoiceNo}</span>}
+                                </span>
+                                {first.type === "ESTIMATE" && first.invoiceId && (
+                                    <button
+                                        onClick={e => { e.stopPropagation(); onConvertToPOS?.(first.invoiceId, first.invoiceNo); }}
+                                        disabled={convertingId === first.invoiceId}
+                                        style={{ height: 32, padding: "0 14px", background: "#BE2B1A", color: "#FFFFFF", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: convertingId === first.invoiceId ? "not-allowed" : "pointer", fontFamily: FONT.ui, display: "inline-flex", alignItems: "center", gap: 6, opacity: convertingId === first.invoiceId ? 0.65 : 1, textTransform: "none", letterSpacing: 0 }}>
+                                        {convertingId === first.invoiceId ? "⏳ Loading…" : "🧾 Convert to POS Billing"}
+                                    </button>
+                                )}
                             </div>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                                 <thead>
@@ -159,7 +170,7 @@ function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice }: any
 }
 
 // ─── Single row ───────────────────────────────────────────────────────────────
-function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice }: any) {
+function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice, onConvertToPOS, convertingId }: any) {
     const cfg = getMovementConfig(m.type);
     return (
         <React.Fragment>
@@ -265,6 +276,16 @@ function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice }: any) {
                                     <div style={{ fontSize: 12, color: T.t2, lineHeight: 1.6 }}>{m.note}</div>
                                 </div>
                             )}
+                            {m.type === "ESTIMATE" && m.invoiceId && (
+                                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                    <button
+                                        onClick={e => { e.stopPropagation(); onConvertToPOS?.(m.invoiceId, m.invoiceNo); }}
+                                        disabled={convertingId === m.invoiceId}
+                                        style={{ height: 34, padding: "0 16px", background: "#BE2B1A", color: "#FFFFFF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: convertingId === m.invoiceId ? "not-allowed" : "pointer", fontFamily: FONT.ui, display: "inline-flex", alignItems: "center", gap: 7, opacity: convertingId === m.invoiceId ? 0.65 : 1 }}>
+                                        {convertingId === m.invoiceId ? "⏳ Loading…" : "🧾 Convert to POS Billing"}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </td>
                 </tr>
@@ -301,6 +322,7 @@ const TABS = [
 export function HistoryPage() {
     const { orders, activeShopId, apiSynced } = useStore();
     const isMobile = useIsMobile();
+    const navigate = useNavigate();
     const [tab, setTab]             = useState<string>("ALL");
     const [period, setPeriod]       = useState<Period>("7D");
     const [search, setSearch]       = useState("");
@@ -309,6 +331,7 @@ export function HistoryPage() {
     const [dateTo, setDateTo]       = useState("");
     const [visibleCount, setVisibleCount] = useState(50);
     const [invoicePreview, setInvoicePreview] = useState<{ id: number; no?: string | null; url?: string; loading: boolean } | null>(null);
+    const [convertingId, setConvertingId] = useState<number | null>(null);
 
     // Local movements fetched directly from the API (server-first).
     const [apiMovements, setApiMovements] = useState<any[]>([]);
@@ -340,6 +363,40 @@ export function HistoryPage() {
     useEffect(() => () => {
         if (invoicePreview?.url) URL.revokeObjectURL(invoicePreview.url);
     }, [invoicePreview?.url]);
+
+    const handleConvertToPOS = async (invoiceId: number, invoiceNo: string | null) => {
+        if (convertingId) return;
+        setConvertingId(invoiceId);
+        try {
+            const res = await getInvoice(invoiceId);
+            const inv = res?.invoice || res?.data || res;
+            const rawItems: any[] = inv?.items || inv?.lineItems || [];
+            if (!rawItems.length) { window.alert("No items found in this quotation."); return; }
+            const posItems = rawItems.map((item: any, idx: number) => ({
+                productId: item.inventoryId != null ? item.inventoryId : `custom_${Date.now() + idx}`,
+                name: item.partName || item.name || "Item",
+                brand: item.brand || "",
+                sku: item.sku || "",
+                oemNumber: item.oemNumber || "",
+                image: "📦",
+                qty: item.qty,
+                price: item.unitPrice,
+                originalPrice: item.unitPrice,
+                discount: item.discount || 0,
+                discountType: "%",
+                gstRate: item.gstRate ?? 18,
+                buyPrice: item.buyingPrice || item.buyPrice || 0,
+                maxStock: 9999,
+                hsnCode: item.hsnCode || "",
+                mrp: item.mrp || null,
+            }));
+            navigate("/billing", { state: { fromQuotation: { invoiceNo: invoiceNo || "", items: posItems } } });
+        } catch {
+            window.alert("Could not load quotation. Please try again.");
+        } finally {
+            setConvertingId(null);
+        }
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -593,6 +650,15 @@ export function HistoryPage() {
                                             >
                                                 Preview Invoice
                                             </button>
+                                            {first.type === "ESTIMATE" && (
+                                                <button
+                                                    onClick={() => handleConvertToPOS(first.invoiceId, first.invoiceNo)}
+                                                    disabled={convertingId === first.invoiceId}
+                                                    style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "none", background: "#BE2B1A", color: "#FFFFFF", fontSize: 12, fontWeight: 700, fontFamily: FONT.ui, opacity: convertingId === first.invoiceId ? 0.65 : 1 }}
+                                                >
+                                                    {convertingId === first.invoiceId ? "Loading…" : "🧾 Convert"}
+                                                </button>
+                                            )}
                                         </CardActions>
                                     )}
                                 </MobileCard>
@@ -651,8 +717,8 @@ export function HistoryPage() {
                                                 </tr>
                                             )}
                                             {group.items.length > 1
-                                                ? <GroupRow group={group} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} />
-                                                : <SingleRow m={group.items[0]} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} />
+                                                ? <GroupRow group={group} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} onConvertToPOS={handleConvertToPOS} convertingId={convertingId} />
+                                                : <SingleRow m={group.items[0]} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} onConvertToPOS={handleConvertToPOS} convertingId={convertingId} />
                                             }
                                         </React.Fragment>
                                     );

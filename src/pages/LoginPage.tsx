@@ -167,7 +167,7 @@ const FEATURES = [
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function LoginPage({ onLogin, isModal = false }) {
   const [step, setStep]           = useState(STEPS.LANDING);
-  const [role, setRole]           = useState("");         // "shop" | "customer" | "admin"
+  const [role, setRole]           = useState("customer"); // "shop" | "customer" | "admin"
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
@@ -188,7 +188,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [forgotMode, setForgotMode]       = useState(false);
 
   const [forgotSent, setForgotSent]       = useState(false);
-  const [landingTab, setLandingTab]       = useState("owner"); // "owner" | "customer"
+  const [landingTab, setLandingTab]       = useState("customer"); // "owner" | "customer"
   const [googleLoading, setGoogleLoading] = useState(false);
 
   // ── Email OTP verification (manual signup/login only — Google is pre-verified) ──
@@ -200,24 +200,28 @@ export default function LoginPage({ onLogin, isModal = false }) {
   // What to do once the code checks out — set right before go(STEPS.VERIFY_EMAIL)
   const [afterVerify, setAfterVerify]     = useState(null);
 
-  // Modal-responsive style tokens — shadow module-level BASE_S
+  // Modal-responsive style tokens — shadow module-level BASE_S.
+  // The modal panel is large (≈1000×660), so keep type/controls near full
+  // size for readability; only trim a little vs the standalone page.
   const S = isModal ? {
     ...BASE_S,
-    heading:   { ...BASE_S.heading, fontSize: 16, marginBottom: 2 },
-    sub:       { ...BASE_S.sub, fontSize: 11, marginBottom: 12 },
-    chip:      { ...BASE_S.chip, fontSize: 9, marginBottom: 4 },
-    label:     { ...BASE_S.label, fontSize: 10, marginBottom: 3 },
-    hint:      { ...BASE_S.hint, fontSize: 11, marginBottom: 10 },
-    input:     { ...BASE_S.input, padding: "8px 10px", fontSize: 12 },
-    phoneFlag: { ...BASE_S.phoneFlag, padding: "8px 10px", fontSize: 12 },
-    phoneInput:{ ...BASE_S.phoneInput, padding: "8px 10px", fontSize: 12 },
-    btnPrimary:(d) => ({ ...BASE_S.btnPrimary(d), padding: "9px", fontSize: 11 }),
-    btnOutline:{ ...BASE_S.btnOutline, padding: "8px", fontSize: 11 },
-    btnGoogle: { ...BASE_S.btnGoogle, padding: "8px", fontSize: 11 },
-    btnBack:   { ...BASE_S.btnBack, padding: "0 0 10px", fontSize: 11 },
-    otpBox:    { ...BASE_S.otpBox, width: 38, height: 44, fontSize: 18 },
-    error:     { ...BASE_S.error, padding: "8px 10px", fontSize: 11, marginBottom: 10 },
-    divider:   { ...BASE_S.divider, margin: "10px 0" },
+    // Full-screen login → a deliberate, generous type scale (Plus Jakarta hero,
+    // Inter body, JetBrains Mono labels): Hero 28 / Sub 15 / Body 15 / Label 11.
+    heading:   { ...BASE_S.heading, fontSize: 28, marginBottom: 6, letterSpacing: "-0.4px", lineHeight: 1.15 },
+    sub:       { ...BASE_S.sub, fontSize: 15, marginBottom: 24, lineHeight: 1.5 },
+    chip:      { ...BASE_S.chip, fontSize: 11, marginBottom: 10, letterSpacing: "0.12em" },
+    label:     { ...BASE_S.label, fontSize: 11, marginBottom: 7 },
+    hint:      { ...BASE_S.hint, fontSize: 13, marginBottom: 14 },
+    input:     { ...BASE_S.input, padding: "10px 13px", fontSize: 14 },
+    phoneFlag: { ...BASE_S.phoneFlag, padding: "10px 13px", fontSize: 14 },
+    phoneInput:{ ...BASE_S.phoneInput, padding: "10px 13px", fontSize: 14 },
+    btnPrimary:(d) => ({ ...BASE_S.btnPrimary(d), padding: "12px", fontSize: 13 }),
+    btnOutline:{ ...BASE_S.btnOutline, padding: "11px", fontSize: 13 },
+    btnGoogle: { ...BASE_S.btnGoogle, padding: "11px", fontSize: 13 },
+    btnBack:   { ...BASE_S.btnBack, padding: "0 0 14px", fontSize: 13 },
+    otpBox:    { ...BASE_S.otpBox, width: 46, height: 52, fontSize: 20 },
+    error:     { ...BASE_S.error, padding: "10px 13px", fontSize: 13, marginBottom: 12 },
+    divider:   { ...BASE_S.divider, margin: "14px 0" },
   } : BASE_S;
 
   const go = (s) => { setStep(s); setError(""); };
@@ -565,57 +569,156 @@ export default function LoginPage({ onLogin, isModal = false }) {
       // LANDING — Role selector: Customer vs Shop Owner
       // ══════════════════════════════════════════════════════════════════════
       case STEPS.LANDING:
+        // isModal: Option 3 — slim top bar (rendered in layout) + toggle + sign-in form
+        if (isModal) {
+          return (
+            <div className="auth-card">
+              {/* Segmented role toggle */}
+              <div style={{ display: "flex", background: "#F0E8DF", borderRadius: 11, padding: 4, marginBottom: 18 }}>
+                {[
+                  { key: "customer", emoji: "🚗", label: "Customer" },
+                  { key: "owner", emoji: "🏪", label: "Shop Owner" },
+                ].map(t => (
+                  <button
+                    key={t.key}
+                    onClick={() => { setLandingTab(t.key); setRole(t.key === "owner" ? "shop" : "customer"); setError(""); }}
+                    style={{
+                      flex: 1, padding: "9px 0", borderRadius: 8, border: "none",
+                      background: landingTab === t.key ? "#FFFFFF" : "transparent",
+                      color: landingTab === t.key ? "#1A1205" : "#9C8C7C",
+                      fontSize: 13, fontWeight: 700, cursor: "pointer",
+                      fontFamily: "'Inter', sans-serif",
+                      boxShadow: landingTab === t.key ? "0 1px 6px rgba(26,18,5,0.1)" : "none",
+                      transition: "all 0.18s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    }}
+                  >
+                    <span>{t.emoji}</span>
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "#1A1205", letterSpacing: "-0.3px", fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1.15 }}>
+                  {landingTab === "owner" ? "Welcome back" : "Sign in"}
+                </div>
+                <div style={{ fontSize: 13, color: "#9C8C7C", marginTop: 4, lineHeight: 1.4 }}>
+                  {landingTab === "owner" ? "Sign in to your shop dashboard." : "Access your RedPiston account."}
+                </div>
+              </div>
+
+              {error && <div style={S.error}>{error}</div>}
+
+              {!forgotMode && (
+                <>
+                  <label style={S.label}>Email Address</label>
+                  <input className="auth-input" style={{ ...S.input, marginBottom: 10 }} type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
+
+                  <label style={S.label}>Password</label>
+                  <div style={{ position: "relative", marginBottom: 4 }}>
+                    <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showPwd ? "text" : "password"} placeholder="Your password" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && emailSignIn()} />
+                    <button onClick={() => setShowPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 15 }}>{showPwd ? "🙈" : "👁"}</button>
+                  </div>
+                  <div style={{ textAlign: "right", marginBottom: 14 }}>
+                    <button onClick={() => { setForgotMode(true); setForgotEmail(email); setError(""); }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 12, fontFamily: "'Inter',sans-serif", fontWeight: 600 }}>Forgot password?</button>
+                  </div>
+
+                  <button className="btn-primary" style={{ ...S.btnPrimary(loading || googleLoading), marginBottom: 12 }} disabled={loading || googleLoading} onClick={emailSignIn}>
+                    {loading ? "Signing in…" : "Sign In →"}
+                  </button>
+                  <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
+                  <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer" }} disabled={loading || googleLoading} onClick={() => googleAuth("signin")}>
+                    <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                    {googleLoading ? "Signing in…" : "Continue with Google"}
+                  </button>
+                </>
+              )}
+
+              {/* Forgot password inline */}
+              {forgotMode && (
+                <>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1205", marginBottom: 6 }}>Reset Password</div>
+                  <div style={{ fontSize: 13, color: "#9C8C7C", marginBottom: 18 }}>Enter your email and we'll send a reset link.</div>
+                  {forgotSent ? (
+                    <div style={{ background: "#F0FDF4", border: `1px solid #86EFAC`, borderRadius: 10, padding: "14px 16px", fontSize: 13 }}>
+                      <div style={{ color: "#16A34A", fontWeight: 700, marginBottom: 6 }}>✅ Link sent! Check your inbox.</div>
+                      <div style={{ color: "#5C4F40", lineHeight: 1.5 }}>
+                        We sent a link to <strong style={{ color: "#1A1205" }}>{forgotEmail}</strong>.<br />
+                        Click it to set or reset your password. Check spam if you don't see it.
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label style={S.label}>Email Address</label>
+                      <input className="auth-input" style={{ ...S.input, marginBottom: 16 }} type="email" placeholder="you@example.com" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} autoFocus />
+                      <button className="btn-primary" style={{ ...S.btnPrimary(loading), marginBottom: 12 }} disabled={loading} onClick={sendForgotPassword}>
+                        {loading ? "Sending…" : "Send Reset Link →"}
+                      </button>
+                    </>
+                  )}
+                  <button style={{ ...S.btnOutline }} onClick={() => { setForgotMode(false); setForgotSent(false); setError(""); }}>← Back to Sign In</button>
+                </>
+              )}
+
+              {!forgotMode && (
+                <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 14, paddingTop: 12, borderTop: "1px solid #E0D5C8" }}>
+                  {landingTab === "owner" ? "New shop? " : "No account? "}
+                  <button onClick={() => {
+                    setEmail(""); setPassword(""); setConfirmPwd("");
+                    go(STEPS.REG_AUTH);
+                  }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'Inter',sans-serif" }}>
+                    {landingTab === "owner" ? "Register your shop →" : "Create account →"}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // Non-modal: two role cards
         return (
           <div className="auth-card">
-            <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <div style={{ textAlign: "center", marginBottom: 28 }}>
               <div style={S.heading}>Welcome to RedPiston</div>
-              <div style={{ fontSize: 12, color: "#af8785", marginTop: 4 }}>How would you like to continue?</div>
+              <div style={{ fontSize: 15, color: "#9C8C7C", marginTop: 8, lineHeight: 1.5 }}>How would you like to continue?</div>
             </div>
 
             {/* Role cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-              {/* Customer */}
-              <div style={{ background: "#FFFFFF", border: "2px solid #E0D5C8", borderRadius: 12, padding: "14px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0, boxShadow: "0 2px 8px rgba(26,18,5,0.06)" }}>
-                <div style={{ fontSize: 26, marginBottom: 4 }}>🚗</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1205", marginBottom: 3, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer</div>
-                <div style={{ fontSize: 11, color: "#9C8C7C", lineHeight: 1.4, textAlign: "center", marginBottom: 10 }}>Buy auto parts with fitment guarantee</div>
-                <button className="btn-primary" style={{ ...S.btnPrimary(false), marginBottom: 6, fontSize: 12, padding: "9px 12px" }}
-                  onClick={() => { setLandingTab("customer"); go(STEPS.SIGNIN); }}>
-                  Sign In →
-                </button>
-                <button className="btn-outline-stitch" style={{ ...S.btnOutline, fontSize: 11, padding: "8px 12px" }}
-                  onClick={() => { setRole("customer"); setLandingTab("customer"); go(STEPS.REG_AUTH); }}>
-                  Create Account
-                </button>
-              </div>
-
-              {/* Shop Owner */}
-              <div style={{ background: "#FFFFFF", border: "2px solid #E0D5C8", borderRadius: 12, padding: "14px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0, boxShadow: "0 2px 8px rgba(26,18,5,0.06)" }}>
-                <div style={{ fontSize: 26, marginBottom: 4 }}>🏪</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1205", marginBottom: 3, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Shop Owner</div>
-                <div style={{ fontSize: 11, color: "#9C8C7C", lineHeight: 1.4, textAlign: "center", marginBottom: 10 }}>Manage your shop, billing & inventory</div>
-                <button className="btn-primary" style={{ ...S.btnPrimary(false), marginBottom: 6, fontSize: 12, padding: "9px 12px" }}
-                  onClick={() => { setLandingTab("owner"); go(STEPS.SIGNIN); }}>
-                  Sign In →
-                </button>
-                <button className="btn-outline-stitch" style={{ ...S.btnOutline, fontSize: 11, padding: "8px 12px" }}
-                  onClick={() => { setRole("shop"); setLandingTab("owner"); go(STEPS.REG_AUTH); }}>
-                  Register Shop
-                </button>
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 22 }}>
+              {[
+                { key: "customer", emoji: "🚗", title: "Customer", desc: "Buy auto parts with fitment guarantee", cta: "Create Account",
+                  onSignIn: () => { setLandingTab("customer"); go(STEPS.SIGNIN); },
+                  onCreate: () => { setRole("customer"); setLandingTab("customer"); go(STEPS.REG_AUTH); } },
+                { key: "owner", emoji: "🏪", title: "Shop Owner", desc: "Manage your shop, billing & inventory", cta: "Register Shop",
+                  onSignIn: () => { setLandingTab("owner"); go(STEPS.SIGNIN); },
+                  onCreate: () => { setRole("shop"); setLandingTab("owner"); go(STEPS.REG_AUTH); } },
+              ].map(r => (
+                <div key={r.key} style={{ background: "#FFFFFF", border: "1.5px solid #E0D5C8", borderRadius: 16, padding: "26px 18px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0, boxShadow: "0 2px 10px rgba(26,18,5,0.05)" }}>
+                  <div style={{ width: 58, height: 58, borderRadius: "50%", background: "#FBF0EE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, marginBottom: 14 }}>{r.emoji}</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: "#1A1205", marginBottom: 6, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{r.title}</div>
+                  <div style={{ fontSize: 13, color: "#9C8C7C", lineHeight: 1.5, textAlign: "center", marginBottom: 20, minHeight: 40 }}>{r.desc}</div>
+                  <button className="btn-primary" style={{ ...S.btnPrimary(false), marginBottom: 9 }}
+                    onClick={r.onSignIn}>
+                    Sign In →
+                  </button>
+                  <button className="btn-outline-stitch" style={{ ...S.btnOutline }}
+                    onClick={r.onCreate}>
+                    {r.cta}
+                  </button>
+                </div>
+              ))}
             </div>
 
             {/* Admin access */}
-            {!isModal && (
-              <div style={{ textAlign: "center", paddingTop: 16, borderTop: "1px solid #E0D5C8" }}>
-                <button
-                  style={{ background: "none", border: "none", color: "#BFB0A0", cursor: "pointer", fontSize: 11, fontFamily: FONT.mono, letterSpacing: "0.06em" }}
-                  onClick={() => { setEmail(""); setPassword(""); go(STEPS.ADMIN_AUTH); }}
-                >
-                  🛡️ PLATFORM ADMIN ACCESS
-                </button>
-              </div>
-            )}
+            <div style={{ textAlign: "center", paddingTop: 16, borderTop: "1px solid #E0D5C8" }}>
+              <button
+                style={{ background: "none", border: "none", color: "#BFB0A0", cursor: "pointer", fontSize: 11, fontFamily: FONT.mono, letterSpacing: "0.06em" }}
+                onClick={() => { setEmail(""); setPassword(""); go(STEPS.ADMIN_AUTH); }}
+              >
+                🛡️ PLATFORM ADMIN ACCESS
+              </button>
+            </div>
           </div>
         );
 
@@ -1082,11 +1185,26 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
   // ─── Page layout — Stitch "Precision Industrial" split panel ────────────────
   return (
-    <div style={{ display: "flex", height: isModal ? "100%" : undefined, minHeight: isModal ? 0 : "100vh", background: "#FAF6F0", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: isModal ? "column" : "row", width: "100%", height: isModal ? "100%" : undefined, minHeight: isModal ? "100%" : "100vh", background: isModal ? "#FFFFFF" : "#FAF6F0", fontFamily: "'Inter', sans-serif" }}>
       <style>{css}</style>
 
-      {/* ── Left: Engine photo + branding ── */}
-      <div className="auth-hero-left" style={{ width: isModal ? "45%" : "58%", position: "relative", overflow: "hidden", flexShrink: 0 }}>
+      {/* ── Top bar — modal only ── */}
+      {isModal && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 24px", height: 58, flexShrink: 0, borderBottom: "1px solid #F0E8DF", background: "#FFFFFF" }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, overflow: "hidden", border: "1.5px solid #E0D5C8", flexShrink: 0, boxShadow: "0 1px 6px rgba(26,18,5,0.1)" }}>
+            <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#1A1205", fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", lineHeight: 1 }}>RedPiston</div>
+            <div style={{ fontSize: 8, color: "#BE2B1A", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 3 }}>Auto Parts Platform</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Left: Engine photo + branding — standalone page only. The modal is a
+           focused single-column login card with no side image. ── */}
+      {!isModal && (
+      <div className="auth-hero-left" style={{ width: "58%", position: "relative", overflow: "hidden", flexShrink: 0 }}>
         {/* Engine photo */}
         {/* loading="lazy" + fetchpriority="low": hero image is decorative, not LCP.
             w=900 serves half the pixels vs w=1932 — panel is never wider than ~800px. */}
@@ -1141,6 +1259,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── Right: Form panel ── */}
       <div className="auth-form-right" style={{
@@ -1150,8 +1269,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
         display: "flex", flexDirection: "column",
         alignItems: "center",
         /* No justifyContent:center — it clips the top of tall forms (SHOP_DETAILS).
-           The inner form container uses margin:auto to stay centered on short steps. */
-        padding: isModal ? "20px 32px" : "32px 48px",
+           On the standalone page the inner form container uses margin:auto to stay
+           centered; the modal is auto-height so its content sits at the top. */
+        padding: isModal ? "14px 24px 20px" : "32px 48px",
         position: "relative", overflowY: "auto",
       }}>
         {/* Live badge */}
@@ -1168,9 +1288,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         </div>
 
-        {/* Form container — margin:auto centers it vertically on short steps;
-            on tall steps (SHOP_DETAILS) it scrolls normally from the top */}
-        <div style={{ width: "100%", maxWidth: 400, marginTop: "auto", marginBottom: "auto", paddingTop: 24, paddingBottom: 24 }}>
+        {/* Auth block — brand lockup + form, vertically centered as one group on
+            the full-screen panel. margin:auto keeps it centered on short steps and
+            lets it scroll from the top on tall ones (SHOP_DETAILS). The modal shows
+            the brand lockup here since the side hero is removed. */}
+        <div style={{ width: "100%", maxWidth: isModal ? 440 : ((step === STEPS.LANDING || step === STEPS.REG_ROLE) ? 580 : 440), marginTop: isModal ? 0 : "auto", marginBottom: isModal ? 0 : "auto", paddingTop: isModal ? 0 : 24, paddingBottom: isModal ? 0 : 24 }}>
           {renderStep()}
         </div>
 
