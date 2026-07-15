@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { T, FONT } from "../theme";
-import { fmt, fmtDate } from "../utils";
+import { fmt, fmtDate, focusFirstError } from "../utils";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 
 export function PurchaseModal({ open, onClose, product, products, onSave, toast }) {
@@ -32,6 +32,7 @@ export function PurchaseModal({ open, onClose, product, products, onSave, toast 
         if (!f.buyPrice || +f.buyPrice <= 0) e.buyPrice = "Enter buying price";
         if (f.payment === "Credit" && (!f.creditDays || +f.creditDays < 1)) e.creditDays = "Enter credit days";
         setErrors(e);
+        focusFirstError(e);
         return Object.keys(e).length === 0;
     };
 
@@ -93,10 +94,10 @@ export function PurchaseModal({ open, onClose, product, products, onSave, toast 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 {/* Row 1 */}
                 <Field label="Quantity Received" required error={errors.qty}>
-                    <Input type="number" value={f.qty} onChange={set("qty")} placeholder="0" suffix="units" autoFocus={!!product} />
+                    <Input name="qty" type="number" value={f.qty} onChange={set("qty")} placeholder="0" suffix="units" autoFocus={!!product} />
                 </Field>
                 <Field label="Buying Price / Unit" required error={errors.buyPrice} hint={sel ? `Last: ${fmt(sel.buyPrice)}` : ""}>
-                    <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder={String(sel?.buyPrice || "")} prefix="₹" />
+                    <Input name="buyPrice" type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder={String(sel?.buyPrice || "")} prefix="₹" />
                 </Field>
 
                 {/* Row 2 */}
@@ -134,7 +135,7 @@ export function PurchaseModal({ open, onClose, product, products, onSave, toast 
                 </div>
                 {f.payment === "Credit" && (
                     <Field label="Credit Period (days)" error={errors.creditDays} hint="Payment due after X days">
-                        <Input type="number" value={f.creditDays} onChange={set("creditDays")} placeholder="30" suffix="days" />
+                        <Input name="creditDays" type="number" value={f.creditDays} onChange={set("creditDays")} placeholder="30" suffix="days" />
                     </Field>
                 )}
 

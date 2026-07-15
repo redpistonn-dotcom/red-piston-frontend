@@ -468,3 +468,21 @@ export function createStockTransfer(fromProduct, toShopId, qty, reason = "") {
         },
     };
 }
+
+/** After a failed validation, focus and scroll to the first invalid field.
+ *  Inputs must have a `name` attribute matching the errors object key. */
+export function focusFirstError(
+    errors: Record<string, string>,
+    container?: HTMLElement | null
+) {
+    const firstKey = Object.keys(errors)[0];
+    if (!firstKey) return;
+    const root = container ?? document.body;
+    setTimeout(() => {
+        const el = root.querySelector<HTMLElement>(`[name="${firstKey}"]`);
+        if (el) {
+            el.focus();
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }, 0);
+}

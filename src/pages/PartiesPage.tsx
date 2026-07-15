@@ -938,7 +938,7 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
     };
 
     const handleSave = () => {
-        if (!f.name.trim()) { setNameError(true); return; }
+        if (!f.name.trim()) { setNameError(true); setTimeout(() => { (document.querySelector('[name="partyName"]') as HTMLElement)?.focus(); }, 0); return; }
         if (f.phone.trim() && !isValidMobile(f.phone)) { setPhoneError("Enter a valid 10-digit mobile (starts 6–9)"); return; }
         if (f.gstin.trim() && !isValidGstin(f.gstin)) { setGstinError("Invalid GSTIN — 15 chars like 27AABCU9603R1ZX"); return; }
         if (f.email.trim() && !isValidEmail(f.email)) { setEmailError("Enter a valid email or clear it"); return; }
@@ -956,7 +956,7 @@ function PartyFormModal({ open, party, type, onClose, onSave, activeShopId }: an
     return (
         <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${type === "customer" ? "Customer" : "Supplier"}` : `Add ${type === "customer" ? "Customer" : "Supplier"}`} width={560}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <div style={{ gridColumn: "span 2" }}><Field label="Name" required error={nameError ? "Name is required" : undefined}><Input value={f.name} onChange={set("name")} placeholder="Business or person name" invalid={nameError} /></Field></div>
+                <div style={{ gridColumn: "span 2" }}><Field label="Name" required error={nameError ? "Name is required" : undefined}><Input name="partyName" value={f.name} onChange={set("name")} placeholder="Business or person name" invalid={nameError} /></Field></div>
                 <Field label="Phone" error={phoneError || undefined}><Input value={f.phone} onChange={(v: string) => set("phone")(cleanMobile(v))} placeholder="10-digit mobile" invalid={!!phoneError} /></Field>
                 <Field label="Email" error={emailError || undefined}><Input value={f.email} onChange={set("email")} placeholder="email@example.com" invalid={!!emailError} /></Field>
                 <Field label="GSTIN" error={gstinError || undefined}><Input value={f.gstin} onChange={(v: string) => set("gstin")(cleanGstin(v))} placeholder="22AAAAA0000A1Z5" invalid={!!gstinError} /></Field>

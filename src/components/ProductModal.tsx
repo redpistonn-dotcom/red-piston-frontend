@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { T, FONT } from "../theme";
-import { uid, CATEGORIES, POSITIONS, ENGINE_TYPES, TRANSMISSIONS, EMOJIS, fmt } from "../utils";
+import { uid, CATEGORIES, POSITIONS, ENGINE_TYPES, TRANSMISSIONS, EMOJIS, fmt, focusFirstError } from "../utils";
 import { searchCatalog, addInventory, contributePart } from "../api/inventory";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 import { cleanHsn } from "../utils/validators";
@@ -58,6 +58,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
         if (f.stock === "" || isNaN(+f.stock)) e.stock = "Required";
         else if (+f.stock < 0) e.stock = "Stock cannot be negative";
         setErrors(e);
+        focusFirstError(e);
         return !Object.keys(e).length;
     };
 
@@ -213,9 +214,9 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
             </div>
 
             <div className="inner-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Field label="Part Name" required error={errors.name} style={{ gridColumn: "span 1" }}><Input value={f.name} onChange={set("name")} placeholder="Bosch Brake Pad Set — Front" invalid={!!errors.name} /></Field>
+                <Field label="Part Name" required error={errors.name} style={{ gridColumn: "span 1" }}><Input name="name" value={f.name} onChange={set("name")} placeholder="Bosch Brake Pad Set — Front" invalid={!!errors.name} /></Field>
                 <Field label="OEM Part Number" hint="Original Equipment Manufacturer number"><Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="e.g. 04465-02220" /></Field>
-                <Field label="SKU / Code" required error={errors.sku}><Input value={f.sku} onChange={set("sku")} placeholder="BRK-F-0042" invalid={!!errors.sku} /></Field>
+                <Field label="SKU / Code" required error={errors.sku}><Input name="sku" value={f.sku} onChange={set("sku")} placeholder="BRK-F-0042" invalid={!!errors.sku} /></Field>
                 <Field label="HSN / SAC Code" hint="For GST filing"><Input value={f.hsnCode} onChange={(v: string) => set("hsnCode")(cleanHsn(v))} placeholder="87083000" /></Field>
                 <Field label="Category"><Select value={f.category} onChange={set("category")} options={CATEGORIES.map(c => ({ value: c, label: c }))} /></Field>
                 <Field label="Brand / Manufacturer"><Input value={f.brand} onChange={set("brand")} placeholder="Bosch, NGK…" /></Field>
@@ -238,8 +239,8 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
 
                 <Divider label="Pricing" />
                 <div style={{ gridColumn: "span 2" }} />
-                <Field label="Buying Price (₹)" required error={errors.buyPrice}><Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" invalid={!!errors.buyPrice} /></Field>
-                <Field label="Selling Price (₹)" required error={errors.sellPrice}><Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" invalid={!!errors.sellPrice} /></Field>
+                <Field label="Buying Price (₹)" required error={errors.buyPrice}><Input name="buyPrice" type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" invalid={!!errors.buyPrice} /></Field>
+                <Field label="Selling Price (₹)" required error={errors.sellPrice}><Input name="sellPrice" type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" invalid={!!errors.sellPrice} /></Field>
                 <Field label="MRP (₹)" hint="Maximum Retail Price"><Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" /></Field>
 
                 {profit !== null && (
@@ -257,7 +258,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
 
                 <Divider label="Inventory" />
                 <div style={{ gridColumn: "span 2" }} />
-                <Field label={isEdit ? "Current Stock" : "Opening Stock"} required error={errors.stock}><Input type="number" value={f.stock} onChange={set("stock")} placeholder="0" suffix="units" invalid={!!errors.stock} /></Field>
+                <Field label={isEdit ? "Current Stock" : "Opening Stock"} required error={errors.stock}><Input name="stock" type="number" value={f.stock} onChange={set("stock")} placeholder="0" suffix="units" invalid={!!errors.stock} /></Field>
                 <Field label="Min Stock Alert" hint="Alert when stock drops below"><Input type="number" value={f.minStock} onChange={set("minStock")} placeholder="10" suffix="units" /></Field>
                 <Field label="Max Stock" hint="Maximum capacity"><Input type="number" value={f.maxStock} onChange={set("maxStock")} placeholder="1000" suffix="units" /></Field>
                 <Field label="Reorder Qty" hint="Auto PO quantity"><Input type="number" value={f.reorderQty} onChange={set("reorderQty")} placeholder="20" suffix="units" /></Field>

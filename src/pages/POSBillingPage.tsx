@@ -390,22 +390,23 @@ export function POSBillingPage() {
     const validate = (effectiveType?: "Sale" | "Quotation") => {
         const checkType = effectiveType ?? billType;
         if (items.length === 0) { toast?.("Add at least one product", "warning"); return false; }
-        if (customerPhone && !isValidMobile(customerPhone)) { toast?.("Enter a valid 10-digit mobile number, or clear the field", "warning"); return false; }
-        if (customerGstin && !isValidGstin(customerGstin)) { toast?.("Enter a valid 15-character GSTIN (e.g. 27AABCU9603R1ZX), or clear the field", "warning"); return false; }
+        if (customerPhone && !isValidMobile(customerPhone)) { toast?.("Enter a valid 10-digit mobile number, or clear the field", "warning"); setTimeout(() => { (document.querySelector('[name="customerPhone"]') as HTMLElement)?.focus(); }, 0); return false; }
+        if (customerGstin && !isValidGstin(customerGstin)) { toast?.("Enter a valid 15-character GSTIN (e.g. 27AABCU9603R1ZX), or clear the field", "warning"); setTimeout(() => { (document.querySelector('[name="customerGstin"]') as HTMLElement)?.focus(); }, 0); return false; }
         if (paymentMode === "Udhaar" && overLimit) {
             toast?.(`Credit limit exceeded — ${selectedParty?.name || "party"}'s outstanding will reach ${fmt(creditAfterSale)} (limit ${fmt(creditLimit)}). Collect a payment first or reduce the sale.`, "error");
             return false;
         }
-        for (const item of items) {
-            if (item.qty <= 0) { toast?.(`Invalid qty for ${item.name}`, "warning"); return false; }
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.qty <= 0) { toast?.(`Invalid qty for ${item.name}`, "warning"); setTimeout(() => { (document.querySelector(`[data-item-price="${i}"]`) as HTMLElement)?.focus(); }, 0); return false; }
             const isCustom = String(item.productId || "").startsWith("custom_");
             if (!isCustom && item.maxStock <= 0) { toast?.(`"${item.name}" is out of stock (0 available)`, "error"); return false; }
             if (checkType === "Sale" && !isCustom && item.qty > item.maxStock) { toast?.(`Only ${item.maxStock} units of ${item.name} in stock`, "warning"); return false; }
             if (isCustom && !item.name.trim()) {
-                toast?.("Enter a product name for the custom item before submitting", "warning"); return false;
+                toast?.("Enter a product name for the custom item before submitting", "warning"); setTimeout(() => { (document.querySelector(`[data-item-name="${i}"]`) as HTMLElement)?.focus(); }, 0); return false;
             }
             if (item.price <= 0) {
-                toast?.(`"${item.name}" has no valid price (₹${item.price}). Set a price before submitting`, "warning"); return false;
+                toast?.(`"${item.name}" has no valid price (₹${item.price}). Set a price before submitting`, "warning"); setTimeout(() => { (document.querySelector(`[data-item-price="${i}"]`) as HTMLElement)?.focus(); }, 0); return false;
             }
         }
         return true;
@@ -1165,7 +1166,7 @@ export function POSBillingPage() {
                                                     <div>
                                                         {String(item.productId || "").startsWith("custom_") ? (
                                                             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                                                <input value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Enter Product Name"
+                                                                <input data-item-name={idx} value={item.name} onChange={e => updateItem(idx, "name", e.target.value)} placeholder="Enter Product Name"
                                                                     maxLength={100}
                                                                     style={{ width: 200, height: 30, background: T.bg, border: `1px solid ${item.name.trim() ? T.border : T.amber}`, borderRadius: 6, padding: "0 8px", color: T.t1, fontSize: 13, fontWeight: 700, outline: "none" }} />
                                                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1211,7 +1212,7 @@ export function POSBillingPage() {
                                                 </div>
                                             </td>
                                             <td style={{ padding: "12px 10px", textAlign: "right" }}>
-                                                <input type="number" value={item.price === 0 ? "" : item.price} min="0" max="10000000" step="0.01" placeholder="0"
+                                                <input data-item-price={idx} type="number" value={item.price === 0 ? "" : item.price} min="0" max="10000000" step="0.01" placeholder="0"
                                                     onFocus={e => e.target.select()}
                                                     onChange={e => updateItem(idx, "price", e.target.value === "" ? 0 : Math.max(0, +e.target.value))}
                                                     style={{ width: 82, height: 34, background: T.bg, border: `1px solid ${item.price !== item.originalPrice ? T.amber : T.border}`, borderRadius: 7, padding: "0 8px", color: T.t1, fontFamily: FONT.mono, fontSize: 13, textAlign: "right", outline: "none" }} />
@@ -1310,7 +1311,7 @@ export function POSBillingPage() {
                         </div>
                         <div>
                             <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>WhatsApp No.</label>
-                            <input value={customerPhone} onChange={e => setCustomerPhone(cleanMobile(e.target.value))}
+                            <input name="customerPhone" value={customerPhone} onChange={e => setCustomerPhone(cleanMobile(e.target.value))}
                                 placeholder="10-digit mobile" type="tel" maxLength={10} inputMode="numeric"
                                 style={{ width: "100%", height: 34, background: T.bg, border: `1.5px solid ${isValidMobile(customerPhone) ? T.emerald : customerPhone.length > 0 ? T.crimson : T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box" }}
                                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}
@@ -1339,7 +1340,7 @@ export function POSBillingPage() {
                             <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4, fontFamily: FONT.ui }}>
                                 Customer GSTIN <span style={{ color: T.t4, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(for B2B — required for buyer's ITC claim)</span>
                             </label>
-                            <input value={customerGstin} onChange={e => setCustomerGstin(cleanGstin(e.target.value))}
+                            <input name="customerGstin" value={customerGstin} onChange={e => setCustomerGstin(cleanGstin(e.target.value))}
                                 placeholder="e.g. 27AABCU9603R1ZX" maxLength={15}
                                 style={{ width: "100%", height: 34, background: T.bg, border: `1.5px solid ${isValidGstin(customerGstin) ? T.emerald : customerGstin.length > 0 ? T.crimson : T.border}`, borderRadius: 8, padding: "0 10px", color: T.t1, fontSize: 12, fontFamily: FONT.mono, outline: "none", boxSizing: "border-box", letterSpacing: "0.04em" }}
                                 onFocus={e => { (e.target as HTMLInputElement).style.borderColor = T.amber; }}

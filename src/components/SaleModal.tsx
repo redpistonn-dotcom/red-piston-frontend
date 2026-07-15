@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { T, FONT } from "../theme";
-import { fmt, fmtDateTime } from "../utils";
+import { fmt, fmtDateTime, focusFirstError } from "../utils";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 import { cleanMobile } from "../utils/validators";
 
@@ -68,6 +68,7 @@ export function SaleModal({ open, onClose, product, products, onSave, toast }) {
         if (!f.sellPrice || +f.sellPrice <= 0) e.sellPrice = "Enter price";
 
         setErrors(e);
+        focusFirstError(e);
         return Object.keys(e).length === 0;
     };
 
@@ -207,10 +208,10 @@ export function SaleModal({ open, onClose, product, products, onSave, toast }) {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <Field label="Quantity" required error={errors.qty} hint={f.type === "Sale" && sel ? `Available: ${sel.stock} units` : ""}>
-                    <Input type="number" value={f.qty} onChange={set("qty")} placeholder="1" suffix="units" autoFocus={!!product} />
+                    <Input name="qty" type="number" value={f.qty} onChange={set("qty")} placeholder="1" suffix="units" autoFocus={!!product} />
                 </Field>
                 <Field label="Selling Price / Unit" required error={errors.sellPrice} hint={sel ? `Default: ${fmt(sel.sellPrice)}` : ""}>
-                    <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder={String(sel?.sellPrice || "")} prefix="₹" />
+                    <Input name="sellPrice" type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder={String(sel?.sellPrice || "")} prefix="₹" />
                 </Field>
 
                 {/* Discount */}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { T, FONT } from "../theme";
-import { fmt, fmtDate } from "../utils";
+import { fmt, fmtDate, focusFirstError } from "../utils";
 import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 
 const ADJUSTMENT_TYPES = [
@@ -88,6 +88,7 @@ export function StockAdjustmentModal({ open, onClose, product, products, onSave,
         if (f.adjustType === "RETURN_IN" && !f.reason) e.reason = "Select return reason";
         if (f.adjustType === "RETURN_OUT" && !f.supplierName) e.supplierName = "Enter supplier name";
         setErrors(e);
+        focusFirstError(e);
         return Object.keys(e).length === 0;
     };
 
@@ -188,7 +189,7 @@ export function StockAdjustmentModal({ open, onClose, product, products, onSave,
                 {f.adjustType === "AUDIT" ? (
                     <>
                         <Field label="Actual Physical Count" required error={errors.actualCount} hint={sel ? `System says: ${sel.stock}` : ""}>
-                            <Input type="number" value={f.actualCount} onChange={set("actualCount")} placeholder="0" suffix="units" autoFocus />
+                            <Input name="actualCount" type="number" value={f.actualCount} onChange={set("actualCount")} placeholder="0" suffix="units" autoFocus />
                         </Field>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {f.actualCount !== "" && (
@@ -213,7 +214,7 @@ export function StockAdjustmentModal({ open, onClose, product, products, onSave,
                 ) : (
                     /* NORMAL MODE: Enter qty */
                     <Field label="Quantity" required error={errors.qty}>
-                        <Input type="number" value={f.qty} onChange={set("qty")} placeholder="1" suffix="units" autoFocus />
+                        <Input name="qty" type="number" value={f.qty} onChange={set("qty")} placeholder="1" suffix="units" autoFocus />
                     </Field>
                 )}
 
@@ -236,7 +237,7 @@ export function StockAdjustmentModal({ open, onClose, product, products, onSave,
                 {f.adjustType === "RETURN_OUT" && (
                     <>
                         <Field label="Supplier Name" required error={errors.supplierName}>
-                            <Input value={f.supplierName} onChange={set("supplierName")} placeholder="Bosch India Pvt Ltd" icon="🏭" />
+                            <Input name="supplierName" value={f.supplierName} onChange={set("supplierName")} placeholder="Bosch India Pvt Ltd" icon="🏭" />
                         </Field>
                         <Field label="Original Invoice No.">
                             <Input value={f.originalInvoice} onChange={set("originalInvoice")} placeholder="PINV-12345" icon="🧾" />
