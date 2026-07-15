@@ -194,32 +194,18 @@ export function POSBillingPage() {
     useEffect(() => {
         if (showInvoice && printFormat === 'a4') {
             let cancelled = false;
-            const updatePdf = async () => {
-                // For Sales, ALWAYS use the backend-generated PDF (matches Screenshot 5 format)
-                // Wait for syncedInvoiceId — don't fall back to client-side jsPDF which has different format
-                if (syncedInvoiceId) {
-                    try {
-                        const res = await fetch(getInvoicePdfUrl(syncedInvoiceId, { showOem: showOemOnBill, showMrp: showMrpOnBill }), {
-                            headers: { Authorization: `Bearer ${getAccessToken()}` },
-                            credentials: 'include',
-                        });
-                        if (res.ok) {
-                            const blob = await res.blob();
-                            if (!cancelled) setInlinePdfUrl(URL.createObjectURL(blob));
-                            return;
-                        }
-                    } catch {}
-                }
-                // Both Sales and Quotations now sync to the backend (a quotation is
-                // an ESTIMATE), so we always wait for the server-generated PDF and
-                // never fall back to the differently-formatted client-side jsPDF.
-                // Without syncedInvoiceId yet, don't render — the effect re-fires
-                // when the invoice:synced event delivers the id.
-            };
-            updatePdf();
+            (async () => {
+                try {
+                    const doc = await buildBillPdf({ showOem: showOemOnBill, showMrp: showMrpOnBill });
+                    if (!cancelled) {
+                        const url = URL.createObjectURL(doc.output("blob"));
+                        setInlinePdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+                    }
+                } catch {}
+            })();
             return () => { cancelled = true; };
         }
-    }, [showInvoice, syncedInvoiceId, printFormat, showOemOnBill, showMrpOnBill, billType]);
+    }, [showInvoice, printFormat, showOemOnBill, showMrpOnBill]);
 
     const [suspendedBill, setSuspendedBill] = useState(() => {
         try {
