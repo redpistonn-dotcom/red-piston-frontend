@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useContext, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { T, FONT, SHADOWS } from "../theme";
-import { fmt, fmtDate, uid, JOB_STATUS, generateCSV, downloadCSV } from "../utils";
+import { fmt, fmtDate, uid, JOB_STATUS, generateCSV, downloadCSV, focusFirstError } from "../utils";
 import { Btn, Input, Select, Modal, Field, Divider, MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { ImageUploader } from "../components/ImageUploader";
 import { useStore } from "../store";
@@ -1407,6 +1407,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
     const [vehicleId, setVehicleId]       = useState("");
     const [customerId, setCustomerId]     = useState("");
     const [complaints, setComplaints]     = useState("");
+    const [errors, setErrors]             = useState<Record<string, string>>({});
     const [diagnosis, setDiagnosis]       = useState("");
     const [assignedTo, setAssignedTo]     = useState("");
     const [priority, setPriority]         = useState("NORMAL");
@@ -1424,7 +1425,11 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
     };
 
     const handleSave = () => {
-        if (!vehicleId || !complaints.trim()) return;
+        const e: Record<string, string> = {};
+        if (!vehicleId) e.vehicleId = "Select a vehicle";
+        if (!complaints.trim()) e.complaints = "Describe the complaint";
+        if (Object.keys(e).length) { setErrors(e); focusFirstError(e); return; }
+        setErrors({});
         const labour = labourDesc && labourAmt ? [{ description: labourDesc, amount: +labourAmt }] : [];
         const estimated = selectedParts.reduce((s, p) => s + p.qty * p.price, 0) + labour.reduce((s, l) => s + l.amount, 0);
         onSave({
@@ -1453,7 +1458,7 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
             completedAt: null,
             createdAt: Date.now(),
         });
-        setVehicleId(""); setCustomerId(""); setComplaints(""); setDiagnosis(""); setAssignedTo(""); setPriority("NORMAL"); setSelectedParts([]); setLabourDesc(""); setLabourAmt("");
+        setVehicleId(""); setCustomerId(""); setComplaints(""); setDiagnosis(""); setAssignedTo(""); setPriority("NORMAL"); setSelectedParts([]); setLabourDesc(""); setLabourAmt(""); setErrors({});
     };
 
     const customers = (parties || []).filter((p: any) => p.type === "customer" || p.type === "both");
@@ -1461,8 +1466,8 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
     return (
         <Modal open={open} onClose={onClose} title="🔧 New Job Card" subtitle="Create a workshop job card" width={640}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Field label="Vehicle" required>
-                    <Select value={vehicleId} onChange={(v: string) => { setVehicleId(v); const veh = vehicles.find((x: any) => String(x.id) === String(v)); if (veh) setCustomerId(veh.ownerId); }}
+                <Field label="Vehicle" required error={errors.vehicleId}>
+                    <Select value={vehicleId} onChange={(v: string) => { setVehicleId(v); if (v) setErrors(p => { const n = {...p}; delete n.vehicleId; return n; }); const veh = vehicles.find((x: any) => String(x.id) === String(v)); if (veh) setCustomerId(veh.ownerId); }}
                         options={[{ value: "", label: "Select vehicle…" }, ...vehicles.map((v: any) => ({ value: v.id, label: `${v.registrationNumber} — ${v.make} ${v.model}` }))]} />
                 </Field>
                 <Field label="Customer">
@@ -1488,8 +1493,8 @@ function JobCardCreateModal({ open, onClose, vehicles, parties, products, active
                     <div style={{ fontSize: 11, color: T.t3, fontFamily: FONT.ui }}>Job # auto-assigned as <span style={{ fontFamily: FONT.mono, color: T.amber }}>#RP-{9001 + existingCount}</span></div>
                 </div>
                 <div style={{ gridColumn: "span 2" }}>
-                    <Field label="Customer Complaint" required>
-                        <Input value={complaints} onChange={setComplaints} placeholder="Describe the issue…" />
+                    <Field label="Customer Complaint" required error={errors.complaints}>
+                        <Input name="complaints" value={complaints} onChange={setComplaints} placeholder="Describe the issue…" />
                     </Field>
                 </div>
                 <div style={{ gridColumn: "span 2" }}>

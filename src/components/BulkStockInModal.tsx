@@ -10,7 +10,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from "react-dom";
 import { T, FONT } from '../theme';
-import { fmt } from '../utils';
+import { fmt, focusFirstError } from '../utils';
 import { cleanMobile } from '../utils/validators';
 import { lookupCatalog, lookupByBarcode, bulkStockIn, contributePart, addInventory } from '../api/inventory';
 import { mapInventoryToProduct } from '../api/sync';
@@ -56,11 +56,11 @@ function Field({ label, required, children, error }) {
   );
 }
 
-function Input({ value, onChange, placeholder, type = 'text', min, step, disabled, style }) {
+function Input({ value, onChange, placeholder, type = 'text', min, step, disabled, style, name }) {
   return (
     <input
       type={type} value={value} onChange={onChange} placeholder={placeholder}
-      min={min} step={step} disabled={disabled}
+      min={min} step={step} disabled={disabled} name={name}
       style={{
         background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8,
         padding: '8px 10px', color: disabled ? T.t3 : T.t1, fontSize: 13, fontWeight: 600,
@@ -165,7 +165,7 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
   // ── Add / update cart ─────────────────────────────────────────────────────
   const addToCart = () => {
     const errs = validate();
-    if (Object.keys(errs).length) { setFormErr(errs); return; }
+    if (Object.keys(errs).length) { setFormErr(errs); focusFirstError(errs); return; }
 
     // For manual items, merge the (possibly edited) part name back into the part object
     const updatedPart = selected._manual
@@ -356,13 +356,13 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
                   <Input type="number" min="0" step="0.01" value={form.buyPrice} onChange={e => setForm(f => ({ ...f, buyPrice: e.target.value }))} placeholder="Cost price" />
                 </Field>
                 <Field label="Selling Price (₹)" required error={formErr.sellPrice}>
-                  <Input type="number" min="0" step="0.01" value={form.sellPrice} onChange={e => setForm(f => ({ ...f, sellPrice: e.target.value }))} placeholder="MRP / sell price" />
+                  <Input name="sellPrice" type="number" min="0" step="0.01" value={form.sellPrice} onChange={e => setForm(f => ({ ...f, sellPrice: e.target.value }))} placeholder="MRP / sell price" />
                 </Field>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Field label="Quantity (Units)" required error={formErr.qty}>
-                  <Input type="number" min="1" value={form.qty} onChange={e => setForm(f => ({ ...f, qty: e.target.value }))} placeholder="0" />
+                  <Input name="qty" type="number" min="1" value={form.qty} onChange={e => setForm(f => ({ ...f, qty: e.target.value }))} placeholder="0" />
                 </Field>
                 <Field label="Min Stock Alert">
                   <Input type="number" min="0" value={form.minAlert} onChange={e => setForm(f => ({ ...f, minAlert: e.target.value }))} placeholder="5" />
