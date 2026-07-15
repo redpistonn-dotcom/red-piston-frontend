@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { MobileCard, MobileCardList, CardField, CardActions, useIsMobile, Skeleton } from "../components/ui";
 import { T, FONT, SHADOWS } from "../theme";
@@ -48,7 +48,7 @@ function groupMovements(filtered: any[]) {
 }
 
 // ─── Group row (multi-item invoice) ──────────────────────────────────────────
-function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice, onConvertToPOS, convertingId }: any) {
+function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice, onPrefetchInvoice, onConvertToPOS, convertingId }: any) {
     const first = group.items[0];
     const cfg = getMovementConfig(first.type);
     const totalAmt = group.items.reduce((s: number, m: any) => s + (m.total || 0), 0);
@@ -87,6 +87,7 @@ function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice, onCon
                 <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>
                     {first.invoiceId ? (
                         <button onClick={e => { e.stopPropagation(); onPreviewInvoice(first.invoiceId, first.invoiceNo); }}
+                            onMouseEnter={() => onPrefetchInvoice?.(first.invoiceId)}
                             title="Preview invoice PDF"
                             style={{ background: "none", border: "none", padding: 0, color: T.sky, fontFamily: FONT.mono, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
                             {invoiceDisplay}
@@ -170,7 +171,7 @@ function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice, onCon
 }
 
 // ─── Single row ───────────────────────────────────────────────────────────────
-function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice, onConvertToPOS, convertingId }: any) {
+function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice, onPrefetchInvoice, onConvertToPOS, convertingId }: any) {
     const cfg = getMovementConfig(m.type);
     return (
         <React.Fragment>
@@ -198,6 +199,7 @@ function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice, onConver
                 <td style={{ padding: "12px 14px", fontFamily: FONT.mono, fontSize: 11, color: T.t3 }}>
                     {m.invoiceId ? (
                         <button onClick={e => { e.stopPropagation(); onPreviewInvoice(m.invoiceId, m.invoiceNo); }}
+                            onMouseEnter={() => onPrefetchInvoice?.(m.invoiceId)}
                             title="Preview invoice PDF"
                             style={{ background: "none", border: "none", padding: 0, color: T.sky, fontFamily: FONT.mono, fontSize: 11, cursor: "pointer", textDecoration: "underline" }}>
                             {m.invoiceNo || "View"}
@@ -332,6 +334,13 @@ export function HistoryPage() {
     const [visibleCount, setVisibleCount] = useState(50);
     const [invoicePreview, setInvoicePreview] = useState<{ id: number; no?: string | null; url?: string; loading: boolean } | null>(null);
     const [convertingId, setConvertingId] = useState<number | null>(null);
+    const prefetchCache = useRef<Map<number, Promise<string>>>(new Map());
+    const prefetchInvoice = useCallback((id: number) => {
+        if (!id || prefetchCache.current.has(id)) return;
+        const p = fetchInvoicePdfBlobUrl(id);
+        p.catch(() => prefetchCache.current.delete(id));
+        prefetchCache.current.set(id, p);
+    }, []);
 
     // Local movements fetched directly from the API (server-first).
     const [apiMovements, setApiMovements] = useState<any[]>([]);
@@ -352,7 +361,8 @@ export function HistoryPage() {
             return { id: invoiceId, no: invoiceNo, loading: true };
         });
         try {
-            const url = await fetchInvoicePdfBlobUrl(invoiceId);
+            const cached = prefetchCache.current.get(invoiceId);
+            const url = cached ? await cached : await fetchInvoicePdfBlobUrl(invoiceId);
             setInvoicePreview(prev => (prev?.id === invoiceId ? { id: invoiceId, no: invoiceNo, url, loading: false } : prev));
         } catch {
             setInvoicePreview(null);
@@ -646,6 +656,7 @@ export function HistoryPage() {
                                         <CardActions>
                                             <button
                                                 onClick={() => previewInvoice(first.invoiceId, first.invoiceNo)}
+                                                onMouseEnter={() => prefetchInvoice(first.invoiceId)}
                                                 style={{ height: 34, padding: "0 14px", borderRadius: 8, border: `1px solid ${T.border}`, background: "#FFFFFF", color: T.sky, fontSize: 12, fontWeight: 700, fontFamily: FONT.ui }}
                                             >
                                                 Preview Invoice
@@ -717,8 +728,8 @@ export function HistoryPage() {
                                                 </tr>
                                             )}
                                             {group.items.length > 1
-                                                ? <GroupRow group={group} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} onConvertToPOS={handleConvertToPOS} convertingId={convertingId} />
-                                                : <SingleRow m={group.items[0]} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} onConvertToPOS={handleConvertToPOS} convertingId={convertingId} />
+                                                ? <GroupRow group={group} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} onPrefetchInvoice={prefetchInvoice} onConvertToPOS={handleConvertToPOS} convertingId={convertingId} />
+                                                : <SingleRow m={group.items[0]} isExpanded={isExpanded} onToggle={toggle} isLast={isLast} onPreviewInvoice={previewInvoice} onPrefetchInvoice={prefetchInvoice} onConvertToPOS={handleConvertToPOS} convertingId={convertingId} />
                                             }
                                         </React.Fragment>
                                     );

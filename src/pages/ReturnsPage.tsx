@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { T, FONT } from "../theme";
 import { useAppCtx } from "../AppCtx";
 import { Btn, Select, DataTable, TC, TCMono, type Column } from "../components/ui";
@@ -72,11 +72,28 @@ export function ReturnsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [openingInvoiceId, setOpeningInvoiceId] = useState<number | null>(null);
   const [pdfPreview, setPdfPreview] = useState<{ url: string | null; loading: boolean; title: string; filename: string } | null>(null);
+  const exchangePdfCache = useRef<Map<number, Promise<string>>>(new Map());
+  const returnPdfCache = useRef<Map<number, Promise<string>>>(new Map());
+
+  const prefetchExchange = useCallback((id: number) => {
+    if (!id || exchangePdfCache.current.has(id)) return;
+    const p = previewExchangePdf(id);
+    p.catch(() => exchangePdfCache.current.delete(id));
+    exchangePdfCache.current.set(id, p);
+  }, []);
+
+  const prefetchReturn = useCallback((id: number) => {
+    if (!id || returnPdfCache.current.has(id)) return;
+    const p = previewReturnInvoicePdf(id);
+    p.catch(() => returnPdfCache.current.delete(id));
+    returnPdfCache.current.set(id, p);
+  }, []);
 
   const viewExchangeInvoice = async (exchangeId: number, exchangeNo?: string) => {
     setPdfPreview({ url: null, loading: true, title: `Exchange Invoice ${exchangeNo || exchangeId}`, filename: `exchange-${exchangeNo || exchangeId}.pdf` });
     try {
-      const url = await previewExchangePdf(exchangeId);
+      const cached = exchangePdfCache.current.get(exchangeId);
+      const url = cached ? await cached : await previewExchangePdf(exchangeId);
       setPdfPreview({ url, loading: false, title: `Exchange Invoice ${exchangeNo || exchangeId}`, filename: `exchange-${exchangeNo || exchangeId}.pdf` });
     } catch (e: any) {
       setPdfPreview(null);
@@ -87,7 +104,8 @@ export function ReturnsPage() {
   const viewReturnInvoice = async (returnId: number, returnNo?: string) => {
     setPdfPreview({ url: null, loading: true, title: `Return Invoice ${returnNo || returnId}`, filename: `return-${returnNo || returnId}.pdf` });
     try {
-      const url = await previewReturnInvoicePdf(returnId);
+      const cached = returnPdfCache.current.get(returnId);
+      const url = cached ? await cached : await previewReturnInvoicePdf(returnId);
       setPdfPreview({ url, loading: false, title: `Return Invoice ${returnNo || returnId}`, filename: `return-${returnNo || returnId}.pdf` });
     } catch (e: any) {
       setPdfPreview(null);
@@ -175,6 +193,7 @@ export function ReturnsPage() {
               <td style={TC}>
                 <button
                   onClick={() => isExchange ? viewExchangeInvoice(row.exchangeOrder.exchangeId, row.exchangeOrder.exchangeNo) : viewReturnInvoice(row.returnId, row.returnNo)}
+                  onMouseEnter={() => isExchange ? prefetchExchange(row.exchangeOrder.exchangeId) : prefetchReturn(row.returnId)}
                   title={isExchange ? "View Exchange Invoice" : "View Return Invoice / Credit Note"}
                   style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 7, padding: "4px 8px", cursor: "pointer", fontSize: 12, color: T.t2 }}
                 >

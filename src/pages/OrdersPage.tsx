@@ -1,4 +1,4 @@
-import { useState, useMemo, useContext, useEffect, useCallback } from "react";
+import { useState, useMemo, useContext, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { T, FONT, SHADOWS } from "../theme";
 import { useStore } from "../store";
@@ -302,6 +302,22 @@ export function OrdersPage() {
     const [viewOrder, setViewOrder] = useState<any>(null);
     const [dropdownOrder, setDropdownOrder] = useState<string | null>(null);
     const [orderPdfPreview, setOrderPdfPreview] = useState<{ url: string | null; loading: boolean; title?: string; filename?: string; error?: string | null } | null>(null);
+    const orderPdfCache = useRef<Map<string, Promise<string>>>(new Map());
+    const prefetchOrderPdf = useCallback((order: any) => {
+        const key = String(order?.id);
+        if (!order?.id || orderPdfCache.current.has(key)) return;
+        let p: Promise<string>;
+        if (order.type === "Sale") {
+            p = fetch(getInvoicePdfUrl(order.id, { showOem: true, showMrp: true }), {
+                headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+            }).then(res => { if (!res.ok) throw new Error(); return res.blob(); })
+              .then(blob => URL.createObjectURL(blob));
+        } else {
+            p = import("../api/purchaseOrders").then(m => m.previewPurchaseOrderPdf(order.id));
+        }
+        p.catch(() => orderPdfCache.current.delete(key));
+        orderPdfCache.current.set(key, p);
+    }, []);
 
     const printOrder = async (order: any) => {
         // Consistent filename = invoice number (fallback to the order id), sanitized
@@ -310,17 +326,19 @@ export function OrdersPage() {
         setOrderPdfPreview({ url: null, loading: true, title: `Order ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
         try {
             if (order.type === "Sale" && order.id) {
-                const res = await fetch(getInvoicePdfUrl(order.id, { showOem: true, showMrp: true }), {
-                    headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
-                });
-                if (res.ok) {
-                    const blob = await res.blob();
-                    setOrderPdfPreview({ url: URL.createObjectURL(blob), loading: false, title: `Invoice ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
-                    return;
-                }
+                const cached = orderPdfCache.current.get(String(order.id));
+                const url = cached ? await cached : await (async () => {
+                    const res = await fetch(getInvoicePdfUrl(order.id, { showOem: true, showMrp: true }), {
+                        headers: { Authorization: `Bearer ${getAccessToken()}` }, credentials: "include",
+                    });
+                    if (!res.ok) throw new Error();
+                    return URL.createObjectURL(await res.blob());
+                })();
+                setOrderPdfPreview({ url, loading: false, title: `Invoice ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
+                return;
             } else if (order.type === "Purchase" && order.id) {
-                const { previewPurchaseOrderPdf } = await import("../api/purchaseOrders");
-                const url = await previewPurchaseOrderPdf(order.id);
+                const cached = orderPdfCache.current.get(String(order.id));
+                const url = cached ? await cached : await (await import("../api/purchaseOrders")).previewPurchaseOrderPdf(order.id);
                 setOrderPdfPreview({ url, loading: false, title: `Purchase Order ${order.orderId}`, filename: `${fileBase}.pdf`, error: null });
                 return;
             }
@@ -894,7 +912,7 @@ export function OrdersPage() {
                                                         </>
                                                     )}
                                                     <button title="View Invoice" onClick={() => { if (!isCancelled) printOrder(order); }} style={{ width: 30, height: 30, borderRadius: 7, border: `1px solid ${T.border}`, background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: T.t2, transition: "all 0.12s" }}
-                                                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; }}
+                                                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.amber; (e.currentTarget as HTMLButtonElement).style.color = T.amber; if (!isCancelled) prefetchOrderPdf(order); }}
                                                         onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = T.border; (e.currentTarget as HTMLButtonElement).style.color = T.t2; }}>
                                                         👁
                                                     </button>
