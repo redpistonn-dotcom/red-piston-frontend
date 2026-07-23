@@ -20,7 +20,7 @@ import { T, FONT } from "../theme";
 import { Modal, Field, Input, Select, Btn } from "./ui";
 import { BarcodeScanner } from "./BarcodeScanner.jsx";
 import { lookupCatalog, lookupByBarcode, scanBarcode, addInventory, contributePart } from "../api/inventory.js";
-import { uid, CATEGORIES, fmt } from "../utils";
+import { uid, CATEGORIES, fmt, focusFirstError } from "../utils";
 import { SupplierAutocomplete } from "./SupplierAutocomplete";
 
 // ─── constants ────────────────────────────────────────────────────────────────
@@ -724,6 +724,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
     if (f.mrp && (isNaN(f.mrp) || parseFloat(f.mrp) <= 0)) e.mrp = "Must be greater than 0";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
     setErrors(e);
+    focusFirstError(e);
     return Object.keys(e).length === 0;
   };
 
@@ -813,16 +814,16 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
             </Field>
           </div>
           <Field label="Buying Price (₹)" required error={errors.buyPrice}>
-            <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
+            <Input name="buyPrice" type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
           </Field>
           <Field label="Selling Price (₹)" required error={errors.sellPrice}>
-            <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.sellPrice} />
+            <Input name="sellPrice" type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.sellPrice} />
           </Field>
           <Field label="MRP (₹)" error={errors.mrp} hint="Printed ceiling price (optional)">
-            <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.mrp} />
+            <Input name="mrp" type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.mrp} />
           </Field>
           <Field label="Opening Stock" required error={errors.stockQty} hint="Units currently in hand">
-            <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" invalid={!!errors.stockQty} />
+            <Input name="stockQty" type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" invalid={!!errors.stockQty} />
           </Field>
           <Field label="Min Stock Alert" hint="Alert below this threshold">
             <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" min="0" max="10000" />
@@ -922,6 +923,7 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
     if (f.mrp && (isNaN(f.mrp) || parseFloat(f.mrp) <= 0)) e.mrp = "Must be greater than 0";
     if (f.stockQty === "" || isNaN(f.stockQty)) e.stockQty = "Required";
     setErrors(e);
+    focusFirstError(e);
     return Object.keys(e).length === 0;
   };
 
@@ -957,7 +959,7 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         {/* Photo is added later at marketplace "Go Live" — not required here. */}
         <Field label="OEM Name" required error={errors.partName} hint="The official / manufacturer name">
-          <Input value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" maxLength={200} invalid={!!errors.partName} />
+          <Input name="partName" value={f.partName} onChange={set("partName")} placeholder="Bosch Front Brake Pad Set" maxLength={200} invalid={!!errors.partName} />
         </Field>
         <Field label="OEM Part Number" hint="From the box / manufacturer website">
           <Input value={f.oemNumber} onChange={set("oemNumber")} placeholder="04465-02220" maxLength={50} />
@@ -998,16 +1000,16 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
           <Input value={f.hsnCode} onChange={e => set("hsnCode")(e.replace(/[^\d]/g, "").slice(0, 8))} placeholder="87083000" maxLength={8} inputMode="numeric" />
         </Field>
         <Field label="Buying Price (₹)" required error={errors.buyPrice}>
-          <Input type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
+          <Input name="buyPrice" type="number" value={f.buyPrice} onChange={set("buyPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.buyPrice} />
         </Field>
         <Field label="Selling Price (₹)" required error={errors.sellPrice}>
-          <Input type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.sellPrice} />
+          <Input name="sellPrice" type="number" value={f.sellPrice} onChange={set("sellPrice")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.sellPrice} />
         </Field>
         <Field label="MRP (₹)" error={errors.mrp} hint="Printed ceiling price (optional)">
-          <Input type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.mrp} />
+          <Input name="mrp" type="number" value={f.mrp} onChange={set("mrp")} placeholder="0" prefix="₹" min="0" max="10000000" step="0.01" invalid={!!errors.mrp} />
         </Field>
         <Field label="Opening Stock" required error={errors.stockQty}>
-          <Input type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" invalid={!!errors.stockQty} />
+          <Input name="stockQty" type="number" value={f.stockQty} onChange={set("stockQty")} placeholder="0" suffix="units" min="0" max="100000" invalid={!!errors.stockQty} />
         </Field>
         <Field label="Min Stock Alert">
           <Input type="number" value={f.minStockAlert} onChange={set("minStockAlert")} placeholder="5" suffix="units" min="0" max="10000" />

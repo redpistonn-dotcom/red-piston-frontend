@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { T, FONT } from "../theme";
 import { getBatchesForProduct, addBatch, StockBatch, CreateBatchInput } from "../api/stockBatches.js";
+import { focusFirstError } from "../utils";
 
 interface Product {
   inventoryId?: number | string;
@@ -95,6 +96,7 @@ export function BatchesSlideOver({ open, product, onClose, toast }: Props) {
     if (!form.qtyReceived || form.qtyReceived <= 0) errs.qtyReceived = "Must be > 0";
     if (form.costPrice == null || form.costPrice < 0) errs.costPrice = "Must be ≥ 0";
     setErrors(errs);
+    focusFirstError(errs);
     return Object.keys(errs).length === 0;
   }
 
@@ -239,6 +241,7 @@ export function BatchesSlideOver({ open, product, onClose, toast }: Props) {
                 <div>
                   <label style={labelStyle}>Qty Received <span style={{ color: T.crimson }}>*</span></label>
                   <input
+                    name="qtyReceived"
                     type="number" min={1} step={1}
                     value={form.qtyReceived}
                     onChange={e => setField("qtyReceived", Number(e.target.value))}
@@ -251,6 +254,7 @@ export function BatchesSlideOver({ open, product, onClose, toast }: Props) {
                 <div>
                   <label style={labelStyle}>Cost Price (₹) <span style={{ color: T.crimson }}>*</span></label>
                   <input
+                    name="costPrice"
                     type="number" min={0} step={0.01}
                     value={form.costPrice}
                     onChange={e => setField("costPrice", Number(e.target.value))}

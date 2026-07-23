@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { T, FONT } from "../../theme";
 import { useStore } from "../../store";
 import { api } from "../../api/client";
-import { fmt, uid } from "../../utils";
+import { fmt, uid, focusFirstError } from "../../utils";
 import { cleanMobile, cleanPincode } from "../../utils/validators";
 import { DELIVERY_SLOTS } from "../api/mockDatabase";
 import { assignDeliveryPartner } from "../api/engine";
@@ -66,6 +66,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
         if (!address.pincode.trim() || address.pincode.length < 6) e.pincode = "Valid pincode required";
         if (!address.line1.trim()) e.line1 = "Address is required";
         setErrors(e);
+        focusFirstError(e);
         return Object.keys(e).length === 0;
     };
 
@@ -260,18 +261,18 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                             <div className="inner-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                 <div>
                                     <label style={labelStyle}>Full Name *</label>
-                                    <input value={address.name} onChange={e => setAddress({ ...address, name: e.target.value })} style={fieldStyle(errors.name)} placeholder="John Doe" />
+                                    <input name="name" value={address.name} onChange={e => setAddress({ ...address, name: e.target.value })} style={fieldStyle(errors.name)} placeholder="John Doe" />
                                     {errors.name && <div style={{ fontSize: 11, color: T.crimson, marginTop: 4 }}>{errors.name}</div>}
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Phone Number *</label>
-                                    <input value={address.phone} onChange={e => setAddress({ ...address, phone: cleanMobile(e.target.value) })} style={fieldStyle(errors.phone)} placeholder="10-digit mobile" maxLength={10} inputMode="numeric" />
+                                    <input name="phone" value={address.phone} onChange={e => setAddress({ ...address, phone: cleanMobile(e.target.value) })} style={fieldStyle(errors.phone)} placeholder="10-digit mobile" maxLength={10} inputMode="numeric" />
                                     {errors.phone && <div style={{ fontSize: 11, color: T.crimson, marginTop: 4 }}>{errors.phone}</div>}
                                 </div>
                             </div>
                             <div>
                                 <label style={labelStyle}>Address Line 1 *</label>
-                                <input value={address.line1} onChange={e => setAddress({ ...address, line1: e.target.value })} style={fieldStyle(errors.line1)} placeholder="House/Flat No, Street Name" />
+                                <input name="line1" value={address.line1} onChange={e => setAddress({ ...address, line1: e.target.value })} style={fieldStyle(errors.line1)} placeholder="House/Flat No, Street Name" />
                                 {errors.line1 && <div style={{ fontSize: 11, color: T.crimson, marginTop: 4 }}>{errors.line1}</div>}
                             </div>
                             <div>
@@ -289,7 +290,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Pincode *</label>
-                                    <input value={address.pincode} onChange={e => handlePincodeChange(e.target.value)} style={fieldStyle(errors.pincode)} placeholder="500033" maxLength={6} />
+                                    <input name="pincode" value={address.pincode} onChange={e => handlePincodeChange(e.target.value)} style={fieldStyle(errors.pincode)} placeholder="500033" maxLength={6} />
                                     {errors.pincode && <div style={{ fontSize: 11, color: T.crimson, marginTop: 4 }}>{errors.pincode}</div>}
                                 </div>
                             </div>
