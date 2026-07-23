@@ -914,8 +914,8 @@ function AppContent() {
         <Routes>
           {/* Public — "/" shows LandingPage for unauthenticated users */}
           <Route path="/" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LandingPage />} />
-          {/* /login shows LandingPage with auth modal pre-opened */}
-          <Route path="/login" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LandingPage openAuth />} />
+          {/* /login — standalone login page with full layout and footer */}
+          <Route path="/login" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LoginPage onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/accept-invite" element={<AcceptInvitePage />} />
 

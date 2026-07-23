@@ -117,6 +117,17 @@ const css = `
   @media (max-width: 380px) {
     .auth-form-right { padding: 28px 16px 36px !important; }
   }
+  /* Footer */
+  .auth-footer-link { color: #5C4F40; text-decoration: none; transition: color 0.18s; }
+  .auth-footer-link:hover { color: #BE2B1A !important; }
+  .auth-footer-social:hover { border-color: #BE2B1A !important; color: #BE2B1A !important; }
+  @media (max-width: 900px) {
+    .auth-footer-grid { grid-template-columns: 1fr 1fr !important; }
+  }
+  @media (max-width: 540px) {
+    .auth-footer-grid { grid-template-columns: 1fr !important; }
+    .auth-footer { padding: 40px 24px 28px !important; }
+  }
 `;
 
 // ─── Shared style tokens (light cream palette) ────────────────────────────────
@@ -1185,7 +1196,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
   // ─── Page layout — Stitch "Precision Industrial" split panel ────────────────
   return (
-    <div style={{ display: "flex", flexDirection: isModal ? "column" : "row", width: "100%", height: isModal ? "100%" : undefined, minHeight: isModal ? "100%" : "100vh", background: isModal ? "#FFFFFF" : "#FAF6F0", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", height: isModal ? "100%" : undefined, minHeight: isModal ? "100%" : "100vh", background: isModal ? "#FFFFFF" : "#FAF6F0", fontFamily: "'Inter', sans-serif" }}>
       <style>{css}</style>
 
       {/* ── Top bar — modal only ── */}
@@ -1200,6 +1211,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         </div>
       )}
+
+      {/* ── Content area: hero + form ── */}
+      <div style={{ flex: 1, display: "flex", flexDirection: isModal ? "column" : "row", minHeight: 0 }}>
 
       {/* ── Left: Engine photo + branding — standalone page only. The modal is a
            focused single-column login card with no side image. ── */}
@@ -1326,6 +1340,81 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         )}
       </div>
+      </div>{/* end content area */}
+
+      {!isModal && (
+        <footer className="auth-footer" style={{ background: "#F1EDE8", borderTop: "1px solid #E0D5C8", padding: "56px 48px 32px", fontFamily: "'Inter', sans-serif" }}>
+          <div className="auth-footer-grid" style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "48px 32px" }}>
+
+            {/* Brand column */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, overflow: "hidden", border: "1.5px solid #E0D5C8", flexShrink: 0, background: "#fff" }}>
+                  <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#1A1205", fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1 }}>RedPiston</div>
+                  <div style={{ fontSize: 9, color: "#BE2B1A", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.12em", textTransform: "uppercase", marginTop: 3 }}>Auto Parts Platform</div>
+                </div>
+              </div>
+              <p style={{ fontSize: 13, color: "#5C4F40", lineHeight: 1.65, maxWidth: 260, margin: "0 0 20px" }}>
+                India's trusted ERP for auto parts shops — billing, inventory &amp; fitment-guaranteed marketplace.
+              </p>
+              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                {[
+                  { label: "Facebook", href: "#", icon: <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/></svg> },
+                  { label: "Instagram", href: "#", icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg> },
+                  { label: "LinkedIn", href: "#", icon: <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg> },
+                ].map(s => (
+                  <a key={s.label} href={s.href} aria-label={s.label} className="auth-footer-social" style={{ width: 36, height: 36, borderRadius: "50%", background: "#fff", border: "1.5px solid #E0D5C8", display: "flex", alignItems: "center", justifyContent: "center", color: "#5C4F40", textDecoration: "none", transition: "all 0.18s", flexShrink: 0 }}>
+                    {s.icon}
+                  </a>
+                ))}
+              </div>
+              <div style={{ fontSize: 13 }}>
+                <span style={{ fontWeight: 700, color: "#BE2B1A", fontFamily: "'JetBrains Mono',monospace", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.07em" }}>Contact: </span>
+                <a href="mailto:support@redpiston.com" className="auth-footer-link" style={{ color: "#5C4F40", textDecoration: "none" }}>support@redpiston.com</a>
+              </div>
+            </div>
+
+            {/* About */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#1A1205", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 20, fontFamily: "'JetBrains Mono',monospace" }}>About</div>
+              {["About us", "Contact us", "Blogs", "FAQ"].map(link => (
+                <div key={link} style={{ marginBottom: 14 }}>
+                  <a href="#" className="auth-footer-link" style={{ fontSize: 14, color: "#5C4F40", textDecoration: "none" }}>{link}</a>
+                </div>
+              ))}
+            </div>
+
+            {/* Policy */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#1A1205", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 20, fontFamily: "'JetBrains Mono',monospace" }}>Policy</div>
+              {["Return Policy", "Privacy Policy", "Disclaimer", "Terms of Use"].map(link => (
+                <div key={link} style={{ marginBottom: 14 }}>
+                  <a href="#" className="auth-footer-link" style={{ fontSize: 14, color: "#5C4F40", textDecoration: "none" }}>{link}</a>
+                </div>
+              ))}
+            </div>
+
+            {/* Useful Links */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#1A1205", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 20, fontFamily: "'JetBrains Mono',monospace" }}>Useful Links</div>
+              {["Category", "OEM Brands", "OES Brands"].map(link => (
+                <div key={link} style={{ marginBottom: 14 }}>
+                  <a href="#" className="auth-footer-link" style={{ fontSize: 14, color: "#5C4F40", textDecoration: "none" }}>{link}</a>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div style={{ maxWidth: 1200, margin: "32px auto 0", paddingTop: 24, borderTop: "1px solid #E0D5C8", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 12, color: "#9C8C7C" }}>© {new Date().getFullYear()} RedPiston. All rights reserved.</div>
+            <div style={{ fontSize: 12, color: "#9C8C7C" }}>Made in India 🇮🇳</div>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }
