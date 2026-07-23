@@ -472,7 +472,7 @@ export function ERPShell({ children }: ERPShellProps) {
             return (
               <button
                 key={n.key}
-                onClick={() => navigate(n.path)}
+                onClick={() => navigate(n.path, { state: { _sidebarTs: Date.now() } })}
                 className={`nav-item${isActive ? " active" : ""}`}
                 title={n.label}
                 style={{
@@ -644,7 +644,7 @@ export function ERPShell({ children }: ERPShellProps) {
             return (
               <button
                 key={n.key}
-                onClick={() => { navigate(n.path); setDrawerOpen(false); }}
+                onClick={() => { navigate(n.path, { state: { _sidebarTs: Date.now() } }); setDrawerOpen(false); }}
                 style={{
                   width: "100%", display: "flex", alignItems: "center", gap: 14,
                   padding: "13px 16px", borderRadius: 10, border: "none",
@@ -940,7 +940,7 @@ export function ERPShell({ children }: ERPShellProps) {
           return (
             <button
               key={n.key}
-              onClick={() => navigate(n.path)}
+              onClick={() => navigate(n.path, { state: { _sidebarTs: Date.now() } })}
               aria-label={n.label}
               aria-current={isActive ? "page" : undefined}
               style={{
@@ -1016,7 +1016,7 @@ export function ERPShell({ children }: ERPShellProps) {
               {visibleNavItems.filter(n => !cmdKQuery.trim() || n.label.toLowerCase().includes(cmdKQuery.toLowerCase())).map(n => {
                 const isActive = n.key === navActiveKey;
                 return (
-                  <button key={n.key} onClick={() => { navigate(n.path); setShowSearch(false); setCmdKQuery(""); }}
+                  <button key={n.key} onClick={() => { navigate(n.path, { state: { _sidebarTs: Date.now() } }); setShowSearch(false); setCmdKQuery(""); }}
                     style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 20px", border: "none", background: isActive ? T.amberGlow : "transparent", cursor: "pointer", textAlign: "left", fontFamily: FONT.ui, borderBottom: `1px solid ${T.border}` }}>
                     <MSIcon name={n.icon} filled={isActive} size={18} />
                     <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 400, color: isActive ? T.amber : T.t1 }}>{n.label}</span>

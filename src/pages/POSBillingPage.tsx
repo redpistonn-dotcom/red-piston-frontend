@@ -102,6 +102,17 @@ export function POSBillingPage() {
     const [showInvoice, setShowInvoice] = useState(false);
     const [saving, setSaving]       = useState(false);
 
+    // Sidebar nav to /billing while invoice preview is open → return to billing form.
+    const lastSidebarTsRef = useRef<number | undefined>((location.state as any)?._sidebarTs);
+    useEffect(() => {
+        const ts = (location.state as any)?._sidebarTs as number | undefined;
+        if (ts && ts !== lastSidebarTsRef.current) {
+            lastSidebarTsRef.current = ts;
+            if (showInvoice) setShowInvoice(false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [(location.state as any)?._sidebarTs]);
+
     // Store credit available for the linked customer (partyId), and how much
     // of it the cashier chose to apply to this bill.
     const [availableCredit, setAvailableCredit] = useState<{ creditNoteId: number; remainingBalance: number }[]>([]);
