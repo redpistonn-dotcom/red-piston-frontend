@@ -11,6 +11,7 @@ const ADMIN_TABS = [
   { key: "verifications", label: "Verifications",   icon: "✅" },
   { key: "catalog",       label: "Parts Catalog",   icon: "📦" },
   { key: "autodukan",     label: "Autodukan Import", icon: "🔄" },
+  { key: "system-monitor", label: "System Monitor", icon: "📈" },
 ];
 
 // Cream palette specific to admin UI — kept local, not in global theme

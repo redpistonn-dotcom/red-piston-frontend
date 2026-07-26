@@ -167,7 +167,7 @@ class PageErrorBoundary extends Component {
 
 // ── Routes /profile and /settings need a shell that matches the user's role ───
 function AuthenticatedShell({ user, children }) {
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/" replace />;
   const r = getUserRole(user);
   if (r === "SHOP_OWNER" || r === "SHOP_STAFF") return <ERPShell>{children}</ERPShell>;
   if (r === "CUSTOMER") return <MPShell>{children}</MPShell>;
@@ -177,7 +177,7 @@ function AuthenticatedShell({ user, children }) {
 // ── Role gate helper — used inline in routes ──────────────────────────────────
 function requireRole(user, role, element) {
   if (getUserRole(user) === role) return element;
-  return <Navigate to={user ? getDefaultRoute(user) : "/login"} replace />;
+  return <Navigate to={user ? getDefaultRoute(user) : "/"} replace />;
 }
 
 // ── Section gate — the ERP route guard. SHOP_OWNER/PLATFORM_ADMIN always pass;
@@ -198,7 +198,7 @@ function requireSection(user, sectionKey, element) {
       return element;
     }
   }
-  return <Navigate to={user ? getDefaultRoute(user) : "/login"} replace />;
+  return <Navigate to={user ? getDefaultRoute(user) : "/"} replace />;
 }
 
 // ========== MAIN APP COMPONENT ==========
@@ -348,7 +348,7 @@ function AppContent() {
 
       try { localStorage.removeItem("as_user"); localStorage.removeItem("as_refresh_token"); localStorage.removeItem("as_impersonating"); } catch {}
       setCurrentUser(null);
-      window.location.replace("/login");
+      window.location.replace("/");
     };
     window.addEventListener("auth:session-expired", handler);
     return () => window.removeEventListener("auth:session-expired", handler);
@@ -485,7 +485,7 @@ function AppContent() {
       sessionStorage.removeItem("vl_low_stock_dismissed");
     } catch {}
     setCurrentUser(null);
-    window.location.replace("/login");
+    window.location.replace("/");
   }, [clearStore]);
 
   const handleImpersonate = useCallback((targetUser, impersonationToken) => {
@@ -531,7 +531,7 @@ function AppContent() {
       // rather than landing on /admin with no token and hitting a messy 401 cascade.
       try { localStorage.removeItem('as_user'); localStorage.removeItem('as_refresh_token'); } catch {}
       setCurrentUser(null);
-      window.location.replace('/login');
+      window.location.replace('/');
       return;
     }
 
@@ -914,8 +914,6 @@ function AppContent() {
         <Routes>
           {/* Public — "/" shows LandingPage for unauthenticated users */}
           <Route path="/" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LandingPage />} />
-          {/* /login — standalone login page with full layout and footer */}
-          <Route path="/login" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LoginPage onLogin={handleLogin} />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
@@ -952,9 +950,9 @@ function AppContent() {
           {/* /oem-parts removed — redirect to marketplace */}
           <Route path="/oem-parts"            element={<Navigate to="/marketplace" replace />} />
           <Route path="/marketplace/legacy"   element={<MarketplaceHome />} />
-          <Route path="/marketplace/orders"   element={currentUser ? <MPShell><PageErrorBoundary><OrderTrackingPage /></PageErrorBoundary></MPShell> : <Navigate to="/login" replace />} />
-          <Route path="/marketplace/pricing"  element={currentUser ? <MPShell><PageErrorBoundary><PricingPage /></PageErrorBoundary></MPShell>        : <Navigate to="/login" replace />} />
-          <Route path="/marketplace/checkout" element={currentUser ? <MPShell><PageErrorBoundary><CheckoutPage /></PageErrorBoundary></MPShell>       : <Navigate to="/login" replace />} />
+          <Route path="/marketplace/orders"   element={currentUser ? <MPShell><PageErrorBoundary><OrderTrackingPage /></PageErrorBoundary></MPShell> : <Navigate to="/" replace />} />
+          <Route path="/marketplace/pricing"  element={currentUser ? <MPShell><PageErrorBoundary><PricingPage /></PageErrorBoundary></MPShell>        : <Navigate to="/" replace />} />
+          <Route path="/marketplace/checkout" element={currentUser ? <MPShell><PageErrorBoundary><CheckoutPage /></PageErrorBoundary></MPShell>       : <Navigate to="/" replace />} />
 
           {/* Shared pages — shell matches role */}
           <Route path="/profile"  element={<AuthenticatedShell user={currentUser}><ProfilePage user={currentUser} onUserUpdate={(u) => setCurrentUser(u)} onLogout={handleLogout} /></AuthenticatedShell>} />

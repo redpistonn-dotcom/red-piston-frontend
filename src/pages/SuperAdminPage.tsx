@@ -6,6 +6,7 @@ import { T, FONT } from "../theme.js"; // T kept for any remaining tokens
 import { Avatar } from "../components/Avatar.jsx";
 import { fetchVehicleManufacturers, fetchVehicleModelsByManufacturer } from "../api/marketplace.js";
 import { importStore } from "../importProgress.js";
+import SystemMonitor from "./admin/SystemMonitor.tsx";
 
 const C = {
   bg:       "#FAF6F0",
@@ -1759,6 +1760,9 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
             <button style={S.tab(activeTab === "audit")} onClick={() => setActiveTab("audit")}>
               Audit Logs
             </button>
+            <button style={S.tab(activeTab === "system-monitor")} onClick={() => setActiveTab("system-monitor")}>
+              Logs Monitor
+            </button>
           </div>
         )}
 
@@ -2685,6 +2689,9 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
 
         {/* ─── AUDIT LOGS TAB ─── */}
         {activeTab === "audit" && <AuditTab />}
+
+        {/* ─── SYSTEM MONITOR TAB ─── */}
+        {activeTab === "system-monitor" && <SystemMonitor />}
 
       {/* Add User Modal */}
       {showAddUser && (

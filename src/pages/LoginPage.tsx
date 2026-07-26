@@ -78,11 +78,36 @@ const STEPS = {
 };
 
 // ─── Error message helper ─────────────────────────────────────────────────────
-function getErr(e, fallback = "Something went wrong. Please try again.") {
-  if (e?.data?.error?.message) return e.data.error.message;
-  if (typeof e?.data?.error === "string") return e.data.error;
-  if (e?.data?.message) return e.data.message;
-  if (e?.message && e.message !== "Request failed") return e.message;
+const INFRA_ERR_PATTERNS = [
+  "connection is closed",
+  "connection refused",
+  "connection timed out",
+  "econnrefused",
+  "econnreset",
+  "etimedout",
+  "prisma",
+  "redis",
+  "max requests limit",
+  "socket hang up",
+  "network socket disconnected",
+];
+function isInfraErr(msg: string) {
+  const lower = msg.toLowerCase();
+  return INFRA_ERR_PATTERNS.some((p) => lower.includes(p));
+}
+function getErr(e: unknown, fallback = "Something went wrong. Please try again."): string {
+  const candidates = [
+    (e as any)?.data?.error?.message,
+    typeof (e as any)?.data?.error === "string" ? (e as any)?.data?.error : null,
+    (e as any)?.data?.message,
+    (e as any)?.message && (e as any).message !== "Request failed" ? (e as any).message : null,
+  ];
+  for (const msg of candidates) {
+    if (typeof msg === "string" && msg) {
+      if (isInfraErr(msg)) return "Service temporarily unavailable. Please try again in a moment.";
+      return msg;
+    }
+  }
   return fallback;
 }
 
@@ -1340,9 +1365,19 @@ export default function LoginPage({ onLogin, isModal = false }) {
           </div>
         )}
       </div>
+      {isModal && (
+        <div style={{ paddingTop: 20, paddingBottom: 12, textAlign: "center", borderTop: "1px solid #E0D5C8", marginTop: 16 }}>
+          <span style={{ fontSize: 11, color: "#BFB0A0", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em" }}>
+            © {new Date().getFullYear()} RedPiston &nbsp;·&nbsp;{" "}
+            <a href="#" style={{ color: "#BFB0A0", textDecoration: "none" }}>Privacy</a>
+            &nbsp;·&nbsp;{" "}
+            <a href="#" style={{ color: "#BFB0A0", textDecoration: "none" }}>Terms</a>
+          </span>
+        </div>
+      )}
       </div>{/* end content area */}
 
-      <footer className="auth-footer" style={{ background: "#F1EDE8", borderTop: "1px solid #E0D5C8", padding: "56px 48px 32px", fontFamily: "'Inter', sans-serif" }}>
+      {!isModal && (<footer className="auth-footer" style={{ background: "#F1EDE8", borderTop: "1px solid #E0D5C8", padding: "56px 48px 32px", fontFamily: "'Inter', sans-serif" }}>
           <div className="auth-footer-grid" style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "48px 32px" }}>
 
             {/* Brand column */}
@@ -1412,7 +1447,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={{ fontSize: 12, color: "#9C8C7C" }}>© {new Date().getFullYear()} RedPiston. All rights reserved.</div>
             <div style={{ fontSize: 12, color: "#9C8C7C" }}>Made in India 🇮🇳</div>
           </div>
-        </footer>
+        </footer>)}
     </div>
   );
 }

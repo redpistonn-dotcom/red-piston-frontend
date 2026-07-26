@@ -99,7 +99,7 @@ export function SuppliersPage() {
             /* Not logged in — match landing page header */
             <>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/')}
                 style={{ color: '#8b1e1e', padding: '0 16px', height: 44, background: 'none', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: 14, transition: 'background 0.2s' }}
                 onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#eae7e7')}
                 onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
@@ -107,7 +107,7 @@ export function SuppliersPage() {
                 Sign In
               </button>
               <button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/')}
                 style={{ backgroundColor: '#8b1e1e', color: '#fff', padding: '0 16px', height: 44, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 14, transition: 'opacity 0.2s' }}
                 onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
                 onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
@@ -144,7 +144,7 @@ export function SuppliersPage() {
                 Browse Suppliers
               </button>
               <button
-                onClick={() => navigate('/login?role=shop')}
+                onClick={() => navigate('/')}
                 style={{ backgroundColor: 'transparent', color: '#fff', border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 12, padding: '13px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
                 Become a Supplier →
               </button>
@@ -302,7 +302,7 @@ export function SuppliersPage() {
         <p style={{ opacity: 0.7, fontSize: 15, marginBottom: 28 }}>Join 500+ verified suppliers and reach 50,000+ buyers</p>
         <div className="lp-cta-row" style={{ display: 'flex', gap: 14, justifyContent: 'center' }}>
           <button
-            onClick={() => navigate('/login?role=shop')}
+            onClick={() => navigate('/')}
             style={{ backgroundColor: '#8b1e1e', color: '#fff', border: 'none', borderRadius: 12, padding: '14px 28px', fontWeight: 800, fontSize: 15, cursor: 'pointer', minHeight: 44 }}>
             Apply as Supplier →
           </button>
