@@ -1,38 +1,50 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from "../../api/client";
-import { Activity, Database, Server, AlertTriangle, RefreshCw, Cpu, HardDrive, Shield, Cloud, CheckCircle, XCircle, List } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Activity, Database, AlertTriangle, RefreshCw, Cpu, HardDrive, Shield, List, TrendingUp, TrendingDown, Minus, BarChart2, Clock, Zap } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 const C = {
-  bg:       "#FAF6F0",
-  surface:  "#FFFFFF",
-  border:   "#E0D5C8",
+  bg:          "#FAF6F0",
+  surface:     "#FFFFFF",
+  border:      "#E0D5C8",
   borderLight: "#F0E8DF",
-  t1:       "#1A1205",
-  t2:       "#5C4F40",
-  t3:       "#9C8C7C",
-  red:      "#BE2B1A",
-  redBg:    "rgba(190,43,26,0.08)",
-  green:    "#16A34A",
-  greenBg:  "rgba(22,163,74,0.08)",
-  sky:      "#0284C7",
-  skyBg:    "rgba(2,132,199,0.08)",
-  violet:   "#7C3AED",
-  violetBg: "rgba(124,58,237,0.08)",
-  amber:    "#D97706",
-  amberBg:  "rgba(217,119,6,0.08)",
+  t1:          "#1A1205",
+  t2:          "#5C4F40",
+  t3:          "#9C8C7C",
+  red:         "#BE2B1A",
+  redBg:       "rgba(190,43,26,0.08)",
+  green:       "#16A34A",
+  greenBg:     "rgba(22,163,74,0.08)",
+  sky:         "#0284C7",
+  skyBg:       "rgba(2,132,199,0.08)",
+  violet:      "#7C3AED",
+  violetBg:    "rgba(124,58,237,0.08)",
+  amber:       "#D97706",
+  amberBg:     "rgba(217,119,6,0.08)",
 };
 
 const FONT = { ui: "'Inter', sans-serif" };
 
+// Helper: Stat card
+function StatCard({ icon, label, value, sub, color, bg }: any) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ padding: 8, background: bg, color, borderRadius: 10 }}>{icon}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.t2 }}>{label}</div>
+      </div>
+      <div style={{ fontSize: 30, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans', sans-serif", lineHeight: 1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: C.t3, marginTop: 6 }}>{sub}</div>}
+    </div>
+  );
+}
+
 export default function SystemMonitor() {
   const [sentryToken, setSentryToken] = useState(import.meta.env.VITE_SENTRY_AUTH_TOKEN || '');
-  const [vercelToken, setVercelToken] = useState(import.meta.env.VITE_VERCEL_TOKEN || '');
-  const [vercelProject, setVercelProject] = useState('red-piston'); // default project name
-  
-  const [sentryOrg] = useState('redpiston');
+  const [sentryOrg]     = useState('redpiston');
   const [sentryProject] = useState('redpiston-backend');
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   // Backend system metrics
   const { data: metrics, isLoading, refetch, isRefetching } = useQuery({
@@ -46,356 +58,337 @@ export default function SystemMonitor() {
 
   // Sentry Live Issues
   const activeSentryToken = sentryToken || import.meta.env.VITE_SENTRY_AUTH_TOKEN || '';
-  const { data: sentryIssues, isLoading: isLoadingIssues } = useQuery({
+  const { data: sentryIssues, isLoading: isLoadingIssues, error: sentryError } = useQuery({
     queryKey: ['sentry-issues', activeSentryToken],
     queryFn: async () => {
       if (!activeSentryToken) return [];
-      const res = await fetch(`https://de.sentry.io/api/0/projects/${sentryOrg}/${sentryProject}/issues/`, {
-        headers: { Authorization: `Bearer ${activeSentryToken}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch Sentry logs');
+      const res = await fetch(
+        `https://de.sentry.io/api/0/projects/${sentryOrg}/${sentryProject}/issues/?limit=25&query=is:unresolved`,
+        { headers: { Authorization: `Bearer ${activeSentryToken}` } }
+      );
+      if (!res.ok) throw new Error(`Sentry API error: ${res.status}`);
       return res.json();
     },
     enabled: !!activeSentryToken,
-    retry: false
+    retry: false,
+    refetchInterval: 60000,
   });
 
-  // Vercel Deployments
-  const activeVercelToken = vercelToken || import.meta.env.VITE_VERCEL_TOKEN || '';
-  const { data: vercelDeployments, isLoading: isLoadingDeployments } = useQuery({
-    queryKey: ['vercel-deployments', activeVercelToken, vercelProject],
-    queryFn: async () => {
-      if (!activeVercelToken || !vercelProject) return [];
-      const res = await api.get(`/api/admin/deployments/vercel?token=${activeVercelToken}&projectId=${vercelProject}`);
-      return res.data?.data?.deployments || [];
-    },
-    enabled: !!activeVercelToken && !!vercelProject,
-    retry: false
-  });
-
-  // Network Logs
+  // Network Logs — poll every 2s for freshness
   const { data: networkStats } = useQuery({
     queryKey: ['network-logs'],
     queryFn: async () => {
       const res = await api.get('/api/admin/network-logs');
       return res.data?.data;
     },
-    refetchInterval: 3000,
+    refetchInterval: 2000,
   });
 
-  const chartData = [
-    { time: '10:00', requests: 120, latency: 45 },
-    { time: '11:00', requests: 200, latency: 55 },
-    { time: '12:00', requests: 150, latency: 40 },
-    { time: '13:00', requests: 300, latency: 80 },
-    { time: '14:00', requests: 250, latency: 60 },
-    { time: '15:00', requests: 400, latency: 90 },
-    { time: '16:00', requests: 180, latency: 50 },
-  ];
+  // Build live traffic sparkline from network logs
+  const trafficSparkline = (() => {
+    const logs: any[] = networkStats?.logs || [];
+    if (!logs.length) return [];
+    // Group into ~10 time buckets
+    const now = Date.now();
+    const bucketMs = 30000; // 30s buckets
+    const buckets: Record<number, { requests: number; errors: number; latency: number[]; }> = {};
+    logs.forEach((log) => {
+      const t = new Date(log.timestamp).getTime();
+      const key = Math.floor(t / bucketMs) * bucketMs;
+      if (!buckets[key]) buckets[key] = { requests: 0, errors: 0, latency: [] };
+      buckets[key].requests++;
+      if (log.status >= 400) buckets[key].errors++;
+      buckets[key].latency.push(log.latency);
+    });
+    return Object.entries(buckets)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .slice(-12)
+      .map(([ts, b]) => ({
+        time: new Date(Number(ts)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        requests: b.requests,
+        errors: b.errors,
+        avgLatency: b.latency.length ? Math.round(b.latency.reduce((a, v) => a + v, 0) / b.latency.length) : 0,
+      }));
+  })();
 
+  const health = networkStats?.health;
   const dbSizeMB = metrics?.database?.sizeMb || 0;
   const dbPercent = Math.min(100, (dbSizeMB / 500) * 100);
+  const errorRate = health?.total ? Math.round(((health.errors4xx + health.errors5xx) / health.total) * 100) : 0;
 
   return (
-    <div style={{ padding: 32, fontFamily: FONT.ui, display: 'flex', flexDirection: 'column', gap: 32, maxWidth: 1200, margin: '0 auto' }}>
-      
+    <div style={{ padding: 32, fontFamily: FONT.ui, display: 'flex', flexDirection: 'column', gap: 32, maxWidth: 1280, margin: '0 auto' }}>
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: C.t1, margin: '0 0 4px 0', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>System Monitor</h1>
-          <div style={{ fontSize: 13, color: C.t3 }}>Comprehensive infrastructure, security, and application health</div>
+          <div style={{ fontSize: 13, color: C.t3 }}>Live infrastructure · security · application health</div>
         </div>
-        <button 
-          onClick={() => refetch()} 
+        <button
+          onClick={() => refetch()}
           disabled={isRefetching}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
-            background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-            cursor: 'pointer', fontSize: 13, fontWeight: 600, color: C.t2
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: C.t2 }}
         >
           <RefreshCw size={14} style={{ animation: isRefetching ? 'spin 1s linear infinite' : 'none' }} />
           Refresh
         </button>
       </div>
 
-      {/* --- SECTION: INFRASTRUCTURE --- */}
+      {/* ── SECTION: INFRASTRUCTURE ── */}
       <div>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: C.t2, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Infrastructure</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
-          
-          {/* DB Card */}
-          <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-              <div style={{ padding: 8, background: C.greenBg, color: C.green, borderRadius: 10 }}><Database size={20} /></div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>PostgreSQL Database</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {isLoading ? '...' : dbSizeMB} <span style={{ fontSize: 14, color: C.t3, fontWeight: 600 }}>MB</span>
-              </div>
-              <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Supabase Free Tier (Limit: 500 MB)</div>
-              {metrics?.database?.activeConnections !== undefined && (
-                <div style={{ fontSize: 13, color: C.t2, marginTop: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 4, background: C.green }} />
-                  {metrics.database.activeConnections} Active Connections
-                </div>
-              )}
-            </div>
-            <div style={{ marginTop: 24, background: C.borderLight, height: 6, borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${dbPercent}%`, background: C.green, height: '100%', borderRadius: 3, transition: 'width 1s ease' }} />
-            </div>
-          </div>
-
-          {/* Redis Card */}
-          <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-              <div style={{ padding: 8, background: C.redBg, color: C.red, borderRadius: 10 }}><HardDrive size={20} /></div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>Redis Cache & Queue</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {isLoading ? '...' : metrics?.cache?.usedMemoryHuman || '0B'}
-              </div>
-              <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>Upstash Free Tier (Limit: 256 MB)</div>
-            </div>
-          </div>
-
-          {/* Server Card */}
-          <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-              <div style={{ padding: 8, background: C.violetBg, color: C.violet, borderRadius: 10 }}><Cpu size={20} /></div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>Backend Server (Railway)</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                {isLoading ? '...' : metrics?.server?.loadavg?.[0]?.toFixed(2) || '0.00'}
-              </div>
-              <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>1-Minute Load Average</div>
-              {metrics?.server && (
-                <div style={{ fontSize: 13, color: C.t2, marginTop: 12, fontWeight: 600 }}>
-                  RAM: {Math.round((metrics.server.totalmem - metrics.server.freemem) / 1024 / 1024)}MB / {Math.round(metrics.server.totalmem / 1024 / 1024)}MB
-                </div>
-              )}
-            </div>
-          </div>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: C.t3, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.2 }}>Infrastructure</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+          <StatCard icon={<Database size={18} />} label="PostgreSQL Database" color={C.green} bg={C.greenBg}
+            value={isLoading ? '…' : `${dbSizeMB} MB`}
+            sub={`${dbPercent.toFixed(1)}% of 500MB · ${metrics?.database?.activeConnections ?? 0} connections active`}
+          />
+          <StatCard icon={<HardDrive size={18} />} label="Redis Cache" color={C.red} bg={C.redBg}
+            value={isLoading ? '…' : metrics?.cache?.usedMemoryHuman || 'N/A'}
+            sub="Upstash free tier — 256 MB limit"
+          />
+          <StatCard icon={<Cpu size={18} />} label="Backend Server" color={C.violet} bg={C.violetBg}
+            value={isLoading ? '…' : `${metrics?.server?.loadavg?.[0]?.toFixed(2) ?? '0.00'}`}
+            sub={metrics?.server ? `RAM: ${Math.round((metrics.server.totalmem - metrics.server.freemem) / 1024 / 1024)}MB / ${Math.round(metrics.server.totalmem / 1024 / 1024)}MB` : '1-min load avg'}
+          />
         </div>
       </div>
 
-      {/* --- SECTION: SECURITY & TRAFFIC --- */}
+      {/* ── SECTION: LIVE ANALYTICS SUMMARY ── */}
       <div>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: C.t2, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Security & Traffic</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 24 }}>
-          
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: C.t3, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.2 }}>Live API Analytics</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+          <StatCard icon={<Zap size={18} />} label="Total Requests" color={C.sky} bg={C.skyBg}
+            value={health?.total ?? 0}
+            sub="Since last server start"
+          />
+          <StatCard icon={<TrendingUp size={18} />} label="Success (2xx)" color={C.green} bg={C.greenBg}
+            value={health?.success ?? 0}
+            sub={health?.total ? `${Math.round((health.success / health.total) * 100)}% success rate` : 'No data yet'}
+          />
+          <StatCard icon={<AlertTriangle size={18} />} label="Client Errors (4xx)" color={C.amber} bg={C.amberBg}
+            value={health?.errors4xx ?? 0}
+            sub="Auth / Not Found / Validation"
+          />
+          <StatCard icon={<TrendingDown size={18} />} label="Server Errors (5xx)" color={C.red} bg={C.redBg}
+            value={health?.errors5xx ?? 0}
+            sub={health?.errors5xx > 0 ? '⚠️ Needs immediate attention' : 'All clear'}
+          />
+          <StatCard icon={<Clock size={18} />} label="Avg Latency" color={C.violet} bg={C.violetBg}
+            value={health?.avgLatency ? `${health.avgLatency}ms` : '—'}
+            sub={health?.avgLatency > 300 ? 'Slow — investigate DB queries' : health?.avgLatency > 0 ? 'Healthy response time' : 'No data yet'}
+          />
+        </div>
+      </div>
+
+      {/* ── SECTION: SECURITY & TRAFFIC ── */}
+      <div>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: C.t3, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.2 }}>Security & Traffic</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20 }}>
+
           {/* Rate Limits */}
           <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-              <div style={{ padding: 8, background: C.amberBg, color: C.amber, borderRadius: 10 }}><Shield size={20} /></div>
+              <div style={{ padding: 8, background: C.amberBg, color: C.amber, borderRadius: 10 }}><Shield size={18} /></div>
               <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>API Gateway</div>
             </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ padding: 12, background: C.bg, borderRadius: 8, border: `1px solid ${C.borderLight}` }}>
-                <div style={{ fontSize: 12, color: C.t3, fontWeight: 600, marginBottom: 4 }}>Active Global IPs (Last 60s)</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.t1 }}>{isLoading ? '...' : metrics?.rateLimits?.api?.active || 0}</div>
-                {metrics?.rateLimits?.api?.warnings > 0 && (
-                  <div style={{ fontSize: 11, color: C.red, fontWeight: 600, marginTop: 4 }}>{metrics.rateLimits.api.warnings} IPs approaching limits!</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ padding: 14, background: C.bg, borderRadius: 10, border: `1px solid ${C.borderLight}` }}>
+                <div style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Active Global IPs (60s)</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.t1 }}>{isLoading ? '…' : metrics?.rateLimits?.api?.active ?? 0}</div>
+                {(metrics?.rateLimits?.api?.warnings ?? 0) > 0 && (
+                  <div style={{ fontSize: 11, color: C.red, fontWeight: 600, marginTop: 4 }}>⚠️ {metrics.rateLimits.api.warnings} IPs approaching limit</div>
                 )}
               </div>
-              
-              <div style={{ padding: 12, background: C.bg, borderRadius: 8, border: `1px solid ${C.borderLight}` }}>
-                <div style={{ fontSize: 12, color: C.t3, fontWeight: 600, marginBottom: 4 }}>Active Mutators (POST/PUT/DEL)</div>
-                <div style={{ fontSize: 24, fontWeight: 800, color: C.t1 }}>{isLoading ? '...' : metrics?.rateLimits?.mutations?.active || 0}</div>
+              <div style={{ padding: 14, background: C.bg, borderRadius: 10, border: `1px solid ${C.borderLight}` }}>
+                <div style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Active Mutators (POST/PUT/DEL)</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: C.t1 }}>{isLoading ? '…' : metrics?.rateLimits?.mutations?.active ?? 0}</div>
+              </div>
+              <div style={{ padding: 14, background: errorRate > 10 ? C.redBg : C.greenBg, borderRadius: 10, border: `1px solid ${C.borderLight}` }}>
+                <div style={{ fontSize: 11, color: C.t3, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6 }}>Current Error Rate</div>
+                <div style={{ fontSize: 28, fontWeight: 800, color: errorRate > 10 ? C.red : C.green }}>{errorRate}%</div>
               </div>
             </div>
           </div>
 
-          {/* Traffic Chart */}
+          {/* Live Traffic Sparkline (real data from network logs) */}
           <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 24, boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-              <Activity size={18} color={C.t3} />
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>Traffic & Latency (Mock 24h)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+              <BarChart2 size={18} color={C.t3} />
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>Live Traffic (30s buckets)</div>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: C.t3, background: C.greenBg, padding: '2px 8px', borderRadius: 10, color: C.green, fontWeight: 600 }}>● LIVE</span>
             </div>
-            <div style={{ height: 220, width: '100%' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.borderLight} />
-                  <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: C.t3 }} dy={10} />
-                  <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: C.t3 }} dx={-10} />
-                  <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: C.t3 }} dx={10} />
-                  <Tooltip contentStyle={{ borderRadius: 8, border: `1px solid ${C.border}`, boxShadow: '0 4px 12px rgba(26,18,5,0.1)' }} />
-                  <Line yAxisId="left" type="monotone" dataKey="requests" name="Requests" stroke={C.violet} strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
-                  <Line yAxisId="right" type="monotone" dataKey="latency" name="Latency (ms)" stroke={C.green} strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* --- SECTION: APPLICATION HEALTH --- */}
-      <div>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: C.t2, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Application Health</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-          
-          {/* Sentry Logs */}
-          <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,18,5,0.03)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <AlertTriangle size={18} color={C.red} />
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>Live Sentry Error Feed</div>
-              </div>
-              <input
-                type="password"
-                placeholder="Sentry API Token..."
-                value={sentryToken}
-                onChange={(e) => setSentryToken(e.target.value)}
-                style={{ padding: '6px 12px', fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 6, width: 160, background: C.bg, color: C.t1, outline: 'none' }}
-              />
-            </div>
-            
-            <div style={{ background: '#111827', padding: 24, height: 350, overflow: 'auto', fontFamily: "monospace", fontSize: 13, color: '#D1D5DB' }}>
-              {!activeSentryToken ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.5, marginTop: 60 }}>
-                  <AlertTriangle size={32} style={{ marginBottom: 12 }} />
-                  <div>Token required for Sentry Logs.</div>
-                </div>
-              ) : isLoadingIssues ? (
-                <div style={{ opacity: 0.5 }}>Loading logs...</div>
-              ) : sentryIssues?.length === 0 ? (
-                <div style={{ color: '#34D399', textAlign: 'center', marginTop: 80 }}>All systems operational. No unhandled errors.</div>
+            <div style={{ height: 230 }}>
+              {trafficSparkline.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trafficSparkline} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <defs>
+                      <linearGradient id="reqGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={C.violet} stopOpacity={0.2} />
+                        <stop offset="95%" stopColor={C.violet} stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="errGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={C.red} stopOpacity={0.2} />
+                        <stop offset="95%" stopColor={C.red} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={C.borderLight} />
+                    <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: C.t3 }} dy={8} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: C.t3 }} dx={-8} />
+                    <Tooltip contentStyle={{ borderRadius: 8, border: `1px solid ${C.border}`, boxShadow: '0 4px 12px rgba(26,18,5,0.1)', fontSize: 12 }} />
+                    <Area type="monotone" dataKey="requests" name="Requests" stroke={C.violet} strokeWidth={2} fill="url(#reqGrad)" dot={false} />
+                    <Area type="monotone" dataKey="errors" name="Errors" stroke={C.red} strokeWidth={2} fill="url(#errGrad)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {sentryIssues?.map((issue: any) => (
-                    <div key={issue.id} style={{ borderLeft: `3px solid ${C.red}`, paddingLeft: 16, paddingBottom: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#9CA3AF', marginBottom: 6 }}>
-                        <span>{new Date(issue.lastSeen).toLocaleString()}</span>
-                        <span style={{ background: '#1F2937', padding: '2px 8px', borderRadius: 4 }}>{issue.project?.name || 'unknown'}</span>
-                      </div>
-                      <div style={{ color: '#F87171', fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{issue.title}</div>
-                      <div style={{ color: '#9CA3AF', fontSize: 12 }}>{issue.culprit}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Vercel Deployments */}
-          <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,18,5,0.03)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                <Cloud size={18} color={C.sky} />
-                <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>Vercel Deployments</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  placeholder="Project Name..."
-                  value={vercelProject}
-                  onChange={(e) => setVercelProject(e.target.value)}
-                  style={{ padding: '6px 12px', fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 6, width: 120, background: C.bg, color: C.t1, outline: 'none' }}
-                />
-                <input
-                  type="password"
-                  placeholder="Vercel Access Token..."
-                  value={vercelToken}
-                  onChange={(e) => setVercelToken(e.target.value)}
-                  style={{ padding: '6px 12px', fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 6, width: 160, background: C.bg, color: C.t1, outline: 'none' }}
-                />
-              </div>
-            </div>
-            
-            <div style={{ background: C.bg, padding: 24, height: 350, overflow: 'auto' }}>
-              {!activeVercelToken ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.5, marginTop: 60 }}>
-                  <Cloud size={32} style={{ marginBottom: 12 }} />
-                  <div>Token required for Vercel Builds.</div>
-                </div>
-              ) : isLoadingDeployments ? (
-                <div style={{ opacity: 0.5 }}>Loading deployments...</div>
-              ) : vercelDeployments?.length === 0 ? (
-                <div style={{ color: C.t3, textAlign: 'center', marginTop: 80 }}>No deployments found.</div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {vercelDeployments?.map((dep: any) => (
-                    <div key={dep.uid} style={{ background: C.surface, border: `1px solid ${C.borderLight}`, padding: 16, borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          {dep.state === 'READY' ? <CheckCircle size={14} color={C.green} /> : dep.state === 'ERROR' ? <XCircle size={14} color={C.red} /> : <RefreshCw size={14} color={C.amber} style={{ animation: 'spin 2s linear infinite' }} />}
-                          <span style={{ fontWeight: 700, fontSize: 14, color: C.t1 }}>{dep.name}</span>
-                          <span style={{ fontSize: 10, background: C.borderLight, padding: '2px 6px', borderRadius: 12, color: C.t2 }}>{dep.target || 'preview'}</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: C.t3, marginTop: 4 }}>{new Date(dep.created).toLocaleString()}</div>
-                      </div>
-                      <a href={`https://${dep.url}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: C.sky, fontWeight: 600, textDecoration: 'none' }}>
-                        Visit Deployment
-                      </a>
-                    </div>
-                  ))}
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.t3, fontSize: 13 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Activity size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+                    <div>Chart will populate once API requests are made</div>
+                    <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>Navigate around the app to generate data</div>
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
-      {/* --- SECTION: NETWORK LOGS --- */}
+
+      {/* ── SECTION: APPLICATION HEALTH (Sentry full-width) ── */}
       <div>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: C.t2, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Live Network Logs</h2>
-        <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,18,5,0.03)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: C.t3, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.2 }}>Application Health</h2>
+        <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
+          <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <List size={18} color={C.t2} />
-              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>HTTP Request Feed</div>
+              <AlertTriangle size={18} color={C.red} />
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>Live Sentry Error Feed</div>
+              {sentryIssues && sentryIssues.length > 0 && (
+                <span style={{ background: C.redBg, color: C.red, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>
+                  {sentryIssues.length} unresolved
+                </span>
+              )}
+              {sentryIssues?.length === 0 && (
+                <span style={{ background: C.greenBg, color: C.green, fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>
+                  ✓ All clear
+                </span>
+              )}
             </div>
-            {networkStats?.health && (
-              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: C.t2, fontWeight: 600 }}>
-                <span style={{ color: C.green }}>{networkStats.health.success} Success</span>
-                <span style={{ color: C.amber }}>{networkStats.health.errors4xx} 4xx Errors</span>
-                <span style={{ color: C.red }}>{networkStats.health.errors5xx} 5xx Errors</span>
-                <span>Avg Latency: {networkStats.health.avgLatency}ms</span>
+            <input
+              type="password"
+              placeholder="Sentry Auth Token…"
+              value={sentryToken}
+              onChange={(e) => setSentryToken(e.target.value)}
+              style={{ padding: '6px 12px', fontSize: 12, border: `1px solid ${C.border}`, borderRadius: 6, width: 200, background: C.bg, color: C.t1, outline: 'none' }}
+            />
+          </div>
+
+          <div style={{ background: '#0D1117', padding: 20, minHeight: 300, maxHeight: 450, overflow: 'auto', fontFamily: 'monospace', fontSize: 12 }}>
+            {!activeSentryToken ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 260, color: '#4B5563' }}>
+                <AlertTriangle size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
+                <div style={{ fontSize: 13 }}>Paste your Sentry Auth Token above to see live errors</div>
+                <div style={{ fontSize: 11, marginTop: 4, opacity: 0.6 }}>Settings → Auth Tokens → Create Token in Sentry</div>
+              </div>
+            ) : isLoadingIssues ? (
+              <div style={{ color: '#4B5563', padding: 20 }}>Connecting to Sentry…</div>
+            ) : sentryError ? (
+              <div style={{ color: '#F87171', padding: 20 }}>❌ Could not connect to Sentry. Check your token and org/project slug.</div>
+            ) : sentryIssues?.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 260, color: '#34D399' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                <div style={{ fontSize: 13 }}>All systems operational — no unresolved errors</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {sentryIssues.map((issue: any) => {
+                  const level = issue.level || 'error';
+                  const levelColor = level === 'error' ? '#F87171' : level === 'warning' ? '#FBBF24' : '#60A5FA';
+                  return (
+                    <div key={issue.id} style={{ borderLeft: `3px solid ${levelColor}`, paddingLeft: 14, paddingBottom: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: levelColor, fontWeight: 700, fontSize: 13 }}>{issue.title}</span>
+                        <span style={{ background: '#1C2433', color: '#9CA3AF', padding: '2px 8px', borderRadius: 4, fontSize: 10 }}>
+                          {issue.count}× seen · last {new Date(issue.lastSeen).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div style={{ color: '#6B7280', fontSize: 11 }}>{issue.culprit}</div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-          <div style={{ background: '#111827', height: 400, overflow: 'auto', padding: 12 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: 12, textAlign: 'left' }}>
-              <thead>
-                <tr style={{ color: '#9CA3AF', borderBottom: '1px solid #374151' }}>
-                  <th style={{ padding: '8px 12px' }}>Time</th>
-                  <th style={{ padding: '8px 12px' }}>Method</th>
-                  <th style={{ padding: '8px 12px' }}>Path</th>
-                  <th style={{ padding: '8px 12px' }}>Status</th>
-                  <th style={{ padding: '8px 12px' }}>Latency</th>
-                  <th style={{ padding: '8px 12px' }}>IP</th>
+        </div>
+      </div>
+
+      {/* ── SECTION: LIVE NETWORK LOGS ── */}
+      <div>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: C.t3, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.2 }}>Live Network Logs</h2>
+        <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
+          <div style={{ padding: '14px 24px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <List size={16} color={C.t2} />
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>HTTP Request Feed</div>
+              <span style={{ fontSize: 11, color: C.green, background: C.greenBg, fontWeight: 600, padding: '2px 8px', borderRadius: 10 }}>● Auto-refresh 2s</span>
+            </div>
+            {health && (
+              <div style={{ display: 'flex', gap: 20, fontSize: 12, fontWeight: 600 }}>
+                <span style={{ color: C.green }}>✓ {health.success} 2xx</span>
+                <span style={{ color: C.amber }}>⚠ {health.errors4xx} 4xx</span>
+                <span style={{ color: C.red }}>✕ {health.errors5xx} 5xx</span>
+                <span style={{ color: C.t2 }}>⏱ {health.avgLatency}ms avg</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ background: '#0D1117', height: 450, overflowY: 'auto', fontSize: 12, fontFamily: 'monospace' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead style={{ position: 'sticky', top: 0, background: '#161B22', zIndex: 1 }}>
+                <tr style={{ color: '#6B7280' }}>
+                  <th style={{ padding: '10px 16px', fontWeight: 600 }}>Time</th>
+                  <th style={{ padding: '10px 16px', fontWeight: 600 }}>Method</th>
+                  <th style={{ padding: '10px 16px', fontWeight: 600, minWidth: 280 }}>Path</th>
+                  <th style={{ padding: '10px 16px', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '10px 16px', fontWeight: 600 }}>Latency</th>
+                  <th style={{ padding: '10px 16px', fontWeight: 600 }}>IP</th>
                 </tr>
               </thead>
               <tbody>
                 {networkStats?.logs?.map((log: any) => {
-                  const isError = log.status >= 500;
-                  const isWarning = log.status >= 400 && log.status < 500;
-                  const color = isError ? '#F87171' : isWarning ? '#FBBF24' : '#34D399';
-                  
+                  const is5xx = log.status >= 500;
+                  const is4xx = log.status >= 400;
+                  const statusColor = is5xx ? '#F87171' : is4xx ? '#FBBF24' : '#34D399';
+                  const methodColor: Record<string, string> = { GET: '#60A5FA', POST: '#34D399', PUT: '#FBBF24', PATCH: '#C084FC', DELETE: '#F87171' };
+                  const rowBg = is5xx ? 'rgba(248,113,113,0.05)' : is4xx ? 'rgba(251,191,36,0.04)' : 'transparent';
                   return (
-                    <tr key={log.id} style={{ borderBottom: '1px solid #1F2937', color: '#D1D5DB' }}>
-                      <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleTimeString()}</td>
-                      <td style={{ padding: '8px 12px', fontWeight: 'bold' }}>{log.method}</td>
-                      <td style={{ padding: '8px 12px' }}>{log.path}</td>
-                      <td style={{ padding: '8px 12px', color, fontWeight: 'bold' }}>{log.status}</td>
-                      <td style={{ padding: '8px 12px' }}>{log.latency}ms</td>
-                      <td style={{ padding: '8px 12px', color: '#9CA3AF' }}>{log.ip}</td>
+                    <tr key={log.id} style={{ borderBottom: '1px solid #1C2433', background: rowBg }}>
+                      <td style={{ padding: '8px 16px', color: '#6B7280', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleTimeString()}</td>
+                      <td style={{ padding: '8px 16px', fontWeight: 700, color: methodColor[log.method] || '#D1D5DB' }}>{log.method}</td>
+                      <td style={{ padding: '8px 16px', color: '#D1D5DB', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.path}</td>
+                      <td style={{ padding: '8px 16px', color: statusColor, fontWeight: 700 }}>
+                        {is5xx && '🔴 '}{is4xx && '🟡 '}{!is5xx && !is4xx && '🟢 '}{log.status}
+                      </td>
+                      <td style={{ padding: '8px 16px', color: log.latency > 1000 ? '#F87171' : log.latency > 300 ? '#FBBF24' : '#9CA3AF' }}>
+                        {log.latency}ms
+                      </td>
+                      <td style={{ padding: '8px 16px', color: '#4B5563' }}>{log.ip}</td>
                     </tr>
                   );
                 })}
                 {!networkStats?.logs?.length && (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
-                      Listening for incoming requests...
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '60px 0', color: '#374151' }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Activity size={28} style={{ opacity: 0.3 }} />
+                      </div>
+                      <div>Listening for incoming requests…</div>
+                      <div style={{ fontSize: 11, marginTop: 4, opacity: 0.6 }}>Click around the app — requests will appear here instantly</div>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+            <div ref={logEndRef} />
           </div>
         </div>
       </div>
