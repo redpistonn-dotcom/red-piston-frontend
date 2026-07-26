@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from "../../api/client";
-import { Activity, Database, Server, AlertTriangle, RefreshCw, Cpu, HardDrive, Shield, Cloud, CheckCircle, XCircle } from 'lucide-react';
+import { Activity, Database, Server, AlertTriangle, RefreshCw, Cpu, HardDrive, Shield, Cloud, CheckCircle, XCircle, List } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const C = {
@@ -64,15 +64,21 @@ export default function SystemMonitor() {
     queryKey: ['vercel-deployments', vercelToken, vercelProject],
     queryFn: async () => {
       if (!vercelToken || !vercelProject) return [];
-      const res = await fetch(`https://api.vercel.com/v6/deployments?app=${vercelProject}&limit=5`, {
-        headers: { Authorization: `Bearer ${vercelToken}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch Vercel deployments');
-      const data = await res.json();
-      return data.deployments;
+      const res = await api.get(`/api/admin/deployments/vercel?token=${vercelToken}&projectId=${vercelProject}`);
+      return res.data?.data?.deployments || [];
     },
     enabled: !!vercelToken && !!vercelProject,
     retry: false
+  });
+
+  // Network Logs
+  const { data: networkStats } = useQuery({
+    queryKey: ['network-logs'],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/network-logs');
+      return res.data?.data;
+    },
+    refetchInterval: 3000,
   });
 
   const chartData = [
@@ -332,7 +338,66 @@ export default function SystemMonitor() {
           </div>
         </div>
       </div>
-      
+      {/* --- SECTION: NETWORK LOGS --- */}
+      <div>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: C.t2, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1 }}>Live Network Logs</h2>
+        <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,18,5,0.03)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <List size={18} color={C.t2} />
+              <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>HTTP Request Feed</div>
+            </div>
+            {networkStats?.health && (
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: C.t2, fontWeight: 600 }}>
+                <span style={{ color: C.green }}>{networkStats.health.success} Success</span>
+                <span style={{ color: C.amber }}>{networkStats.health.errors4xx} 4xx Errors</span>
+                <span style={{ color: C.red }}>{networkStats.health.errors5xx} 5xx Errors</span>
+                <span>Avg Latency: {networkStats.health.avgLatency}ms</span>
+              </div>
+            )}
+          </div>
+          <div style={{ background: '#111827', height: 400, overflow: 'auto', padding: 12 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: 12, textAlign: 'left' }}>
+              <thead>
+                <tr style={{ color: '#9CA3AF', borderBottom: '1px solid #374151' }}>
+                  <th style={{ padding: '8px 12px' }}>Time</th>
+                  <th style={{ padding: '8px 12px' }}>Method</th>
+                  <th style={{ padding: '8px 12px' }}>Path</th>
+                  <th style={{ padding: '8px 12px' }}>Status</th>
+                  <th style={{ padding: '8px 12px' }}>Latency</th>
+                  <th style={{ padding: '8px 12px' }}>IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {networkStats?.logs?.map((log: any) => {
+                  const isError = log.status >= 500;
+                  const isWarning = log.status >= 400 && log.status < 500;
+                  const color = isError ? '#F87171' : isWarning ? '#FBBF24' : '#34D399';
+                  
+                  return (
+                    <tr key={log.id} style={{ borderBottom: '1px solid #1F2937', color: '#D1D5DB' }}>
+                      <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>{new Date(log.timestamp).toLocaleTimeString()}</td>
+                      <td style={{ padding: '8px 12px', fontWeight: 'bold' }}>{log.method}</td>
+                      <td style={{ padding: '8px 12px' }}>{log.path}</td>
+                      <td style={{ padding: '8px 12px', color, fontWeight: 'bold' }}>{log.status}</td>
+                      <td style={{ padding: '8px 12px' }}>{log.latency}ms</td>
+                      <td style={{ padding: '8px 12px', color: '#9CA3AF' }}>{log.ip}</td>
+                    </tr>
+                  );
+                })}
+                {!networkStats?.logs?.length && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#6B7280' }}>
+                      Listening for incoming requests...
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
