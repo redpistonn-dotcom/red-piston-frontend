@@ -45,29 +45,31 @@ export default function SystemMonitor() {
   });
 
   // Sentry Live Issues
+  const activeSentryToken = sentryToken || import.meta.env.VITE_SENTRY_AUTH_TOKEN || '';
   const { data: sentryIssues, isLoading: isLoadingIssues } = useQuery({
-    queryKey: ['sentry-issues', sentryToken],
+    queryKey: ['sentry-issues', activeSentryToken],
     queryFn: async () => {
-      if (!sentryToken) return [];
+      if (!activeSentryToken) return [];
       const res = await fetch(`https://de.sentry.io/api/0/projects/${sentryOrg}/${sentryProject}/issues/`, {
-        headers: { Authorization: `Bearer ${sentryToken}` }
+        headers: { Authorization: `Bearer ${activeSentryToken}` }
       });
       if (!res.ok) throw new Error('Failed to fetch Sentry logs');
       return res.json();
     },
-    enabled: !!sentryToken,
+    enabled: !!activeSentryToken,
     retry: false
   });
 
   // Vercel Deployments
+  const activeVercelToken = vercelToken || import.meta.env.VITE_VERCEL_TOKEN || '';
   const { data: vercelDeployments, isLoading: isLoadingDeployments } = useQuery({
-    queryKey: ['vercel-deployments', vercelToken, vercelProject],
+    queryKey: ['vercel-deployments', activeVercelToken, vercelProject],
     queryFn: async () => {
-      if (!vercelToken || !vercelProject) return [];
-      const res = await api.get(`/api/admin/deployments/vercel?token=${vercelToken}&projectId=${vercelProject}`);
+      if (!activeVercelToken || !vercelProject) return [];
+      const res = await api.get(`/api/admin/deployments/vercel?token=${activeVercelToken}&projectId=${vercelProject}`);
       return res.data?.data?.deployments || [];
     },
-    enabled: !!vercelToken && !!vercelProject,
+    enabled: !!activeVercelToken && !!vercelProject,
     retry: false
   });
 
@@ -254,7 +256,7 @@ export default function SystemMonitor() {
             </div>
             
             <div style={{ background: '#111827', padding: 24, height: 350, overflow: 'auto', fontFamily: "monospace", fontSize: 13, color: '#D1D5DB' }}>
-              {!sentryToken ? (
+              {!activeSentryToken ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.5, marginTop: 60 }}>
                   <AlertTriangle size={32} style={{ marginBottom: 12 }} />
                   <div>Token required for Sentry Logs.</div>
@@ -306,7 +308,7 @@ export default function SystemMonitor() {
             </div>
             
             <div style={{ background: C.bg, padding: 24, height: 350, overflow: 'auto' }}>
-              {!vercelToken ? (
+              {!activeVercelToken ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: 0.5, marginTop: 60 }}>
                   <Cloud size={32} style={{ marginBottom: 12 }} />
                   <div>Token required for Vercel Builds.</div>
