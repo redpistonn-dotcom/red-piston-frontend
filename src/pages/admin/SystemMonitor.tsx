@@ -43,7 +43,7 @@ function StatCard({ icon, label, value, sub, color, bg }: any) {
 export default function SystemMonitor() {
   const [sentryToken, setSentryToken] = useState(import.meta.env.VITE_SENTRY_AUTH_TOKEN || '');
   const [sentryOrg]     = useState('redpiston');
-  const [sentryProject] = useState('redpiston-backend');
+  const [sentryProject] = useState('node');
   const logEndRef = useRef<HTMLDivElement>(null);
 
   // Backend system metrics
