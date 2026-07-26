@@ -32,7 +32,7 @@ export function LoginModal({ onClose, onLogin }) {
   };
 
   return createPortal(
-    // Full-screen login — fills the entire viewport (no floating box).
+    // Full-screen login — no background header, footer at bottom.
     <div style={{
       position: "fixed", inset: 0, zIndex: 99999,
       background: "#FAF6F0", display: "flex",
@@ -42,18 +42,18 @@ export function LoginModal({ onClose, onLogin }) {
         onClick={onClose}
         aria-label="Close"
         style={{
-          position: "fixed", top: 9, right: 16, zIndex: 200,
-          width: 40, height: 40, borderRadius: "50%",
-          background: "#BE2B1A",
-          border: "none",
-          color: "#FFFFFF",
-          cursor: "pointer", fontSize: 17, fontWeight: 700,
+          position: "fixed", top: 14, right: 20, zIndex: 200,
+          width: 36, height: 36, borderRadius: "50%",
+          background: "#FFFFFF",
+          border: "1.5px solid #E0D5C8",
+          color: "#5C4F40",
+          cursor: "pointer", fontSize: 16, fontWeight: 700,
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 2px 12px rgba(190,43,26,0.35)",
+          boxShadow: "0 2px 8px rgba(26,18,5,0.10)",
           transition: "all 0.15s",
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = "#9B1E10"; e.currentTarget.style.transform = "scale(1.08)"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "#BE2B1A"; e.currentTarget.style.transform = "scale(1)"; }}
+        onMouseEnter={e => { e.currentTarget.style.background = "#BE2B1A"; e.currentTarget.style.borderColor = "#BE2B1A"; e.currentTarget.style.color = "#FFFFFF"; e.currentTarget.style.transform = "scale(1.08)"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "#FFFFFF"; e.currentTarget.style.borderColor = "#E0D5C8"; e.currentTarget.style.color = "#5C4F40"; e.currentTarget.style.transform = "scale(1)"; }}
       >
         ✕
       </button>

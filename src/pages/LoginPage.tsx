@@ -1224,18 +1224,6 @@ export default function LoginPage({ onLogin, isModal = false }) {
     <div style={{ display: "flex", flexDirection: "column", width: "100%", height: isModal ? "100%" : undefined, minHeight: isModal ? "100%" : "100vh", background: isModal ? "#FFFFFF" : "#FAF6F0", fontFamily: "'Inter', sans-serif" }}>
       <style>{css}</style>
 
-      {/* ── Top bar — modal only ── */}
-      {isModal && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 24px", height: 58, flexShrink: 0, borderBottom: "1px solid #F0E8DF", background: "#FFFFFF" }}>
-          <div style={{ width: 34, height: 34, borderRadius: 8, overflow: "hidden", border: "1.5px solid #E0D5C8", flexShrink: 0, boxShadow: "0 1px 6px rgba(26,18,5,0.1)" }}>
-            <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#1A1205", fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", lineHeight: 1 }}>RedPiston</div>
-            <div style={{ fontSize: 8, color: "#BE2B1A", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 3 }}>Auto Parts Platform</div>
-          </div>
-        </div>
-      )}
 
       {/* ── Content area: hero + form ── */}
       <div style={{ flex: 1, display: "flex", flexDirection: isModal ? "column" : "row", minHeight: 0 }}>
@@ -1310,7 +1298,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
         /* No justifyContent:center — it clips the top of tall forms (SHOP_DETAILS).
            On the standalone page the inner form container uses margin:auto to stay
            centered; the modal is auto-height so its content sits at the top. */
-        padding: isModal ? "14px 24px 20px" : "32px 48px",
+        padding: isModal ? "48px 32px 20px" : "32px 48px",
         position: "relative", overflowY: "auto",
       }}>
         {/* Live badge */}
@@ -1318,6 +1306,19 @@ export default function LoginPage({ onLogin, isModal = false }) {
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10B981", display: "block", boxShadow: "0 0 8px rgba(16,185,129,0.6)", animation: "auth-pulse 2s infinite" }} />
           <span style={{ fontSize: 10, color: "#9C8C7C", fontFamily: "'JetBrains Mono',monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Secure Access</span>
         </div>}
+
+        {/* Brand mark — modal only, replaces the removed top bar */}
+        {isModal && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, overflow: "hidden", border: "1.5px solid #E0D5C8", flexShrink: 0, boxShadow: "0 1px 6px rgba(26,18,5,0.08)" }}>
+              <img src="/logo.png" alt="RedPiston" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#1A1205", fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", lineHeight: 1 }}>RedPiston</div>
+              <div style={{ fontSize: 8, color: "#BE2B1A", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.14em", textTransform: "uppercase", marginTop: 3 }}>Auto Parts Platform</div>
+            </div>
+          </div>
+        )}
 
         {/* Mobile branding */}
         <div style={{ display: "none" }} className="auth-mobile-brand">
@@ -1366,14 +1367,25 @@ export default function LoginPage({ onLogin, isModal = false }) {
         )}
       </div>
       {isModal && (
-        <div style={{ paddingTop: 20, paddingBottom: 12, textAlign: "center", borderTop: "1px solid #E0D5C8", marginTop: 16 }}>
-          <span style={{ fontSize: 11, color: "#BFB0A0", fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.06em" }}>
-            © {new Date().getFullYear()} RedPiston &nbsp;·&nbsp;{" "}
-            <a href="#" style={{ color: "#BFB0A0", textDecoration: "none" }}>Privacy</a>
-            &nbsp;·&nbsp;{" "}
-            <a href="#" style={{ color: "#BFB0A0", textDecoration: "none" }}>Terms</a>
-          </span>
-        </div>
+        <footer style={{ background: "#F8F4EF", borderTop: "1px solid #E8DDD4", padding: "14px 24px", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: "#9C8C7C", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "0.04em" }}>© {new Date().getFullYear()} RedPiston</span>
+            {[
+              { label: "Privacy Policy", href: "#" },
+              { label: "Terms of Service", href: "#" },
+              { label: "Contact", href: "mailto:support@redpiston.com" },
+            ].map(l => (
+              <span key={l.label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ color: "#D4C8BA", fontSize: 10 }}>·</span>
+                <a href={l.href} style={{ fontSize: 11, color: "#9C8C7C", textDecoration: "none", fontFamily: "'Inter',sans-serif", transition: "color 0.15s" }}
+                  onMouseEnter={e => { (e.target as HTMLAnchorElement).style.color = "#BE2B1A"; }}
+                  onMouseLeave={e => { (e.target as HTMLAnchorElement).style.color = "#9C8C7C"; }}>
+                  {l.label}
+                </a>
+              </span>
+            ))}
+          </div>
+        </footer>
       )}
       </div>{/* end content area */}
 
