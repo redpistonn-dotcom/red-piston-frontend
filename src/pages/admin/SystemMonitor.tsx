@@ -51,7 +51,7 @@ export default function SystemMonitor() {
     queryKey: ['system-metrics'],
     queryFn: async () => {
       const res = await api.get('/api/admin/system-metrics');
-      return res.data?.data ?? res.data;
+      return (res as any).data?.data ?? (res as any).data;
     },
     refetchInterval: 30000,
   });
@@ -79,7 +79,7 @@ export default function SystemMonitor() {
     queryKey: ['network-logs'],
     queryFn: async () => {
       const res = await api.get('/api/admin/network-logs');
-      return res.data?.data;
+      return (res as any).data?.data;
     },
     refetchInterval: 2000,
   });
@@ -216,7 +216,7 @@ export default function SystemMonitor() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
               <BarChart2 size={18} color={C.t3} />
               <div style={{ fontSize: 15, fontWeight: 700, color: C.t1 }}>Live Traffic (30s buckets)</div>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: C.t3, background: C.greenBg, padding: '2px 8px', borderRadius: 10, color: C.green, fontWeight: 600 }}>● LIVE</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, background: C.greenBg, padding: '2px 8px', borderRadius: 10, color: C.green, fontWeight: 600 }}>● LIVE</span>
             </div>
             <div style={{ height: 230 }}>
               {trafficSparkline.length > 0 ? (
