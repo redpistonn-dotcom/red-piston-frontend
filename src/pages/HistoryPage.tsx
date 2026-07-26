@@ -115,13 +115,16 @@ function GroupRow({ group, isExpanded, onToggle, isLast, onPreviewInvoice, onPre
                                     <span style={{ color: T.amber }}>{group.items.length} Line Items</span>
                                     {first.invoiceNo && <span style={{ color: T.sky, fontFamily: FONT.mono }}> · {first.invoiceNo}</span>}
                                 </span>
-                                {first.type === "ESTIMATE" && first.invoiceId && (
+                                {first.type === "ESTIMATE" && first.invoiceId && first.status !== "CONVERTED" && (
                                     <button
                                         onClick={e => { e.stopPropagation(); onConvertToPOS?.(first.invoiceId, first.invoiceNo); }}
                                         disabled={convertingId === first.invoiceId}
                                         style={{ height: 32, padding: "0 14px", background: "#BE2B1A", color: "#FFFFFF", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: convertingId === first.invoiceId ? "not-allowed" : "pointer", fontFamily: FONT.ui, display: "inline-flex", alignItems: "center", gap: 6, opacity: convertingId === first.invoiceId ? 0.65 : 1, textTransform: "none", letterSpacing: 0 }}>
                                         {convertingId === first.invoiceId ? "⏳ Loading…" : "🧾 Convert to POS Billing"}
                                     </button>
+                                )}
+                                {first.type === "ESTIMATE" && first.status === "CONVERTED" && (
+                                    <span style={{ fontSize: 11, color: "#065F46", fontWeight: 700, background: "#D1FAE5", borderRadius: 6, padding: "4px 10px" }}>✓ Converted</span>
                                 )}
                             </div>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -278,7 +281,7 @@ function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice, onPrefet
                                     <div style={{ fontSize: 12, color: T.t2, lineHeight: 1.6 }}>{m.note}</div>
                                 </div>
                             )}
-                            {m.type === "ESTIMATE" && m.invoiceId && (
+                            {m.type === "ESTIMATE" && m.invoiceId && m.status !== "CONVERTED" && (
                                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                                     <button
                                         onClick={e => { e.stopPropagation(); onConvertToPOS?.(m.invoiceId, m.invoiceNo); }}
@@ -286,6 +289,11 @@ function SingleRow({ m, isExpanded, onToggle, isLast, onPreviewInvoice, onPrefet
                                         style={{ height: 34, padding: "0 16px", background: "#BE2B1A", color: "#FFFFFF", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: convertingId === m.invoiceId ? "not-allowed" : "pointer", fontFamily: FONT.ui, display: "inline-flex", alignItems: "center", gap: 7, opacity: convertingId === m.invoiceId ? 0.65 : 1 }}>
                                         {convertingId === m.invoiceId ? "⏳ Loading…" : "🧾 Convert to POS Billing"}
                                     </button>
+                                </div>
+                            )}
+                            {m.type === "ESTIMATE" && m.status === "CONVERTED" && (
+                                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                    <span style={{ fontSize: 12, color: "#065F46", fontWeight: 700, background: "#D1FAE5", borderRadius: 6, padding: "4px 10px" }}>✓ Converted</span>
                                 </div>
                             )}
                         </div>
@@ -350,14 +358,14 @@ export function HistoryPage() {
 
     const closeInvoicePreview = () => {
         setInvoicePreview(prev => {
-            if (prev?.url) URL.revokeObjectURL(prev.url);
+            if (prev?.url) { URL.revokeObjectURL(prev.url); prefetchCache.current.delete(prev.id); }
             return null;
         });
     };
 
     const previewInvoice = async (invoiceId: number, invoiceNo?: string | null) => {
         setInvoicePreview(prev => {
-            if (prev?.url) URL.revokeObjectURL(prev.url);
+            if (prev?.url) { URL.revokeObjectURL(prev.url); prefetchCache.current.delete(prev.id); }
             return { id: invoiceId, no: invoiceNo, loading: true };
         });
         try {
@@ -396,11 +404,20 @@ export function HistoryPage() {
                 discountType: "%",
                 gstRate: item.gstRate ?? 18,
                 buyPrice: item.buyingPrice || item.buyPrice || 0,
-                maxStock: 9999,
+                maxStock: item.stock ?? item.maxStock ?? 9999,
                 hsnCode: item.hsnCode || "",
                 mrp: item.mrp || null,
             }));
-            navigate("/billing", { state: { fromQuotation: { invoiceNo: invoiceNo || "", items: posItems } } });
+            navigate("/billing", { state: { fromQuotation: {
+                invoiceId: invoiceId,
+                invoiceNo: invoiceNo || "",
+                items: posItems,
+                partyName: inv.partyName || "",
+                partyPhone: inv.partyPhone || "",
+                partyGstin: inv.partyGstin || "",
+                billingAddress: inv.billingAddress || "",
+                vehicleReg: inv.vehicleReg || "",
+            } } });
         } catch {
             window.alert("Could not load quotation. Please try again.");
         } finally {

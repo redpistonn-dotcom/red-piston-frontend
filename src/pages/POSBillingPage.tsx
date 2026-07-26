@@ -13,7 +13,7 @@ import PdfPreviewModal from "../components/PdfPreviewModal";
 import { useStore } from "../store";
 import { AppCtx } from "../AppCtx";
 import { getAccessToken } from "../api/client";
-import { getInvoicePdfUrl } from "../api/billing";
+import { getInvoicePdfUrl, updateInvoiceStatus } from "../api/billing";
 import { getAvailableCreditNotes } from "../api/creditNotes";
 import { printInvoice } from "../lib/printInvoice";
 import { getPrintFormat, setPrintFormat, type PrintFormat } from "../lib/printSettings";
@@ -80,6 +80,7 @@ export function POSBillingPage() {
     const [vehicleReg, setVehicleReg]   = useState(draft?.vehicleReg || "");
     const [partyId, setPartyId]     = useState<string | number | null>(draft?.partyId || null);
     const [quotationBanner, setQuotationBanner] = useState<string | null>(null);
+    const [sourceQuotationId, setSourceQuotationId] = useState<number | null>(null);
     const [addToInvItem, setAddToInvItem] = useState<{ idx: number; item: any } | null>(null);
 
     // Pre-populate cart from a quotation conversion (navigate state set by HistoryPage)
@@ -88,6 +89,12 @@ export function POSBillingPage() {
         if (!q?.items?.length) return;
         setItems(q.items);
         setBillType("Sale");
+        if (q.partyName)      setCustomerName(q.partyName);
+        if (q.partyPhone)     setCustomerPhone(q.partyPhone);
+        if (q.partyGstin)     setCustomerGstin(q.partyGstin);
+        if (q.billingAddress) setCustomerAddress(q.billingAddress);
+        if (q.vehicleReg)     setVehicleReg(q.vehicleReg);
+        if (q.invoiceId)      setSourceQuotationId(q.invoiceId);
         setQuotationBanner(`${q.items.length} item${q.items.length !== 1 ? "s" : ""} loaded from quotation${q.invoiceNo ? ` · ${q.invoiceNo}` : ""}`);
         window.history.replaceState({}, "", window.location.pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,13 +109,13 @@ export function POSBillingPage() {
     const [showInvoice, setShowInvoice] = useState(false);
     const [saving, setSaving]       = useState(false);
 
-    // Sidebar nav to /billing while invoice preview is open → return to billing form.
+    // Sidebar nav to /billing while invoice preview is open → start a new bill.
     const lastSidebarTsRef = useRef<number | undefined>((location.state as any)?._sidebarTs);
     useEffect(() => {
         const ts = (location.state as any)?._sidebarTs as number | undefined;
         if (ts && ts !== lastSidebarTsRef.current) {
             lastSidebarTsRef.current = ts;
-            if (showInvoice) setShowInvoice(false);
+            if (showInvoice) newBill();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [(location.state as any)?._sidebarTs]);
@@ -462,6 +469,10 @@ export function POSBillingPage() {
         if (safeOverride) setBillType(safeOverride);
         localStorage.removeItem(draftKey); // clear draft on successful save
         setSaving(false); setShowInvoice(true);
+        if (sourceQuotationId && effectiveBillType === "Sale") {
+            updateInvoiceStatus(sourceQuotationId, "CONVERTED").catch(() => {});
+            setSourceQuotationId(null);
+        }
     };
 
     useLayoutEffect(() => { handleSubmitRef.current = handleSubmit; });
@@ -475,7 +486,8 @@ export function POSBillingPage() {
         setInvoiceAt(null); setBillType("Sale");
         setCashTendered(0); setUpiRef(""); setSplitCash(0);
         setInlinePdfUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
-        setSyncedInvoiceId(null);
+        setSyncedInvoiceId(null); setSourceQuotationId(null);
+        setQuotationBanner(null);
         setTimeout(() => searchRef.current?.focus(), 50);
     };
 

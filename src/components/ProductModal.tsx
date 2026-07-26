@@ -96,7 +96,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
 
         // Normalized product fields for the local store.
         const base = {
-            ...f, id: product?.id || "p" + uid(), shopId: product?.shopId || activeShopId,
+            ...f, id: product?.id || "custom_" + uid(), shopId: product?.shopId || activeShopId,
             buyPrice: +f.buyPrice, sellPrice: +f.sellPrice, mrp: +f.mrp || null, stock: +f.stock,
             minStock: +f.minStock || 10, maxStock: +f.maxStock || 1000, reorderQty: +f.reorderQty || 20,
             gstRate: +f.gstRate || 18, hsnCode: f.hsnCode || "", trackBatch: !!f.trackBatch,

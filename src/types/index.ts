@@ -145,6 +145,7 @@ export interface Movement {
   note?: string;
   /** Unix timestamp in milliseconds */
   date: number;
+  status?: string | null;
   priceOverride?: PriceOverride;
   adjustmentMeta?: AdjustmentMeta;
   multiItemInvoice?: boolean;

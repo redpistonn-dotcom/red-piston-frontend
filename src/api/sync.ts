@@ -77,7 +77,11 @@ interface BackendMovement {
   invoiceId?: string;
   inventory?: { customPartName?: string | null; masterPart?: { partName?: string } };
   party?: { name?: string; type?: string } | null;
+  invoice?: { status?: string } | null;
   productName?: string;
+  referenceNumber?: string;
+  invoiceNumber?: string;
+  partyName?: string;
 }
 
 interface BackendParty {
@@ -209,6 +213,7 @@ export function mapMovement(m: BackendMovement): Movement {
     partyId: m.partyId ? String(m.partyId) : null,
     supplierName: isSupply ? partyName : null,
     customerName: isSupply ? null : partyName,
+    status: m.invoice?.status ?? null,
   };
 }
 

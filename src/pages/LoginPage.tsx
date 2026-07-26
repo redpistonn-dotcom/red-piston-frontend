@@ -1342,8 +1342,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
       </div>
       </div>{/* end content area */}
 
-      {!isModal && (
-        <footer className="auth-footer" style={{ background: "#F1EDE8", borderTop: "1px solid #E0D5C8", padding: "56px 48px 32px", fontFamily: "'Inter', sans-serif" }}>
+      <footer className="auth-footer" style={{ background: "#F1EDE8", borderTop: "1px solid #E0D5C8", padding: "56px 48px 32px", fontFamily: "'Inter', sans-serif" }}>
           <div className="auth-footer-grid" style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "48px 32px" }}>
 
             {/* Brand column */}
@@ -1414,7 +1413,6 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <div style={{ fontSize: 12, color: "#9C8C7C" }}>Made in India 🇮🇳</div>
           </div>
         </footer>
-      )}
     </div>
   );
 }

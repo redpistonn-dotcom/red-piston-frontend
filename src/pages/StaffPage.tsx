@@ -7,6 +7,7 @@ import { useState, useEffect, useContext } from "react";
 import { T, FONT, SHADOWS } from "../theme";
 import { Btn, Skeleton } from "../components/ui";
 import { AppCtx } from "../AppCtx";
+import { focusFirstError } from "../utils";
 import {
   getStaff, deactivateStaff, reactivateStaff, removeStaff, updateStaffAccess,
   getStaffInvites, resendStaffInvite, cancelStaffInvite, createStaffInvite,
@@ -56,6 +57,8 @@ export function StaffPage() {
         setInviteFieldErrors(errors);
         if (errors.email || errors.roleLabel || errors.sections) {
             toast?.(!inviteEmail.trim() ? "Email is required" : errors.email ? "Enter a valid email address" : errors.roleLabel ? "A role is required" : "Pick at least one section", "error");
+            const errFields = Object.fromEntries(Object.entries(errors).filter(([, v]) => v).map(([k]) => [k, "error"]));
+            focusFirstError(errFields as Record<string, string>);
             return;
         }
         setInviting(true);
@@ -204,7 +207,7 @@ export function StaffPage() {
                         <div style={{ flex: "1 1 220px", minWidth: 220 }}>
                             <input
                                 style={{ width: "100%", boxSizing: "border-box", height: 38, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, color: T.t1, outline: "none", border: `1.5px solid ${inviteFieldErrors.email ? T.crimson : T.border}`, boxShadow: inviteFieldErrors.email ? `0 0 0 3px ${T.crimson}22` : "none" }}
-                                type="email" value={inviteEmail}
+                                type="email" name="email" value={inviteEmail}
                                 onChange={e => { setInviteEmail(e.target.value); setInviteFieldErrors(p => ({ ...p, email: false })); }}
                                 placeholder="Their email (verification code sent here)"
                             />
@@ -213,7 +216,7 @@ export function StaffPage() {
                         <div style={{ flex: "1 1 160px", minWidth: 160 }}>
                             <input
                                 style={{ width: "100%", boxSizing: "border-box", height: 38, borderRadius: 9, padding: "0 12px", fontSize: 13, fontFamily: FONT.ui, color: T.t1, outline: "none", border: `1.5px solid ${inviteFieldErrors.roleLabel ? T.crimson : T.border}`, boxShadow: inviteFieldErrors.roleLabel ? `0 0 0 3px ${T.crimson}22` : "none" }}
-                                value={inviteRoleLabel}
+                                name="roleLabel" value={inviteRoleLabel}
                                 onChange={e => { setInviteRoleLabel(e.target.value); setInviteFieldErrors(p => ({ ...p, roleLabel: false })); }}
                                 placeholder="Role, e.g. Mechanic"
                             />

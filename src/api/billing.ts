@@ -13,3 +13,4 @@ export const getInvoicePdfUrl = (id: any, opts?: { showOem?: boolean; showMrp?: 
 export const sendInvoiceWhatsApp = (id) => api.post(`/api/billing/invoice/${id}/send-whatsapp`, {});
 export const getInvoice = (id) => api.get(`/api/billing/invoice/${id}`);
 export const recordInvoicePayment = (id, data) => api.post(`/api/billing/invoice/${id}/payment`, data);
+export const updateInvoiceStatus = (id: number, status: string) => api.patch(`/api/billing/invoice/${id}/status`, { status });
