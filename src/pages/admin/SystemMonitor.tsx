@@ -74,11 +74,11 @@ export default function SystemMonitor() {
     refetchInterval: 60000,
   });
 
-  // Network Logs — poll every 2s for freshness
+  // Network Logs — poll every 2s, timestamp busts 304 caching
   const { data: networkStats } = useQuery({
     queryKey: ['network-logs'],
     queryFn: async () => {
-      const res = await api.get('/api/admin/network-logs');
+      const res = await api.get(`/api/admin/network-logs?_t=${Date.now()}`);
       return (res as any).data?.data;
     },
     refetchInterval: 2000,
