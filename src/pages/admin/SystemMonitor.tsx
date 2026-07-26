@@ -39,7 +39,7 @@ export default function SystemMonitor() {
     queryKey: ['system-metrics'],
     queryFn: async () => {
       const res = await api.get('/api/admin/system-metrics');
-      return res.data;
+      return res.data?.data ?? res.data;
     },
     refetchInterval: 30000,
   });
@@ -157,7 +157,7 @@ export default function SystemMonitor() {
           <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 24, display: 'flex', flexDirection: 'column', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
               <div style={{ padding: 8, background: C.violetBg, color: C.violet, borderRadius: 10 }}><Cpu size={20} /></div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>Backend Server (Fly.io)</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>Backend Server (Railway)</div>
             </div>
             <div>
               <div style={{ fontSize: 32, fontWeight: 800, color: C.t1, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
