@@ -681,7 +681,7 @@ function CatalogTab() {
 
       {/* Case 1: No file — compact drop zone */}
       {!fileData && !parsing && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, background: C.bg, border: `1.5px dashed ${C.border}`, borderRadius: 10, padding: '12px 16px' }}
+        <div
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
