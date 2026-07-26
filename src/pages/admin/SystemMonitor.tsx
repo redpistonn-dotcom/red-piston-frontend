@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from "../../api/client";
+import { api, apiRequest } from "../../api/client";
 import { Activity, Database, AlertTriangle, RefreshCw, Cpu, HardDrive, Shield, List, TrendingUp, TrendingDown, Minus, BarChart2, Clock, Zap } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
@@ -74,14 +74,15 @@ export default function SystemMonitor() {
     refetchInterval: 60000,
   });
 
-  // Network Logs — poll every 2s, timestamp busts 304 caching
+  // Network Logs — bypass GET deduplication cache with apiRequest + unique timestamp
   const { data: networkStats } = useQuery({
     queryKey: ['network-logs'],
     queryFn: async () => {
-      const res = await api.get(`/api/admin/network-logs?_t=${Date.now()}`);
-      return (res as any).data?.data;
+      // Use direct apiRequest to skip the inflight deduplication map in api.get()
+      const data = await apiRequest<any>(`/api/admin/network-logs?_t=${Date.now()}`);
+      return (data as any)?.data;
     },
-    refetchInterval: 2000,
+    refetchInterval: 3000,
   });
 
   // Build live traffic sparkline from network logs
