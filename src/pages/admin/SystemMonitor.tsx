@@ -89,8 +89,6 @@ export default function SystemMonitor() {
   const trafficSparkline = (() => {
     const logs: any[] = networkStats?.logs || [];
     if (!logs.length) return [];
-    // Group into ~10 time buckets
-    const now = Date.now();
     const bucketMs = 30000; // 30s buckets
     const buckets: Record<number, { requests: number; errors: number; latency: number[]; }> = {};
     logs.forEach((log) => {
@@ -111,6 +109,40 @@ export default function SystemMonitor() {
         avgLatency: b.latency.length ? Math.round(b.latency.reduce((a, v) => a + v, 0) / b.latency.length) : 0,
       }));
   })();
+
+  // Endpoint Performance Analytics — aggregate logs by path
+  const endpointStats = (() => {
+    const logs: any[] = networkStats?.logs || [];
+    if (!logs.length) return [];
+    const map: Record<string, { count: number; latencies: number[]; errors: number; statuses: number[]; }> = {};
+    logs.forEach((log) => {
+      // Normalize dynamic path segments like /api/parts/123 → /api/parts/:id
+      const normalizedPath = log.path
+        .split('?')[0] // strip query params
+        .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/:id') // UUIDs
+        .replace(/\/\d+/g, '/:id'); // numeric IDs
+
+      if (!map[normalizedPath]) map[normalizedPath] = { count: 0, latencies: [], errors: 0, statuses: [] };
+      map[normalizedPath].count++;
+      map[normalizedPath].latencies.push(log.latency);
+      map[normalizedPath].statuses.push(log.status);
+      if (log.status >= 400) map[normalizedPath].errors++;
+    });
+    return Object.entries(map)
+      .map(([path, d]) => ({
+        path,
+        count: d.count,
+        avgLatency: Math.round(d.latencies.reduce((a, v) => a + v, 0) / d.latencies.length),
+        maxLatency: Math.max(...d.latencies),
+        errorRate: Math.round((d.errors / d.count) * 100),
+        errors: d.errors,
+      }))
+      .sort((a, b) => b.count - a.count) // Sort by most-used
+      .slice(0, 15);
+  })();
+
+  const maxEndpointCount = endpointStats[0]?.count || 1;
+  const maxEndpointLatency = Math.max(...endpointStats.map(e => e.avgLatency), 1);
 
   const health = networkStats?.health;
   const dbSizeMB = metrics?.database?.sizeMb || 0;
@@ -253,6 +285,100 @@ export default function SystemMonitor() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── SECTION: ENDPOINT PERFORMANCE ── */}
+      <div>
+        <h2 style={{ fontSize: 13, fontWeight: 700, color: C.t3, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.2 }}>Endpoint Performance</h2>
+        {endpointStats.length === 0 ? (
+          <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, padding: 32, textAlign: 'center', color: C.t3, fontSize: 13 }}>
+            Navigate around the app to populate endpoint data
+          </div>
+        ) : (
+          <div style={{ background: C.surface, border: `1px solid ${C.borderLight}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(26,18,5,0.03)' }}>
+            {/* Sort tabs */}
+            <div style={{ padding: '12px 24px', borderBottom: `1px solid ${C.borderLight}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>Top Endpoints by Usage &amp; Latency</div>
+              <div style={{ display: 'flex', gap: 8, fontSize: 11, color: C.t3 }}>
+                <span style={{ background: C.violetBg, color: C.violet, padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>■ Usage</span>
+                <span style={{ background: C.amberBg, color: C.amber, padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>■ Avg Latency</span>
+                <span style={{ background: C.redBg, color: C.red, padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>■ Error Rate</span>
+              </div>
+            </div>
+            <div style={{ overflow: 'auto', maxHeight: 480 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: "'Inter', sans-serif" }}>
+                <thead>
+                  <tr style={{ color: C.t3, borderBottom: `1px solid ${C.borderLight}`, background: C.bg }}>
+                    <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600 }}>Endpoint</th>
+                    <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600 }}>Requests</th>
+                    <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600 }}>Avg Latency</th>
+                    <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600 }}>Peak Latency</th>
+                    <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600 }}>Error Rate</th>
+                    <th style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600 }}>Insight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {endpointStats.map((ep, i) => {
+                    const isSlowAvg = ep.avgLatency > 1000;
+                    const isWarnAvg = ep.avgLatency > 300;
+                    const isSlowPeak = ep.maxLatency > 3000;
+                    const isHighError = ep.errorRate > 20;
+                    const latencyColor = isSlowAvg ? C.red : isWarnAvg ? C.amber : C.green;
+                    const usageBarW = Math.round((ep.count / maxEndpointCount) * 100);
+                    const latencyBarW = Math.round((ep.avgLatency / maxEndpointLatency) * 100);
+
+                    const insight = isHighError
+                      ? '🔴 High error rate — needs investigation'
+                      : isSlowPeak
+                      ? '⚠️ Occasional slow spikes — check N+1 queries'
+                      : isSlowAvg
+                      ? '🐢 Consistently slow — optimize DB query or add cache'
+                      : isWarnAvg
+                      ? '⏱ Moderate latency — monitor closely'
+                      : '✅ Healthy';
+
+                    return (
+                      <tr key={ep.path} style={{ borderBottom: `1px solid ${C.borderLight}`, background: i % 2 === 0 ? 'transparent' : C.bg }}>
+                        <td style={{ padding: '12px 20px', fontFamily: 'monospace', fontSize: 11, color: C.t1, maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ep.path}
+                        </td>
+                        <td style={{ padding: '12px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ background: C.borderLight, borderRadius: 4, height: 6, width: 80, overflow: 'hidden' }}>
+                              <div style={{ width: `${usageBarW}%`, height: '100%', background: C.violet, borderRadius: 4 }} />
+                            </div>
+                            <span style={{ fontWeight: 700, color: C.t1 }}>{ep.count}</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ background: C.borderLight, borderRadius: 4, height: 6, width: 80, overflow: 'hidden' }}>
+                              <div style={{ width: `${latencyBarW}%`, height: '100%', background: latencyColor, borderRadius: 4 }} />
+                            </div>
+                            <span style={{ fontWeight: 700, color: latencyColor }}>{ep.avgLatency}ms</span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '12px 20px', fontWeight: 700, color: isSlowPeak ? C.red : C.t2 }}>
+                          {ep.maxLatency}ms
+                        </td>
+                        <td style={{ padding: '12px 20px' }}>
+                          <span style={{
+                            background: isHighError ? C.redBg : ep.errorRate > 0 ? C.amberBg : C.greenBg,
+                            color: isHighError ? C.red : ep.errorRate > 0 ? C.amber : C.green,
+                            padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 11
+                          }}>
+                            {ep.errorRate}%
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 20px', fontSize: 11, color: C.t2 }}>{insight}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── SECTION: APPLICATION HEALTH (Sentry full-width) ── */}
