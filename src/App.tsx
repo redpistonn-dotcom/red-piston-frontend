@@ -75,6 +75,15 @@ const AuditLogPage       = lazy(() => import("./pages/AuditLogPage").then(m => (
 const StaffPage          = lazy(() => import("./pages/StaffPage").then(m => ({ default: m.StaffPage })));
 const ShopSettingsPage   = lazy(() => import("./pages/ShopSettingsPage").then(m => ({ default: m.ShopSettingsPage })));
 
+// ── Mechanic app pages ────────────────────────────────────────────────────────
+const MechanicShell           = lazy(() => import("./shells/MechanicShell"));
+const MechanicDashboard       = lazy(() => import("./pages/mechanic/DashboardPage"));
+const MechanicJobsPage        = lazy(() => import("./pages/mechanic/JobsPage"));
+const MechanicJobDetailPage   = lazy(() => import("./pages/mechanic/JobDetailPage"));
+const MechanicAcceptInvite    = lazy(() => import("./pages/mechanic/AcceptInvitePage"));
+const MechanicProfilePage     = lazy(() => import("./pages/mechanic/ProfilePage"));
+const MechanicCustomersPage   = lazy(() => import("./pages/mechanic/CustomersPage"));
+
 // ── Page skeleton shown while a lazy chunk downloads ──────────────────────────
 const PageLoader = () => (
   <div style={{ padding: "28px 32px", fontFamily: FONT.ui }}>
@@ -960,6 +969,16 @@ function AppContent() {
 
           {/* Admin */}
           <Route path="/admin" element={requireRole(currentUser, "PLATFORM_ADMIN", <AdminShell><PageErrorBoundary><SuperAdminPage onImpersonate={handleImpersonate} /></PageErrorBoundary></AdminShell>)} />
+
+          {/* Mechanic app — separate user type, own shell */}
+          <Route path="/mechanic/accept-invite" element={<Suspense><MechanicAcceptInvite /></Suspense>} />
+          <Route path="/mechanic" element={requireRole(currentUser, "MECHANIC", <Suspense><MechanicShell /></Suspense>)}>
+            <Route index element={<Suspense><MechanicDashboard /></Suspense>} />
+            <Route path="jobs" element={<Suspense><MechanicJobsPage /></Suspense>} />
+            <Route path="jobs/:id" element={<Suspense><MechanicJobDetailPage /></Suspense>} />
+            <Route path="profile" element={<Suspense><MechanicProfilePage /></Suspense>} />
+            <Route path="customers" element={<Suspense><MechanicCustomersPage /></Suspense>} />
+          </Route>
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to={currentUser ? getDefaultRoute(currentUser) : "/"} replace />} />

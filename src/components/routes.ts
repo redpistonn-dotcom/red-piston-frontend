@@ -35,6 +35,7 @@ export function getDefaultRoute(userOrRole) {
     const firstGranted = sections.map(s => SECTION_PATHS[s]).find(Boolean);
     return firstGranted || "/dashboard";
   }
+  if (role === "MECHANIC") return "/mechanic";
   if (role === "PLATFORM_ADMIN") return "/admin";
   return "/marketplace";
 }

@@ -41,9 +41,6 @@ function StatCard({ icon, label, value, sub, color, bg }: any) {
 }
 
 export default function SystemMonitor() {
-  const [sentryToken, setSentryToken] = useState(import.meta.env.VITE_SENTRY_AUTH_TOKEN || '');
-  const [sentryOrg]     = useState('redpiston');
-  const [sentryProject] = useState('node');
   const logEndRef = useRef<HTMLDivElement>(null);
 
   // Backend system metrics
@@ -56,20 +53,13 @@ export default function SystemMonitor() {
     refetchInterval: 30000,
   });
 
-  // Sentry Live Issues
-  const activeSentryToken = sentryToken || import.meta.env.VITE_SENTRY_AUTH_TOKEN || '';
+  // Sentry Live Issues (Proxied through backend to avoid CORS and hide token)
   const { data: sentryIssues, isLoading: isLoadingIssues, error: sentryError } = useQuery({
-    queryKey: ['sentry-issues', activeSentryToken],
+    queryKey: ['sentry-issues'],
     queryFn: async () => {
-      if (!activeSentryToken) return [];
-      const res = await fetch(
-        `https://de.sentry.io/api/0/projects/${sentryOrg}/${sentryProject}/issues/?limit=25&query=is:unresolved`,
-        { headers: { Authorization: `Bearer ${activeSentryToken}` } }
-      );
-      if (!res.ok) throw new Error(`Sentry API error: ${res.status}`);
-      return res.json();
+      const res = await api.get('/api/admin/sentry-issues');
+      return (res as any).data ?? [];
     },
-    enabled: !!activeSentryToken,
     retry: false,
     refetchInterval: 60000,
   });
