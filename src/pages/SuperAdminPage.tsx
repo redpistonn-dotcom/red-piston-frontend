@@ -205,7 +205,7 @@ const EDITABLE_TYPES = [
 ];
 
 function EditPrivilegesModal({ user, onClose, onSuccess }) {
-  const currentSlug = user.profileType === "MECHANIC" && user.role === "CUSTOMER" ? "MECHANIC" : (user.userType?.slug || user.role);
+  const currentSlug = user.customerProfile?.profileType === "MECHANIC" && user.role === "CUSTOMER" ? "MECHANIC" : (user.userType?.slug || user.role);
   const [type, setType] = useState(currentSlug);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
