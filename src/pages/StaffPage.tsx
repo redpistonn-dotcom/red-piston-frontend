@@ -11,7 +11,7 @@ import { focusFirstError } from "../utils";
 import {
   getStaff, deactivateStaff, reactivateStaff, removeStaff, updateStaffAccess,
   getStaffInvites, resendStaffInvite, cancelStaffInvite, createStaffInvite,
-  SECTION_OPTIONS, type StaffMember, type StaffInvite,
+  getStaffSections, type StaffMember, type StaffInvite,
 } from "../api/staff";
 
 const ROLE_COLOR = { OWNER: "#D97706", STAFF: "#0EA5E9" } as Record<string, string>;
@@ -20,6 +20,7 @@ export function StaffPage() {
     const { toast } = useContext(AppCtx);
     const [staff, setStaff] = useState<StaffMember[]>([]);
     const [invites, setInvites] = useState<StaffInvite[]>([]);
+    const [sectionOptions, setSectionOptions] = useState<Array<{ key: string; label: string }>>([]);
     const [loading, setLoading] = useState(true);
 
     // Per-action loading state, keyed by "actionName-id" — lets each button
@@ -79,9 +80,10 @@ export function StaffPage() {
     const load = async () => {
         setLoading(true);
         try {
-            const [staffRes, invitesRes] = await Promise.all([getStaff(), getStaffInvites()]);
+            const [staffRes, invitesRes, sectionsRes] = await Promise.all([getStaff(), getStaffInvites(), getStaffSections()]);
             setStaff(staffRes.data || []);
             setInvites(invitesRes.data || []);
+            setSectionOptions(sectionsRes.data || []);
         } catch (e) {
             console.error("[StaffPage] load", e);
         } finally {
@@ -229,7 +231,7 @@ export function StaffPage() {
                         padding: inviteFieldErrors.sections ? 8 : 0, borderRadius: 10,
                         border: inviteFieldErrors.sections ? `1.5px solid ${T.crimson}` : "none",
                     }}>
-                        {SECTION_OPTIONS.map(s => (
+                        {sectionOptions.map(s => (
                             <label key={s.key} style={{
                                 display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999,
                                 border: `1.5px solid ${inviteSections.includes(s.key) ? T.amber : T.border}`,
@@ -347,7 +349,7 @@ export function StaffPage() {
                                                         display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6, padding: sectionsInvalid[m.id] ? 6 : 0,
                                                         borderRadius: 8, border: sectionsInvalid[m.id] ? `1.5px solid ${T.crimson}` : "none",
                                                     }}>
-                                                        {SECTION_OPTIONS.map(s => (
+                                                        {sectionOptions.map(s => (
                                                             <label key={s.key} style={{
                                                                 display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 99,
                                                                 border: `1px solid ${editing.includes(s.key) ? T.amber : T.border}`,

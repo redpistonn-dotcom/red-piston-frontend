@@ -8,6 +8,7 @@ export interface ShopMechanic {
   employee_id: string | null;
   designation: string | null;
   skills: string[] | null;
+  sections: string[];
   is_active: boolean;
   joined_at: string;
   head_mechanic_id: number | null;
@@ -27,6 +28,11 @@ export interface MechanicInvite {
   created_at: string;
 }
 
+export interface MechanicSection {
+  key: string;
+  label: string;
+}
+
 export const getMechanics = () => api.get<{ success: boolean; data: ShopMechanic[] }>('/api/shop/mechanics');
 
 export const getMechanicInvites = () => api.get<{ success: boolean; data: MechanicInvite[] }>('/api/shop/mechanics/invites');
@@ -35,20 +41,27 @@ export const getMechanicJoinCode = () => api.get<{ success: boolean; data: { joi
 
 export const rotateMechanicJoinCode = () => api.post<{ success: boolean; data: { joinCode: string } }>('/api/shop/mechanics/join-code/rotate');
 
-export const inviteMechanic = (data: { email: string; mechanicRole?: 'HEAD' | 'MEMBER' }) =>
+// DB-backed privilege registry (see prisma Section model / index.js seed) —
+// replaces a hardcoded frontend list.
+export const getMechanicSections = () => api.get<{ success: boolean; data: MechanicSection[] }>('/api/shop/mechanics/sections');
+
+export const inviteMechanic = (data: { email: string; mechanicRole?: 'HEAD' | 'MEMBER'; sections?: string[] }) =>
   api.post('/api/shop/mechanics/invite', data);
 
 export const resendMechanicInvite = (id: number | string) => api.post(`/api/shop/mechanics/invite/${id}/resend`);
 
 export const cancelMechanicInvite = (id: number | string) => api.delete(`/api/shop/mechanics/invite/${id}`);
 
-export const approveMechanic = (id: number | string, mechanicRole?: 'HEAD' | 'MEMBER') =>
-  api.patch(`/api/shop/mechanics/${id}/approve`, { mechanicRole });
+export const approveMechanic = (id: number | string, mechanicRole?: 'HEAD' | 'MEMBER', sections?: string[]) =>
+  api.patch(`/api/shop/mechanics/${id}/approve`, { mechanicRole, sections });
 
 export const rejectMechanic = (id: number | string) => api.patch(`/api/shop/mechanics/${id}/reject`, {});
 
 export const updateMechanicRole = (id: number | string, mechanicRole: 'HEAD' | 'MEMBER') =>
   api.patch(`/api/shop/mechanics/${id}/role`, { mechanicRole });
+
+export const updateMechanicSections = (id: number | string, sections: string[]) =>
+  api.patch(`/api/shop/mechanics/${id}/sections`, { sections });
 
 export const deactivateMechanic = (id: number | string) => api.patch(`/api/shop/mechanics/${id}/deactivate`, {});
 export const reactivateMechanic = (id: number | string) => api.patch(`/api/shop/mechanics/${id}/reactivate`, {});

@@ -1,25 +1,11 @@
 import { api } from './client.js';
 
-// Sidebar section keys — must match ERPShell.tsx NAV_ITEMS keys and the
-// backend's src/lib/section-permissions.js SECTION_KEYS exactly.
-export const SECTION_OPTIONS: Array<{ key: string; label: string }> = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'inventory', label: 'Inventory' },
-  { key: 'pos', label: 'POS Billing' },
-  { key: 'parties', label: 'Parties' },
-  { key: 'workshop', label: 'Job Cards' },
-  { key: 'workshop-mp', label: 'Parts Listing' },
-  { key: 'history', label: 'History' },
-  { key: 'reports', label: 'Reports' },
-  { key: 'orders', label: 'Orders' },
-  { key: 'gstr', label: 'GSTR-1 Export' },
-  { key: 'audit', label: 'Audit Log' },
-  { key: 'staff', label: 'Staff' },
-  { key: 'shop-settings', label: 'Shop Settings' },
-  { key: 'returns', label: 'Returns & Exchange' },
-  { key: 'purchase-returns', label: 'Purchase Returns' },
-  { key: 'warranty', label: 'Warranty' },
-];
+// DB-backed section registry (see prisma Section model, index.js
+// ensureSchemaFixes seed) — replaces what used to be a hardcoded array here.
+// Server-side validation still lives in lib/section-permissions.js
+// (SECTION_KEYS / isValidSection), which stays 1:1 with the dot-namespace
+// permission map — this is the picker's display-layer data source.
+export const getStaffSections = () => api.get<{ success: boolean; data: Array<{ key: string; label: string }> }>('/api/shop/staff/sections');
 
 export interface StaffMember {
   id: number;
