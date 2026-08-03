@@ -78,7 +78,16 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const allowedTypes = userTypes.filter(ut => ALLOWED_ROLE_SLUGS.includes(ut.slug));
+  // Mechanic isn't a real UserType row (it's a CUSTOMER-role account with
+  // profileType MECHANIC — see admin.js USER_TYPE_MAP), so it's spliced in
+  // here rather than coming from the userTypes API response.
+  const allowedTypes = [
+    ...userTypes.filter(ut => ALLOWED_ROLE_SLUGS.includes(ut.slug)),
+    { slug: "MECHANIC", name: "Mechanic" },
+  ].sort((a, b) => {
+    const order = ["CUSTOMER", "MECHANIC", "SHOP_OWNER", "PLATFORM_ADMIN"];
+    return order.indexOf(a.slug) - order.indexOf(b.slug);
+  });
 
   const handleSubmit = async () => {
     if (!email.trim()) { setError("Email is required"); return; }
@@ -177,6 +186,90 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
             disabled={loading}
           >
             {loading ? "Creating..." : "Create User"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ─── Edit Privileges Modal ──────────────────────────────────────────────────
+// Same CUSTOMER/MECHANIC/SHOP_OWNER/PLATFORM_ADMIN list as AddUserModal — see
+// USER_TYPE_MAP in admin.js for how MECHANIC maps onto role+profileType.
+const EDITABLE_TYPES = [
+  { slug: "CUSTOMER", name: "Customer" },
+  { slug: "MECHANIC", name: "Mechanic" },
+  { slug: "SHOP_OWNER", name: "Shop Owner" },
+  { slug: "PLATFORM_ADMIN", name: "Platform Admin" },
+];
+
+function EditPrivilegesModal({ user, onClose, onSuccess }) {
+  const currentSlug = user.profileType === "MECHANIC" && user.role === "CUSTOMER" ? "MECHANIC" : (user.userType?.slug || user.role);
+  const [type, setType] = useState(currentSlug);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async () => {
+    setError(""); setLoading(true);
+    try {
+      const res = await api.patch(`/api/admin/users/${user.userId}/usertype`, { type });
+      onSuccess(res.data);
+    } catch (e) {
+      setError(e.data?.error?.message || e.message || "Failed to update privileges");
+    }
+    setLoading(false);
+  };
+
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1000,
+      background: "rgba(26,18,5,0.5)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16,
+        padding: 32, maxWidth: 440, width: "100%", margin: "0 16px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: C.t1 }}>Edit Privileges</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.t3, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+
+        <div style={{ fontSize: 13, color: C.t2, marginBottom: 20 }}>
+          {user.name || user.email} <span style={{ color: C.t4 }}>({user.email})</span>
+        </div>
+
+        {error && (
+          <div style={{ background: C.redBg, border: `1.5px solid ${C.red}`, borderRadius: 10, padding: "10px 14px", color: C.red, fontSize: 13, marginBottom: 16 }}>
+            {error}
+          </div>
+        )}
+
+        <label style={{ fontSize: 13, fontWeight: 600, color: C.t2, marginBottom: 6, display: "block" }}>User Type</label>
+        <select
+          style={{ width: "100%", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: "11px 14px", color: C.t1, fontSize: 14, outline: "none", fontFamily: FONT.ui, boxSizing: "border-box", marginBottom: 24, cursor: "pointer" }}
+          value={type}
+          onChange={e => setType(e.target.value)}
+        >
+          {EDITABLE_TYPES.map(t => (
+            <option key={t.slug} value={t.slug}>{t.name}</option>
+          ))}
+        </select>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            style={{ flex: 1, padding: "12px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 10, color: C.t3, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT.ui }}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            style={{ flex: 2, padding: "12px", background: loading ? C.amberBg : C.amber, border: "none", borderRadius: 10, color: loading ? C.t3 : "#fff", fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: FONT.ui }}
+            onClick={handleSubmit}
+            disabled={loading || type === currentSlug}
+          >
+            {loading ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
@@ -1278,6 +1371,8 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
 
   // Add User modal
   const [showAddUser, setShowAddUser] = useState(false);
+  // Edit Privileges modal — holds the user row being edited, or null
+  const [editingUser, setEditingUser] = useState(null);
 
   // ── Autodukan tab state ──────────────────────────────────────────────────
   const [adStats, setAdStats]         = useState<any>(null);
@@ -1499,6 +1594,13 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
   const handleAddUserSuccess = (newUser) => {
     setShowAddUser(false);
     showSuccess(`User "${newUser.email}" created successfully.`);
+    fetchUsers(search, roleFilter, offset);
+    fetchStats();
+  };
+
+  const handleEditPrivilegesSuccess = (updated) => {
+    setEditingUser(null);
+    showSuccess(`Updated privileges for "${updated.name || updated.userId}".`);
     fetchUsers(search, roleFilter, offset);
     fetchStats();
   };
@@ -1868,6 +1970,13 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                               </button>
                             )}
                             <button
+                              style={{ ...S.btnToggle(true), background: "transparent", border: `1px solid ${C.border}`, color: C.t2 }}
+                              onClick={() => setEditingUser(u)}
+                              title="Edit privileges"
+                            >
+                              Edit
+                            </button>
+                            <button
                               className={u.isActive ? "btn-toggle-active" : "btn-toggle-inactive"}
                               style={S.btnToggle(u.isActive)}
                               onClick={() => handleToggleActive(u)}
@@ -1923,6 +2032,12 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                           {impersonatingId === u.userId ? "Loading…" : "⚡ Impersonate"}
                         </button>
                       )}
+                      <button
+                        style={{ flex: 1, padding: "9px 12px", fontSize: 12, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, color: C.t2, fontWeight: 700, fontFamily: FONT.ui, cursor: "pointer" }}
+                        onClick={() => setEditingUser(u)}
+                      >
+                        Edit
+                      </button>
                       <button
                         style={{ ...S.btnToggle(u.isActive), flex: 1, padding: "9px 12px", fontSize: 12 }}
                         onClick={() => handleToggleActive(u)}
@@ -2699,6 +2814,15 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
           userTypes={userTypes}
           onClose={() => setShowAddUser(false)}
           onSuccess={handleAddUserSuccess}
+        />
+      )}
+
+      {/* Edit Privileges Modal */}
+      {editingUser && (
+        <EditPrivilegesModal
+          user={editingUser}
+          onClose={() => setEditingUser(null)}
+          onSuccess={handleEditPrivilegesSuccess}
         />
       )}
 
