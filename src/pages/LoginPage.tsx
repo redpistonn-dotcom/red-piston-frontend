@@ -708,6 +708,12 @@ export default function LoginPage({ onLogin, isModal = false }) {
                   </button>
                 </div>
               )}
+
+              {!forgotMode && (
+                <div style={{ textAlign: "center", marginTop: 10 }}>
+                  <a href="/mechanic/join" style={{ fontSize: 12, color: "#9C8C7C", textDecoration: "none" }}>🔧 Join as a shop mechanic →</a>
+                </div>
+              )}
             </div>
           );
         }
@@ -744,6 +750,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
                   </button>
                 </div>
               ))}
+            </div>
+
+            {/* Mechanic self-signup */}
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <a href="/mechanic/join" style={{ fontSize: 13, color: "#9C8C7C", textDecoration: "none" }}>🔧 Join as a shop mechanic →</a>
             </div>
 
             {/* Admin access */}

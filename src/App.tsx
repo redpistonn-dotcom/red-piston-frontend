@@ -73,6 +73,7 @@ const SuperAdminPage     = lazy(() => import("./pages/SuperAdminPage").then(m =>
 const GstrPage           = lazy(() => import("./pages/GstrPage").then(m => ({ default: m.GstrPage })));
 const AuditLogPage       = lazy(() => import("./pages/AuditLogPage").then(m => ({ default: m.AuditLogPage })));
 const StaffPage          = lazy(() => import("./pages/StaffPage").then(m => ({ default: m.StaffPage })));
+const MechanicsPage      = lazy(() => import("./pages/MechanicsPage").then(m => ({ default: m.MechanicsPage })));
 const ShopSettingsPage   = lazy(() => import("./pages/ShopSettingsPage").then(m => ({ default: m.ShopSettingsPage })));
 
 // ── Mechanic app pages ────────────────────────────────────────────────────────
@@ -81,6 +82,7 @@ const MechanicDashboard       = lazy(() => import("./pages/mechanic/DashboardPag
 const MechanicJobsPage        = lazy(() => import("./pages/mechanic/JobsPage"));
 const MechanicJobDetailPage   = lazy(() => import("./pages/mechanic/JobDetailPage"));
 const MechanicAcceptInvite    = lazy(() => import("./pages/mechanic/AcceptInvitePage"));
+const MechanicJoinPage        = lazy(() => import("./pages/mechanic/JoinPage"));
 const MechanicProfilePage     = lazy(() => import("./pages/mechanic/ProfilePage"));
 const MechanicCustomersPage   = lazy(() => import("./pages/mechanic/CustomersPage"));
 
@@ -941,6 +943,7 @@ function AppContent() {
           <Route path="/gstr"       element={requireSection(currentUser, "gstr", <ERPShell><PageErrorBoundary><GstrPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/audit"      element={requireSection(currentUser, "audit", <ERPShell><PageErrorBoundary><AuditLogPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/staff"      element={requireSection(currentUser, "staff", <ERPShell><PageErrorBoundary><StaffPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/mechanics"  element={requireSection(currentUser, "staff", <ERPShell><PageErrorBoundary><MechanicsPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/shop-settings" element={requireSection(currentUser, "shop-settings", <ERPShell><PageErrorBoundary><ShopSettingsPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/returns"          element={requireSection(currentUser, "returns", <ERPShell><PageErrorBoundary><ReturnsPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/purchase-returns" element={requireSection(currentUser, "purchase-returns", <ERPShell><PageErrorBoundary><PurchaseReturnsPage /></PageErrorBoundary></ERPShell>)} />
@@ -972,6 +975,7 @@ function AppContent() {
 
           {/* Mechanic app — separate user type, own shell */}
           <Route path="/mechanic/accept-invite" element={<Suspense><MechanicAcceptInvite /></Suspense>} />
+          <Route path="/mechanic/join" element={<Suspense><MechanicJoinPage /></Suspense>} />
           <Route path="/mechanic" element={requireRole(currentUser, "MECHANIC", <Suspense><MechanicShell /></Suspense>)}>
             <Route index element={<Suspense><MechanicDashboard /></Suspense>} />
             <Route path="jobs" element={<Suspense><MechanicJobsPage /></Suspense>} />

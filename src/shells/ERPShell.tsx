@@ -48,6 +48,7 @@ const NAV_ITEMS = [
   { key: "gstr",        path: "/gstr",               icon: "receipt_long",   label: "GSTR-1 Export"  },
   { key: "audit",       path: "/audit",              icon: "manage_search",  label: "Audit Log"      },
   { key: "staff",       path: "/staff",              icon: "group",          label: "Staff"          },
+  { key: "mechanics",   path: "/mechanics",          icon: "build_circle",   label: "Mechanics"      },
   { key: "returns",     path: "/returns",            icon: "assignment_return", label: "Returns & Exchange" },
   { key: "purchase-returns", path: "/purchase-returns", icon: "unarchive",  label: "Purchase Returns" },
   { key: "warranty",    path: "/warranty",           icon: "verified",       label: "Warranty"       },
@@ -169,9 +170,11 @@ export function ERPShell({ children }: ERPShellProps) {
     if (currentUser?.role !== "SHOP_STAFF") return NAV_ITEMS;
     const sections = currentUser?.sections || [];
     if (sections.length === 0) return NAV_ITEMS.filter(n => n.key === "dashboard");
-    // "credit-notes" rides on the "returns" permission (see App.tsx's matching
-    // requireSection gate) rather than its own section key — it's the same data.
-    return NAV_ITEMS.filter(n => sections.includes(n.key === "credit-notes" ? "returns" : n.key));
+    // "credit-notes" rides on the "returns" permission, and "mechanics" rides
+    // on "staff" (see App.tsx's matching requireSection gates) rather than
+    // having their own section keys.
+    const sectionKey = (k: string) => k === "credit-notes" ? "returns" : k === "mechanics" ? "staff" : k;
+    return NAV_ITEMS.filter(n => sections.includes(sectionKey(n.key)));
   }, [currentUser]);
 
 
