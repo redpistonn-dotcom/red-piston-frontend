@@ -81,6 +81,23 @@ export default function JobDetailPage() {
   const [partQty, setPartQty] = useState("1");
   const [savingRequest, setSavingRequest] = useState(false);
 
+  // Basic inventory — search shop stock and add straight to the job (Section
+  // 6.2 "Basic Inventory (search, view stock/location, add to job card)").
+  const [showAddPart, setShowAddPart] = useState(false);
+  const [partSearch, setPartSearch] = useState("");
+  const [partResults, setPartResults] = useState<any[]>([]);
+  const [searchingParts, setSearchingParts] = useState(false);
+  const [selectedPart, setSelectedPart] = useState<any>(null);
+  const [addQty, setAddQty] = useState("1");
+  const [addingItem, setAddingItem] = useState(false);
+  const [removingItemId, setRemovingItemId] = useState<number | null>(null);
+  // Custom (non-inventory) part — same "type: 'PART'" as a searched part so it
+  // still counts toward parts_total/invoice subtotal (see jobs.js — both the
+  // total recompute and the invoice generator filter on type === 'PART').
+  const [customMode, setCustomMode] = useState(false);
+  const [customDesc, setCustomDesc] = useState("");
+  const [customPrice, setCustomPrice] = useState("");
+
   const load = useCallback(() => {
     if (!id) return;
     setLoading(true);
@@ -97,6 +114,19 @@ export default function JobDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Debounced inventory search — fires 300ms after typing stops.
+  useEffect(() => {
+    if (!showAddPart || customMode || !partSearch.trim()) { setPartResults([]); return; }
+    setSearchingParts(true);
+    const t = setTimeout(() => {
+      api.get(`/mechanic/jobs/${id}/parts?q=${encodeURIComponent(partSearch.trim())}`)
+        .then((r: any) => setPartResults(r.data || []))
+        .catch(() => setPartResults([]))
+        .finally(() => setSearchingParts(false));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [partSearch, showAddPart, customMode, id]);
 
   async function transition(toStatus: string) {
     setTransitioning(true);
@@ -141,6 +171,51 @@ export default function JobDetailPage() {
     }
   }
 
+  function resetAddPart() {
+    setShowAddPart(false); setPartSearch(""); setPartResults([]); setSelectedPart(null);
+    setAddQty("1"); setCustomMode(false); setCustomDesc(""); setCustomPrice("");
+  }
+
+  async function addSelectedPart() {
+    const qty = parseInt(addQty) || 1;
+    if (qty <= 0) return;
+    setAddingItem(true);
+    setError("");
+    try {
+      if (customMode) {
+        if (!customDesc.trim() || customPrice === "") return;
+        await api.post(`/mechanic/jobs/${id}/items`, {
+          description: customDesc.trim(), qty, unitPrice: parseFloat(customPrice), type: "PART",
+        });
+      } else if (selectedPart) {
+        await api.post(`/mechanic/jobs/${id}/items`, {
+          inventoryId: selectedPart.inventory_id, description: selectedPart.part_name,
+          qty, unitPrice: Number(selectedPart.selling_price), type: "PART",
+        });
+      } else {
+        return;
+      }
+      resetAddPart();
+      load();
+    } catch (e: any) {
+      setError(e?.data?.error?.message || e?.error?.message || "Failed to add part");
+    } finally {
+      setAddingItem(false);
+    }
+  }
+
+  async function removeItem(itemId: number) {
+    setRemovingItemId(itemId);
+    try {
+      await api.delete(`/mechanic/jobs/${id}/items/${itemId}`);
+      load();
+    } catch (e: any) {
+      setError(e?.data?.error?.message || e?.error?.message || "Failed to remove item");
+    } finally {
+      setRemovingItemId(null);
+    }
+  }
+
   async function saveNote() {
     if (!noteText.trim()) return;
     setSavingNote(true);
@@ -180,6 +255,8 @@ export default function JobDetailPage() {
 
   const allowedNext = MECHANIC_TRANSITIONS[job.status] ?? [];
   const canInvoice = job.status === "QC_PASSED" && !job.mechanic_invoice_id;
+  // Mirrors the backend's own guard in jobs.js POST/DELETE /items.
+  const jobLocked = ["DELIVERED", "CANCELLED", "QC_PASSED"].includes(job.status);
 
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -396,23 +473,184 @@ export default function JobDetailPage() {
       </Section>
 
       {/* Parts / items */}
-      {job.items?.length > 0 && (
+      {(job.items?.length > 0 || !jobLocked) && (
         <Section title="Parts & Labour">
-          {job.items.map((item: any) => (
-            <div key={item.id} style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${T.border}` }}>
+          {job.items?.map((item: any) => (
+            <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "10px 0", borderBottom: `1px solid ${T.border}` }}>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: T.t1 }}>{item.description}</div>
                 <div style={{ fontSize: 12, color: T.t3 }}>x{item.qty} · {item.type}</div>
               </div>
-              <div style={{ fontFamily: FONT.mono, fontSize: 14, fontWeight: 700, color: T.t1 }}>
-                ₹{Number(item.total).toFixed(2)}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ fontFamily: FONT.mono, fontSize: 14, fontWeight: 700, color: T.t1 }}>
+                  ₹{Number(item.total).toFixed(2)}
+                </div>
+                {!jobLocked && (
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    disabled={removingItemId === item.id}
+                    title="Remove"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: T.t3, padding: 2, opacity: removingItemId === item.id ? 0.4 : 1 }}
+                  >
+                    <MSIcon name="close" size={16} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
-          <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, fontWeight: 700 }}>
-            <span style={{ fontSize: 14, color: T.t2 }}>Total</span>
-            <span style={{ fontFamily: FONT.mono, fontSize: 15, color: T.t1 }}>₹{Number(job.total_amount).toFixed(2)}</span>
-          </div>
+          {job.items?.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 10, fontWeight: 700 }}>
+              <span style={{ fontSize: 14, color: T.t2 }}>Total</span>
+              <span style={{ fontFamily: FONT.mono, fontSize: 15, color: T.t1 }}>₹{Number(job.total_amount).toFixed(2)}</span>
+            </div>
+          )}
+
+          {/* Add Part — basic inventory search + custom part (Section 6.2) */}
+          {!jobLocked && (
+            !showAddPart ? (
+              <button
+                onClick={() => setShowAddPart(true)}
+                style={{
+                  marginTop: job.items?.length > 0 ? 10 : 0, padding: "8px 14px", background: "transparent",
+                  border: `1.5px dashed ${T.border}`, borderRadius: 8, cursor: "pointer",
+                  color: T.t2, fontSize: 13, fontFamily: FONT.ui, width: "100%",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                }}
+              >
+                <MSIcon name="add" size={16} /> Add Part
+              </button>
+            ) : (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => setCustomMode(false)}
+                    style={{
+                      flex: 1, padding: "7px", borderRadius: 8, border: `1.5px solid ${!customMode ? T.amber : T.border}`,
+                      background: !customMode ? T.amberGlow : "transparent", color: !customMode ? T.amber : T.t3,
+                      fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui,
+                    }}
+                  >
+                    Search Stock
+                  </button>
+                  <button
+                    onClick={() => { setCustomMode(true); setSelectedPart(null); setPartResults([]); }}
+                    style={{
+                      flex: 1, padding: "7px", borderRadius: 8, border: `1.5px solid ${customMode ? T.amber : T.border}`,
+                      background: customMode ? T.amberGlow : "transparent", color: customMode ? T.amber : T.t3,
+                      fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui,
+                    }}
+                  >
+                    Custom Part
+                  </button>
+                </div>
+
+                {!customMode ? (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Search by name, brand, or OEM number"
+                      value={partSearch}
+                      onChange={e => { setPartSearch(e.target.value); setSelectedPart(null); }}
+                      autoFocus
+                      style={{
+                        padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                        fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                        background: T.surfaceContainerLowest,
+                      }}
+                    />
+                    {searchingParts && <div style={{ fontSize: 12, color: T.t3 }}>Searching…</div>}
+                    {!selectedPart && partResults.length > 0 && (
+                      <div style={{ maxHeight: 220, overflowY: "auto", border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                        {partResults.map((p: any) => (
+                          <button
+                            key={p.inventory_id}
+                            onClick={() => { setSelectedPart(p); setPartResults([]); setPartSearch(p.part_name); }}
+                            style={{
+                              width: "100%", textAlign: "left", padding: "9px 12px", background: "transparent",
+                              border: "none", borderBottom: `1px solid ${T.border}`, cursor: "pointer", fontFamily: FONT.ui,
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 600, color: T.t1 }}>{p.part_name} {p.brand ? `· ${p.brand}` : ""}</div>
+                            <div style={{ fontSize: 11, color: T.t3 }}>
+                              Stock: {p.stock_qty}{p.location ? ` · ${p.location}` : ""} · ₹{Number(p.selling_price).toFixed(2)}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {selectedPart && (
+                      <div style={{ padding: "8px 12px", background: T.amberGlow, borderRadius: 8, fontSize: 12, color: T.t1 }}>
+                        Selected: <strong>{selectedPart.part_name}</strong> — stock {selectedPart.stock_qty}, ₹{Number(selectedPart.selling_price).toFixed(2)} each
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Part / service description"
+                      value={customDesc}
+                      onChange={e => setCustomDesc(e.target.value)}
+                      style={{
+                        padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                        fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                        background: T.surfaceContainerLowest,
+                      }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Unit price (₹)"
+                      value={customPrice}
+                      min={0}
+                      onChange={e => setCustomPrice(e.target.value)}
+                      style={{
+                        padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                        fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                        background: T.surfaceContainerLowest,
+                      }}
+                    />
+                  </>
+                )}
+
+                <input
+                  type="number"
+                  placeholder="Qty"
+                  value={addQty}
+                  min={1}
+                  onChange={e => setAddQty(e.target.value)}
+                  style={{
+                    padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                    fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                    background: T.surfaceContainerLowest, width: "100px",
+                  }}
+                />
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={addSelectedPart}
+                    disabled={addingItem || (customMode ? (!customDesc.trim() || customPrice === "") : !selectedPart)}
+                    style={{
+                      flex: 1, padding: "9px", background: T.amber, color: "#fff",
+                      border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer",
+                      opacity: addingItem || (customMode ? (!customDesc.trim() || customPrice === "") : !selectedPart) ? 0.5 : 1,
+                      fontFamily: FONT.ui,
+                    }}
+                  >
+                    {addingItem ? "Adding…" : "Add to Job"}
+                  </button>
+                  <button
+                    onClick={resetAddPart}
+                    style={{
+                      padding: "9px 14px", background: "transparent", border: `1px solid ${T.border}`,
+                      borderRadius: 8, cursor: "pointer", color: T.t2, fontFamily: FONT.ui,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )
+          )}
         </Section>
       )}
 
