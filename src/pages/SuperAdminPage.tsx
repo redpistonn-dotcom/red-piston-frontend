@@ -195,8 +195,10 @@ function AddUserModal({ userTypes, onClose, onSuccess }) {
 }
 
 // ─── Edit Privileges Modal ──────────────────────────────────────────────────
-// Same CUSTOMER/MECHANIC/SHOP_OWNER/PLATFORM_ADMIN list as AddUserModal — see
-// USER_TYPE_MAP in admin.js for how MECHANIC maps onto role+profileType.
+// Same CUSTOMER/MECHANIC/SHOP_OWNER/PLATFORM_ADMIN list as AddUserModal.
+// MECHANIC is the real shop-staff role (role='MECHANIC' at the top level,
+// see USER_TYPE_MAP in admin.js) — normal accounts arrive via shop self-signup
+// or owner invite (routes/mechanic/*); this is a direct admin escape hatch.
 const EDITABLE_TYPES = [
   { slug: "CUSTOMER", name: "Customer" },
   { slug: "MECHANIC", name: "Mechanic" },
@@ -205,7 +207,7 @@ const EDITABLE_TYPES = [
 ];
 
 function EditPrivilegesModal({ user, onClose, onSuccess }) {
-  const currentSlug = user.customerProfile?.profileType === "MECHANIC" && user.role === "CUSTOMER" ? "MECHANIC" : (user.userType?.slug || user.role);
+  const currentSlug = user.userType?.slug || user.role;
   const [type, setType] = useState(currentSlug);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
