@@ -85,6 +85,7 @@ const MechanicAcceptInvite    = lazy(() => import("./pages/mechanic/AcceptInvite
 const MechanicJoinPage        = lazy(() => import("./pages/mechanic/JoinPage"));
 const MechanicProfilePage     = lazy(() => import("./pages/mechanic/ProfilePage"));
 const MechanicCustomersPage   = lazy(() => import("./pages/mechanic/CustomersPage"));
+const MechanicSuppliersPage   = lazy(() => import("./pages/mechanic/SuppliersPage"));
 
 // ── Page skeleton shown while a lazy chunk downloads ──────────────────────────
 const PageLoader = () => (
@@ -982,6 +983,7 @@ function AppContent() {
             <Route path="jobs/:id" element={<Suspense><MechanicJobDetailPage /></Suspense>} />
             <Route path="profile" element={<Suspense><MechanicProfilePage /></Suspense>} />
             <Route path="customers" element={<Suspense><MechanicCustomersPage /></Suspense>} />
+            <Route path="suppliers" element={<Suspense><MechanicSuppliersPage /></Suspense>} />
           </Route>
 
           {/* Catch-all */}

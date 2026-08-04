@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { key: "dashboard", path: "/mechanic",           icon: "dashboard",     label: "Dashboard" },
   { key: "jobs",      path: "/mechanic/jobs",      icon: "build_circle",  label: "My Jobs"   },
   { key: "customers", path: "/mechanic/customers", icon: "people",        label: "Customers" },
+  { key: "suppliers", path: "/mechanic/suppliers", icon: "local_shipping", label: "Suppliers" },
   { key: "profile",   path: "/mechanic/profile",   icon: "person",        label: "Profile"   },
 ] as const;
 
