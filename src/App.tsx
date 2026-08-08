@@ -86,6 +86,8 @@ const MechanicJoinPage        = lazy(() => import("./pages/mechanic/JoinPage"));
 const MechanicProfilePage     = lazy(() => import("./pages/mechanic/ProfilePage"));
 const MechanicCustomersPage   = lazy(() => import("./pages/mechanic/CustomersPage"));
 const MechanicSuppliersPage   = lazy(() => import("./pages/mechanic/SuppliersPage"));
+const MechanicCreateJobPage   = lazy(() => import("./pages/mechanic/CreateJobPage"));
+const MechanicTeamPage        = lazy(() => import("./pages/mechanic/TeamPage"));
 
 // ── Page skeleton shown while a lazy chunk downloads ──────────────────────────
 const PageLoader = () => (
@@ -980,10 +982,12 @@ function AppContent() {
           <Route path="/mechanic" element={requireRole(currentUser, "MECHANIC", <Suspense><MechanicShell /></Suspense>)}>
             <Route index element={<Suspense><MechanicDashboard /></Suspense>} />
             <Route path="jobs" element={<Suspense><MechanicJobsPage /></Suspense>} />
+            <Route path="jobs/new" element={<Suspense><MechanicCreateJobPage /></Suspense>} />
             <Route path="jobs/:id" element={<Suspense><MechanicJobDetailPage /></Suspense>} />
             <Route path="profile" element={<Suspense><MechanicProfilePage /></Suspense>} />
             <Route path="customers" element={<Suspense><MechanicCustomersPage /></Suspense>} />
             <Route path="suppliers" element={<Suspense><MechanicSuppliersPage /></Suspense>} />
+            <Route path="team" element={<Suspense><MechanicTeamPage /></Suspense>} />
           </Route>
 
           {/* Catch-all */}

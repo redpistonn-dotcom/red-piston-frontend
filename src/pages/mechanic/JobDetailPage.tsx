@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client.js";
 import { T, FONT } from "../../theme";
@@ -51,15 +51,17 @@ function Btn({ label, icon, onClick, color = T.amber, disabled = false, outline 
       onClick={onClick}
       disabled={disabled}
       style={{
-        padding: "12px 16px", borderRadius: 10, border: outline ? `2px solid ${color}` : "none",
+        padding: "14px 16px", borderRadius: 12, border: outline ? `2px solid ${color}` : "none",
         background: outline ? "transparent" : disabled ? T.surfaceContainerHigh : color,
         color: outline ? color : disabled ? T.t3 : "#fff",
         fontWeight: 700, fontSize: 14, cursor: disabled ? "not-allowed" : "pointer",
-        display: "flex", alignItems: "center", gap: 6, fontFamily: FONT.ui,
-        flex: 1, justifyContent: "center",
+        display: "flex", alignItems: "center", gap: 8, fontFamily: FONT.ui,
+        flex: 1, justifyContent: "center", minHeight: 52,
+        boxShadow: !outline && !disabled ? `0 2px 10px ${color}44` : "none",
+        transition: "transform 0.1s, box-shadow 0.1s",
       }}
     >
-      {icon && <MSIcon name={icon} size={18} />}
+      {icon && <MSIcon name={icon} size={20} />}
       {label}
     </button>
   );
@@ -80,6 +82,23 @@ export default function JobDetailPage() {
   const [partDesc, setPartDesc] = useState("");
   const [partQty, setPartQty] = useState("1");
   const [savingRequest, setSavingRequest] = useState(false);
+
+  // Work timer
+  const [elapsed, setElapsed] = useState(0);
+
+  // Team assignment
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [assigningTo, setAssigningTo] = useState("");
+  const [assigning, setAssigning] = useState(false);
+
+  // Voice-to-text
+  const recognitionRef = useRef<any>(null);
+  const [listening, setListening] = useState(false);
+
+  // Photo upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photoStage, setPhotoStage] = useState<"BEFORE" | "DURING" | "AFTER">("DURING");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Basic inventory — search shop stock and add straight to the job (Section
   // 6.2 "Basic Inventory (search, view stock/location, add to job card)").
@@ -102,8 +121,8 @@ export default function JobDetailPage() {
     if (!id) return;
     setLoading(true);
     Promise.all([
-      api.get(`/mechanic/jobs/${id}`),
-      api.get(`/mechanic/jobs/${id}/part-requests`).catch(() => ({ data: [] })),
+      api.get(`/api/mechanic/jobs/${id}`),
+      api.get(`/api/mechanic/jobs/${id}/part-requests`).catch(() => ({ data: [] })),
     ])
       .then(([jobRes, prRes]: any[]) => {
         setJob(jobRes.data);
@@ -115,12 +134,30 @@ export default function JobDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Load registered team members for assignment (independent mechanics only)
+  useEffect(() => {
+    api.get("/api/mechanic/team")
+      .then((r: any) => setTeamMembers((r.data || []).filter((m: any) => m.member_user_id)))
+      .catch(() => {});
+  }, []);
+
+  // Live work clock — counts up while job is IN_PROGRESS
+  useEffect(() => {
+    if (job?.status !== "IN_PROGRESS") { setElapsed(0); return; }
+    const startEvent = [...(job.timeline || [])].reverse().find((t: any) => t.to_status === "IN_PROGRESS");
+    const startMs = startEvent ? new Date(startEvent.created_at).getTime() : Date.now();
+    const tick = () => setElapsed(Math.floor((Date.now() - startMs) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [job?.status, job?.timeline]);
+
   // Debounced inventory search — fires 300ms after typing stops.
   useEffect(() => {
     if (!showAddPart || customMode || !partSearch.trim()) { setPartResults([]); return; }
     setSearchingParts(true);
     const t = setTimeout(() => {
-      api.get(`/mechanic/jobs/${id}/parts?q=${encodeURIComponent(partSearch.trim())}`)
+      api.get(`/api/mechanic/jobs/${id}/parts?q=${encodeURIComponent(partSearch.trim())}`)
         .then((r: any) => setPartResults(r.data || []))
         .catch(() => setPartResults([]))
         .finally(() => setSearchingParts(false));
@@ -132,7 +169,7 @@ export default function JobDetailPage() {
     setTransitioning(true);
     setError("");
     try {
-      await api.patch(`/mechanic/jobs/${id}/status`, { status: toStatus });
+      await api.patch(`/api/mechanic/jobs/${id}/status`, { status: toStatus });
       load();
     } catch (e: any) {
       setError(e?.error?.message || "Status update failed");
@@ -145,7 +182,7 @@ export default function JobDetailPage() {
     setTransitioning(true);
     setError("");
     try {
-      await api.patch(`/mechanic/jobs/${id}/progress`, { progress });
+      await api.patch(`/api/mechanic/jobs/${id}/progress`, { progress });
       load();
     } catch (e: any) {
       setError(e?.error?.message || "Progress update failed");
@@ -158,7 +195,7 @@ export default function JobDetailPage() {
     if (!partDesc.trim()) return;
     setSavingRequest(true);
     try {
-      await api.post(`/mechanic/jobs/${id}/part-requests`, {
+      await api.post(`/api/mechanic/jobs/${id}/part-requests`, {
         description: partDesc.trim(),
         qtyRequested: parseInt(partQty) || 1,
       });
@@ -184,11 +221,11 @@ export default function JobDetailPage() {
     try {
       if (customMode) {
         if (!customDesc.trim() || customPrice === "") return;
-        await api.post(`/mechanic/jobs/${id}/items`, {
+        await api.post(`/api/mechanic/jobs/${id}/items`, {
           description: customDesc.trim(), qty, unitPrice: parseFloat(customPrice), type: "PART",
         });
       } else if (selectedPart) {
-        await api.post(`/mechanic/jobs/${id}/items`, {
+        await api.post(`/api/mechanic/jobs/${id}/items`, {
           inventoryId: selectedPart.inventory_id, description: selectedPart.part_name,
           qty, unitPrice: Number(selectedPart.selling_price), type: "PART",
         });
@@ -207,7 +244,7 @@ export default function JobDetailPage() {
   async function removeItem(itemId: number) {
     setRemovingItemId(itemId);
     try {
-      await api.delete(`/mechanic/jobs/${id}/items/${itemId}`);
+      await api.delete(`/api/mechanic/jobs/${id}/items/${itemId}`);
       load();
     } catch (e: any) {
       setError(e?.data?.error?.message || e?.error?.message || "Failed to remove item");
@@ -216,11 +253,67 @@ export default function JobDetailPage() {
     }
   }
 
+  async function assignJob() {
+    if (!assigningTo) return;
+    setAssigning(true);
+    setError("");
+    try {
+      await api.patch(`/api/mechanic/jobs/${id}/assign`, { memberId: parseInt(assigningTo) });
+      setAssigningTo("");
+      load();
+    } catch (e: any) {
+      setError(e?.error?.message || "Assignment failed");
+    } finally {
+      setAssigning(false);
+    }
+  }
+
+  function toggleVoice() {
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { alert("Voice input not supported on this browser. Use Chrome on Android."); return; }
+    if (listening) { recognitionRef.current?.stop(); setListening(false); return; }
+    const r = new SR();
+    r.lang = "en-IN";
+    r.continuous = true;
+    r.interimResults = false;
+    r.onresult = (e: any) => {
+      const text = Array.from(e.results).map((res: any) => res[0].transcript).join(" ");
+      setNoteText(prev => (prev ? prev + " " : "") + text);
+    };
+    r.onerror = () => setListening(false);
+    r.onend = () => setListening(false);
+    r.start();
+    recognitionRef.current = r;
+    setListening(true);
+  }
+
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    setError("");
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await api.post(`/api/mechanic/jobs/${id}/photos/upload`, { imageBase64: base64, stage: photoStage });
+      load();
+    } catch {
+      setError("Photo upload failed. Try again.");
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   async function saveNote() {
     if (!noteText.trim()) return;
     setSavingNote(true);
     try {
-      await api.post(`/mechanic/jobs/${id}/notes`, { note: noteText.trim() });
+      await api.post(`/api/mechanic/jobs/${id}/notes`, { note: noteText.trim() });
       setNoteText("");
       load();
     } catch (e: any) {
@@ -234,7 +327,7 @@ export default function JobDetailPage() {
     setGeneratingInvoice(true);
     setError("");
     try {
-      const r = await api.post(`/mechanic/jobs/${id}/invoice`, {}) as any;
+      const r = await api.post(`/api/mechanic/jobs/${id}/invoice`, {}) as any;
       load();
       alert(`Invoice ${r.data.invoiceNumber} generated (₹${Number(r.data.total).toFixed(2)})`);
     } catch (e: any) {
@@ -261,42 +354,107 @@ export default function JobDetailPage() {
   return (
     <div style={{ paddingBottom: 32 }}>
       {/* Header */}
-      <div style={{ padding: "16px 16px 0", display: "flex", gap: 12, alignItems: "center" }}>
-        <button onClick={() => navigate(-1)} style={{ background: "none", border: "none", cursor: "pointer", color: T.t2, padding: 0 }}>
-          <MSIcon name="arrow_back" size={22} />
-        </button>
-        <div>
-          <div style={{ fontFamily: FONT.mono, fontSize: 12, color: T.amber, fontWeight: 700 }}>{job.job_number}</div>
-          <div style={{ fontSize: 17, fontWeight: 700, color: T.t1 }}>{job.customer_name}</div>
+      <div style={{ background: T.surface, borderBottom: `1px solid ${T.border}`, paddingBottom: 14 }}>
+        <div style={{ height: 3, background: `linear-gradient(90deg, ${T.amber}, ${T.crimson})`, borderRadius: "0 0 2px 2px" }} />
+        <div style={{ padding: "14px 16px 0", display: "flex", gap: 12, alignItems: "center" }}>
+          <button onClick={() => navigate(-1)} style={{
+            background: T.bg, border: `1px solid ${T.border}`, cursor: "pointer",
+            color: T.t2, padding: 8, borderRadius: 10, display: "flex", alignItems: "center",
+            flexShrink: 0,
+          }}>
+            <MSIcon name="arrow_back" size={20} />
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: FONT.mono, fontSize: 11, color: T.amber, fontWeight: 700, letterSpacing: "0.04em" }}>{job.job_number}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: T.t1, lineHeight: 1.15, marginTop: 2 }}>{job.customer_name}</div>
+          </div>
+        </div>
+
+        {/* Status + priority + timer row */}
+        <div style={{ padding: "12px 16px 0", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <span style={{
+            fontSize: 12, fontWeight: 700, padding: "5px 12px", borderRadius: 20,
+            background: T.amberGlow, color: T.amber, border: `1px solid ${T.amber}33`,
+          }}>
+            {STATUS_LABEL[job.status] || job.status}
+          </span>
+          <span style={{
+            fontSize: 11, fontWeight: 700, padding: "5px 10px", borderRadius: 20,
+            background: job.priority === "URGENT" ? "#FEE2E2" : job.priority === "HIGH" ? "#FEF3C7" : T.bg,
+            color: PRIORITY_COLOR(job.priority),
+            border: `1px solid ${PRIORITY_COLOR(job.priority)}55`,
+          }}>
+            {job.priority}
+          </span>
+          {job.status === "IN_PROGRESS" && (
+            <div style={{
+              marginLeft: "auto", display: "flex", alignItems: "center", gap: 6,
+              padding: "5px 12px", background: T.skyBg, borderRadius: 20, border: `1px solid ${T.sky}44`,
+            }}>
+              <MSIcon name="timer" size={14} />
+              <span style={{ fontFamily: FONT.mono, fontSize: 13, fontWeight: 700, color: T.sky }}>
+                {elapsed >= 3600
+                  ? `${Math.floor(elapsed / 3600)}h ${String(Math.floor((elapsed % 3600) / 60)).padStart(2, "0")}m`
+                  : `${Math.floor(elapsed / 60)}m ${String(elapsed % 60).padStart(2, "0")}s`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Status chip */}
-      <div style={{ padding: "12px 16px 0" }}>
-        <span style={{
-          fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 6,
-          background: T.amberGlow, color: T.amber,
-        }}>
-          {STATUS_LABEL[job.status] || job.status}
-        </span>
-        <span style={{ marginLeft: 10, fontSize: 12, color: PRIORITY_COLOR(job.priority) }}>
-          {job.priority} PRIORITY
-        </span>
-      </div>
-
       {/* Vehicle + complaint */}
-      <div style={{ margin: "16px 16px 0", background: T.surface, borderRadius: 12, padding: 14, border: `1px solid ${T.border}` }}>
+      <div style={{ margin: "12px 16px 0", background: T.surface, borderRadius: 14, padding: "2px 16px 6px", border: `1px solid ${T.border}` }}>
         <Row icon="directions_car" label="Vehicle" value={`${job.vehicle_make} ${job.vehicle_model}${job.vehicle_year ? ` (${job.vehicle_year})` : ""}`} />
-        {job.vehicle_reg && <Row icon="pin" label="Reg" value={job.vehicle_reg} />}
+        {job.vehicle_reg && <Row icon="pin" label="Reg No." value={job.vehicle_reg} />}
         {job.odometer_in && <Row icon="speed" label="Odometer" value={`${job.odometer_in} km`} />}
         {job.complaint && <Row icon="report_problem" label="Complaint" value={job.complaint} />}
         {job.diagnosis && <Row icon="medical_information" label="Diagnosis" value={job.diagnosis} />}
         {job.estimated_at && <Row icon="schedule" label="Due by" value={new Date(job.estimated_at).toLocaleString("en-IN")} />}
       </div>
 
+      {/* Team assignment — only for independent mechanics with registered team members */}
+      {!job.shop_id && teamMembers.length > 0 && !jobLocked && (
+        <div style={{ margin: "12px 16px 0", background: T.surface, borderRadius: 14, padding: "12px 14px", border: `1px solid ${T.border}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <MSIcon name="group" size={16} />
+          <span style={{ fontSize: 12, color: T.t2, fontWeight: 600 }}>Assign to:</span>
+          <select
+            value={assigningTo}
+            onChange={e => setAssigningTo(e.target.value)}
+            style={{
+              flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 8,
+              border: `1.5px solid ${T.border}`, background: T.surfaceContainerLowest,
+              fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+            }}
+          >
+            <option value="">Me (default)</option>
+            {teamMembers.map((m: any) => (
+              <option key={m.member_user_id} value={String(m.member_user_id)}>{m.name}</option>
+            ))}
+          </select>
+          {assigningTo && (
+            <button
+              onClick={assignJob}
+              disabled={assigning}
+              style={{
+                padding: "7px 14px", background: T.amber, color: "#fff",
+                border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer",
+                fontSize: 13, fontFamily: FONT.ui, opacity: assigning ? 0.6 : 1,
+              }}
+            >
+              {assigning ? "…" : "Assign"}
+            </button>
+          )}
+          {job.assigned_mechanic_name && (
+            <span style={{ fontSize: 12, color: T.t3, width: "100%" }}>
+              Currently: <strong style={{ color: T.t1 }}>{job.assigned_mechanic_name}</strong>
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Action buttons */}
       {(allowedNext.length > 0 || canInvoice) && (
-        <div style={{ margin: "16px 16px 0", display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ margin: "12px 16px 0", display: "flex", gap: 10, flexWrap: "wrap" }}>
           {/* Single-option status */}
           {allowedNext.length === 1 && (
             <Btn
@@ -320,54 +478,67 @@ export default function JobDetailPage() {
         </div>
       )}
       {job.mechanic_invoice_id && (
-        <div style={{ margin: "12px 16px 0", fontSize: 13, color: T.emerald, fontWeight: 600 }}>
+        <div style={{ margin: "8px 16px 0", padding: "10px 14px", background: "#D1FAE5", borderRadius: 10, fontSize: 13, color: T.emerald, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
           <MSIcon name="check_circle" size={16} /> Invoice generated
         </div>
       )}
 
-      {error && <p style={{ margin: "8px 16px 0", fontSize: 13, color: T.crimson }}>{error}</p>}
+      {error && (
+        <div style={{ margin: "8px 16px 0", padding: "10px 14px", background: "#FFDAD6", borderRadius: 10, fontSize: 13, color: T.crimson, border: `1px solid ${T.crimson}44` }}>
+          {error}
+        </div>
+      )}
 
       {/* Work progress sub-status — only visible while job is active */}
       {["RECEIVED", "IN_PROGRESS", "WAITING_PARTS", "QC_REWORK"].includes(job.status) && (
         <Section title="Work Progress">
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
             {PROGRESS_STAGES.map((stage, idx) => {
               const stageKeys = PROGRESS_STAGES.map(s => s.key);
               const currentIdx = stageKeys.indexOf(job.mechanic_progress ?? "");
               const isDone = currentIdx >= idx && currentIdx >= 0;
               const isCurrent = job.mechanic_progress === stage.key;
               const isNext = currentIdx + 1 === idx || (currentIdx === -1 && idx === 0);
+              const isLast = idx === PROGRESS_STAGES.length - 1;
 
               return (
-                <button
-                  key={stage.key}
-                  onClick={() => !transitioning && isNext && setProgress(stage.key)}
-                  disabled={transitioning || !isNext}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "8px 10px", borderRadius: 8, border: "none",
-                    background: isCurrent ? T.amberGlow : isDone ? T.surfaceContainerHigh : "transparent",
-                    cursor: isNext && !transitioning ? "pointer" : "default",
-                    opacity: !isDone && !isNext ? 0.4 : 1,
-                  }}
-                >
-                  <span style={{
-                    width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-                    background: isDone ? T.emerald : isNext ? T.amber : T.border,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <MSIcon
-                      name={isDone ? "check" : stage.icon}
-                      size={13}
-                    />
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: isCurrent ? 700 : 500, color: isCurrent ? T.amber : isDone ? T.t2 : T.t1 }}>
-                    {stage.label}
-                  </span>
-                  {isNext && (
-                    <span style={{ marginLeft: "auto", fontSize: 11, color: T.amber, fontWeight: 700 }}>TAP →</span>
-                  )}
-                </button>
+                <div key={stage.key} style={{ display: "flex", alignItems: "stretch" }}>
+                  {/* Left: circle + connector line */}
+                  <div style={{ width: 36, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 11, flexShrink: 0 }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                      background: isDone ? T.emerald : isNext ? T.amber : T.border,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      boxShadow: isCurrent ? `0 0 0 4px ${T.amber}22` : "none",
+                      transition: "box-shadow 0.2s",
+                    }}>
+                      <MSIcon name={isDone ? "check" : stage.icon} size={13} />
+                    </div>
+                    {!isLast && (
+                      <div style={{ width: 2, flex: 1, minHeight: 16, background: isDone ? T.emerald : T.border, opacity: isDone ? 0.5 : 0.25, marginTop: 3 }} />
+                    )}
+                  </div>
+                  {/* Right: tappable row */}
+                  <button
+                    onClick={() => !transitioning && isNext && setProgress(stage.key)}
+                    disabled={transitioning || !isNext}
+                    style={{
+                      flex: 1, display: "flex", alignItems: "center", gap: 8,
+                      padding: "9px 10px 9px 4px",
+                      borderRadius: 8, border: "none",
+                      background: isCurrent ? T.amberGlow : isDone ? T.surfaceContainerHigh : "transparent",
+                      cursor: isNext && !transitioning ? "pointer" : "default",
+                      opacity: !isDone && !isNext ? 0.4 : 1,
+                      marginBottom: isLast ? 0 : 3,
+                    }}
+                  >
+                    <span style={{ flex: 1, textAlign: "left", fontSize: 13, fontWeight: isCurrent ? 700 : isDone ? 500 : 400, color: isCurrent ? T.amber : isDone ? T.t2 : T.t1 }}>
+                      {stage.label}
+                    </span>
+                    {isNext && <span style={{ fontSize: 11, color: T.amber, fontWeight: 700 }}>TAP →</span>}
+                    {isDone && !isCurrent && <span style={{ fontSize: 12, color: T.emerald }}>✓</span>}
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -376,9 +547,9 @@ export default function JobDetailPage() {
 
       {/* Vehicle service history link */}
       {job.vehicle_reg && (
-        <div style={{ margin: "12px 16px 0" }}>
+        <div style={{ margin: "8px 16px 0" }}>
           <button
-            onClick={() => navigate(`/mechanic/jobs?vehicleReg=${job.vehicle_reg}`)}
+            onClick={() => navigate(`/api/mechanic/jobs?vehicleReg=${job.vehicle_reg}`)}
             style={{
               width: "100%", padding: "10px 14px", background: T.surface,
               border: `1px solid ${T.border}`, borderRadius: 10, cursor: "pointer",
@@ -654,19 +825,61 @@ export default function JobDetailPage() {
         </Section>
       )}
 
-      {/* Photos */}
-      {job.photos?.length > 0 && (
-        <Section title={`Photos (${job.photos.length})`}>
-          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
-            {job.photos.map((p: any) => (
-              <img
-                key={p.id}
-                src={p.url}
-                alt={p.stage}
-                style={{ width: 80, height: 80, borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
-              />
-            ))}
-          </div>
+      {/* Photos — upload + stage-grouped display */}
+      {(job.photos?.length > 0 || !jobLocked) && (
+        <Section title={`Photos${job.photos?.length > 0 ? ` (${job.photos.length})` : ""}`}>
+          {job.photos?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              {(["BEFORE", "DURING", "AFTER"] as const).map(s => {
+                const sp = job.photos.filter((p: any) => p.stage === s);
+                if (!sp.length) return null;
+                return (
+                  <div key={s} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: T.t3, fontWeight: 700, marginBottom: 4, letterSpacing: "0.08em" }}>{s}</div>
+                    <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
+                      {sp.map((p: any) => (
+                        <img key={p.id} src={p.url} alt={p.stage}
+                          style={{ width: 76, height: 76, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!jobLocked && (
+            <>
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                {(["BEFORE", "DURING", "AFTER"] as const).map(s => (
+                  <button key={s} type="button" onClick={() => setPhotoStage(s)}
+                    style={{
+                      flex: 1, padding: "6px 4px", borderRadius: 8, cursor: "pointer",
+                      border: `1.5px solid ${photoStage === s ? T.amber : T.border}`,
+                      background: photoStage === s ? T.amberGlow : "transparent",
+                      color: photoStage === s ? T.amber : T.t3,
+                      fontSize: 11, fontWeight: 700, fontFamily: FONT.ui,
+                    }}
+                  >{s}</button>
+                ))}
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+                style={{ display: "none" }} onChange={handlePhotoSelect} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                style={{
+                  width: "100%", padding: "9px 14px", background: "transparent",
+                  border: `1.5px dashed ${T.border}`, borderRadius: 8, cursor: uploadingPhoto ? "not-allowed" : "pointer",
+                  color: T.t2, fontSize: 13, fontFamily: FONT.ui,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  opacity: uploadingPhoto ? 0.6 : 1,
+                }}
+              >
+                <MSIcon name={uploadingPhoto ? "hourglass_empty" : "photo_camera"} size={16} />
+                {uploadingPhoto ? "Uploading…" : `Add ${photoStage.toLowerCase()} photo`}
+              </button>
+            </>
+          )}
         </Section>
       )}
 
@@ -693,17 +906,33 @@ export default function JobDetailPage() {
 
       {/* Add note */}
       <Section title="Add Note">
-        <textarea
-          value={noteText}
-          onChange={e => setNoteText(e.target.value)}
-          placeholder="Type a note visible to the workshop…"
-          rows={3}
-          style={{
-            width: "100%", padding: 10, borderRadius: 8, border: `1px solid ${T.border}`,
-            fontFamily: FONT.ui, fontSize: 13, color: T.t1, resize: "vertical",
-            boxSizing: "border-box",
-          }}
-        />
+        <div style={{ position: "relative" }}>
+          <textarea
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            placeholder="Type or speak a note visible to the workshop…"
+            rows={3}
+            style={{
+              width: "100%", padding: "10px 40px 10px 10px", borderRadius: 8,
+              border: `1px solid ${listening ? T.sky : T.border}`,
+              fontFamily: FONT.ui, fontSize: 13, color: T.t1, resize: "vertical",
+              boxSizing: "border-box", transition: "border-color 0.2s",
+            }}
+          />
+          <button
+            onClick={toggleVoice}
+            title={listening ? "Stop listening" : "Speak note"}
+            style={{
+              position: "absolute", top: 8, right: 8,
+              background: listening ? T.sky : "transparent",
+              border: `1px solid ${listening ? T.sky : T.border}`,
+              borderRadius: 6, padding: 4, cursor: "pointer",
+              color: listening ? "#fff" : T.t3, lineHeight: 1,
+            }}
+          >
+            <MSIcon name={listening ? "mic" : "mic_none"} size={18} />
+          </button>
+        </div>
         <button
           onClick={saveNote}
           disabled={savingNote || !noteText.trim()}
@@ -722,11 +951,11 @@ export default function JobDetailPage() {
 
 function Row({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
-    <div style={{ display: "flex", gap: 10, padding: "6px 0", borderBottom: `1px solid ${T.border}` }}>
-      <span className="material-symbols-outlined" style={{ fontSize: 16, color: T.t3, marginTop: 1 }}>{icon}</span>
-      <div>
-        <div style={{ fontSize: 11, color: T.t3 }}>{label}</div>
-        <div style={{ fontSize: 14, color: T.t1 }}>{value}</div>
+    <div style={{ display: "flex", gap: 12, padding: "11px 0", borderBottom: `1px solid ${T.border}88` }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 18, color: T.amber, marginTop: 2, flexShrink: 0 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10, color: T.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</div>
+        <div style={{ fontSize: 14, color: T.t1, marginTop: 2, fontWeight: 500, lineHeight: 1.4, wordBreak: "break-word" }}>{value}</div>
       </div>
     </div>
   );
@@ -734,8 +963,13 @@ function Row({ icon, label, value }: { icon: string; label: string; value: strin
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ margin: "16px 16px 0", background: T.surface, borderRadius: 12, padding: 14, border: `1px solid ${T.border}` }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+    <div style={{ margin: "12px 16px 0", background: T.surface, borderRadius: 14, padding: "14px 16px", border: `1px solid ${T.border}` }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, color: T.t3,
+        textTransform: "uppercase", letterSpacing: "0.08em",
+        marginBottom: 12,
+        borderLeft: `3px solid ${T.amber}`, paddingLeft: 8,
+      }}>
         {title}
       </div>
       {children}

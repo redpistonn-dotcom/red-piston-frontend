@@ -32,7 +32,7 @@ export default function MechanicProfilePage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get("/mechanic/profile")
+    api.get("/api/mechanic/profile")
       .then((r: any) => {
         setProfile(r.data);
         setSkillInput(r.data?.skills || []);
@@ -52,7 +52,7 @@ export default function MechanicProfilePage() {
   async function saveSkills() {
     setSaving(true);
     try {
-      await api.patch("/mechanic/profile/skills", { skills: skillInput });
+      await api.patch("/api/mechanic/profile/skills", { skills: skillInput });
       setProfile((p: any) => ({ ...p, skills: skillInput }));
       setEditing(false);
     } catch (e: any) {

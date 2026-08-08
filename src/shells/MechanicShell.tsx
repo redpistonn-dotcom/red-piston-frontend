@@ -8,19 +8,20 @@
  */
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { T, FONT, GLOBAL_CSS } from "../theme";
-import { useStore } from "../store";
+import { useAppCtx } from "../context/AppCtx";
 import { ProfileDropdown } from "../components/ProfileDropdown";
 import { BrandHeader } from "../components/BrandHeader";
 
 const SIDEBAR_W = 68; // collapsed rail width — matches ERPShell's SIDEBAR_W
 
-const NAV_ITEMS = [
+const BASE_NAV = [
   { key: "dashboard", path: "/mechanic",           icon: "dashboard",     label: "Dashboard" },
   { key: "jobs",      path: "/mechanic/jobs",      icon: "build_circle",  label: "My Jobs"   },
   { key: "customers", path: "/mechanic/customers", icon: "people",        label: "Customers" },
-  { key: "suppliers", path: "/mechanic/suppliers", icon: "local_shipping", label: "Suppliers" },
-  { key: "profile",   path: "/mechanic/profile",   icon: "person",        label: "Profile"   },
-] as const;
+];
+const INDEPENDENT_NAV = { key: "team",      path: "/mechanic/team",      icon: "group",          label: "Team"      };
+const SHOP_NAV        = { key: "suppliers", path: "/mechanic/suppliers", icon: "local_shipping", label: "Suppliers" };
+const PROFILE_NAV     = { key: "profile",   path: "/mechanic/profile",   icon: "person",         label: "Profile"   };
 
 function MSIcon({ name, filled = false, size = 22 }: { name: string; filled?: boolean; size?: number }) {
   return (
@@ -40,7 +41,10 @@ function MSIcon({ name, filled = false, size = 22 }: { name: string; filled?: bo
 export default function MechanicShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser } = useStore();
+  const { currentUser, handleLogout } = useAppCtx();
+
+  const isIndependent = !currentUser?.shopId;
+  const NAV_ITEMS = [...BASE_NAV, isIndependent ? INDEPENDENT_NAV : SHOP_NAV, PROFILE_NAV];
 
   const activeKey = NAV_ITEMS.find(t =>
     t.path === "/mechanic"
@@ -61,7 +65,7 @@ export default function MechanicShell() {
         .mech-content { padding-top: 56px; padding-bottom: 76px; min-height: 100vh; }
         @media (min-width: 768px) {
           .mech-topbar  { left: ${SIDEBAR_W}px; }
-          .mech-content { margin-left: ${SIDEBAR_W}px; padding-bottom: 24px; max-width: 900px; }
+          .mech-content { margin-left: ${SIDEBAR_W}px; padding-bottom: 24px; }
         }
       `}</style>
 
@@ -119,7 +123,7 @@ export default function MechanicShell() {
         <span style={{ fontSize: 13, color: T.t3, fontWeight: 500 }}>
           {currentUser?.name || "Mechanic"}
         </span>
-        <ProfileDropdown />
+        <ProfileDropdown user={currentUser} onLogout={handleLogout} />
       </header>
 
       {/* Page content */}

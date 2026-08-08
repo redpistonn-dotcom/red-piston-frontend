@@ -65,16 +65,17 @@ function ShopPhotoUploader({ photoUrl, onUploaded }: { photoUrl: string; onUploa
  */
 
 const STEPS = {
-  LANDING:      "landing",      // Sign In / Create Account choice
-  SIGNIN:       "signin",       // Sign-in form (email + password)
-  REG_ROLE:     "reg_role",     // Role selection for new users
-  REG_AUTH:     "reg_auth",     // Email registration form
-  VERIFY_EMAIL: "verify_email", // 6-digit code sent to the email just entered/signed-in-with
-  SHOP_DETAILS: "shop_details", // Shop info form (new shop owners)
-  PROFILE:      "profile",      // Name setup (new customers)
-  PENDING:      "pending",      // Shop owner awaiting approval
-  REJECTED:     "rejected",     // Shop owner rejected
-  ADMIN_AUTH:   "admin_auth",   // Admin email+password login
+  LANDING:          "landing",          // Sign In / Create Account choice
+  SIGNIN:           "signin",           // Sign-in form (email + password)
+  REG_ROLE:         "reg_role",         // Role selection for new users
+  REG_AUTH:         "reg_auth",         // Email registration form
+  VERIFY_EMAIL:     "verify_email",     // 6-digit code sent to the email just entered/signed-in-with
+  SHOP_DETAILS:     "shop_details",     // Shop info form (new shop owners)
+  PROFILE:          "profile",          // Name setup (new customers)
+  MECHANIC_DETAILS: "mechanic_details", // Name/phone/shop details for new independent mechanics
+  PENDING:          "pending",          // Shop owner awaiting approval
+  REJECTED:         "rejected",         // Shop owner rejected
+  ADMIN_AUTH:       "admin_auth",       // Admin email+password login
 };
 
 // ─── Error message helper ─────────────────────────────────────────────────────
@@ -224,8 +225,13 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [forgotMode, setForgotMode]       = useState(false);
 
   const [forgotSent, setForgotSent]       = useState(false);
-  const [landingTab, setLandingTab]       = useState("customer"); // "owner" | "customer"
+  const [landingTab, setLandingTab]       = useState("customer"); // "owner" | "customer" | "mechanic"
+  const landingTabRef = useRef("customer");
+  useEffect(() => { landingTabRef.current = landingTab; }, [landingTab]);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [roleMismatch, setRoleMismatch]   = useState<{ user: any } | null>(null);
+  const [hideGoogleForMechanic, setHideGoogleForMechanic] = useState(false);
+  const [mechDetails, setMechDetails]     = useState({ name: "", phone: "", shopName: "", shopLocation: "" });
 
   // ── Email OTP verification (manual signup/login only — Google is pre-verified) ──
   const [otpCode, setOtpCode]             = useState("");
@@ -333,7 +339,19 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
     setTokens(accessToken, refreshToken);
 
-    if ((isNewUser || !userData.name) && userData.role === "CUSTOMER") {
+    // Role mismatch: user selected mechanic tab but existing account is a different role
+    // Skip for admin roles — they can access any tab
+    if (landingTab === "mechanic" && userData.role && userData.role !== "MECHANIC" && userData.role !== "PLATFORM_ADMIN" && userData.role !== "ADMIN") {
+      setPendingUser(userData);
+      setRoleMismatch({ user: userData });
+      return;
+    }
+
+    if ((isNewUser || !userData.name || !userData.phone) && userData.role === "MECHANIC") {
+      // New mechanic or returning mechanic who never completed details (phone/shop missing)
+      setPendingUser(userData);
+      go(STEPS.MECHANIC_DETAILS);
+    } else if ((isNewUser || !userData.name) && userData.role === "CUSTOMER") {
       // New customer — or returning customer who never finished the name step
       setPendingUser(userData);
       if (userData.name) setProfile(p => ({ ...p, name: userData.name }));
@@ -365,6 +383,12 @@ export default function LoginPage({ onLogin, isModal = false }) {
       setTokens(data.accessToken, data.refreshToken);
 
       const proceedPastEmailCheck = () => {
+        // Mechanic who never finished profile setup
+        if (!userData.name && userData.role === "MECHANIC") {
+          setPendingUser(userData);
+          go(STEPS.MECHANIC_DETAILS);
+          return;
+        }
         // Customer who never finished the name step — resume it
         if (!userData.name && userData.role === "CUSTOMER") {
           setPendingUser(userData);
@@ -429,6 +453,70 @@ export default function LoginPage({ onLogin, isModal = false }) {
         return setLoading(false);
       }
       setError(getErr(e, "Registration failed. Try again."));
+    }
+    setLoading(false);
+  };
+
+  // ── Step 1: validate email/password, collect details next ────────────────
+  const emailRegisterMechanic = () => {
+    if (!email) { setError("Enter your email address"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("Enter a valid email"); return; }
+    if (!password || password.length < 8) { setError("Password must be at least 8 characters"); return; }
+    if (password !== confirmPwd) { setError("Passwords do not match"); return; }
+    setError("");
+    go(STEPS.MECHANIC_DETAILS);
+  };
+
+  // ── Step 2: submit mechanic details ──────────────────────────────────────
+  // Google/existing-user path: pendingUser already has userId → just PATCH profile
+  // Email registration path: no userId yet → register + send OTP → verify email
+  const submitMechanicRegistration = async () => {
+    if (!mechDetails.name.trim()) { setError("Enter your name"); return; }
+    if (!mechDetails.phone.trim()) { setError("Enter your mobile number"); return; }
+    setError(""); setLoading(true);
+
+    if ((pendingUser as any)?.userId) {
+      // Already authenticated (Google or existing sign-in) — update profile, then verify email
+      try {
+        const res = await api.patch("/api/mechanic/profile/setup", {
+          name: mechDetails.name.trim(),
+          phone: mechDetails.phone.trim(),
+          shopName: mechDetails.shopName.trim(),
+          shopLocation: mechDetails.shopLocation.trim(),
+        });
+        const user = { ...(pendingUser || {}), name: mechDetails.name.trim(), role: "MECHANIC", ...(res as any)?.data };
+        // Force OTP verification regardless of prior emailVerified state
+        await api.post("/api/mechanic-auth/send-otp", {});
+        setEmail((pendingUser as any)?.email || "");
+        goVerifyEmail(() => {
+          localStorage.setItem("as_user", JSON.stringify(user));
+          onLogin(user);
+        });
+      } catch (e) { setError(getErr(e, "Could not save details. Try again.")); }
+      setLoading(false);
+      return;
+    }
+
+    // Email registration: register account + send OTP
+    try {
+      const data = await api.post("/api/mechanic-auth/register-independent", {
+        email, password,
+        name: mechDetails.name.trim(),
+        phone: mechDetails.phone.trim(),
+        shopName: mechDetails.shopName.trim(),
+        shopLocation: mechDetails.shopLocation.trim(),
+      });
+      setTokens(data.accessToken, data.refreshToken);
+      setPendingUser(data.user);
+      goVerifyEmail(() => {
+        const user = { ...(data.user || {}), name: mechDetails.name.trim(), role: "MECHANIC" };
+        localStorage.setItem("as_user", JSON.stringify(user));
+        onLogin(user);
+      });
+    } catch (e) {
+      const code = (e as any).data?.error?.code;
+      if (code === "EMAIL_EXISTS") setError("An account with this email already exists. Sign in instead.");
+      else setError(getErr(e, "Registration failed. Try again."));
     }
     setLoading(false);
   };
@@ -535,7 +623,8 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        const data = await api.post("/api/auth/google", { accessToken: tokenResponse.access_token, role });
+        const googleRole = landingTabRef.current === "mechanic" ? "mechanic" : landingTabRef.current === "owner" ? "shop" : "customer";
+        const data = await api.post("/api/auth/google", { accessToken: tokenResponse.access_token, role: googleRole });
         handleAuthResponse(data);
       } catch (e: any) {
         setError(getErr(e, "Google sign-in failed. Try again."));
@@ -614,10 +703,11 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 {[
                   { key: "customer", emoji: "🚗", label: "Customer" },
                   { key: "owner", emoji: "🏪", label: "Shop Owner" },
+                  { key: "mechanic", emoji: "🔧", label: "Mechanic" },
                 ].map(t => (
                   <button
                     key={t.key}
-                    onClick={() => { setLandingTab(t.key); setRole(t.key === "owner" ? "shop" : "customer"); setError(""); }}
+                    onClick={() => { setLandingTab(t.key); setRole(t.key === "owner" ? "shop" : t.key === "mechanic" ? "mechanic" : "customer"); setError(""); }}
                     style={{
                       flex: 1, padding: "9px 0", borderRadius: 8, border: "none",
                       background: landingTab === t.key ? "#FFFFFF" : "transparent",
@@ -637,10 +727,10 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: "#1A1205", letterSpacing: "-0.3px", fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1.15 }}>
-                  {landingTab === "owner" ? "Welcome back" : "Sign in"}
+                  {landingTab === "mechanic" ? "Mechanic Portal" : landingTab === "owner" ? "Welcome back" : "Sign in"}
                 </div>
                 <div style={{ fontSize: 13, color: "#9C8C7C", marginTop: 4, lineHeight: 1.4 }}>
-                  {landingTab === "owner" ? "Sign in to your shop dashboard." : "Access your RedPiston account."}
+                  {landingTab === "mechanic" ? "Sign in to your mechanic dashboard." : landingTab === "owner" ? "Sign in to your shop dashboard." : "Access your RedPiston account."}
                 </div>
               </div>
 
@@ -699,19 +789,14 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
               {!forgotMode && (
                 <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 14, paddingTop: 12, borderTop: "1px solid #E0D5C8" }}>
-                  {landingTab === "owner" ? "New shop? " : "No account? "}
+                  {landingTab === "mechanic" ? "New mechanic? " : landingTab === "owner" ? "New shop? " : "No account? "}
                   <button onClick={() => {
                     setEmail(""); setPassword(""); setConfirmPwd("");
+                    setRole(landingTab === "owner" ? "shop" : landingTab === "mechanic" ? "mechanic" : "customer");
                     go(STEPS.REG_AUTH);
                   }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'Inter',sans-serif" }}>
-                    {landingTab === "owner" ? "Register your shop →" : "Create account →"}
+                    {landingTab === "mechanic" ? "Register as mechanic →" : landingTab === "owner" ? "Register your shop →" : "Create account →"}
                   </button>
-                </div>
-              )}
-
-              {!forgotMode && (
-                <div style={{ textAlign: "center", marginTop: 10 }}>
-                  <a href="/mechanic/join" style={{ fontSize: 12, color: "#9C8C7C", textDecoration: "none" }}>🔧 Join as a shop mechanic →</a>
                 </div>
               )}
             </div>
@@ -727,7 +812,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
             </div>
 
             {/* Role cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 22 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 22 }}>
               {[
                 { key: "customer", emoji: "🚗", title: "Customer", desc: "Buy auto parts with fitment guarantee", cta: "Create Account",
                   onSignIn: () => { setLandingTab("customer"); go(STEPS.SIGNIN); },
@@ -735,6 +820,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 { key: "owner", emoji: "🏪", title: "Shop Owner", desc: "Manage your shop, billing & inventory", cta: "Register Shop",
                   onSignIn: () => { setLandingTab("owner"); go(STEPS.SIGNIN); },
                   onCreate: () => { setRole("shop"); setLandingTab("owner"); go(STEPS.REG_AUTH); } },
+                { key: "mechanic", emoji: "🔧", title: "Mechanic", desc: "Manage jobs, track clients & grow your workshop", cta: "Register",
+                  onSignIn: () => { setLandingTab("mechanic"); go(STEPS.SIGNIN); },
+                  onCreate: () => { setRole("mechanic"); setLandingTab("mechanic"); go(STEPS.REG_AUTH); } },
               ].map(r => (
                 <div key={r.key} style={{ background: "#FFFFFF", border: "1.5px solid #E0D5C8", borderRadius: 16, padding: "26px 18px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0, boxShadow: "0 2px 10px rgba(26,18,5,0.05)" }}>
                   <div style={{ width: 58, height: 58, borderRadius: "50%", background: "#FBF0EE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, marginBottom: 14 }}>{r.emoji}</div>
@@ -752,9 +840,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
               ))}
             </div>
 
-            {/* Mechanic self-signup */}
+            {/* Shop mechanic join (via invite code) */}
             <div style={{ textAlign: "center", marginBottom: 12 }}>
-              <a href="/mechanic/join" style={{ fontSize: 13, color: "#9C8C7C", textDecoration: "none" }}>🔧 Join as a shop mechanic →</a>
+              <a href="/mechanic/join" style={{ fontSize: 12, color: "#BFB0A0", textDecoration: "none" }}>Joining a shop via invite code? →</a>
             </div>
 
             {/* Admin access */}
@@ -776,9 +864,9 @@ export default function LoginPage({ onLogin, isModal = false }) {
         return (
           <div className="auth-card">
             <button style={S.btnBack} onClick={() => back(STEPS.LANDING)}>← Back</button>
-            <div style={S.chip}>{landingTab === "owner" ? "🏪 Shop Owner" : "🚗 Customer"} · Sign In</div>
+            <div style={S.chip}>{landingTab === "mechanic" ? "🔧 Mechanic" : landingTab === "owner" ? "🏪 Shop Owner" : "🚗 Customer"} · Sign In</div>
             <div style={S.heading}>Welcome back</div>
-            <div style={S.sub}>{landingTab === "owner" ? "Sign in to your shop dashboard." : "Sign in to browse parts & track orders."}</div>
+            <div style={S.sub}>{landingTab === "mechanic" ? "Sign in to your mechanic dashboard." : landingTab === "owner" ? "Sign in to your shop dashboard." : "Sign in to browse parts & track orders."}</div>
 
             {error && <div style={S.error}>{error}</div>}
 
@@ -834,13 +922,13 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
             {/* Link to create account */}
             <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 24, paddingTop: 18, borderTop: `1px solid #E0D5C8` }}>
-              {landingTab === "owner" ? "New shop? " : "No account? "}
+              {landingTab === "mechanic" ? "New mechanic? " : landingTab === "owner" ? "New shop? " : "No account? "}
               <button onClick={() => {
-                setRole(landingTab === "owner" ? "shop" : "customer");
+                setRole(landingTab === "owner" ? "shop" : landingTab === "mechanic" ? "mechanic" : "customer");
                 setEmail(""); setPassword("");
                 go(STEPS.REG_AUTH);
               }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: FONT.ui }}>
-                {landingTab === "owner" ? "Register your shop →" : "Create account →"}
+                {landingTab === "mechanic" ? "Register as mechanic →" : landingTab === "owner" ? "Register your shop →" : "Create account →"}
               </button>
             </div>
           </div>
@@ -887,10 +975,10 @@ export default function LoginPage({ onLogin, isModal = false }) {
       case STEPS.REG_AUTH:
         return (
           <div className="auth-card">
-            <button style={S.btnBack} onClick={() => back(STEPS.LANDING)}>← Back</button>
-            <div style={S.chip}>{role === "shop" ? "🏪 Register Shop" : "🚗 Customer"} · Step 1 of 3</div>
-            <div style={S.heading}>{role === "shop" ? "Create Shop Account" : "Create Account"}</div>
-            <div style={S.sub}>{role === "shop" ? "Set up your credentials — shop details come next." : "Quick setup — takes under a minute."}</div>
+            <button style={S.btnBack} onClick={() => { setHideGoogleForMechanic(false); back(STEPS.LANDING); }}>← Back</button>
+            <div style={S.chip}>{role === "shop" ? "🏪 Register Shop" : role === "mechanic" ? "🔧 Register Mechanic" : "🚗 Customer"} · Step 1 of {role === "mechanic" ? "3" : "3"}</div>
+            <div style={S.heading}>{role === "shop" ? "Create Shop Account" : role === "mechanic" ? "Create Mechanic Account" : "Create Account"}</div>
+            <div style={S.sub}>{role === "shop" ? "Set up your credentials — shop details come next." : role === "mechanic" ? "Set up your credentials — your profile details come next." : "Quick setup — takes under a minute."}</div>
 
             {error && <div style={S.error}>{error}</div>}
 
@@ -906,14 +994,24 @@ export default function LoginPage({ onLogin, isModal = false }) {
               <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showConfirmPwd ? "text" : "password"} placeholder="Repeat password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && emailRegister()} />
               <button onClick={() => setShowConfirmPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showConfirmPwd ? "🙈" : "👁"}</button>
             </div>
-            <button className="btn-primary" style={{ ...S.btnPrimary(loading || googleLoading), marginBottom: 14 }} disabled={loading || googleLoading} onClick={emailRegister}>
-              {loading ? "Creating account…" : (role === "shop" ? "Continue to Shop Details →" : "Create Account →")}
+            <button className="btn-primary" style={{ ...S.btnPrimary(loading || googleLoading), marginBottom: 14 }} disabled={loading || googleLoading}
+              onClick={role === "mechanic" ? emailRegisterMechanic : emailRegister}>
+              {loading ? "Creating account…" : role === "shop" ? "Continue to Shop Details →" : role === "mechanic" ? "Continue →" : "Create Account →"}
             </button>
-            <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
-            <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer", marginBottom: 6 }} disabled={loading || googleLoading} onClick={() => googleAuth("register")}>
-              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-              {googleLoading ? "Signing in…" : "Continue with Google"}
-            </button>
+            {!(role === "mechanic" && hideGoogleForMechanic) && (
+              <>
+                <div style={S.divider}><div style={S.dividerLine}/><span style={S.dividerText}>OR</span><div style={S.dividerLine}/></div>
+                <button className="btn-google" style={{ ...S.btnGoogle, opacity: loading || googleLoading ? 0.6 : 1, cursor: loading || googleLoading ? "not-allowed" : "pointer", marginBottom: 6 }} disabled={loading || googleLoading} onClick={() => googleAuth("register")}>
+                  <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+                  {googleLoading ? "Signing in…" : "Continue with Google"}
+                </button>
+              </>
+            )}
+            {role === "mechanic" && hideGoogleForMechanic && (
+              <div style={{ fontSize: 12, color: "#9C8C7C", textAlign: "center", marginTop: 8, padding: "10px 12px", background: "#FAF6F0", borderRadius: 8, border: "1px solid #E0D5C8" }}>
+                Your Google email is linked to a Customer account. Use a different email to create a Mechanic account.
+              </div>
+            )}
 
             <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 6, paddingTop: 16, borderTop: `1px solid #E0D5C8` }}>
               Already have an account?{" "}
@@ -1091,26 +1189,20 @@ export default function LoginPage({ onLogin, isModal = false }) {
             {error && <div style={S.error}>{error}</div>}
             <label style={S.label}>Full Name <span style={{ color: "#DC2626" }}>*</span></label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 18, ...errStyle(!!error && !profile.name.trim()) }} placeholder="e.g. Arjun Sharma" value={profile.name} onChange={e => { setProfile(p => ({ ...p, name: e.target.value })); setError(""); }} autoFocus />
-            <label style={S.label}>I am a…</label>
+            <label style={S.label}>Account Type</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-              {[
-                { value: "INDIVIDUAL", label: "Car Owner", icon: "🚗" },
-                { value: "MECHANIC",   label: "Mechanic",  icon: "🔧" },
-                { value: "FLEET_MANAGER", label: "Fleet Manager", icon: "🚚" },
-              ].map(opt => (
-                <button key={opt.value} type="button"
-                  onClick={() => setProfile(p => ({ ...p, profileType: opt.value }))}
-                  style={{ flex: 1, padding: "10px 6px", borderRadius: 8, border: `1.5px solid ${profile.profileType === opt.value ? "#FF1F3A" : "#3F3F46"}`, background: profile.profileType === opt.value ? "rgba(255,31,58,0.08)" : "#1a1b22", color: profile.profileType === opt.value ? "#FF1F3A" : "#c9c6c5", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", transition: "all 0.15s", textAlign: "center" }}>
-                  <div style={{ fontSize: 18, marginBottom: 4 }}>{opt.icon}</div>
-                  {opt.label}
-                </button>
-              ))}
+              <button type="button"
+                onClick={() => setProfile(p => ({ ...p, profileType: p.profileType === "FLEET_MANAGER" ? "INDIVIDUAL" : "FLEET_MANAGER" }))}
+                style={{ flex: 1, padding: "10px 6px", borderRadius: 8, border: `1.5px solid ${profile.profileType === "FLEET_MANAGER" ? "#BE2B1A" : "#E0D5C8"}`, background: profile.profileType === "FLEET_MANAGER" ? "rgba(190,43,26,0.08)" : "#FFFFFF", color: profile.profileType === "FLEET_MANAGER" ? "#BE2B1A" : "#5C4F40", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", transition: "all 0.15s", textAlign: "center" }}>
+                <div style={{ fontSize: 18, marginBottom: 4 }}>🚚</div>
+                Fleet Manager
+              </button>
             </div>
 
             {/* Vehicle — core to the marketplace experience */}
-            <div style={{ background: "#16171e", border: "1px solid #2e2f3a", borderRadius: 10, padding: "14px 14px 10px", marginBottom: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#c9c6c5", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                🚗 Add Your Vehicle <span style={{ fontWeight: 400, color: "#6b6b75", fontSize: 11 }}>(optional — get personalised part suggestions)</span>
+            <div style={{ background: "#FAF6F0", border: "1px solid #E0D5C8", borderRadius: 10, padding: "14px 14px 10px", marginBottom: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#5C4F40", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                🚗 Add Your Vehicle <span style={{ fontWeight: 400, color: "#9C8C7C", fontSize: 11 }}>(optional — get personalised part suggestions)</span>
               </div>
               <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                 <input className="auth-input" style={{ ...S.input, flex: 1, marginBottom: 0 }} placeholder="Make (e.g. Maruti)" value={vehicle.make} onChange={e => setVehicle(v => ({ ...v, make: e.target.value }))} />
@@ -1131,6 +1223,55 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
             <button className="btn-primary" style={S.btnPrimary(loading)} disabled={loading} onClick={saveProfile}>
               {loading ? "Saving…" : "Enter RedPiston →"}
+            </button>
+          </div>
+        );
+
+      // ══════════════════════════════════════════════════════════════════════
+      // MECHANIC DETAILS — name / phone / shop info for new independent mechanics
+      // ══════════════════════════════════════════════════════════════════════
+      case STEPS.MECHANIC_DETAILS:
+        return (
+          <div className="auth-card">
+            <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+              {[
+                { label: "Account", done: true },
+                { label: "Your Details", done: true },
+                { label: "Verify Email", done: false },
+              ].map(({ label, done }) => (
+                <div key={label} style={{ flex: 1 }}>
+                  <div style={{ height: 3, borderRadius: 4, background: done ? "#BE2B1A" : "#E0D5C8", marginBottom: 5 }} />
+                  <div style={{ fontSize: 9, color: done ? "#BE2B1A" : "#BFB0A0", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={S.chip}>🔧 Mechanic · Step 2 of 3</div>
+            <div style={S.heading}>Your Details</div>
+            <div style={S.sub}>Tell us about yourself and your workshop.</div>
+
+            {error && <div style={S.error}>{error}</div>}
+
+            <label style={S.label}>Full Name <span style={{ color: "#DC2626" }}>*</span></label>
+            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Raju Mechanics" value={mechDetails.name} onChange={e => { setMechDetails(d => ({ ...d, name: e.target.value })); setError(""); }} autoFocus />
+
+            <label style={S.label}>Mobile Number <span style={{ color: "#DC2626" }}>*</span></label>
+            <div style={{ ...S.phoneRow, marginBottom: 14 }}>
+              <div style={S.phoneFlag}>IN +91</div>
+              <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" maxLength={10} inputMode="numeric"
+                value={mechDetails.phone} onChange={e => setMechDetails(d => ({ ...d, phone: e.target.value.replace(/\D/g, "") }))} />
+            </div>
+
+            <label style={S.label}>Mechanic Shop Name</label>
+            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Raju Auto Works" value={mechDetails.shopName} onChange={e => setMechDetails(d => ({ ...d, shopName: e.target.value }))} />
+
+            <label style={S.label}>Shop Location / Area</label>
+            <input className="auth-input" style={{ ...S.input, marginBottom: 24 }} placeholder="e.g. Kukatpally, Hyderabad" value={mechDetails.shopLocation} onChange={e => setMechDetails(d => ({ ...d, shopLocation: e.target.value }))} />
+
+            <button className="btn-primary" style={S.btnPrimary(loading || !mechDetails.name.trim() || !mechDetails.phone.trim())}
+              disabled={loading || !mechDetails.name.trim() || !mechDetails.phone.trim()}
+              onClick={submitMechanicRegistration}>
+              {loading ? "Sending verification…" : "Verify Email →"}
             </button>
           </div>
         );
@@ -1346,6 +1487,45 @@ export default function LoginPage({ onLogin, isModal = false }) {
         <div style={{ width: "100%", maxWidth: isModal ? 440 : ((step === STEPS.LANDING || step === STEPS.REG_ROLE) ? 580 : 440), marginTop: isModal ? 0 : "auto", marginBottom: isModal ? 0 : "auto", paddingTop: isModal ? 0 : 24, paddingBottom: isModal ? 0 : 24 }}>
           {renderStep()}
         </div>
+
+        {/* Role mismatch popup — shown when user tries mechanic tab but account exists as a different role */}
+        {roleMismatch && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 30, backdropFilter: "blur(4px)" }}>
+            <div style={{ background: "#FFFFFF", borderRadius: 16, padding: "28px 28px 24px", maxWidth: 360, width: "calc(100% - 40px)", boxShadow: "0 8px 40px rgba(0,0,0,0.18)", fontFamily: "'Inter', sans-serif" }}>
+              <div style={{ fontSize: 28, marginBottom: 12, textAlign: "center" }}>🔔</div>
+              <div style={{ fontSize: 17, fontWeight: 800, color: "#1A1A1A", marginBottom: 8, textAlign: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Account Already Exists</div>
+              <div style={{ fontSize: 13, color: "#5C4F40", lineHeight: 1.55, marginBottom: 22, textAlign: "center" }}>
+                This email is linked to a <strong>{roleMismatch.user.role === "SHOP_OWNER" ? "Shop Owner" : "Customer"}</strong> account.
+                Would you like to create a separate Mechanic account or continue as {roleMismatch.user.role === "SHOP_OWNER" ? "Shop Owner" : "Customer"}?
+              </div>
+              {roleMismatch.user.role === "CUSTOMER" && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await api.post("/api/mechanic-auth/convert-to-mechanic", {});
+                      const user = { ...(roleMismatch.user || {}), ...(res as any)?.user, role: "MECHANIC" };
+                      setRoleMismatch(null);
+                      setPendingUser(user);
+                      go(STEPS.MECHANIC_DETAILS);
+                    } catch (e) { setError(getErr(e, "Conversion failed. Try again.")); }
+                  }}
+                  style={{ width: "100%", padding: "12px 0", borderRadius: 10, border: "none", background: "#BE2B1A", color: "#FFFFFF", fontWeight: 700, fontSize: 14, cursor: "pointer", marginBottom: 10, fontFamily: "'Inter', sans-serif" }}>
+                  🔧 Convert to Mechanic Account
+                </button>
+              )}
+              <button
+                onClick={() => { setRoleMismatch(null); setRole("mechanic"); setEmail(""); setPassword(""); setConfirmPwd(""); setHideGoogleForMechanic(true); go(STEPS.REG_AUTH); }}
+                style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "1.5px solid #E0D5C8", background: "#FAF6F0", color: "#5C4F40", fontWeight: 600, fontSize: 14, cursor: "pointer", marginBottom: 10, fontFamily: "'Inter', sans-serif" }}>
+                🔧 Create New Mechanic Account
+              </button>
+              <button
+                onClick={() => { setRoleMismatch(null); localStorage.setItem("as_user", JSON.stringify(roleMismatch.user)); onLogin(roleMismatch.user); }}
+                style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "1.5px solid #E0D5C8", background: "#FAF6F0", color: "#5C4F40", fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                Continue as {roleMismatch.user.role === "SHOP_OWNER" ? "Shop Owner" : "Customer"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Transition overlay — shown briefly while navigating from email form to shop details */}
         {settingUp && (

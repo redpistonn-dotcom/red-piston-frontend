@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client.js";
 import { T, FONT } from "../../theme";
+import { useAppCtx } from "../../context/AppCtx.js";
 
 interface Job {
   job_id: number;
@@ -51,6 +52,7 @@ function MSIcon({ name, size = 18 }: { name: string; size?: number }) {
 export default function MechanicJobsPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
+  const { currentUser } = useAppCtx();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function MechanicJobsPage() {
   const load = useCallback((status: string) => {
     setLoading(true);
     const q = status ? `?status=${status}` : "";
-    api.get(`/mechanic/jobs${q}`)
+    api.get(`/api/mechanic/jobs${q}`)
       .then(r => { setJobs(r.data); setTotal(r.total ?? r.data.length); })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -68,8 +70,10 @@ export default function MechanicJobsPage() {
 
   useEffect(() => { load(activeStatus); }, [activeStatus, load]);
 
+  const isIndependent = !currentUser?.shopId;
+
   return (
-    <div style={{ padding: "0 0 16px" }}>
+    <div style={{ padding: "0 0 80px" }}>
       {/* Status filter pills */}
       <div style={{
         display: "flex", gap: 8, overflowX: "auto", padding: "16px 16px 12px",
@@ -101,6 +105,18 @@ export default function MechanicJobsPage() {
         <div style={{ padding: "48px 16px", textAlign: "center" }}>
           <MSIcon name="build_circle" size={48} />
           <p style={{ color: T.t3, marginTop: 12, fontSize: 14 }}>No jobs found</p>
+          {isIndependent && (
+            <button
+              onClick={() => navigate("/mechanic/jobs/new")}
+              style={{
+                marginTop: 16, padding: "12px 24px", background: T.amber, color: "#fff",
+                border: "none", borderRadius: 10, fontWeight: 700, fontSize: 14,
+                cursor: "pointer", fontFamily: FONT.ui,
+              }}
+            >
+              Create your first job
+            </button>
+          )}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -157,6 +173,23 @@ export default function MechanicJobsPage() {
             </div>
           ))}
         </div>
+      )}
+      {/* FAB — create job (independent mechanics only) */}
+      {isIndependent && (
+        <button
+          onClick={() => navigate("/mechanic/jobs/new")}
+          aria-label="Create new job"
+          style={{
+            position: "fixed", bottom: 80, right: 20,
+            width: 56, height: 56, borderRadius: "50%",
+            background: T.amber, color: "#fff", border: "none",
+            boxShadow: "0 4px 16px rgba(139,30,30,0.35)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", zIndex: 100,
+          }}
+        >
+          <MSIcon name="add" size={28} />
+        </button>
       )}
     </div>
   );

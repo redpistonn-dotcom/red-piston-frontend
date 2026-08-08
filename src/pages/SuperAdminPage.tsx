@@ -1947,6 +1947,11 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                               <div style={{ fontSize: 12, fontWeight: 600, color: C.t1 }}>{u.shop.name}</div>
                               <div style={{ fontSize: 11, color: C.t3 }}>{u.shop.city}</div>
                             </div>
+                          ) : (u as any).mechanicShopName ? (
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: C.t1 }}>{(u as any).mechanicShopName}</div>
+                              {(u as any).mechanicShopLocation && <div style={{ fontSize: 11, color: C.t3 }}>{(u as any).mechanicShopLocation}</div>}
+                            </div>
                           ) : <span style={{ color: C.t4 }}>—</span>}
                         </td>
                         <td style={{ ...S.td, color: C.t3 }}>
@@ -2019,9 +2024,11 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                     {/* Row 2: Role badge + shop */}
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <RoleBadge slug={u.userType?.slug || u.role} name={u.userType?.name} />
-                      {u.shop && (
+                      {u.shop ? (
                         <span style={{ fontSize: 12, color: C.t3, fontFamily: FONT.ui }}>🏪 {u.shop.name}, {u.shop.city}</span>
-                      )}
+                      ) : (u as any).mechanicShopName ? (
+                        <span style={{ fontSize: 12, color: C.t3, fontFamily: FONT.ui }}>🔧 {(u as any).mechanicShopName}{(u as any).mechanicShopLocation ? `, ${(u as any).mechanicShopLocation}` : ""}</span>
+                      ) : null}
                     </div>
                     {/* Row 3: Actions */}
                     <div style={{ display: "flex", gap: 8 }}>

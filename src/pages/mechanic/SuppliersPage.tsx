@@ -13,7 +13,7 @@ export default function MechanicSuppliersPage() {
 
   const fetchSuppliers = useCallback((q = "") => {
     setLoading(true);
-    api.get(`/mechanic/suppliers?q=${encodeURIComponent(q)}&limit=100`)
+    api.get(`/api/mechanic/suppliers?q=${encodeURIComponent(q)}&limit=100`)
       .then((r: any) => setSuppliers(r.data || []))
       .catch(console.error)
       .finally(() => setLoading(false));
