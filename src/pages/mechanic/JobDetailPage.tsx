@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api } from "../../api/client.js";
 import { T, FONT } from "../../theme";
+import { useAppCtx } from "../../context/AppCtx.js";
 
 // Mechanic-side allowed transitions (mirrors server lib/mechanic-transitions.js)
 const MECHANIC_TRANSITIONS: Record<string, string[]> = {
@@ -70,6 +71,7 @@ function Btn({ label, icon, onClick, color = T.amber, disabled = false, outline 
 export default function JobDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { currentUser } = useAppCtx();
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [noteText, setNoteText] = useState("");
@@ -81,7 +83,21 @@ export default function JobDetailPage() {
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [partDesc, setPartDesc] = useState("");
   const [partQty, setPartQty] = useState("1");
+  const [partPrice, setPartPrice] = useState("");
   const [savingRequest, setSavingRequest] = useState(false);
+
+  // WhatsApp preview — every customer-facing action (status change, extra
+  // work found, call outcome) returns the exact message text server-side.
+  // The mechanic only ever taps "Send on WhatsApp"; they never type it.
+  const [waPreview, setWaPreview] = useState<{ text: string; link: string | null } | null>(null);
+
+  // Customer call log
+  const [showCallForm, setShowCallForm] = useState(false);
+  const [callPurpose, setCallPurpose] = useState<"STATUS_UPDATE" | "EXTRA_WORK_APPROVAL" | "GENERAL">("GENERAL");
+  const [callPartRequestId, setCallPartRequestId] = useState("");
+  const [callOutcome, setCallOutcome] = useState<"APPROVED" | "REJECTED" | "NO_ANSWER" | "DISCUSSED">("DISCUSSED");
+  const [callNotes, setCallNotes] = useState("");
+  const [savingCall, setSavingCall] = useState(false);
 
   // Work timer
   const [elapsed, setElapsed] = useState(0);
@@ -90,6 +106,14 @@ export default function JobDetailPage() {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [assigningTo, setAssigningTo] = useState("");
   const [assigning, setAssigning] = useState(false);
+
+  // Commission — only a HEAD mechanic (or, for an independent team, the job's
+  // creator) can set what the assigned mechanic earns on this job.
+  const [myRole, setMyRole] = useState<string | null>(null);
+  const [showCommissionForm, setShowCommissionForm] = useState(false);
+  const [commissionAmount, setCommissionAmount] = useState("");
+  const [commissionNote, setCommissionNote] = useState("");
+  const [savingCommission, setSavingCommission] = useState(false);
 
   // Voice-to-text
   const recognitionRef = useRef<any>(null);
@@ -141,6 +165,13 @@ export default function JobDetailPage() {
       .catch(() => {});
   }, []);
 
+  // Own role — determines whether the commission-set control is shown
+  useEffect(() => {
+    api.get("/api/mechanic/profile")
+      .then((r: any) => setMyRole(r.data?.mechanic_role || null))
+      .catch(() => {});
+  }, []);
+
   // Live work clock — counts up while job is IN_PROGRESS
   useEffect(() => {
     if (job?.status !== "IN_PROGRESS") { setElapsed(0); return; }
@@ -169,7 +200,8 @@ export default function JobDetailPage() {
     setTransitioning(true);
     setError("");
     try {
-      await api.patch(`/api/mechanic/jobs/${id}/status`, { status: toStatus });
+      const r: any = await api.patch(`/api/mechanic/jobs/${id}/status`, { status: toStatus });
+      if (r?.data?.whatsapp) setWaPreview(r.data.whatsapp);
       load();
     } catch (e: any) {
       setError(e?.error?.message || "Status update failed");
@@ -195,16 +227,38 @@ export default function JobDetailPage() {
     if (!partDesc.trim()) return;
     setSavingRequest(true);
     try {
-      await api.post(`/api/mechanic/jobs/${id}/part-requests`, {
+      const r: any = await api.post(`/api/mechanic/jobs/${id}/part-requests`, {
         description: partDesc.trim(),
         qtyRequested: parseInt(partQty) || 1,
+        unitPrice: partPrice ? parseFloat(partPrice) : undefined,
       });
-      setPartDesc(""); setPartQty("1"); setShowRequestForm(false);
+      if (r?.data?.whatsapp) setWaPreview(r.data.whatsapp);
+      setPartDesc(""); setPartQty("1"); setPartPrice(""); setShowRequestForm(false);
       load();
     } catch (e: any) {
       setError(e?.error?.message || "Failed to submit request");
     } finally {
       setSavingRequest(false);
+    }
+  }
+
+  async function logCall() {
+    setSavingCall(true);
+    setError("");
+    try {
+      const r: any = await api.post(`/api/mechanic/jobs/${id}/calls`, {
+        purpose: callPurpose,
+        outcome: callOutcome,
+        notes: callNotes.trim() || undefined,
+        partRequestId: callPurpose === "EXTRA_WORK_APPROVAL" && callPartRequestId ? parseInt(callPartRequestId) : undefined,
+      });
+      if (r?.data?.whatsapp) setWaPreview(r.data.whatsapp);
+      setShowCallForm(false); setCallPurpose("GENERAL"); setCallPartRequestId(""); setCallOutcome("DISCUSSED"); setCallNotes("");
+      load();
+    } catch (e: any) {
+      setError(e?.error?.message || "Failed to log call");
+    } finally {
+      setSavingCall(false);
     }
   }
 
@@ -265,6 +319,22 @@ export default function JobDetailPage() {
       setError(e?.error?.message || "Assignment failed");
     } finally {
       setAssigning(false);
+    }
+  }
+
+  async function saveCommission() {
+    const amount = parseFloat(commissionAmount);
+    if (!Number.isFinite(amount) || amount < 0) return;
+    setSavingCommission(true);
+    setError("");
+    try {
+      await api.patch(`/api/mechanic/jobs/${id}/commission`, { amount, note: commissionNote.trim() || undefined });
+      setShowCommissionForm(false); setCommissionAmount(""); setCommissionNote("");
+      load();
+    } catch (e: any) {
+      setError(e?.error?.message || "Failed to set commission");
+    } finally {
+      setSavingCommission(false);
     }
   }
 
@@ -412,6 +482,78 @@ export default function JobDetailPage() {
         {job.estimated_at && <Row icon="schedule" label="Due by" value={new Date(job.estimated_at).toLocaleString("en-IN")} />}
       </div>
 
+      {/* Commission — what the assigned mechanic earns on this job */}
+      {(job.mechanic_commission || (job.shop_id && myRole === "HEAD") || (!job.shop_id && currentUser?.userId === job.created_by)) && (
+        <div style={{ margin: "12px 16px 0", background: T.surface, borderRadius: 14, padding: "12px 14px", border: `1px solid ${T.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <MSIcon name="payments" size={18} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.t1 }}>
+                {job.mechanic_commission ? `Commission: ₹${Number(job.mechanic_commission).toFixed(2)}` : "No commission set"}
+              </span>
+            </div>
+            {((job.shop_id && myRole === "HEAD") || (!job.shop_id && currentUser?.userId === job.created_by)) && !showCommissionForm && (
+              <button
+                onClick={() => { setShowCommissionForm(true); setCommissionAmount(job.mechanic_commission ? String(job.mechanic_commission) : ""); setCommissionNote(job.commission_note || ""); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: T.amber, fontSize: 12, fontWeight: 700, fontFamily: FONT.ui }}
+              >
+                {job.mechanic_commission ? "Edit" : "Set"}
+              </button>
+            )}
+          </div>
+          {job.commission_note && !showCommissionForm && (
+            <div style={{ fontSize: 12, color: T.t3, marginTop: 4 }}>{job.commission_note}</div>
+          )}
+
+          {showCommissionForm && (
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                type="number"
+                placeholder="Commission amount ₹"
+                value={commissionAmount}
+                min={0}
+                onChange={e => setCommissionAmount(e.target.value)}
+                style={{
+                  padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                  fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                  background: T.surfaceContainerLowest,
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Note (optional)"
+                value={commissionNote}
+                onChange={e => setCommissionNote(e.target.value)}
+                style={{
+                  padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                  fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                  background: T.surfaceContainerLowest,
+                }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={saveCommission}
+                  disabled={savingCommission || commissionAmount === ""}
+                  style={{
+                    flex: 1, padding: "9px", background: T.amber, color: "#fff",
+                    border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer",
+                    opacity: savingCommission || commissionAmount === "" ? 0.5 : 1, fontFamily: FONT.ui,
+                  }}
+                >
+                  {savingCommission ? "Saving…" : "Save"}
+                </button>
+                <button
+                  onClick={() => setShowCommissionForm(false)}
+                  style={{ padding: "9px 14px", background: "transparent", border: `1px solid ${T.border}`, borderRadius: 8, cursor: "pointer", color: T.t2, fontFamily: FONT.ui }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Team assignment — only for independent mechanics with registered team members */}
       {!job.shop_id && teamMembers.length > 0 && !jobLocked && (
         <div style={{ margin: "12px 16px 0", background: T.surface, borderRadius: 14, padding: "12px 14px", border: `1px solid ${T.border}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -486,6 +628,47 @@ export default function JobDetailPage() {
       {error && (
         <div style={{ margin: "8px 16px 0", padding: "10px 14px", background: "#FFDAD6", borderRadius: 10, fontSize: 13, color: T.crimson, border: `1px solid ${T.crimson}44` }}>
           {error}
+        </div>
+      )}
+
+      {/* WhatsApp preview — same text shown here goes out on WhatsApp, verbatim */}
+      {waPreview && (
+        <div style={{
+          margin: "8px 16px 0", padding: "12px 14px", borderRadius: 12,
+          background: "#DCF8C6", border: "1px solid #25D36655",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            <MSIcon name="chat" size={16} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#075E54", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Ready to send on WhatsApp
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: "#111", whiteSpace: "pre-wrap", marginBottom: 10, lineHeight: 1.4 }}>
+            {waPreview.text}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {waPreview.link ? (
+              <a
+                href={waPreview.link}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  flex: 1, padding: "9px", background: "#25D366", color: "#fff", textAlign: "center",
+                  borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: "none", fontFamily: FONT.ui,
+                }}
+              >
+                Open WhatsApp & Send
+              </a>
+            ) : (
+              <div style={{ flex: 1, fontSize: 12, color: T.crimson, alignSelf: "center" }}>No customer phone number on file</div>
+            )}
+            <button
+              onClick={() => setWaPreview(null)}
+              style={{ padding: "9px 14px", background: "transparent", border: "1px solid #075E5455", borderRadius: 8, cursor: "pointer", color: "#075E54", fontFamily: FONT.ui }}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
@@ -575,8 +758,19 @@ export default function JobDetailPage() {
                 color: pr.status === "APPROVED" ? T.emerald : pr.status === "REJECTED" ? T.crimson : T.amber,
               }}>{pr.status}</span>
             </div>
-            <div style={{ fontSize: 12, color: T.t3 }}>Qty: {pr.qty_requested}</div>
-            {pr.review_notes && <div style={{ fontSize: 12, color: T.t2, fontStyle: "italic" }}>{pr.review_notes}</div>}
+            <div style={{ fontSize: 12, color: T.t3 }}>
+              Qty: {pr.qty_requested}{pr.unit_price ? ` · ₹${Number(pr.unit_price).toFixed(2)} each` : ""}
+            </div>
+            {pr.review_notes && <div style={{ fontSize: 12, color: T.t2, fontStyle: "italic" }}>Shop: {pr.review_notes}</div>}
+            {pr.customer_decision && (
+              <div style={{
+                marginTop: 4, display: "inline-block", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                background: pr.customer_decision === "APPROVED" ? "#D1FAE522" : "#FEE2E222",
+                color: pr.customer_decision === "APPROVED" ? T.emerald : T.crimson,
+              }}>
+                Customer {pr.customer_decision.toLowerCase()} on call
+              </div>
+            )}
           </div>
         ))}
 
@@ -605,18 +799,32 @@ export default function JobDetailPage() {
                 background: T.surfaceContainerLowest,
               }}
             />
-            <input
-              type="number"
-              placeholder="Qty"
-              value={partQty}
-              min={1}
-              onChange={e => setPartQty(e.target.value)}
-              style={{
-                padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
-                fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
-                background: T.surfaceContainerLowest, width: "100px",
-              }}
-            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="number"
+                placeholder="Qty"
+                value={partQty}
+                min={1}
+                onChange={e => setPartQty(e.target.value)}
+                style={{
+                  padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                  fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                  background: T.surfaceContainerLowest, width: "100px",
+                }}
+              />
+              <input
+                type="number"
+                placeholder="Est. price ₹ (optional)"
+                value={partPrice}
+                min={0}
+                onChange={e => setPartPrice(e.target.value)}
+                style={{
+                  flex: 1, padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                  fontFamily: FONT.ui, fontSize: 13, color: T.t1, outline: "none",
+                  background: T.surfaceContainerLowest,
+                }}
+              />
+            </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={submitPartRequest}
@@ -630,7 +838,129 @@ export default function JobDetailPage() {
                 {savingRequest ? "Sending…" : "Send Request"}
               </button>
               <button
-                onClick={() => { setShowRequestForm(false); setPartDesc(""); setPartQty("1"); }}
+                onClick={() => { setShowRequestForm(false); setPartDesc(""); setPartQty("1"); setPartPrice(""); }}
+                style={{
+                  padding: "9px 14px", background: "transparent", border: `1px solid ${T.border}`,
+                  borderRadius: 8, cursor: "pointer", color: T.t2, fontFamily: FONT.ui,
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* Customer calls — log the phone call, then the exact outcome text
+          goes to WhatsApp so the customer sees the same thing that was
+          agreed on the call. */}
+      <Section title={`Customer Calls${job.calls?.length > 0 ? ` (${job.calls.length})` : ""}`}>
+        {job.customer_phone && (
+          <a
+            href={`tel:${job.customer_phone}`}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "10px 14px", background: T.sky, color: "#fff", borderRadius: 8,
+              fontWeight: 700, fontSize: 13, textDecoration: "none", fontFamily: FONT.ui, marginBottom: 8,
+            }}
+          >
+            <MSIcon name="call" size={16} /> Call {job.customer_name} — {job.customer_phone}
+          </a>
+        )}
+
+        {job.calls?.map((c: any) => (
+          <div key={c.id} style={{ padding: "8px 0", borderBottom: `1px solid ${T.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: T.t1 }}>{c.purpose.replace(/_/g, " ")}</div>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                background: c.outcome === "APPROVED" ? "#D1FAE522" : c.outcome === "REJECTED" ? "#FEE2E222" : T.amberGlow,
+                color: c.outcome === "APPROVED" ? T.emerald : c.outcome === "REJECTED" ? T.crimson : T.amber,
+              }}>{c.outcome}</span>
+            </div>
+            {c.notes && <div style={{ fontSize: 12, color: T.t2, fontStyle: "italic" }}>{c.notes}</div>}
+            <div style={{ fontSize: 11, color: T.t3 }}>{c.mechanic_name} · {new Date(c.created_at).toLocaleString("en-IN")}</div>
+          </div>
+        ))}
+
+        {!showCallForm ? (
+          <button
+            onClick={() => setShowCallForm(true)}
+            style={{
+              marginTop: 8, padding: "8px 14px", background: "transparent",
+              border: `1.5px dashed ${T.border}`, borderRadius: 8, cursor: "pointer",
+              color: T.t2, fontSize: 13, fontFamily: FONT.ui, width: "100%",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            <MSIcon name="add" size={16} /> Log Call Outcome
+          </button>
+        ) : (
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+            <select
+              value={callPurpose}
+              onChange={e => { setCallPurpose(e.target.value as any); setCallPartRequestId(""); }}
+              style={{ padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`, fontFamily: FONT.ui, fontSize: 13, color: T.t1, background: T.surfaceContainerLowest }}
+            >
+              <option value="GENERAL">General update</option>
+              <option value="STATUS_UPDATE">Status update</option>
+              <option value="EXTRA_WORK_APPROVAL">Extra work approval</option>
+            </select>
+
+            {callPurpose === "EXTRA_WORK_APPROVAL" && (
+              <select
+                value={callPartRequestId}
+                onChange={e => setCallPartRequestId(e.target.value)}
+                style={{ padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`, fontFamily: FONT.ui, fontSize: 13, color: T.t1, background: T.surfaceContainerLowest }}
+              >
+                <option value="">Which extra-work item?</option>
+                {partRequests.map((pr: any) => (
+                  <option key={pr.id} value={pr.id}>{pr.description} x{pr.qty_requested}</option>
+                ))}
+              </select>
+            )}
+
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {(["APPROVED", "REJECTED", "NO_ANSWER", "DISCUSSED"] as const).map(o => (
+                <button
+                  key={o}
+                  onClick={() => setCallOutcome(o)}
+                  style={{
+                    flex: "1 1 auto", padding: "7px 10px", borderRadius: 8, cursor: "pointer",
+                    border: `1.5px solid ${callOutcome === o ? T.amber : T.border}`,
+                    background: callOutcome === o ? T.amberGlow : "transparent",
+                    color: callOutcome === o ? T.amber : T.t3,
+                    fontSize: 11, fontWeight: 700, fontFamily: FONT.ui,
+                  }}
+                >{o.replace("_", " ")}</button>
+              ))}
+            </div>
+
+            <textarea
+              placeholder="What was discussed (optional)…"
+              value={callNotes}
+              onChange={e => setCallNotes(e.target.value)}
+              rows={2}
+              style={{
+                padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${T.border}`,
+                fontFamily: FONT.ui, fontSize: 13, color: T.t1, resize: "vertical", boxSizing: "border-box",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={logCall}
+                disabled={savingCall || (callPurpose === "EXTRA_WORK_APPROVAL" && !callPartRequestId)}
+                style={{
+                  flex: 1, padding: "9px", background: T.amber, color: "#fff",
+                  border: "none", borderRadius: 8, fontWeight: 700, cursor: "pointer",
+                  opacity: savingCall || (callPurpose === "EXTRA_WORK_APPROVAL" && !callPartRequestId) ? 0.5 : 1, fontFamily: FONT.ui,
+                }}
+              >
+                {savingCall ? "Saving…" : "Save & Prepare WhatsApp"}
+              </button>
+              <button
+                onClick={() => { setShowCallForm(false); setCallNotes(""); setCallPartRequestId(""); }}
                 style={{
                   padding: "9px 14px", background: "transparent", border: `1px solid ${T.border}`,
                   borderRadius: 8, cursor: "pointer", color: T.t2, fontFamily: FONT.ui,

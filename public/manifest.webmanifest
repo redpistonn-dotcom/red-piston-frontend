@@ -1,0 +1,15 @@
+{
+  "name": "RedPiston",
+  "short_name": "RedPiston",
+  "description": "RedPiston: automotive parts ERP, workshop & mechanic app.",
+  "start_url": "/mechanic",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FDFBF7",
+  "theme_color": "#8B1E1E",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -6,11 +6,13 @@
  * so the two apps read as one product, not two.
  * Completely separate from ERPShell — mechanics have no ERP access.
  */
+import { useEffect } from "react";
 import { useLocation, useNavigate, Outlet } from "react-router-dom";
 import { T, FONT, GLOBAL_CSS } from "../theme";
 import { useAppCtx } from "../context/AppCtx";
 import { ProfileDropdown } from "../components/ProfileDropdown";
 import { BrandHeader } from "../components/BrandHeader";
+import { registerMechanicPush } from "../lib/push";
 
 const SIDEBAR_W = 68; // collapsed rail width — matches ERPShell's SIDEBAR_W
 
@@ -45,6 +47,12 @@ export default function MechanicShell() {
 
   const isIndependent = !currentUser?.shopId;
   const NAV_ITEMS = [...BASE_NAV, isIndependent ? INDEPENDENT_NAV : SHOP_NAV, PROFILE_NAV];
+
+  // Ask once per session — no-ops silently if Firebase/VAPID isn't configured
+  // or the mechanic denies the browser permission prompt.
+  useEffect(() => {
+    if (currentUser?.userId) registerMechanicPush();
+  }, [currentUser?.userId]);
 
   const activeKey = NAV_ITEMS.find(t =>
     t.path === "/mechanic"

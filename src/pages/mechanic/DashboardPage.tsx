@@ -12,6 +12,10 @@ interface DashboardCounts {
   ready_for_qc: string;
   rework: string;
   completed_today: string;
+  commission_earned?: number;
+  commission_pending?: number;
+  avg_rating?: number | null;
+  rating_count?: number;
 }
 
 function MSIcon({ name, size = 22, filled = false }: { name: string; size?: number; filled?: boolean }) {
@@ -207,6 +211,34 @@ export default function MechanicDashboard() {
             <span style={{ fontSize: 11, color: T.crimsonDim, display: "block" }}>Tap to review</span>
           </div>
           <MSIcon name="chevron_right" size={20} />
+        </div>
+      )}
+
+      {/* Earnings + rating strip */}
+      {!loading && counts && (Number(counts.commission_earned) > 0 || Number(counts.commission_pending) > 0 || counts.avg_rating != null) && (
+        <div style={{ display: "grid", gridTemplateColumns: counts.avg_rating != null ? "1fr 1fr 1fr" : "1fr 1fr", gap: 10 }}>
+          <div style={{ background: T.emeraldBg, border: `1px solid ${T.emerald}44`, borderRadius: 14, padding: "12px 14px" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.emerald, textTransform: "uppercase", letterSpacing: "0.06em" }}>Earned</div>
+            <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 800, color: T.t1, marginTop: 2 }}>
+              ₹{Number(counts.commission_earned || 0).toFixed(0)}
+            </div>
+          </div>
+          <div style={{ background: T.amberGlow, border: `1px solid ${T.amber}44`, borderRadius: 14, padding: "12px 14px" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.amber, textTransform: "uppercase", letterSpacing: "0.06em" }}>Pending</div>
+            <div style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 800, color: T.t1, marginTop: 2 }}>
+              ₹{Number(counts.commission_pending || 0).toFixed(0)}
+            </div>
+          </div>
+          {counts.avg_rating != null && (
+            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: "12px 14px" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em" }}>Rating</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginTop: 2 }}>
+                <span style={{ fontFamily: FONT.mono, fontSize: 18, fontWeight: 800, color: T.t1 }}>{counts.avg_rating}</span>
+                <MSIcon name="star" size={14} filled />
+                <span style={{ fontSize: 11, color: T.t3 }}>({counts.rating_count})</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

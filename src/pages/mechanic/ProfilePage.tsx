@@ -79,13 +79,23 @@ export default function MechanicProfilePage() {
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: T.t1 }}>{profile.name}</div>
             <div style={{ fontSize: 13, color: T.t3 }}>{profile.email}</div>
-            <span style={{
-              display: "inline-block", marginTop: 4, fontSize: 11, fontWeight: 700,
-              padding: "2px 8px", borderRadius: 6,
-              background: roleColor + "22", color: roleColor,
-            }}>
-              {profile.mechanic_role} MECHANIC
-            </span>
+            <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                background: roleColor + "22", color: roleColor,
+              }}>
+                {profile.mechanic_role} MECHANIC
+              </span>
+              {profile.avg_rating != null && (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: 3,
+                  fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6,
+                  background: "#FEF3C7", color: "#B45309",
+                }}>
+                  <MSIcon name="star" size={12} /> {profile.avg_rating} ({profile.rating_count})
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
