@@ -90,6 +90,19 @@ export default function JobDetailPage() {
   // work found, call outcome) returns the exact message text server-side.
   // The mechanic only ever taps "Send on WhatsApp"; they never type it.
   const [waPreview, setWaPreview] = useState<{ text: string; link: string | null } | null>(null);
+  const [waEditText, setWaEditText] = useState("");
+  const [waSending, setWaSending] = useState(false);
+  const [waSent, setWaSent] = useState(false);
+  const [waError, setWaError] = useState("");
+
+  // Keep the editable textarea in sync whenever a new preview comes in —
+  // the mechanic can edit it before sending, but each fresh action (status
+  // change, progress tap, call log…) starts from that action's own message.
+  useEffect(() => {
+    setWaEditText(waPreview?.text ?? "");
+    setWaSent(false);
+    setWaError("");
+  }, [waPreview]);
 
   // Customer call log
   const [showCallForm, setShowCallForm] = useState(false);
@@ -141,9 +154,18 @@ export default function JobDetailPage() {
   const [customDesc, setCustomDesc] = useState("");
   const [customPrice, setCustomPrice] = useState("");
 
+  // Whether we've ever successfully loaded this job — a ref (not state) so
+  // it doesn't change `load`'s identity and re-trigger the mount effect.
+  const hasLoadedRef = useRef(false);
+
   const load = useCallback(() => {
     if (!id) return;
-    setLoading(true);
+    // Only blank the whole page for the very first load. Every action on
+    // this page (status change, progress tap, add part, log call…) calls
+    // load() again to refresh — without this guard each of those taps
+    // wiped the entire component back to a bare "Loading…" screen instead
+    // of updating in place.
+    if (!hasLoadedRef.current) setLoading(true);
     Promise.all([
       api.get(`/api/mechanic/jobs/${id}`),
       api.get(`/api/mechanic/jobs/${id}/part-requests`).catch(() => ({ data: [] })),
@@ -151,6 +173,7 @@ export default function JobDetailPage() {
       .then(([jobRes, prRes]: any[]) => {
         setJob(jobRes.data);
         setPartRequests(prRes.data || []);
+        hasLoadedRef.current = true;
       })
       .catch(() => setError("Job not found or not assigned to you"))
       .finally(() => setLoading(false));
@@ -339,6 +362,20 @@ export default function JobDetailPage() {
       setError(e?.error?.message || "Failed to set commission");
     } finally {
       setSavingCommission(false);
+    }
+  }
+
+  async function sendWhatsApp() {
+    if (!waEditText.trim()) return;
+    setWaSending(true);
+    setWaError("");
+    try {
+      await api.post(`/api/mechanic/jobs/${id}/notify`, { text: waEditText.trim() });
+      setWaSent(true);
+    } catch (e: any) {
+      setWaError(e?.error?.message || e?.data?.error?.message || "Send failed — check WhatsApp is set up");
+    } finally {
+      setWaSending(false);
     }
   }
 
@@ -635,42 +672,60 @@ export default function JobDetailPage() {
         </div>
       )}
 
-      {/* WhatsApp preview — same text shown here goes out on WhatsApp, verbatim */}
+      {/* WhatsApp preview — editable, sent server-side, no app-switch needed */}
       {waPreview && (
         <div style={{
           margin: "8px 16px 0", padding: "12px 14px", borderRadius: 12,
-          background: "#DCF8C6", border: "1px solid #25D36655",
+          background: waSent ? "#D1FAE5" : "#DCF8C6", border: `1px solid ${waSent ? T.emerald : "#25D36655"}`,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-            <MSIcon name="chat" size={16} />
+            <MSIcon name={waSent ? "check_circle" : "chat"} size={16} />
             <span style={{ fontSize: 11, fontWeight: 700, color: "#075E54", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              Ready to send on WhatsApp
+              {waSent ? "Sent to customer on WhatsApp" : "Send to customer on WhatsApp"}
             </span>
           </div>
-          <div style={{ fontSize: 13, color: "#111", whiteSpace: "pre-wrap", marginBottom: 10, lineHeight: 1.4 }}>
-            {waPreview.text}
-          </div>
+
+          {waSent ? (
+            <div style={{ fontSize: 13, color: "#111", whiteSpace: "pre-wrap", lineHeight: 1.4 }}>{waEditText}</div>
+          ) : (
+            <textarea
+              value={waEditText}
+              onChange={e => setWaEditText(e.target.value)}
+              rows={5}
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #25D36655",
+                fontFamily: FONT.ui, fontSize: 13, color: "#111", resize: "vertical", boxSizing: "border-box",
+                background: "#fff", marginBottom: 10,
+              }}
+            />
+          )}
+
+          {waError && (
+            <div style={{ fontSize: 12, color: T.crimson, marginBottom: 8 }}>{waError}</div>
+          )}
+          {!waPreview.link && !waSent && (
+            <div style={{ fontSize: 12, color: T.crimson, marginBottom: 8 }}>No customer phone number on file</div>
+          )}
+
           <div style={{ display: "flex", gap: 8 }}>
-            {waPreview.link ? (
-              <a
-                href={waPreview.link}
-                target="_blank"
-                rel="noreferrer"
+            {!waSent && (
+              <button
+                onClick={sendWhatsApp}
+                disabled={waSending || !waEditText.trim() || !waPreview.link}
                 style={{
-                  flex: 1, padding: "9px", background: "#25D366", color: "#fff", textAlign: "center",
-                  borderRadius: 8, fontWeight: 700, fontSize: 13, textDecoration: "none", fontFamily: FONT.ui,
+                  flex: 1, padding: "9px", background: "#25D366", color: "#fff", border: "none",
+                  borderRadius: 8, fontWeight: 700, fontSize: 13, fontFamily: FONT.ui, cursor: "pointer",
+                  opacity: waSending || !waEditText.trim() || !waPreview.link ? 0.5 : 1,
                 }}
               >
-                Open WhatsApp & Send
-              </a>
-            ) : (
-              <div style={{ flex: 1, fontSize: 12, color: T.crimson, alignSelf: "center" }}>No customer phone number on file</div>
+                {waSending ? "Sending…" : "Send"}
+              </button>
             )}
             <button
               onClick={() => setWaPreview(null)}
               style={{ padding: "9px 14px", background: "transparent", border: "1px solid #075E5455", borderRadius: 8, cursor: "pointer", color: "#075E54", fontFamily: FONT.ui }}
             >
-              Dismiss
+              {waSent ? "Close" : "Dismiss"}
             </button>
           </div>
         </div>
