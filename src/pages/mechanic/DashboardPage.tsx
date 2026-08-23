@@ -140,8 +140,104 @@ function SkeletonDonut() {
   );
 }
 
+// Push is only worth an onboarding step if it's actually configured —
+// otherwise the item would just be a dead end for the mechanic to tap.
+const PUSH_CONFIGURED = Boolean(
+  (import.meta as any).env?.VITE_FIREBASE_API_KEY && (import.meta as any).env?.VITE_FIREBASE_VAPID_KEY
+);
+
+function OnboardingChecklist({ profile, counts, userId, navigate }: {
+  profile: any; counts: DashboardCounts | null; userId: number | string | undefined; navigate: (p: string) => void;
+}) {
+  const dismissKey = `mechanic_onboarding_dismissed_${userId ?? "anon"}`;
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(dismissKey) === "1");
+  const [notifPermission, setNotifPermission] = useState<string>(
+    typeof Notification !== "undefined" ? Notification.permission : "unsupported"
+  );
+
+  const hasHandledAJob = Number(profile?.jobs_completed ?? 0) + Number(profile?.jobs_active ?? 0) > 0
+    || (counts ? Number(counts.active) + Number(counts.completed_today) > 0 : false);
+
+  const items = [
+    {
+      key: "skills",
+      label: "Add your skills",
+      done: Boolean(profile?.skills?.length),
+      onClick: () => navigate("/mechanic/profile"),
+    },
+    ...(PUSH_CONFIGURED ? [{
+      key: "notifications",
+      label: "Turn on job notifications",
+      done: notifPermission === "granted",
+      onClick: async () => {
+        if (typeof Notification === "undefined") return;
+        const p = await Notification.requestPermission();
+        setNotifPermission(p);
+      },
+    }] : []),
+    {
+      key: "first-job",
+      label: "Handle your first job",
+      done: hasHandledAJob,
+      onClick: () => navigate("/mechanic/jobs"),
+    },
+  ];
+
+  const allDone = items.every(i => i.done);
+  if (dismissed || allDone) return null;
+
+  function dismiss() {
+    localStorage.setItem(dismissKey, "1");
+    setDismissed(true);
+  }
+
+  return (
+    <div style={{
+      background: T.surface, borderRadius: 14, border: `1px solid ${T.border}`,
+      padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Get set up
+        </span>
+        <button
+          onClick={dismiss}
+          style={{ background: "none", border: "none", cursor: "pointer", color: T.t3, fontSize: 11, fontFamily: FONT.ui }}
+        >
+          Dismiss
+        </button>
+      </div>
+      {items.map(item => (
+        <button
+          key={item.key}
+          onClick={item.done ? undefined : item.onClick}
+          disabled={item.done}
+          style={{
+            display: "flex", alignItems: "center", gap: 10, padding: "8px 4px",
+            background: "transparent", border: "none", textAlign: "left",
+            cursor: item.done ? "default" : "pointer", width: "100%",
+          }}
+        >
+          <span style={{
+            width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+            background: item.done ? T.emerald : T.border,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <MSIcon name="check" size={13} />
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: item.done ? T.t3 : T.t1, textDecoration: item.done ? "line-through" : "none", flex: 1 }}>
+            {item.label}
+          </span>
+          {!item.done && <MSIcon name="chevron_right" size={16} />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function MechanicDashboard() {
   const [counts, setCounts] = useState<DashboardCounts | null>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { currentUser } = useAppCtx();
@@ -151,6 +247,7 @@ export default function MechanicDashboard() {
       .then(r => setCounts(r.data))
       .catch(console.error)
       .finally(() => setLoading(false));
+    api.get("/api/mechanic/profile").then((r: any) => setProfile(r.data)).catch(() => {});
   }, []);
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
@@ -192,6 +289,10 @@ export default function MechanicDashboard() {
           </div>
         )}
       </div>
+
+      {!loading && (
+        <OnboardingChecklist profile={profile} counts={counts} userId={currentUser?.userId} navigate={navigate} />
+      )}
 
       {/* Rework alert banner */}
       {!loading && reworkCount > 0 && (

@@ -31,6 +31,17 @@ export default function MechanicProfilePage() {
   const [skillInput, setSkillInput] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+
+  function loadSessions() {
+    api.get("/api/auth/sessions")
+      .then((r: any) => setSessions(r.data || []))
+      .catch(() => {})
+      .finally(() => setSessionsLoading(false));
+  }
+
   useEffect(() => {
     api.get("/api/mechanic/profile")
       .then((r: any) => {
@@ -39,7 +50,20 @@ export default function MechanicProfilePage() {
       })
       .catch(() => setError("Could not load profile"))
       .finally(() => setLoading(false));
+    loadSessions();
   }, []);
+
+  async function revokeSession(id: number) {
+    setRevokingId(id);
+    try {
+      await api.delete(`/api/auth/sessions/${id}`);
+      setSessions(prev => prev.filter(s => s.id !== id));
+    } catch {
+      alert("Could not log out that device — try again.");
+    } finally {
+      setRevokingId(null);
+    }
+  }
 
   if (loading) return <p style={{ padding: 24, color: T.t3, fontFamily: FONT.ui }}>Loading…</p>;
   if (error) return <p style={{ padding: 24, color: T.crimson, fontFamily: FONT.ui }}>{error}</p>;
@@ -185,6 +209,56 @@ export default function MechanicProfilePage() {
             {!profile.skills?.length && (
               <span style={{ fontSize: 13, color: T.t3 }}>No skills added yet — tap Edit to add.</span>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Active sessions — see and revoke other logged-in devices */}
+      <div style={{ margin: "16px 16px 0", background: T.surface, borderRadius: 12, padding: 14, border: `1px solid ${T.border}` }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+          Active Sessions
+        </div>
+
+        {sessionsLoading ? (
+          <div style={{ fontSize: 13, color: T.t3 }}>Loading…</div>
+        ) : sessions.length === 0 ? (
+          <div style={{ fontSize: 13, color: T.t3 }}>No other active sessions.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {sessions.map((s: any) => (
+              <div key={s.id} style={{
+                display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                borderRadius: 8, border: `1px solid ${T.border}`,
+                background: s.isCurrent ? T.amberGlow : "transparent",
+              }}>
+                <MSIcon name={s.deviceInfo?.platform === "mobile" ? "smartphone" : "computer"} size={18} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.t1 }}>
+                    {s.deviceInfo?.browser || "Unknown"} · {s.deviceInfo?.platform || "unknown"}
+                    {s.isCurrent && (
+                      <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 700, color: T.amber }}>THIS DEVICE</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: T.t3 }}>
+                    {s.ipAddress ? `${s.ipAddress} · ` : ""}
+                    Last active {s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString("en-IN") : "—"}
+                  </div>
+                </div>
+                {!s.isCurrent && (
+                  <button
+                    onClick={() => revokeSession(s.id)}
+                    disabled={revokingId === s.id}
+                    style={{
+                      padding: "6px 12px", background: "transparent", border: `1px solid ${T.crimson}55`,
+                      borderRadius: 8, cursor: "pointer", color: T.crimson, fontSize: 12, fontWeight: 700,
+                      fontFamily: FONT.ui, opacity: revokingId === s.id ? 0.5 : 1, flexShrink: 0,
+                    }}
+                  >
+                    {revokingId === s.id ? "…" : "Log out"}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
