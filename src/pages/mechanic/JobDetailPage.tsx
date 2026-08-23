@@ -214,7 +214,11 @@ export default function JobDetailPage() {
     setTransitioning(true);
     setError("");
     try {
-      await api.patch(`/api/mechanic/jobs/${id}/progress`, { progress });
+      const r: any = await api.patch(`/api/mechanic/jobs/${id}/progress`, { progress });
+      // Whether or not the mechanic sent (or dismissed) the previous preview,
+      // this tap always offers its own fresh one — each action independently
+      // sets waPreview, so a dismissed banner never blocks the next prompt.
+      setWaPreview(r?.data?.whatsapp ?? null);
       load();
     } catch (e: any) {
       setError(e?.error?.message || "Progress update failed");
