@@ -91,7 +91,6 @@ export default function JobDetailPage() {
   // The mechanic only ever taps "Send on WhatsApp"; they never type it.
   const [waPreview, setWaPreview] = useState<{ text: string; link: string | null } | null>(null);
   const [waEditText, setWaEditText] = useState("");
-  const [waSending, setWaSending] = useState(false);
   const [waSent, setWaSent] = useState(false);
   const [waError, setWaError] = useState("");
 
@@ -365,18 +364,20 @@ export default function JobDetailPage() {
     }
   }
 
-  async function sendWhatsApp() {
-    if (!waEditText.trim()) return;
-    setWaSending(true);
+  // Phase 1: open WhatsApp directly with the (possibly edited) text — no
+  // WATI/Meta template dependency, works today with zero external setup.
+  // Phase 2 (planned): swap this for a real server-side send once the
+  // Meta Cloud API is wired up — the backend's POST /jobs/:id/notify
+  // already exists and works, it's just not called from here yet.
+  function sendWhatsApp() {
+    if (!waEditText.trim() || !job?.customer_phone) return;
     setWaError("");
-    try {
-      await api.post(`/api/mechanic/jobs/${id}/notify`, { text: waEditText.trim() });
-      setWaSent(true);
-    } catch (e: any) {
-      setWaError(e?.error?.message || e?.data?.error?.message || "Send failed — check WhatsApp is set up");
-    } finally {
-      setWaSending(false);
-    }
+    const digits = String(job.customer_phone).replace(/\D/g, "");
+    const withCountry = digits.startsWith("91") ? digits : `91${digits}`;
+    const link = `https://wa.me/${withCountry}?text=${encodeURIComponent(waEditText.trim())}`;
+    const win = window.open(link, "_blank");
+    if (!win) { setWaError("Popup blocked — allow popups for this site, or open WhatsApp manually."); return; }
+    setWaSent(true);
   }
 
   function toggleVoice() {
@@ -681,12 +682,15 @@ export default function JobDetailPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
             <MSIcon name={waSent ? "check_circle" : "chat"} size={16} />
             <span style={{ fontSize: 11, fontWeight: 700, color: "#075E54", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              {waSent ? "Sent to customer on WhatsApp" : "Send to customer on WhatsApp"}
+              {waSent ? "Opened in WhatsApp" : "Send to customer on WhatsApp"}
             </span>
           </div>
 
           {waSent ? (
-            <div style={{ fontSize: 13, color: "#111", whiteSpace: "pre-wrap", lineHeight: 1.4 }}>{waEditText}</div>
+            <>
+              <div style={{ fontSize: 13, color: "#111", whiteSpace: "pre-wrap", lineHeight: 1.4, marginBottom: 6 }}>{waEditText}</div>
+              <div style={{ fontSize: 11, color: "#075E54" }}>Tap Send inside WhatsApp to actually deliver it.</div>
+            </>
           ) : (
             <textarea
               value={waEditText}
@@ -703,7 +707,7 @@ export default function JobDetailPage() {
           {waError && (
             <div style={{ fontSize: 12, color: T.crimson, marginBottom: 8 }}>{waError}</div>
           )}
-          {!waPreview.link && !waSent && (
+          {!job?.customer_phone && !waSent && (
             <div style={{ fontSize: 12, color: T.crimson, marginBottom: 8 }}>No customer phone number on file</div>
           )}
 
@@ -711,14 +715,14 @@ export default function JobDetailPage() {
             {!waSent && (
               <button
                 onClick={sendWhatsApp}
-                disabled={waSending || !waEditText.trim() || !waPreview.link}
+                disabled={!waEditText.trim() || !job?.customer_phone}
                 style={{
                   flex: 1, padding: "9px", background: "#25D366", color: "#fff", border: "none",
                   borderRadius: 8, fontWeight: 700, fontSize: 13, fontFamily: FONT.ui, cursor: "pointer",
-                  opacity: waSending || !waEditText.trim() || !waPreview.link ? 0.5 : 1,
+                  opacity: !waEditText.trim() || !job?.customer_phone ? 0.5 : 1,
                 }}
               >
-                {waSending ? "Sending…" : "Send"}
+                Open WhatsApp & Send
               </button>
             )}
             <button
