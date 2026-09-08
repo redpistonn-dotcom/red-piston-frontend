@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { api, setTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
 import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
-import { useGoogleLogin } from "@react-oauth/google";
+import { openGoogleAuthPopup } from "../lib/googleAuthPopup";
 
 /** Minimal photo uploader used only inside the shop registration step */
 function ShopPhotoUploader({ photoUrl, onUploaded }: { photoUrl: string; onUploaded: (url: string) => void }) {
@@ -620,30 +620,19 @@ export default function LoginPage({ onLogin, isModal = false }) {
   };
 
   // ── Google Sign-In ─────────────────────────────────────────────────────────
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        const googleRole = landingTabRef.current === "mechanic" ? "mechanic" : landingTabRef.current === "owner" ? "shop" : "customer";
-        const data = await api.post("/api/auth/google", { accessToken: tokenResponse.access_token, role: googleRole });
-        handleAuthResponse(data);
-      } catch (e: any) {
-        setError(getErr(e, "Google sign-in failed. Try again."));
-      }
-      setGoogleLoading(false);
-    },
-    onError: () => {
-      setError("Google sign-in failed. Try again.");
-      setGoogleLoading(false);
-    },
-    onNonOAuthError: () => {
-      setError(""); // user closed the popup — not an error
-      setGoogleLoading(false);
-    },
-  });
-
-  const googleAuth = (_intent: string) => {
+  const googleAuth = async (_intent: string) => {
     setError(""); setGoogleLoading(true);
-    googleLogin();
+    try {
+      const accessToken = await openGoogleAuthPopup();
+      const googleRole = landingTabRef.current === "mechanic" ? "mechanic" : landingTabRef.current === "owner" ? "shop" : "customer";
+      const data = await api.post("/api/auth/google", { accessToken, role: googleRole });
+      handleAuthResponse(data);
+    } catch (e: any) {
+      if (e?.message === "popup_closed") { /* user cancelled — not an error */ }
+      else if (e?.message === "popup_blocked") setError("Please allow popups for this site and try again.");
+      else setError(getErr(e, "Google sign-in failed. Try again."));
+    }
+    setGoogleLoading(false);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
