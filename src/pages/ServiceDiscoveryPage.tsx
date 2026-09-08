@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { Btn, Input } from "../components/ui";
 import { searchServices, type ServiceSearchResult } from "../api/services";
+import { defaultCarPhoto, hideOnError } from "../utils/defaultImages";
 
 const CATEGORIES = ["All", "Detailing", "PPF", "Ceramic Coating", "Car Wash", "Modification", "Interior", "Repair"];
 
@@ -15,7 +16,16 @@ function formatPrice(r: ServiceSearchResult): string {
 
 function ResultCard({ result }: { result: ServiceSearchResult }) {
   return (
-    <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ width: "100%", height: 120, background: `linear-gradient(135deg, ${T.surface}, ${T.border})`, position: "relative" }}>
+        <img
+          src={result.images?.[0] || defaultCarPhoto(result.id)}
+          alt={result.name}
+          onError={hideOnError}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      </div>
+      <div style={{ padding: "0 18px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {result.shop.logoUrl
           ? <img src={result.shop.logoUrl} alt={result.shop.name} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover" }} />
@@ -52,6 +62,7 @@ function ResultCard({ result }: { result: ServiceSearchResult }) {
       ) : (
         <Btn variant="ghost" full size="sm" disabled>Shop page unavailable</Btn>
       )}
+      </div>
     </div>
   );
 }

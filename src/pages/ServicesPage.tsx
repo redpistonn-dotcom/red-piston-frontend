@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { useAppCtx } from "../AppCtx";
 import { Btn, DataTable, TC, TCMono, Modal, Field, Input, Select, type Column } from "../components/ui";
+import { ImagePicker } from "../components/ImagePicker";
 import {
   getMyServices, createService, updateService, deactivateService,
   type Service, type PricingType, type VehicleCategory,
@@ -47,6 +48,7 @@ interface FormState {
   basePrice: string;
   durationMinutes: string;
   gstPercent: string;
+  imageUrl: string;
   packages: ServicePackage[];
   addons: ServiceAddon[];
   vehiclePricing: ServiceVehiclePricing[];
@@ -54,7 +56,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   name: "", category: "", description: "", pricingType: "FIXED",
-  basePrice: "", durationMinutes: "", gstPercent: "18",
+  basePrice: "", durationMinutes: "", gstPercent: "18", imageUrl: "",
   packages: [], addons: [],
   vehiclePricing: VEHICLE_CATEGORIES.map(vehicleCategory => ({ vehicleCategory, price: 0 })),
 };
@@ -77,6 +79,7 @@ function ServiceFormModal({ open, onClose, editing, onSaved, toast }: {
         basePrice: editing.basePrice != null ? String(editing.basePrice) : "",
         durationMinutes: editing.durationMinutes != null ? String(editing.durationMinutes) : "",
         gstPercent: String(editing.gstPercent ?? 18),
+        imageUrl: editing.images?.[0] || "",
         packages: editing.packages.length ? editing.packages : [],
         addons: editing.addons.length ? editing.addons : [],
         vehiclePricing: VEHICLE_CATEGORIES.map(vehicleCategory => {
@@ -102,6 +105,7 @@ function ServiceFormModal({ open, onClose, editing, onSaved, toast }: {
         basePrice: form.basePrice ? Number(form.basePrice) : null,
         durationMinutes: form.durationMinutes ? parseInt(form.durationMinutes, 10) : null,
         gstPercent: form.gstPercent ? Number(form.gstPercent) : 18,
+        images: form.imageUrl ? [form.imageUrl] : [],
         packages: form.packages.filter(p => p.name.trim() && p.price >= 0),
         addons: form.addons.filter(a => a.name.trim() && a.price >= 0),
         vehiclePricing: form.pricingType === "VEHICLE_DEPENDENT" ? form.vehiclePricing : [],
@@ -131,6 +135,8 @@ function ServiceFormModal({ open, onClose, editing, onSaved, toast }: {
         <Field label="Name" required error={nameInvalid ? "Service name is required" : undefined}>
           <Input value={form.name} onChange={v => { setForm(f => ({ ...f, name: v })); setNameInvalid(false); }} placeholder="e.g. Ceramic Coating" invalid={nameInvalid} />
         </Field>
+
+        <ImagePicker label="Photo" url={form.imageUrl} onChange={v => setForm(f => ({ ...f, imageUrl: v }))} folder="service-photos" size={72} />
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Category">

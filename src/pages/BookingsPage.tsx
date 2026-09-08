@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { T, FONT } from "../theme";
 import { useAppCtx } from "../AppCtx";
 import { Btn, DataTable, TC, TCMono, type Column } from "../components/ui";
-import { getShopBookings, updateBookingStatus, type Booking, type BookingStatus } from "../api/bookings";
+import { getShopBookings, updateBookingStatus, assignBooking, type Booking, type BookingStatus } from "../api/bookings";
+import { getStaff, type StaffMember } from "../api/staff";
 
 const STATUS_META: Record<BookingStatus, { bg: string; color: string; label: string }> = {
   PENDING: { bg: "#FEF3C7", color: "#B45309", label: "Pending" },
@@ -41,6 +42,7 @@ const COLUMNS: Column[] = [
   { key: "when", label: "When", width: 160 },
   { key: "total", label: "Total", width: 100 },
   { key: "status", label: "Status", width: 120 },
+  { key: "staff", label: "Assigned To", width: 150 },
   { key: "actions", label: "Actions", width: 220 },
 ];
 
@@ -63,6 +65,30 @@ function mondayOf(d: Date): Date {
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Select instead of a bespoke picker — a real <select> gives free keyboard
+// nav, screen-reader semantics, and a native ≥44px-tall touch target on
+// mobile without any extra work.
+function AssignDropdown({ booking, staff, assigning, onAssign }: { booking: Booking; staff: StaffMember[]; assigning: number | null; onAssign: (b: Booking, staffId: number | null) => void }) {
+  return (
+    <select
+      aria-label={`Assign staff to booking ${booking.bookingNumber}`}
+      value={booking.assignedStaff?.userId ?? ""}
+      disabled={assigning === booking.id}
+      onChange={e => onAssign(booking, e.target.value ? Number(e.target.value) : null)}
+      style={{
+        fontSize: 12, fontFamily: FONT.ui, color: booking.assignedStaff ? T.t1 : T.t3,
+        background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7,
+        padding: "6px 8px", minHeight: 32, cursor: "pointer", maxWidth: 150,
+      }}
+    >
+      <option value="">Unassigned</option>
+      {staff.filter(s => s.isActive).map(s => (
+        <option key={s.user.userId} value={s.user.userId}>{s.user.name || s.user.phone || `Staff #${s.user.userId}`}</option>
+      ))}
+    </select>
+  );
+}
+
 function ActionButtons({ booking, advancing, onAdvance }: { booking: Booking; advancing: number | null; onAdvance: (b: Booking, s: BookingStatus) => void }) {
   const actions = NEXT_ACTION[booking.status] || [];
   if (actions.length === 0) return <span style={{ fontSize: 11, color: T.t3 }}>—</span>;
@@ -75,8 +101,15 @@ function ActionButtons({ booking, advancing, onAdvance }: { booking: Booking; ad
   );
 }
 
-function WeekCalendar({ bookings, advancing, onAdvance }: { bookings: Booking[]; advancing: number | null; onAdvance: (b: Booking, s: BookingStatus) => void }) {
-  const [selected, setSelected] = useState<Booking | null>(null);
+function WeekCalendar({ bookings, advancing, onAdvance, staff, assigning, onAssign }: {
+  bookings: Booking[]; advancing: number | null; onAdvance: (b: Booking, s: BookingStatus) => void;
+  staff: StaffMember[]; assigning: number | null; onAssign: (b: Booking, staffId: number | null) => void;
+}) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Re-derived from the live `bookings` prop every render (not a snapshot) so
+  // the panel reflects a status/assignment change immediately after reload,
+  // instead of showing stale data from the moment it was clicked.
+  const selected = selectedId != null ? bookings.find(b => b.id === selectedId) || null : null;
 
   // Display range derived from the week's actual bookings, clamped to a sane default.
   const { hourStart, hourEnd } = useMemo(() => {
@@ -124,12 +157,12 @@ function WeekCalendar({ bookings, advancing, onAdvance }: { bookings: Booking[];
                 return (
                   <div
                     key={b.id}
-                    onClick={() => setSelected(b)}
+                    onClick={() => setSelectedId(b.id)}
                     style={{
                       position: "absolute", top, height: Math.max(20, height), left: 3, right: 3,
                       background: meta.bg, borderLeft: `3px solid ${meta.color}`, borderRadius: 4,
                       padding: "2px 5px", cursor: "pointer", overflow: "hidden",
-                      outline: selected?.id === b.id ? `2px solid ${T.amber}` : "none",
+                      outline: selectedId === b.id ? `2px solid ${T.amber}` : "none",
                     }}
                     title={`${b.priceSnapshot.serviceName} — ${b.customer?.name || ""}`}
                   >
@@ -153,8 +186,12 @@ function WeekCalendar({ bookings, advancing, onAdvance }: { bookings: Booking[];
             <div style={{ marginTop: 4 }}>
               <span style={{ background: STATUS_META[selected.status].bg, color: STATUS_META[selected.status].color, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 6 }}>{STATUS_META[selected.status].label}</span>
             </div>
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Assigned to</div>
+              <AssignDropdown booking={selected} staff={staff} assigning={assigning} onAssign={onAssign} />
+            </div>
             <div style={{ marginTop: 12 }}>
-              <ActionButtons booking={selected} advancing={advancing} onAdvance={(b, s) => { onAdvance(b, s); setSelected(null); }} />
+              <ActionButtons booking={selected} advancing={advancing} onAdvance={(b, s) => { onAdvance(b, s); setSelectedId(null); }} />
             </div>
           </div>
         ) : (
@@ -172,6 +209,8 @@ export function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [advancing, setAdvancing] = useState<number | null>(null);
+  const [assigning, setAssigning] = useState<number | null>(null);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
 
   const weekEnd = useMemo(() => { const d = new Date(weekStart); d.setDate(d.getDate() + 6); return d; }, [weekStart]);
@@ -187,6 +226,7 @@ export function BookingsPage() {
   }, [view, weekStart, weekEnd]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { getStaff().then(res => setStaff(res.data || [])).catch(() => {}); }, []);
 
   const advance = async (b: Booking, status: BookingStatus) => {
     setAdvancing(b.id);
@@ -199,6 +239,19 @@ export function BookingsPage() {
       load();
     } finally {
       setAdvancing(null);
+    }
+  };
+
+  const assign = async (b: Booking, staffId: number | null) => {
+    setAssigning(b.id);
+    try {
+      await assignBooking(b.id, staffId);
+      toast(staffId ? "Booking assigned" : "Assignment cleared", "success");
+      load();
+    } catch (e: any) {
+      toast(e?.message || "Could not update assignment", "error");
+    } finally {
+      setAssigning(null);
     }
   };
 
@@ -233,7 +286,7 @@ export function BookingsPage() {
       ) : error ? (
         <div style={{ color: T.crimson, fontSize: 13, padding: "20px 0" }}>{error}</div>
       ) : view === "calendar" ? (
-        <WeekCalendar bookings={bookings} advancing={advancing} onAdvance={advance} />
+        <WeekCalendar bookings={bookings} advancing={advancing} onAdvance={advance} staff={staff} assigning={assigning} onAssign={assign} />
       ) : (
         <DataTable
           columns={COLUMNS}
@@ -254,6 +307,7 @@ export function BookingsPage() {
                 <td style={TC}>
                   <span style={{ background: meta.bg, color: meta.color, fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 6, whiteSpace: "nowrap" }}>{meta.label}</span>
                 </td>
+                <td style={TC}><AssignDropdown booking={b} staff={staff} assigning={assigning} onAssign={assign} /></td>
                 <td style={TC}><ActionButtons booking={b} advancing={advancing} onAdvance={advance} /></td>
               </tr>
             );

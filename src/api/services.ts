@@ -87,6 +87,7 @@ export interface ServiceSearchResult {
   basePrice: number | null;
   gstPercent: number;
   durationMinutes: number | null;
+  images: string[];
   distanceKm: number | null;
   shop: {
     shopId: number; name: string; city: string | null;

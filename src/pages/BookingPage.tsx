@@ -4,6 +4,7 @@ import { T, FONT } from "../theme";
 import { useAppCtx } from "../AppCtx";
 import { Btn, Field, Input, Select } from "../components/ui";
 import { getService, type Service } from "../api/services";
+import { defaultCarPhoto, hideOnError } from "../utils/defaultImages";
 import { getMyVehicles, addMyVehicle, type CustomerVehicle } from "../api/customerVehicles";
 import { getAvailability, createBooking } from "../api/bookings";
 
@@ -169,6 +170,14 @@ export function BookingPage() {
   return (
     <div style={{ fontFamily: FONT.ui, minHeight: "100vh", background: T.bg }}>
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 20px 60px" }}>
+        <div style={{ width: "100%", height: 160, borderRadius: 14, overflow: "hidden", position: "relative", background: `linear-gradient(135deg, ${T.surface}, ${T.border})`, marginBottom: 16 }}>
+          <img
+            src={service.images?.[0] || defaultCarPhoto(service.id)}
+            alt={service.name}
+            onError={hideOnError}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        </div>
         <h1 style={{ fontSize: 20, fontWeight: 800, color: T.t1, fontFamily: FONT.display, margin: "0 0 4px" }}>Book {service.name}</h1>
         <p style={{ fontSize: 13, color: T.t3, margin: "0 0 24px" }}>{currentUser?.name ? `Booking as ${currentUser.name}` : ""}</p>
 

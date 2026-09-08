@@ -7,7 +7,7 @@ import { CATEGORIES, fmt, fmtN, pct, margin } from "../utils";
 import { StatCard, ChartTip, Skeleton } from "../components/ui";
 import { useStore } from "../store";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
-import { getDashboardTrend } from "../api/dashboard";
+import { getDashboardTrend, getBookingsSummary, type BookingsSummary } from "../api/dashboard";
 
 const PIE_C = CHART_COLORS;
 
@@ -34,6 +34,137 @@ function defaultFrom(): string {
   const d = new Date();
   d.setDate(d.getDate() - 30);
   return toDateStr(d);
+}
+
+// Mirrors BookingsPage.tsx's STATUS_META colors so a shop owner sees the same
+// status = same color everywhere in the app.
+const BOOKING_STATUS_COLORS: Record<string, string> = {
+  PENDING: "#B45309", CONFIRMED: "#16A34A", CUSTOMER_ARRIVED: "#0B5FA5",
+  SERVICE_IN_PROGRESS: "#0B5FA5", COMPLETED: "#16A34A", DECLINED: "#BA1A1A",
+  CANCELLED: "#6B7280", NO_SHOW: "#BA1A1A",
+};
+const BOOKING_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pending", CONFIRMED: "Confirmed", CUSTOMER_ARRIVED: "Arrived",
+  SERVICE_IN_PROGRESS: "In Progress", COMPLETED: "Completed", DECLINED: "Declined",
+  CANCELLED: "Cancelled", NO_SHOW: "No-show",
+};
+
+// Hand-rolled donut — same technique as pages/mechanic/DashboardPage.tsx's
+// DonutChart (no charting library in this codebase for a single small chart).
+function BookingStatusDonut({ breakdown }: { breakdown: Record<string, number> }) {
+  const data = Object.entries(breakdown).map(([status, value]) => ({
+    status, value, label: BOOKING_STATUS_LABELS[status] || status, color: BOOKING_STATUS_COLORS[status] || T.t3,
+  }));
+  const total = data.reduce((s, d) => s + d.value, 0);
+
+  if (total === 0) {
+    return <div style={{ fontSize: 12, color: T.t3, padding: "24px 0", textAlign: "center" }}>No bookings in the last 30 days</div>;
+  }
+
+  const cx = 70, cy = 70, r = 50, stroke = 20;
+  const circumference = 2 * Math.PI * r;
+  let offset = 0;
+  const slices = data.filter(d => d.value > 0).map(d => {
+    const dash = (d.value / total) * circumference;
+    const slice = { ...d, dash, gap: circumference - dash, offset };
+    offset += dash;
+    return slice;
+  });
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <svg width={140} height={140} viewBox="0 0 140 140" role="img" aria-label={`Booking status breakdown, last 30 days: ${data.map(d => `${d.label} ${d.value}`).join(", ")}`}>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={T.border} strokeWidth={stroke} />
+        {slices.map((s, i) => (
+          <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={s.color} strokeWidth={stroke}
+            strokeDasharray={`${s.dash} ${s.gap}`} strokeDashoffset={-s.offset + circumference * 0.25} />
+        ))}
+        <text x={cx} y={cy - 6} textAnchor="middle" style={{ fontFamily: FONT.mono, fontSize: 20, fontWeight: 700, fill: T.t1 }}>{total}</text>
+        <text x={cx} y={cy + 12} textAnchor="middle" style={{ fontFamily: FONT.ui, fontSize: 10, fill: T.t3 }}>bookings</text>
+      </svg>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 130 }}>
+        {data.filter(d => d.value > 0).map(d => (
+          <div key={d.status} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 3, background: d.color, flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: T.t2, flex: 1 }}>{d.label}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: T.t1, fontFamily: FONT.mono }}>{d.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatBookingWhen(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+// Self-contained — own fetch, own loading state. Deliberately doesn't touch
+// the surrounding page's existing period/trend/POS logic at all.
+function BookingsSummarySection() {
+  const navigate = useNavigate();
+  const [data, setData] = useState<BookingsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getBookingsSummary()
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+        {[1, 2, 3].map(i => <Skeleton key={i} style={{ height: 128, borderRadius: 16 }} />)}
+      </div>
+    );
+  }
+  // No shop context (e.g. the section isn't applicable) — fail quiet, don't
+  // block the rest of the dashboard the owner actually opened this page for.
+  if (!data) return null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, color: T.t1, fontFamily: FONT.ui, margin: 0, textTransform: "uppercase", letterSpacing: "0.04em" }}>Today's Bookings</h2>
+        <button onClick={() => navigate("/shop/bookings")} style={{ fontSize: 12, fontWeight: 700, color: T.amber, background: "none", border: "none", cursor: "pointer", padding: 0 }}>View all →</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+        <StatCard label="Today's Bookings" value={data.todayCount} icon="event_available" color={T.sky} onClick={() => navigate("/shop/bookings")} />
+        <StatCard label="Pending Requests" value={data.pendingCount} icon="pending_actions" color={T.amber} sub={data.pendingCount > 0 ? "Needs your response" : "All caught up"} onClick={() => navigate("/shop/bookings")} />
+        <StatCard label="Today's Booking Revenue" value={fmt(data.todayRevenue)} icon="payments" color={T.emerald} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 12 }} className="dash-bookings-grid">
+        <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Upcoming</div>
+          {data.upcoming.length === 0 ? (
+            <div style={{ fontSize: 12, color: T.t3, padding: "16px 0" }}>Nothing scheduled next.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {data.upcoming.map(b => (
+                <div key={b.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, paddingBottom: 10, borderBottom: `1px solid ${T.border}` }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: T.t1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.serviceName}</div>
+                    <div style={{ fontSize: 11, color: T.t3 }}>{b.customerName} · {formatBookingWhen(b.scheduledStart)}</div>
+                  </div>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: BOOKING_STATUS_COLORS[b.status] || T.t3, background: `${BOOKING_STATUS_COLORS[b.status] || T.t3}18`, padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap" }}>
+                    {BOOKING_STATUS_LABELS[b.status] || b.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div style={{ background: "#FFFFFF", border: `1px solid ${T.border}`, borderRadius: 16, padding: 20 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: T.t3, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Status mix — last 30 days</div>
+          <BookingStatusDonut breakdown={data.statusBreakdown} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function DashboardPage() {
@@ -267,6 +398,9 @@ export function DashboardPage() {
 
   return (
     <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
+
+      <BookingsSummarySection />
+      <div style={{ height: 1, background: T.border, margin: "4px 0" }} />
 
       {/* ── Date Range Picker ─────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

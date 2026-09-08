@@ -34,6 +34,7 @@ export interface Booking {
   shop?: { shopId: number; name: string; phone: string };
   customer?: { userId: number; name: string; phone: string | null; email: string | null };
   vehicle?: { id: number; make: string; model: string; registrationNo: string | null } | null;
+  assignedStaff?: { userId: number; name: string } | null;
 }
 
 export interface AvailabilityResponse {
@@ -83,3 +84,6 @@ export const getShopBookings = (params: ShopBookingsParams = {}) => {
 
 export const updateBookingStatus = (id: number, data: { status: BookingStatus; version: number; note?: string }) =>
   api.patch<{ success: boolean; booking: Booking }>(`/api/bookings/${id}/status`, data);
+
+export const assignBooking = (id: number, staffId: number | null) =>
+  api.patch<{ success: boolean; booking: Booking }>(`/api/bookings/${id}/assign`, { staffId });

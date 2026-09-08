@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { T, FONT } from "../theme";
 import { getPublicStorefront, type PublicStorefront } from "../api/storefront";
 import type { Service } from "../api/services";
+import { defaultCarPhoto, hideOnError } from "../utils/defaultImages";
 
 function formatPrice(s: Service): string {
   if (s.pricingType === "QUOTE_REQUIRED") return "Quote on request";
@@ -72,10 +73,16 @@ export function PublicStorefrontPage() {
 
   return (
     <div style={{ fontFamily: FONT.ui, minHeight: "100vh", background: T.bg }}>
-      <div style={{
-        height: 220, background: data.coverImageUrl ? `center / cover no-repeat url(${data.coverImageUrl})` : `linear-gradient(135deg, ${accent}, ${T.t1})`,
-        position: "relative",
-      }} />
+      <div style={{ height: 220, position: "relative", overflow: "hidden", background: `linear-gradient(135deg, ${accent}, ${T.t1})` }}>
+        {/* Falls back to a generic detailing photo (not the shop's own) until they
+            upload a cover — onError just lets the gradient behind it show through. */}
+        <img
+          src={data.coverImageUrl || defaultCarPhoto(data.shop.shopId)}
+          alt=""
+          onError={hideOnError}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      </div>
 
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "0 20px 60px" }}>
         <div style={{ display: "flex", gap: 16, alignItems: "flex-end", marginTop: -44 }}>
@@ -117,7 +124,14 @@ export function PublicStorefrontPage() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {data.services.map(s => (
-                <div key={s.id} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "16px 18px" }}>
+                <div key={s.id} style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: "16px 18px", display: "flex", gap: 14 }}>
+                  <img
+                    src={s.images?.[0] || defaultCarPhoto(s.id)}
+                    alt=""
+                    onError={hideOnError}
+                    style={{ width: 72, height: 72, borderRadius: 10, objectFit: "cover", flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: T.t1 }}>{s.name}</div>
@@ -131,6 +145,7 @@ export function PublicStorefrontPage() {
                     {s.pricingType !== "QUOTE_REQUIRED" && (
                       <Link to={`/book/${s.id}`} style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: accent, padding: "7px 16px", borderRadius: 8, textDecoration: "none" }}>Book Now</Link>
                     )}
+                  </div>
                   </div>
                 </div>
               ))}
