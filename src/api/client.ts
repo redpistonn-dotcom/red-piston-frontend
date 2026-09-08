@@ -115,6 +115,7 @@ const _inflight = new Map<string, Promise<unknown>>();
 // ─── Core request function ────────────────────────────────────────────────────
 interface RequestOptions extends RequestInit {
   _isRetry?: boolean;
+  _isColdStartRetry?: boolean;
 }
 
 export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -140,6 +141,13 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
 // Render cold start (the refresh call already succeeded by the time these
 // fire in practice) while still giving the UI a bounded failure to react to.
 const REQUEST_TIMEOUT_MS = 30_000;
+// Render free-tier cold start can take up to ~60s. The first GET after a long
+// idle period (tab left open past the 15min spin-down, or reopened later) can
+// legitimately time out at 30s while the backend is still waking up — with no
+// retry, whichever page fired that GET is stuck on its loading skeleton forever
+// (see auth/client.ts's refresh-path comment for the same underlying issue).
+// One retry with a longer timeout gives the now-awake backend a real chance.
+const COLD_START_RETRY_TIMEOUT_MS = 45_000;
 
 async function fetchWithTimeout(url: string, options: RequestInit, ms: number): Promise<Response> {
   const controller = new AbortController();
@@ -151,17 +159,31 @@ async function fetchWithTimeout(url: string, options: RequestInit, ms: number): 
   }
 }
 
-async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}): Promise<T> {
+async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
+  const method = (options.method || 'GET').toUpperCase();
+
   let res: Response;
   try {
-    res = await fetchWithTimeout(url, { ...options, headers, credentials: 'include' }, REQUEST_TIMEOUT_MS);
+    res = await fetchWithTimeout(url, { ...options, headers, credentials: 'include' }, timeoutMs);
   } catch (err: any) {
+    const isTimeoutOrNetwork = err?.name === 'AbortError' || err instanceof TypeError;
+    // Only GET is safe to silently retry (idempotent) — a timed-out POST/PATCH
+    // may have already landed server-side, so retrying it could double it up.
+    if (isTimeoutOrNetwork && method === 'GET' && !options._isColdStartRetry) {
+      try {
+        return await _doRequest<T>(url, { ...options, _isColdStartRetry: true }, COLD_START_RETRY_TIMEOUT_MS);
+      } catch {
+        // fall through to the original error below — the retry's own error
+        // isn't more useful than this one, and we don't want two different
+        // error shapes depending on which attempt failed.
+      }
+    }
     if (err?.name === 'AbortError') {
       throw Object.assign(new Error('Request timed out. Please try again.'), {
         status: 0, code: 'TIMEOUT',
