@@ -6,6 +6,7 @@ import { GRID_PROPS, AXIS_PROPS, YAXIS_PROPS, AREA_ANIMATION, PIE_ANIMATION, LEG
 import { CATEGORIES, fmt, fmtN, pct, margin } from "../utils";
 import { StatCard, ChartTip, Skeleton } from "../components/ui";
 import { useStore } from "../store";
+import { useAppCtx } from "../context/AppCtx";
 import { useShopMarketplaceSales } from "../hooks/useShopMarketplaceSales";
 import { getDashboardTrend, getBookingsSummary, type BookingsSummary } from "../api/dashboard";
 
@@ -169,6 +170,8 @@ function BookingsSummarySection() {
 
 export function DashboardPage() {
   const { products, movements, orders, activeShopId, jobCards, parties, vehicles, apiSynced } = useStore();
+  const { currentUser } = useAppCtx();
+  const businessType = currentUser?.shop?.businessType || "BOTH";
   const navigate = useNavigate();
   // Legacy onNavigate calls replaced with navigate("/" + p) inline below
   const [period, setPeriod] = useState("30");
@@ -399,9 +402,15 @@ export function DashboardPage() {
   return (
     <div className="page-in rp-gap" style={{ display: "flex", flexDirection: "column" }}>
 
-      <BookingsSummarySection />
-      <div style={{ height: 1, background: T.border, margin: "4px 0" }} />
+      {businessType !== "PARTS" && (
+        <>
+          <BookingsSummarySection />
+          <div style={{ height: 1, background: T.border, margin: "4px 0" }} />
+        </>
+      )}
 
+      {businessType !== "SERVICES" && (
+      <>
       {/* ── Date Range Picker ─────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         {/* Standard period pills */}
@@ -747,7 +756,8 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
-
+      </>
+      )}
 
     </div>
   );

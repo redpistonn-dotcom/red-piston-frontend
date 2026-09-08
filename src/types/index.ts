@@ -46,6 +46,9 @@ export interface Shop {
   photoUrl?: string | null;
   logoUrl?: string | null;
   shopCategory?: string | null;
+  // Which vertical(s) this shop operates — PARTS | SERVICES | BOTH. Gates nav
+  // and dashboard sections; see ERPShell.tsx's visibleNavItems.
+  businessType?: string | null;
   whatsappNumber?: string | null;
   shopDescription?: string | null;
 }

@@ -59,6 +59,16 @@ const NAV_ITEMS = [
   { key: "reviews",     path: "/shop/reviews",       icon: "star_rate",     label: "Reviews"         },
 ] as const;
 
+// Shop-level vertical gate — a shop is PARTS-only, SERVICES-only, or BOTH
+// (Shop.businessType). Unlike the per-staff-user `sections` filter below,
+// this applies to SHOP_OWNER too, since the question isn't "does this user
+// have the section," it's "does this shop even offer this vertical."
+const PARTS_ONLY_KEYS = new Set([
+  "inventory", "pos", "parties", "workshop", "workshop-mp", "history", "reports",
+  "orders", "gstr", "returns", "purchase-returns", "warranty", "credit-notes", "mechanics",
+]);
+const SERVICES_ONLY_KEYS = new Set(["services", "portfolio", "bookings", "reviews"]);
+
 // Resolve a single active nav key: the item whose path is the LONGEST match for
 // the current path. This stops a parent route (/workshop) from highlighting at
 // the same time as its child (/workshop/marketplace).
@@ -170,16 +180,23 @@ export function ERPShell({ children }: ERPShellProps) {
   // redirected away from). "dashboard" is gated like any other section now —
   // except when staff has been granted nothing at all, where it's the one
   // thing requireSection still lets through rather than looping forever.
+  const shopScopedNavItems = useMemo(() => {
+    const businessType = currentUser?.shop?.businessType || "BOTH";
+    if (businessType === "PARTS") return NAV_ITEMS.filter(n => !SERVICES_ONLY_KEYS.has(n.key));
+    if (businessType === "SERVICES") return NAV_ITEMS.filter(n => !PARTS_ONLY_KEYS.has(n.key));
+    return NAV_ITEMS;
+  }, [currentUser?.shop?.businessType]);
+
   const visibleNavItems = useMemo(() => {
-    if (currentUser?.role !== "SHOP_STAFF") return NAV_ITEMS;
+    if (currentUser?.role !== "SHOP_STAFF") return shopScopedNavItems;
     const sections = currentUser?.sections || [];
-    if (sections.length === 0) return NAV_ITEMS.filter(n => n.key === "dashboard");
+    if (sections.length === 0) return shopScopedNavItems.filter(n => n.key === "dashboard");
     // "credit-notes" rides on the "returns" permission, and "mechanics" rides
     // on "staff" (see App.tsx's matching requireSection gates) rather than
     // having their own section keys.
     const sectionKey = (k: string) => k === "credit-notes" ? "returns" : k === "mechanics" ? "staff" : k === "portfolio" ? "services" : k;
-    return NAV_ITEMS.filter(n => sections.includes(sectionKey(n.key)));
-  }, [currentUser]);
+    return shopScopedNavItems.filter(n => sections.includes(sectionKey(n.key)));
+  }, [currentUser, shopScopedNavItems]);
 
 
   // ── Mandatory shop profile completion (photo + contact number) ─────────

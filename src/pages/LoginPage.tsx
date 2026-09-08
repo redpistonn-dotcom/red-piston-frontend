@@ -213,7 +213,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const [loading, setLoading]       = useState(false);
   const [settingUp, setSettingUp] = useState(false); // overlay while transitioning to shop-details
   const [error, setError]         = useState("");
-  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "", shopCategory: "", whatsappNumber: "", photoUrl: "" });
+  const [shopDetails, setShopDetails] = useState({ ownerName: "", shopName: "", address: "", city: "Hyderabad", state: "Telangana", pincode: "", contactPhone: "", email: "", gstin: "", shopCategory: "", businessType: "", whatsappNumber: "", photoUrl: "" });
   const [shopFieldErrors, setShopFieldErrors] = useState<Record<string, boolean>>({});
   const [vehicle, setVehicle] = useState({ make: "", model: "", year: "", fuelType: "", registrationNo: "" });
   const [profile, setProfile]     = useState({ name: "", profileType: "INDIVIDUAL" });
@@ -535,7 +535,10 @@ export default function LoginPage({ onLogin, isModal = false }) {
       state: !shopDetails.state,
       pincode: pin.length !== 6,
       contactPhone: ph.length !== 10,
-      shopCategory: !shopDetails.shopCategory,
+      businessType: !shopDetails.businessType,
+      // Only relevant to a shop that actually sells parts — a decor/services-only
+      // shop has no parts taxonomy to pick.
+      shopCategory: shopDetails.businessType !== "SERVICES" && !shopDetails.shopCategory,
       whatsappNumber: wa.length !== 10,
       email: !shopDetails.email.trim() || !emailValid,
       gstin: shopDetails.gstin.length !== 15,
@@ -560,7 +563,8 @@ export default function LoginPage({ onLogin, isModal = false }) {
         contactPhone:    ph,
         email:           shopDetails.email.trim() || undefined,
         gstin:           shopDetails.gstin.trim() || undefined,
-        shopCategory:    shopDetails.shopCategory || undefined,
+        shopCategory:    shopDetails.businessType !== "SERVICES" ? (shopDetails.shopCategory || undefined) : undefined,
+        businessType:    shopDetails.businessType || "BOTH",
         whatsappNumber:  shopDetails.whatsappNumber.replace(/\D/g,"") || undefined,
         photoUrl:        shopDetails.photoUrl || undefined,
       });
@@ -1106,17 +1110,45 @@ export default function LoginPage({ onLogin, isModal = false }) {
               </div>
             </div>
 
-            <label style={S.label}>Shop Category <span style={{ color: "#DC2626" }}>*</span></label>
-            <select className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.shopCategory ? 4 : 14, cursor: "pointer", ...errStyle(shopFieldErrors.shopCategory) }} value={shopDetails.shopCategory} onChange={e => { setShopDetails(d => ({ ...d, shopCategory: e.target.value })); setShopFieldErrors(p => ({ ...p, shopCategory: false })); }}>
-              <option value="">Select category…</option>
-              <option value="AUTO_PARTS">Auto Parts Retailer</option>
-              <option value="WORKSHOP">Workshop / Service Centre</option>
-              <option value="BOTH">Auto Parts + Workshop</option>
-              <option value="TYRES">Tyre Shop</option>
-              <option value="ELECTRICAL">Auto Electrical</option>
-              <option value="GENERAL">General Automotive</option>
-            </select>
-            {shopFieldErrors.shopCategory && <div style={S.fieldErr}>↑ Required</div>}
+            <label style={S.label}>What does your business do? <span style={{ color: "#DC2626" }}>*</span></label>
+            <div style={{ display: "flex", gap: 8, marginBottom: shopFieldErrors.businessType ? 4 : 14 }}>
+              {[
+                { key: "PARTS", label: "Auto Parts Shop" },
+                { key: "SERVICES", label: "Car Decor & Services" },
+                { key: "BOTH", label: "Both" },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => { setShopDetails(d => ({ ...d, businessType: opt.key })); setShopFieldErrors(p => ({ ...p, businessType: false, shopCategory: false })); }}
+                  style={{
+                    flex: 1, padding: "10px 8px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    border: shopDetails.businessType === opt.key ? "2px solid #B91C1C" : "1px solid #D1D5DB",
+                    background: shopDetails.businessType === opt.key ? "#FEF2F2" : "#fff",
+                    color: shopDetails.businessType === opt.key ? "#B91C1C" : "#374151",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {shopFieldErrors.businessType && <div style={S.fieldErr}>↑ Required</div>}
+
+            {shopDetails.businessType !== "SERVICES" && (
+              <>
+                <label style={S.label}>Shop Category <span style={{ color: "#DC2626" }}>*</span></label>
+                <select className="auth-input" style={{ ...S.input, marginBottom: shopFieldErrors.shopCategory ? 4 : 14, cursor: "pointer", ...errStyle(shopFieldErrors.shopCategory) }} value={shopDetails.shopCategory} onChange={e => { setShopDetails(d => ({ ...d, shopCategory: e.target.value })); setShopFieldErrors(p => ({ ...p, shopCategory: false })); }}>
+                  <option value="">Select category…</option>
+                  <option value="AUTO_PARTS">Auto Parts Retailer</option>
+                  <option value="WORKSHOP">Workshop / Service Centre</option>
+                  <option value="BOTH">Auto Parts + Workshop</option>
+                  <option value="TYRES">Tyre Shop</option>
+                  <option value="ELECTRICAL">Auto Electrical</option>
+                  <option value="GENERAL">General Automotive</option>
+                </select>
+                {shopFieldErrors.shopCategory && <div style={S.fieldErr}>↑ Required</div>}
+              </>
+            )}
 
             <label style={S.label}>Shop Contact Number <span style={{ color: "#DC2626" }}>*</span></label>
             <div style={{ ...S.phoneRow, marginBottom: shopFieldErrors.contactPhone ? 4 : 14 }}>

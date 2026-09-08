@@ -906,23 +906,52 @@ export function ProfilePage({ user, onUserUpdate, onLogout }) {
                 <input style={S.input} value={shopData.ownerName || ""} onChange={e => setShopData(p => ({ ...p, ownerName: e.target.value }))} />
               </div>
             </div>
+            <div style={{ ...S.field, marginBottom: 14 }}>
+              <label style={S.label}>What does your business do?</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[
+                  { key: "PARTS", label: "Auto Parts Shop" },
+                  { key: "SERVICES", label: "Car Decor & Services" },
+                  { key: "BOTH", label: "Both" },
+                ].map(opt => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setShopData(p => ({ ...p, businessType: opt.key }))}
+                    style={{
+                      flex: 1, padding: "10px 8px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                      border: (shopData.businessType || "BOTH") === opt.key ? `2px solid ${T.crimson}` : "1px solid #D1D5DB",
+                      background: (shopData.businessType || "BOTH") === opt.key ? "rgba(186,26,26,0.06)" : "#fff",
+                      color: (shopData.businessType || "BOTH") === opt.key ? T.crimson : "#374151",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 11.5, color: T.t3, marginTop: 6, lineHeight: 1.4 }}>
+                Switching away from a vertical hides its menu, dashboard, and manage access — your data is kept and switching back restores it.
+              </div>
+            </div>
             <div className="settings-grid" style={S.row}>
               <div style={S.field}>
                 <label style={S.label}>GSTIN</label>
                 <input style={S.input} value={shopData.gstin || ""} onChange={e => setShopData(p => ({ ...p, gstin: cleanGstin(e.target.value) }))} placeholder="36AABCS1429B1Z1" />
               </div>
-              <div style={S.field}>
-                <label style={S.label}>Shop Category</label>
-                <select style={{ ...S.input, cursor: "pointer" }} value={shopData.shopCategory || ""} onChange={e => setShopData(p => ({ ...p, shopCategory: e.target.value }))}>
-                  <option value="">Select category</option>
-                  <option value="AUTO_PARTS">Auto Parts</option>
-                  <option value="WORKSHOP">Workshop</option>
-                  <option value="BOTH">Auto Parts + Workshop</option>
-                  <option value="TYRES">Tyres</option>
-                  <option value="ELECTRICAL">Electrical</option>
-                  <option value="GENERAL">General</option>
-                </select>
-              </div>
+              {shopData.businessType !== "SERVICES" && (
+                <div style={S.field}>
+                  <label style={S.label}>Shop Category</label>
+                  <select style={{ ...S.input, cursor: "pointer" }} value={shopData.shopCategory || ""} onChange={e => setShopData(p => ({ ...p, shopCategory: e.target.value }))}>
+                    <option value="">Select category</option>
+                    <option value="AUTO_PARTS">Auto Parts</option>
+                    <option value="WORKSHOP">Workshop</option>
+                    <option value="BOTH">Auto Parts + Workshop</option>
+                    <option value="TYRES">Tyres</option>
+                    <option value="ELECTRICAL">Electrical</option>
+                    <option value="GENERAL">General</option>
+                  </select>
+                </div>
+              )}
             </div>
             <div className="settings-grid" style={S.row}>
               <div style={S.field}>
