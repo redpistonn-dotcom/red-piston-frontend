@@ -16,6 +16,7 @@ const LOGO =
 
 const NAV_LINKS = [
   { label: 'Home',      href: '/marketplace' },
+  { label: 'Services',  href: '/services'    },
   { label: 'Suppliers', href: '/suppliers'   },
 ];
 

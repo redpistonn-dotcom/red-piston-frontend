@@ -75,6 +75,15 @@ const AuditLogPage       = lazy(() => import("./pages/AuditLogPage").then(m => (
 const StaffPage          = lazy(() => import("./pages/StaffPage").then(m => ({ default: m.StaffPage })));
 const MechanicsPage      = lazy(() => import("./pages/MechanicsPage").then(m => ({ default: m.MechanicsPage })));
 const ShopSettingsPage   = lazy(() => import("./pages/ShopSettingsPage").then(m => ({ default: m.ShopSettingsPage })));
+const ServicesPage           = lazy(() => import("./pages/ServicesPage").then(m => ({ default: m.ServicesPage })));
+const StorefrontSettingsPage = lazy(() => import("./pages/StorefrontSettingsPage").then(m => ({ default: m.StorefrontSettingsPage })));
+const PublicStorefrontPage   = lazy(() => import("./pages/PublicStorefrontPage").then(m => ({ default: m.PublicStorefrontPage })));
+const PortfolioPage          = lazy(() => import("./pages/PortfolioPage").then(m => ({ default: m.PortfolioPage })));
+const ServiceDiscoveryPage   = lazy(() => import("./pages/ServiceDiscoveryPage").then(m => ({ default: m.ServiceDiscoveryPage })));
+const BookingPage            = lazy(() => import("./pages/BookingPage").then(m => ({ default: m.BookingPage })));
+const MyBookingsPage         = lazy(() => import("./pages/MyBookingsPage").then(m => ({ default: m.MyBookingsPage })));
+const BookingsPage           = lazy(() => import("./pages/BookingsPage").then(m => ({ default: m.BookingsPage })));
+const ReviewsPage            = lazy(() => import("./pages/ReviewsPage").then(m => ({ default: m.ReviewsPage })));
 
 // ── Mechanic app pages ────────────────────────────────────────────────────────
 const MechanicShell           = lazy(() => import("./shells/MechanicShell"));
@@ -948,6 +957,11 @@ function AppContent() {
           <Route path="/staff"      element={requireSection(currentUser, "staff", <ERPShell><PageErrorBoundary><StaffPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/mechanics"  element={requireSection(currentUser, "staff", <ERPShell><PageErrorBoundary><MechanicsPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/shop-settings" element={requireSection(currentUser, "shop-settings", <ERPShell><PageErrorBoundary><ShopSettingsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/shop/services" element={requireSection(currentUser, "services", <ERPShell><PageErrorBoundary><ServicesPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/shop/storefront-settings" element={requireSection(currentUser, "services", <ERPShell><PageErrorBoundary><StorefrontSettingsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/shop/portfolio" element={requireSection(currentUser, "services", <ERPShell><PageErrorBoundary><PortfolioPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/shop/bookings" element={requireSection(currentUser, "bookings", <ERPShell><PageErrorBoundary><BookingsPage /></PageErrorBoundary></ERPShell>)} />
+          <Route path="/shop/reviews" element={requireSection(currentUser, "reviews", <ERPShell><PageErrorBoundary><ReviewsPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/returns"          element={requireSection(currentUser, "returns", <ERPShell><PageErrorBoundary><ReturnsPage /></PageErrorBoundary></ERPShell>)} />
           <Route path="/purchase-returns" element={requireSection(currentUser, "purchase-returns", <ERPShell><PageErrorBoundary><PurchaseReturnsPage /></PageErrorBoundary></ERPShell>)} />
           {/* Returns and Exchange merged into one flow — old bookmarks to /exchanges still land somewhere sensible */}
@@ -959,15 +973,23 @@ function AppContent() {
           {/* Marketplace routes */}
           {/* New marketplace — Stitch design (browse without login, cart requires login) */}
           <Route path="/marketplace"          element={<MarketplacePage />} />
+          <Route path="/services"             element={<ServiceDiscoveryPage />} />
           <Route path="/cart"                 element={<CartPage />} />
           <Route path="/saved"                element={<SavedItemsPage />} />
           <Route path="/suppliers"            element={<SuppliersPage />} />
           {/* /oem-parts removed — redirect to marketplace */}
           <Route path="/oem-parts"            element={<Navigate to="/marketplace" replace />} />
           <Route path="/marketplace/legacy"   element={<MarketplaceHome />} />
+          {/* Public shop storefront — redpiston.in/shop/<slug>, no login required.
+              Static /shop/services and /shop/storefront-settings above always win
+              over this dynamic segment (react-router ranks static routes higher),
+              and those two names are also blocked server-side as reserved slugs. */}
+          <Route path="/shop/:slug" element={<PublicStorefrontPage />} />
           <Route path="/marketplace/orders"   element={currentUser ? <MPShell><PageErrorBoundary><OrderTrackingPage /></PageErrorBoundary></MPShell> : <Navigate to="/" replace />} />
           <Route path="/marketplace/pricing"  element={currentUser ? <MPShell><PageErrorBoundary><PricingPage /></PageErrorBoundary></MPShell>        : <Navigate to="/" replace />} />
           <Route path="/marketplace/checkout" element={currentUser ? <MPShell><PageErrorBoundary><CheckoutPage /></PageErrorBoundary></MPShell>       : <Navigate to="/" replace />} />
+          <Route path="/book/:serviceId" element={currentUser ? <PageErrorBoundary><BookingPage /></PageErrorBoundary> : <Navigate to="/" replace />} />
+          <Route path="/bookings" element={currentUser ? <MPShell><PageErrorBoundary><MyBookingsPage /></PageErrorBoundary></MPShell> : <Navigate to="/" replace />} />
 
           {/* Shared pages — shell matches role */}
           <Route path="/profile"  element={<AuthenticatedShell user={currentUser}><ProfilePage user={currentUser} onUserUpdate={(u) => setCurrentUser(u)} onLogout={handleLogout} /></AuthenticatedShell>} />

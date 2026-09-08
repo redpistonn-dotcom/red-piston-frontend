@@ -6,9 +6,10 @@ import { Toast } from "../components/ui";
 import { CartDrawer } from "../marketplace/components/CartDrawer";
 
 const MP_NAV = [
-  { key: "home",   path: "/marketplace",         icon: "🏠", label: "Home",    color: "#10B981" },
-  { key: "orders", path: "/marketplace/orders",  icon: "📦", label: "Orders",  color: "#0EA5E9" },
-  { key: "pricing",path: "/marketplace/pricing", icon: "💎", label: "Pricing", color: "#D97706" },
+  { key: "home",     path: "/marketplace",  icon: "🏠", label: "Home",         color: "#10B981" },
+  { key: "orders",   path: "/marketplace/orders",  icon: "📦", label: "Orders",  color: "#0EA5E9" },
+  { key: "bookings", path: "/bookings",     icon: "📅", label: "My Bookings",  color: "#8B1A0F" },
+  { key: "pricing",  path: "/marketplace/pricing", icon: "💎", label: "Pricing", color: "#D97706" },
 ];
 
 interface MPShellProps { children: import('react').ReactNode; }

@@ -53,6 +53,10 @@ const NAV_ITEMS = [
   { key: "purchase-returns", path: "/purchase-returns", icon: "unarchive",  label: "Purchase Returns" },
   { key: "warranty",    path: "/warranty",           icon: "verified",       label: "Warranty"       },
   { key: "credit-notes", path: "/credit-notes",      icon: "receipt_long",   label: "Credit Notes"   },
+  { key: "services",    path: "/shop/services",      icon: "home_repair_service", label: "Services"  },
+  { key: "portfolio",   path: "/shop/portfolio",     icon: "photo_library",  label: "Portfolio"      },
+  { key: "bookings",    path: "/shop/bookings",      icon: "event_available", label: "Bookings"      },
+  { key: "reviews",     path: "/shop/reviews",       icon: "star_rate",     label: "Reviews"         },
 ] as const;
 
 // Resolve a single active nav key: the item whose path is the LONGEST match for
@@ -173,7 +177,7 @@ export function ERPShell({ children }: ERPShellProps) {
     // "credit-notes" rides on the "returns" permission, and "mechanics" rides
     // on "staff" (see App.tsx's matching requireSection gates) rather than
     // having their own section keys.
-    const sectionKey = (k: string) => k === "credit-notes" ? "returns" : k === "mechanics" ? "staff" : k;
+    const sectionKey = (k: string) => k === "credit-notes" ? "returns" : k === "mechanics" ? "staff" : k === "portfolio" ? "services" : k;
     return NAV_ITEMS.filter(n => sections.includes(sectionKey(n.key)));
   }, [currentUser]);
 
