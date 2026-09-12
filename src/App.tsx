@@ -15,6 +15,14 @@
  * WHY: App.jsx was 1,330 lines. Shell components are 400+ lines of layout code
  * that had nothing to do with auth or routing. Splitting them makes each file
  * single-purpose and independently navigable.
+ *
+ * ARCHITECTURE NOTE: this repo is designated as the future "marketplace"
+ * (customer-facing) app in the planned redpiston.com / shop.redpiston.com /
+ * admin.redpiston.com split — one backend, separate frontends per audience.
+ * The owner/staff/mechanic surface (ERPShell + MechanicShell + car-decor
+ * management) has already been split off into the sibling red-piston-shop
+ * repo (copy-then-trim from this one, not yet cut over to production).
+ * This repo is untouched by that split and keeps working exactly as before.
  */
 import { useState, useCallback, useEffect, Component, useMemo, lazy, Suspense, cloneElement, isValidElement } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
