@@ -693,38 +693,12 @@ export default function LoginPage({ onLogin, isModal = false }) {
           return (
             <div className="auth-card">
               {/* Segmented role toggle */}
-              <div style={{ display: "flex", background: "#F0E8DF", borderRadius: 11, padding: 4, marginBottom: 18 }}>
-                {[
-                  { key: "customer", emoji: "🚗", label: "Customer" },
-                  { key: "owner", emoji: "🏪", label: "Shop Owner" },
-                  { key: "mechanic", emoji: "🔧", label: "Mechanic" },
-                ].map(t => (
-                  <button
-                    key={t.key}
-                    onClick={() => { setLandingTab(t.key); setRole(t.key === "owner" ? "shop" : t.key === "mechanic" ? "mechanic" : "customer"); setError(""); setPassword(""); setConfirmPwd(""); setShowPwd(false); setShowConfirmPwd(false); setForgotMode(false); }}
-                    style={{
-                      flex: 1, padding: "9px 0", borderRadius: 8, border: "none",
-                      background: landingTab === t.key ? "#FFFFFF" : "transparent",
-                      color: landingTab === t.key ? "#1A1205" : "#9C8C7C",
-                      fontSize: 13, fontWeight: 700, cursor: "pointer",
-                      fontFamily: "'Inter', sans-serif",
-                      boxShadow: landingTab === t.key ? "0 1px 6px rgba(26,18,5,0.1)" : "none",
-                      transition: "all 0.18s",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    }}
-                  >
-                    <span>{t.emoji}</span>
-                    <span>{t.label}</span>
-                  </button>
-                ))}
-              </div>
-
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 20, fontWeight: 800, color: "#1A1205", letterSpacing: "-0.3px", fontFamily: "'Plus Jakarta Sans',sans-serif", lineHeight: 1.15 }}>
-                  {landingTab === "mechanic" ? "Mechanic Portal" : landingTab === "owner" ? "Welcome back" : "Sign in"}
+                  Sign in
                 </div>
                 <div style={{ fontSize: 13, color: "#9C8C7C", marginTop: 4, lineHeight: 1.4 }}>
-                  {landingTab === "mechanic" ? "Sign in to your mechanic dashboard." : landingTab === "owner" ? "Sign in to your shop dashboard." : "Access your RedPiston account."}
+                  Access your RedPiston account.
                 </div>
               </div>
 
@@ -783,13 +757,13 @@ export default function LoginPage({ onLogin, isModal = false }) {
 
               {!forgotMode && (
                 <div style={{ textAlign: "center", fontSize: 13, color: "#9C8C7C", marginTop: 14, paddingTop: 12, borderTop: "1px solid #E0D5C8" }}>
-                  {landingTab === "mechanic" ? "New mechanic? " : landingTab === "owner" ? "New shop? " : "No account? "}
+                  No account?{" "}
                   <button onClick={() => {
                     setEmail(""); setPassword(""); setConfirmPwd("");
-                    setRole(landingTab === "owner" ? "shop" : landingTab === "mechanic" ? "mechanic" : "customer");
+                    setRole("customer");
                     go(STEPS.REG_AUTH);
                   }} style={{ background: "none", border: "none", color: "#BE2B1A", cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "'Inter',sans-serif" }}>
-                    {landingTab === "mechanic" ? "Register as mechanic →" : landingTab === "owner" ? "Register your shop →" : "Create account →"}
+                    Create account →
                   </button>
                 </div>
               )}
@@ -797,50 +771,25 @@ export default function LoginPage({ onLogin, isModal = false }) {
           );
         }
 
-        // Non-modal: two role cards
+        // Non-modal: customer-only sign in / create account
         return (
           <div className="auth-card">
-            <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
               <div style={S.heading}>Welcome to RedPiston</div>
-              <div style={{ fontSize: 15, color: "#9C8C7C", marginTop: 8, lineHeight: 1.5 }}>How would you like to continue?</div>
+              <div style={{ fontSize: 15, color: "#9C8C7C", marginTop: 8, lineHeight: 1.5 }}>Sign in to browse parts &amp; track orders.</div>
             </div>
 
-            {/* Role cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 22 }}>
-              {[
-                { key: "customer", emoji: "🚗", title: "Customer", desc: "Buy auto parts with fitment guarantee", cta: "Create Account",
-                  onSignIn: () => { setLandingTab("customer"); go(STEPS.SIGNIN); },
-                  onCreate: () => { setRole("customer"); setLandingTab("customer"); go(STEPS.REG_AUTH); } },
-                { key: "owner", emoji: "🏪", title: "Shop Owner", desc: "Manage your shop, billing & inventory", cta: "Register Shop",
-                  onSignIn: () => { setLandingTab("owner"); go(STEPS.SIGNIN); },
-                  onCreate: () => { setRole("shop"); setLandingTab("owner"); go(STEPS.REG_AUTH); } },
-                { key: "mechanic", emoji: "🔧", title: "Mechanic", desc: "Manage jobs, track clients & grow your workshop", cta: "Register",
-                  onSignIn: () => { setLandingTab("mechanic"); go(STEPS.SIGNIN); },
-                  onCreate: () => { setRole("mechanic"); setLandingTab("mechanic"); go(STEPS.REG_AUTH); } },
-              ].map(r => (
-                <div key={r.key} style={{ background: "#FFFFFF", border: "1.5px solid #E0D5C8", borderRadius: 16, padding: "26px 18px", display: "flex", flexDirection: "column", alignItems: "center", gap: 0, boxShadow: "0 2px 10px rgba(26,18,5,0.05)" }}>
-                  <div style={{ width: 58, height: 58, borderRadius: "50%", background: "#FBF0EE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 30, marginBottom: 14 }}>{r.emoji}</div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: "#1A1205", marginBottom: 6, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{r.title}</div>
-                  <div style={{ fontSize: 13, color: "#9C8C7C", lineHeight: 1.5, textAlign: "center", marginBottom: 20, minHeight: 40 }}>{r.desc}</div>
-                  <button className="btn-primary" style={{ ...S.btnPrimary(false), marginBottom: 9 }}
-                    onClick={r.onSignIn}>
-                    Sign In →
-                  </button>
-                  <button className="btn-outline-stitch" style={{ ...S.btnOutline }}
-                    onClick={r.onCreate}>
-                    {r.cta}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Shop mechanic join (via invite code) */}
-            <div style={{ textAlign: "center", marginBottom: 12 }}>
-              <a href="/mechanic/join" style={{ fontSize: 12, color: "#BFB0A0", textDecoration: "none" }}>Joining a shop via invite code? →</a>
-            </div>
+            <button className="btn-primary" style={{ ...S.btnPrimary(false), marginBottom: 12 }}
+              onClick={() => { setLandingTab("customer"); go(STEPS.SIGNIN); }}>
+              Sign In →
+            </button>
+            <button className="btn-outline-stitch" style={{ ...S.btnOutline }}
+              onClick={() => { setRole("customer"); setLandingTab("customer"); go(STEPS.REG_AUTH); }}>
+              Create Account
+            </button>
 
             {/* Admin access */}
-            <div style={{ textAlign: "center", paddingTop: 16, borderTop: "1px solid #E0D5C8" }}>
+            <div style={{ textAlign: "center", paddingTop: 20, marginTop: 20, borderTop: "1px solid #E0D5C8" }}>
               <button
                 style={{ background: "none", border: "none", color: "#BFB0A0", cursor: "pointer", fontSize: 11, fontFamily: FONT.mono, letterSpacing: "0.06em" }}
                 onClick={() => { setEmail(""); setPassword(""); go(STEPS.ADMIN_AUTH); }}
