@@ -9,26 +9,26 @@ import { importStore } from "../importProgress.js";
 import SystemMonitor from "./admin/SystemMonitor.tsx";
 
 const C = {
-  bg:       "#FAF6F0",
-  surface:  "#FFFFFF",
-  card:     "#FFFFFF",
-  border:   "#E0D5C8",
-  borderLight: "#F0E8DF",
-  t1:       "#1A1205",
-  t2:       "#5C4F40",
-  t3:       "#9C8C7C",
-  t4:       "#BFB0A0",
-  red:      "#BE2B1A",
-  redBg:    "rgba(190,43,26,0.08)",
-  redDim:   "#DC2626",
-  green:    "#16A34A",
-  greenBg:  "rgba(22,163,74,0.08)",
-  amber:    "#D97706",
-  amberBg:  "rgba(217,119,6,0.08)",
-  violet:   "#7C3AED",
-  violetBg: "rgba(124,58,237,0.08)",
-  sky:      "#0284C7",
-  skyBg:    "rgba(2,132,199,0.08)",
+  bg:          "#F4F6FA",
+  surface:     "#FFFFFF",
+  card:        "#FFFFFF",
+  border:      "#E2E7EF",
+  borderLight: "#EDF0F5",
+  t1:          "#0D1117",
+  t2:          "#3D4A5C",
+  t3:          "#7A8699",
+  t4:          "#B0BAC8",
+  red:         "#C0392B",
+  redBg:       "rgba(192,57,43,0.08)",
+  redDim:      "#E53935",
+  green:       "#16A34A",
+  greenBg:     "rgba(22,163,74,0.08)",
+  amber:       "#D97706",
+  amberBg:     "rgba(217,119,6,0.08)",
+  violet:      "#7C3AED",
+  violetBg:    "rgba(124,58,237,0.08)",
+  sky:         "#0284C7",
+  skyBg:       "rgba(2,132,199,0.08)",
 };
 
 // Color map by slug — uses C.* cream theme tokens
@@ -1636,19 +1636,20 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     },
     titleText: { fontSize: 15, fontWeight: 700, color: C.t1, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" },
     titleSub: { fontSize: 10, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Inter', sans-serif" },
-    body: { padding: "28px 28px", maxWidth: 1300, margin: "0 auto" },
-    statsGrid: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 28 },
+    body: { padding: "0", maxWidth: "100%" },
+    statsGrid: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginBottom: 28 },
     statCard: (color: string, _glow?: string) => ({
       background: C.surface,
       border: `1px solid ${C.border}`,
-      borderTop: `2px solid ${color}`,
-      borderRadius: 12,
-      padding: "18px 20px",
-      transition: "border-color 0.2s, box-shadow 0.2s",
+      borderRadius: 14,
+      padding: "20px 22px",
+      transition: "box-shadow 0.2s, transform 0.15s",
       cursor: "default",
+      position: "relative" as const,
+      overflow: "hidden" as const,
     }),
-    statVal: { fontSize: 26, fontWeight: 700, color: C.t1, marginBottom: 4, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.02em" },
-    statLabel: { fontSize: 10, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: "'Inter', sans-serif" },
+    statVal: { fontSize: 28, fontWeight: 800, color: C.t1, marginBottom: 4, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" },
+    statLabel: { fontSize: 11, color: C.t3, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.07em", fontFamily: "'Inter', sans-serif" },
     controls: { display: "flex", gap: 10, marginBottom: 18, alignItems: "center", flexWrap: "wrap" } as CSSProperties,
     searchWrap: {
       flex: 1, minWidth: 220, position: "relative", display: "flex", alignItems: "center",
@@ -1668,14 +1669,14 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     },
     table: { width: "100%", borderCollapse: "collapse" } as CSSProperties,
     th: {
-      padding: "11px 16px", fontSize: 10, fontWeight: 700, color: C.t3,
+      padding: "12px 16px", fontSize: 10, fontWeight: 700, color: C.t3,
       textTransform: "uppercase", letterSpacing: "0.09em",
-      borderBottom: `1px solid ${C.border}`, textAlign: "left",
-      background: C.surface, whiteSpace: "nowrap",
+      borderBottom: `1.5px solid ${C.border}`, textAlign: "left",
+      background: C.bg, whiteSpace: "nowrap",
     } as CSSProperties,
     td: {
-      padding: "13px 16px", fontSize: 13, color: C.t2,
-      borderBottom: `1px solid ${C.border}`,
+      padding: "14px 16px", fontSize: 13, color: C.t2,
+      borderBottom: `1px solid ${C.borderLight}`,
       fontFamily: FONT.ui, verticalAlign: "middle",
     },
     row: { transition: "background 0.12s", cursor: "default" },
@@ -1703,12 +1704,12 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
       transition: "all 0.15s",
     }),
     btnAddUser: {
-      background: C.amber, border: "none", borderRadius: 8, padding: "9px 18px",
-      color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif",
+      background: C.red, border: "none", borderRadius: 10, padding: "10px 20px",
+      color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif",
       display: "flex", alignItems: "center", gap: 7, flexShrink: 0,
-      textTransform: "uppercase", letterSpacing: "0.06em",
+      letterSpacing: "0.02em",
       transition: "filter 0.15s, transform 0.15s",
-      boxShadow: `0 0 16px ${C.amberBg}`,
+      boxShadow: `0 4px 14px rgba(192,57,43,0.3)`,
     },
     tab: (active) => ({
       padding: "12px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
@@ -1733,7 +1734,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
   const ADMIN_CSS = `
     /* ── Stats grid ── */
     .admin-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px; }
-    .admin-stat-card:hover { border-color: ${C.amber} !important; }
+    .admin-stat-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.08) !important; transform: translateY(-1px) !important; }
 
     /* ── Admin controls row ── */
     .admin-controls-row { display: flex; gap: 10px; margin-bottom: 18px; align-items: center; flex-wrap: wrap; }
@@ -1743,7 +1744,11 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     .admin-add-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
     /* ── Table ── */
-    .admin-table-wrap { background: ${C.surface}; border: 1px solid ${C.border}; border-radius: 12px; overflow: hidden; }
+    .admin-table-wrap {
+      background: ${C.surface}; border: 1px solid ${C.border};
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
     .admin-table-wrap-inner { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .admin-table-wrap-inner table { min-width: 900px; width: 100%; border-collapse: collapse; }
     .admin-table-row:hover { background: ${C.borderLight} !important; }
@@ -1756,57 +1761,42 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
 
     /* ── Impersonate / toggle btn hover ── */
     .btn-impersonate:hover { background: ${C.violetBg} !important; border-color: ${C.violet} !important; }
-    .btn-toggle-active:hover { background: rgba(190,43,26,0.14) !important; }
+    .btn-toggle-active:hover { background: rgba(192,57,43,0.14) !important; }
     .btn-toggle-inactive:hover { background: rgba(22,163,74,0.14) !important; }
 
     /* ── Section heading ── */
     .admin-section-title { font-size: 14px; font-weight: 700; color: ${C.t1}; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 
-    @media (max-width: 1280px) {
+    /* ── Page header area ── */
+    .admin-page-header {
+      margin-bottom: 28px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid ${C.border};
+    }
+    .admin-page-title { font-size: 20px; font-weight: 800; color: ${C.t1}; font-family: 'Plus Jakarta Sans','Inter',sans-serif; letter-spacing: -0.02em; }
+    .admin-page-subtitle { font-size: 13px; color: ${C.t3}; margin-top: 3px; font-family: 'Inter',sans-serif; }
+
+    @media (max-width: 1200px) {
       .admin-stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
     }
 
-    @media (max-width: 768px) {
-      .admin-content-wrap { padding-left: 0 !important; padding-top: 58px !important; }
-
-      .admin-sidebar {
-        top: 0 !important; bottom: auto !important;
-        left: 0 !important; right: 0 !important;
-        width: 100% !important; height: 54px !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        padding: 0 14px !important;
-        border-right: none !important;
-        border-bottom: 1px solid ${C.border} !important;
-        gap: 10px !important;
-      }
-      .admin-sidebar-label { display: none !important; }
-      .sidebar-spacer { flex: 1 !important; display: block !important; }
-      .admin-sidebar-user { flex-direction: row !important; }
-      .admin-sidebar-logout { margin: 0 !important; }
-      .admin-sidebar-logo { margin-bottom: 0 !important; width: 32px !important; height: 32px !important; font-size: 14px !important; }
-
-      .admin-page-body { padding: 16px 14px 40px !important; }
-      .admin-page-sticky-header { top: 54px !important; }
-
+    @media (max-width: 860px) {
       .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; margin-bottom: 18px !important; }
-      .admin-stats-grid .stat-val { font-size: 22px !important; }
-      .admin-stats-grid .stat-label { font-size: 10px !important; }
-
       .admin-controls-row { gap: 8px !important; }
       .admin-search-input { min-width: 0 !important; width: 100% !important; flex: none !important; order: 0 !important; }
       .admin-type-select { flex: 1 !important; min-width: 0 !important; }
       .admin-add-btn { flex-shrink: 0 !important; }
-
       .admin-table-wrap-inner { overflow: visible !important; }
       .admin-table-wrap-inner table { display: none !important; }
       .admin-user-card { display: block !important; }
     }
 
     @media (max-width: 480px) {
-      .admin-page-body { padding: 12px 10px 80px !important; }
       .admin-stats-grid { gap: 8px !important; }
     }
+
+    /* ── Shimmer animation ── */
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
   `;
 
   const STAT_CONFIG = [
@@ -1818,12 +1808,10 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
   ];
 
   return (
-    <div style={S.page}>
+    <div style={{ minHeight: "100vh", color: C.t1, fontFamily: FONT.body }}>
       <style>{ADMIN_CSS}</style>
 
-      {/* Header removed — brand + nav live in AdminShell header */}
-
-      <div className="admin-page-body" style={S.body}>
+      <div className="admin-page-body">
 
         {/* Global error / success */}
         {error && (
@@ -1842,9 +1830,11 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
           <div className="admin-stats-grid">
             {STAT_CONFIG.map((sc) => (
               <div key={sc.label} className="admin-stat-card" style={S.statCard(sc.color, sc.glow)}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                  <div className="stat-val" style={{ ...S.statVal, color: sc.color }}>{stats[sc.key] ?? "—"}</div>
-                  <div style={{ width: 34, height: 34, borderRadius: 9, background: `${sc.color}14`, border: `1px solid ${sc.color}28`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{sc.icon}</div>
+                {/* Accent top bar */}
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: sc.color, borderRadius: "14px 14px 0 0" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, paddingTop: 4 }}>
+                  <div className="stat-val" style={S.statVal}>{stats[sc.key]?.toLocaleString("en-IN") ?? "—"}</div>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: `${sc.color}12`, border: `1px solid ${sc.color}20`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{sc.icon}</div>
                 </div>
                 <div className="stat-label" style={S.statLabel}>{sc.label}</div>
               </div>
@@ -1882,6 +1872,19 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
         {/* ─── USERS TAB ─── */}
         {activeTab === "users" && (
           <>
+            {/* Page header */}
+            <div className="admin-page-header">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                <div>
+                  <div className="admin-page-title">All Users</div>
+                  <div className="admin-page-subtitle">Manage platform users, roles and access levels</div>
+                </div>
+                <button className="admin-add-btn" style={S.btnAddUser} onClick={() => setShowAddUser(true)}>
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add User
+                </button>
+              </div>
+            </div>
+
             {/* Controls */}
             <div className="admin-controls-row" style={S.controls}>
               <div className="admin-search-input" style={S.searchWrap}>
@@ -1904,9 +1907,6 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                   <option key={ut.slug} value={ut.slug}>{ut.name}</option>
                 ))}
               </select>
-              <button className="admin-add-btn" style={S.btnAddUser} onClick={() => setShowAddUser(true)}>
-                <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add User
-              </button>
             </div>
 
             {/* Table */}

@@ -473,6 +473,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
   const submitMechanicRegistration = async () => {
     if (!mechDetails.name.trim()) { setError("Enter your name"); return; }
     if (!mechDetails.phone.trim()) { setError("Enter your mobile number"); return; }
+    if (mechDetails.phone.trim().length !== 10) { setError("Enter a valid 10-digit mobile number"); return; }
     setError(""); setLoading(true);
 
     if ((pendingUser as any)?.userId) {
@@ -700,7 +701,7 @@ export default function LoginPage({ onLogin, isModal = false }) {
                 ].map(t => (
                   <button
                     key={t.key}
-                    onClick={() => { setLandingTab(t.key); setRole(t.key === "owner" ? "shop" : t.key === "mechanic" ? "mechanic" : "customer"); setError(""); }}
+                    onClick={() => { setLandingTab(t.key); setRole(t.key === "owner" ? "shop" : t.key === "mechanic" ? "mechanic" : "customer"); setError(""); setPassword(""); setConfirmPwd(""); setShowPwd(false); setShowConfirmPwd(false); setForgotMode(false); }}
                     style={{
                       flex: 1, padding: "9px 0", borderRadius: 8, border: "none",
                       background: landingTab === t.key ? "#FFFFFF" : "transparent",
@@ -978,13 +979,14 @@ export default function LoginPage({ onLogin, isModal = false }) {
             <label style={S.label}>Email Address</label>
             <input className="auth-input" style={{ ...S.input, marginBottom: 12 }} type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus />
             <label style={S.label}>Password</label>
-            <div style={{ position: "relative", marginBottom: 12 }}>
-              <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showPwd ? "text" : "password"} placeholder="Min. 8 characters" value={password} onChange={e => setPassword(e.target.value)} />
+            <div style={{ position: "relative", marginBottom: 4 }}>
+              <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showPwd ? "text" : "password"} placeholder="Min. 8 chars + special char (!@#$%)" value={password} onChange={e => setPassword(e.target.value)} />
               <button onClick={() => setShowPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showPwd ? "🙈" : "👁"}</button>
             </div>
+            <div style={{ fontSize: 11, color: "#9C8C7C", marginBottom: 12, lineHeight: 1.4 }}>Must be ≥ 8 characters and include at least one special character</div>
             <label style={S.label}>Confirm Password</label>
             <div style={{ position: "relative", marginBottom: 20 }}>
-              <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showConfirmPwd ? "text" : "password"} placeholder="Repeat password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && emailRegister()} />
+              <input className="auth-input" style={{ ...S.input, paddingRight: 44 }} type={showConfirmPwd ? "text" : "password"} placeholder="Repeat password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && (role === "mechanic" ? emailRegisterMechanic() : emailRegister())} />
               <button onClick={() => setShowConfirmPwd(p => !p)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 16 }}>{showConfirmPwd ? "🙈" : "👁"}</button>
             </div>
             <button className="btn-primary" style={{ ...S.btnPrimary(loading || googleLoading), marginBottom: 14 }} disabled={loading || googleLoading}
@@ -1252,8 +1254,14 @@ export default function LoginPage({ onLogin, isModal = false }) {
       // MECHANIC DETAILS — name / phone / shop info for new independent mechanics
       // ══════════════════════════════════════════════════════════════════════
       case STEPS.MECHANIC_DETAILS:
+        const mechDetailsDisabled = loading || !mechDetails.name.trim() || !mechDetails.phone.trim();
         return (
           <div className="auth-card">
+            {/* Back to Step 1 — only for email registration path (no pendingUser yet) */}
+            {!(pendingUser as any)?.userId && (
+              <button style={S.btnBack} onClick={() => { setError(""); go(STEPS.REG_AUTH); }}>← Back</button>
+            )}
+
             <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
               {[
                 { label: "Account", done: true },
@@ -1274,26 +1282,35 @@ export default function LoginPage({ onLogin, isModal = false }) {
             {error && <div style={S.error}>{error}</div>}
 
             <label style={S.label}>Full Name <span style={{ color: "#DC2626" }}>*</span></label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Raju Mechanics" value={mechDetails.name} onChange={e => { setMechDetails(d => ({ ...d, name: e.target.value })); setError(""); }} autoFocus />
+            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Raju Mechanics" value={mechDetails.name} onChange={e => { setMechDetails(d => ({ ...d, name: e.target.value })); setError(""); }} autoFocus
+              onKeyDown={e => e.key === "Enter" && !mechDetailsDisabled && submitMechanicRegistration()} />
 
             <label style={S.label}>Mobile Number <span style={{ color: "#DC2626" }}>*</span></label>
             <div style={{ ...S.phoneRow, marginBottom: 14 }}>
               <div style={S.phoneFlag}>IN +91</div>
               <input className="auth-input" style={S.phoneInput} placeholder="98765 43210" maxLength={10} inputMode="numeric"
-                value={mechDetails.phone} onChange={e => setMechDetails(d => ({ ...d, phone: e.target.value.replace(/\D/g, "") }))} />
+                value={mechDetails.phone} onChange={e => { setMechDetails(d => ({ ...d, phone: e.target.value.replace(/\D/g, "") })); setError(""); }}
+                onKeyDown={e => e.key === "Enter" && submitMechanicRegistration()} />
             </div>
 
             <label style={S.label}>Mechanic Shop Name</label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Raju Auto Works" value={mechDetails.shopName} onChange={e => setMechDetails(d => ({ ...d, shopName: e.target.value }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: 14 }} placeholder="e.g. Raju Auto Works" value={mechDetails.shopName} onChange={e => setMechDetails(d => ({ ...d, shopName: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && submitMechanicRegistration()} />
 
             <label style={S.label}>Shop Location / Area</label>
-            <input className="auth-input" style={{ ...S.input, marginBottom: 24 }} placeholder="e.g. Kukatpally, Hyderabad" value={mechDetails.shopLocation} onChange={e => setMechDetails(d => ({ ...d, shopLocation: e.target.value }))} />
+            <input className="auth-input" style={{ ...S.input, marginBottom: 20 }} placeholder="e.g. Kukatpally, Hyderabad" value={mechDetails.shopLocation} onChange={e => setMechDetails(d => ({ ...d, shopLocation: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && submitMechanicRegistration()} />
 
-            <button className="btn-primary" style={S.btnPrimary(loading || !mechDetails.name.trim() || !mechDetails.phone.trim())}
-              disabled={loading || !mechDetails.name.trim() || !mechDetails.phone.trim()}
+            <button className="btn-primary" style={S.btnPrimary(mechDetailsDisabled)}
+              disabled={mechDetailsDisabled}
               onClick={submitMechanicRegistration}>
               {loading ? "Sending verification…" : "Verify Email →"}
             </button>
+            {mechDetailsDisabled && !loading && (
+              <div style={{ textAlign: "center", fontSize: 12, color: "#9C8C7C", marginTop: 8 }}>
+                Enter your name and mobile number to continue
+              </div>
+            )}
           </div>
         );
 
