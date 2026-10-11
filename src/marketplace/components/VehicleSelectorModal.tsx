@@ -138,7 +138,7 @@ export function VehicleSelectorModal({ open, onClose }) {
   };
 
   const goBack = () => {
-    if (step === 2) { setSelectedBrand(null); setModels([]);          setStep(1); }
+    if (step === 2) { setSelectedBrand(null);                          setStep(1); }
     if (step === 3) { setSelectedModel(null); setSelectedYear(null);  setStep(2); }
     if (step === 4) { setSelectedYear(null);                          setStep(3); }
   };

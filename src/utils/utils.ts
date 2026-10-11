@@ -1,5 +1,6 @@
 import { T } from '../styles/theme.js';
 import { useState, useEffect } from 'react';
+import type { Movement, Party, JobCard } from '../types';
 
 export function useDebounce(value, delay) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -72,7 +73,7 @@ export const SEED_PRODUCTS = import.meta.env.DEV ? [
     { id: "p8", shopId: "s3", name: "Exide FFS0-EP44L Battery", sku: "ELC-BAT-EX", category: "Electrical", brand: "Exide", supplier: "Exide Industries", compatibleVehicles: ["Universal"], buyPrice: 4200, sellPrice: 5800, mrp: 6500, gstRate: 28, stock: 12, reservedStock: 0, minStock: 4, location: "Floor", unit: "pcs", image: "🔋", description: "Maintenance free battery 44Ah.", condition: "New", warranty: "55 Months", globalSku: "mp13", createdAt: Date.now(), updatedAt: Date.now(), isActive: true },
 ] : [];
 
-export const genSeededMovements = () => {
+export const genSeededMovements = (): Movement[] => {
     if (!import.meta.env.DEV) return [];
     const now = Date.now();
     const d = 86400000;
@@ -292,17 +293,17 @@ export const renderStars = (rating) => {
 };
 
 // ===== SEED PARTIES (Customers + Suppliers) =====
-export const SEED_PARTIES = import.meta.env.DEV ? [
+export const SEED_PARTIES: Party[] = import.meta.env.DEV ? [
     // Customers
-    { id: "cust1", shopId: "s1", type: "customer", name: "Sri Durga Motors", phone: "+91 9988776655", email: "durga.motors@gmail.com", gstin: "36AADFD1234G1ZP", address: "15, Kukatpally", city: "Hyderabad", creditLimit: 50000, creditDays: 30, loyaltyPoints: 420, openingBalance: 0, tags: ["regular", "garage"], vehicles: ["v1"], notes: "Regular workshop customer", isActive: true, createdAt: Date.now() - 200 * 86400000 },
-    { id: "cust2", shopId: "s1", type: "customer", name: "Hussain Auto", phone: "+91 9123456789", email: "", gstin: "", address: "Shop 4, Begumpet", city: "Hyderabad", creditLimit: 20000, creditDays: 15, loyaltyPoints: 180, openingBalance: 0, tags: ["walk-in"], vehicles: [], notes: "", isActive: true, createdAt: Date.now() - 90 * 86400000 },
-    { id: "cust3", shopId: "s1", type: "customer", name: "Raju Garage", phone: "+91 9876501234", email: "rajugarage@yahoo.com", gstin: "36AADFR5678H2ZQ", address: "Ameerpet Main Rd", city: "Hyderabad", creditLimit: 100000, creditDays: 30, loyaltyPoints: 890, openingBalance: 5600, tags: ["regular", "mechanic", "credit"], vehicles: ["v2"], notes: "Huge volume buyer. Collects every Friday.", isActive: true, createdAt: Date.now() - 365 * 86400000 },
-    { id: "cust4", shopId: "s1", type: "customer", name: "Alpha Mechanics", phone: "+91 9012345678", email: "alpha.mech@gmail.com", gstin: "", address: "SR Nagar", city: "Hyderabad", creditLimit: 30000, creditDays: 7, loyaltyPoints: 55, openingBalance: 3200, tags: ["credit"], vehicles: ["v3"], notes: "New customer, settling credit weekly", isActive: true, createdAt: Date.now() - 30 * 86400000 },
-    { id: "cust5", shopId: "s1", type: "customer", name: "Sai Motors", phone: "+91 9988112233", email: "", gstin: "", address: "Madhapur", city: "Hyderabad", creditLimit: 10000, creditDays: 15, loyaltyPoints: 310, openingBalance: 0, tags: ["regular"], vehicles: [], notes: "", isActive: true, createdAt: Date.now() - 150 * 86400000 },
+    { id: "cust1", partyId: "cust1", shopId: "s1", type: "customer", name: "Sri Durga Motors", phone: "+91 9988776655", email: "durga.motors@gmail.com", gstin: "36AADFD1234G1ZP", address: "15, Kukatpally", city: "Hyderabad", creditLimit: 50000, creditDays: 30, loyaltyPoints: 420, openingBalance: 0, tags: ["regular", "garage"], vehicles: ["v1"], notes: "Regular workshop customer", isActive: true, createdAt: Date.now() - 200 * 86400000 },
+    { id: "cust2", partyId: "cust2", shopId: "s1", type: "customer", name: "Hussain Auto", phone: "+91 9123456789", email: "", gstin: "", address: "Shop 4, Begumpet", city: "Hyderabad", creditLimit: 20000, creditDays: 15, loyaltyPoints: 180, openingBalance: 0, tags: ["walk-in"], vehicles: [], notes: "", isActive: true, createdAt: Date.now() - 90 * 86400000 },
+    { id: "cust3", partyId: "cust3", shopId: "s1", type: "customer", name: "Raju Garage", phone: "+91 9876501234", email: "rajugarage@yahoo.com", gstin: "36AADFR5678H2ZQ", address: "Ameerpet Main Rd", city: "Hyderabad", creditLimit: 100000, creditDays: 30, loyaltyPoints: 890, openingBalance: 5600, tags: ["regular", "mechanic", "credit"], vehicles: ["v2"], notes: "Huge volume buyer. Collects every Friday.", isActive: true, createdAt: Date.now() - 365 * 86400000 },
+    { id: "cust4", partyId: "cust4", shopId: "s1", type: "customer", name: "Alpha Mechanics", phone: "+91 9012345678", email: "alpha.mech@gmail.com", gstin: "", address: "SR Nagar", city: "Hyderabad", creditLimit: 30000, creditDays: 7, loyaltyPoints: 55, openingBalance: 3200, tags: ["credit"], vehicles: ["v3"], notes: "New customer, settling credit weekly", isActive: true, createdAt: Date.now() - 30 * 86400000 },
+    { id: "cust5", partyId: "cust5", shopId: "s1", type: "customer", name: "Sai Motors", phone: "+91 9988112233", email: "", gstin: "", address: "Madhapur", city: "Hyderabad", creditLimit: 10000, creditDays: 15, loyaltyPoints: 310, openingBalance: 0, tags: ["regular"], vehicles: [], notes: "", isActive: true, createdAt: Date.now() - 150 * 86400000 },
     // Suppliers
-    { id: "sup1", shopId: "s1", type: "supplier", name: "Bosch India Pvt Ltd", phone: "+91 8001234567", email: "orders@boschindia.com", gstin: "36AABCB1234A1ZX", address: "Plot 42, MIDC Chakan", city: "Pune", creditLimit: 500000, creditDays: 45, loyaltyPoints: 0, openingBalance: 0, tags: ["premium", "brakes", "electrical"], vehicles: [], notes: "Primary supplier for brakes, wipers, electrical", isActive: true, createdAt: Date.now() - 500 * 86400000 },
-    { id: "sup2", shopId: "s1", type: "supplier", name: "NGK India", phone: "+91 8009876543", email: "supply@ngkindia.co.in", gstin: "36AABCN5678B2ZY", address: "Sector 18, Udyog Vihar", city: "Gurugram", creditLimit: 200000, creditDays: 30, loyaltyPoints: 0, openingBalance: 8400, tags: ["spark-plugs", "engine"], vehicles: [], notes: "Spark plugs, O2 sensors. Monthly restock.", isActive: true, createdAt: Date.now() - 400 * 86400000 },
-    { id: "sup3", shopId: "s1", type: "supplier", name: "Castrol India Ltd", phone: "+91 8005551234", email: "b2b@castrol.co.in", gstin: "36AABCC9012C3ZZ", address: "Andheri East", city: "Mumbai", creditLimit: 300000, creditDays: 60, loyaltyPoints: 0, openingBalance: 0, tags: ["lubrication", "oils"], vehicles: [], notes: "Engine oils, lubricants. Best margin.", isActive: true, createdAt: Date.now() - 300 * 86400000 },
+    { id: "sup1", partyId: "sup1", shopId: "s1", type: "supplier", name: "Bosch India Pvt Ltd", phone: "+91 8001234567", email: "orders@boschindia.com", gstin: "36AABCB1234A1ZX", address: "Plot 42, MIDC Chakan", city: "Pune", creditLimit: 500000, creditDays: 45, loyaltyPoints: 0, openingBalance: 0, tags: ["premium", "brakes", "electrical"], vehicles: [], notes: "Primary supplier for brakes, wipers, electrical", isActive: true, createdAt: Date.now() - 500 * 86400000 },
+    { id: "sup2", partyId: "sup2", shopId: "s1", type: "supplier", name: "NGK India", phone: "+91 8009876543", email: "supply@ngkindia.co.in", gstin: "36AABCN5678B2ZY", address: "Sector 18, Udyog Vihar", city: "Gurugram", creditLimit: 200000, creditDays: 30, loyaltyPoints: 0, openingBalance: 8400, tags: ["spark-plugs", "engine"], vehicles: [], notes: "Spark plugs, O2 sensors. Monthly restock.", isActive: true, createdAt: Date.now() - 400 * 86400000 },
+    { id: "sup3", partyId: "sup3", shopId: "s1", type: "supplier", name: "Castrol India Ltd", phone: "+91 8005551234", email: "b2b@castrol.co.in", gstin: "36AABCC9012C3ZZ", address: "Andheri East", city: "Mumbai", creditLimit: 300000, creditDays: 60, loyaltyPoints: 0, openingBalance: 0, tags: ["lubrication", "oils"], vehicles: [], notes: "Engine oils, lubricants. Best margin.", isActive: true, createdAt: Date.now() - 300 * 86400000 },
 ] : [];
 
 // ===== SEED VEHICLES =====
@@ -314,7 +315,7 @@ export const SEED_VEHICLES = import.meta.env.DEV ? [
 
 // ===== SEED JOB CARDS =====
 const d = 86400000;
-export const SEED_JOB_CARDS = import.meta.env.DEV ? [
+export const SEED_JOB_CARDS: JobCard[] = import.meta.env.DEV ? [
     { id: "jc1", shopId: "s1", jobNumber: "JC-2026-001", vehicleId: "v1", customerId: "cust1", status: "completed", assignedTo: null, estimatedAmount: 8500, actualAmount: 7850, complaints: "Brake squealing noise from front, vibration at high speed", diagnosis: "Front brake pads worn out, need replacement. Discs OK.", checklist: [{ task: "Remove front wheels", status: "done" }, { task: "Replace brake pads", status: "done" }, { task: "Check disc thickness", status: "done" }, { task: "Test drive", status: "done" }], parts: [{ itemId: "p1", name: "Bosch Brake Pad Set — Front", qty: 1, price: 1850 }], labour: [{ description: "Brake pad replacement labour", amount: 500 }], startedAt: Date.now() - 5 * d, completedAt: Date.now() - 4.5 * d, nextServiceDate: "2026-06-15", nextServiceKm: 45000, voucherId: null, createdAt: Date.now() - 5 * d },
     { id: "jc2", shopId: "s1", jobNumber: "JC-2026-002", vehicleId: "v2", customerId: "cust3", status: "in_progress", assignedTo: null, estimatedAmount: 12500, actualAmount: null, complaints: "Engine oil change, all filters, full service", diagnosis: "Routine 30K km service. Oil filter, air filter due.", checklist: [{ task: "Drain old oil", status: "done" }, { task: "Replace oil filter", status: "done" }, { task: "Replace air filter", status: "pending" }, { task: "Top up coolant", status: "pending" }, { task: "Test drive", status: "pending" }], parts: [{ itemId: "p10", name: "Castrol Edge 5W-30 4L", qty: 1, price: 2650 }, { itemId: "p3", name: "Mahle Oil Filter", qty: 1, price: 320 }], labour: [{ description: "Full service labour", amount: 1500 }], startedAt: Date.now() - 1 * d, completedAt: null, nextServiceDate: null, nextServiceKm: null, voucherId: null, createdAt: Date.now() - 1.5 * d },
     { id: "jc3", shopId: "s1", jobNumber: "JC-2026-003", vehicleId: "v3", customerId: "cust4", status: "estimated", assignedTo: null, estimatedAmount: 5200, actualAmount: null, complaints: "Spark plugs misfiring, rough idle", diagnosis: "Spark plugs fouled. Replace all 4.", checklist: [{ task: "Remove spark plugs", status: "pending" }, { task: "Check coil packs", status: "pending" }, { task: "Install new plugs", status: "pending" }, { task: "Engine diagnostic", status: "pending" }], parts: [{ itemId: "p9", name: "NGK Spark Plug ILZKAR7B11", qty: 4, price: 450 }], labour: [{ description: "Spark plug replacement", amount: 400 }], startedAt: null, completedAt: null, nextServiceDate: null, nextServiceKm: null, voucherId: null, createdAt: Date.now() - 0.5 * d },
@@ -408,7 +409,14 @@ export function getOverduePayments(movements, parties, daysThreshold = 0) {
     );
 
     // Group by customer
-    const byCustomer = {};
+    interface OverdueGroup {
+        name: string;
+        phone: string;
+        total: number;
+        invoices: { id: string; invoiceNo: string | null | undefined; amount: number; date: number }[];
+        oldestDate: number;
+    }
+    const byCustomer: Record<string, OverdueGroup> = {};
     pending.forEach(m => {
         const name = m.customerName || "Unknown";
         if (!byCustomer[name]) byCustomer[name] = { name, phone: m.customerPhone || "", total: 0, invoices: [], oldestDate: Infinity };

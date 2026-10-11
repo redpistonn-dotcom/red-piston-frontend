@@ -65,3 +65,36 @@ export const updateMechanicSections = (id: number | string, sections: string[]) 
 
 export const deactivateMechanic = (id: number | string) => api.patch(`/api/shop/mechanics/${id}/deactivate`, {});
 export const reactivateMechanic = (id: number | string) => api.patch(`/api/shop/mechanics/${id}/reactivate`, {});
+
+export interface MechanicAttendanceRow {
+  user_id: number;
+  name: string;
+  avatar_url: string | null;
+  mechanic_role: 'HEAD' | 'MEMBER';
+  check_in_at: string | null;
+  check_out_at: string | null;
+}
+export const getTeamAttendanceToday = () =>
+  api.get<{ success: boolean; data: MechanicAttendanceRow[] }>('/api/shop/mechanics/attendance/today');
+
+export const getIncentiveSettings = () =>
+  api.get<{ success: boolean; data: { rate_per_job: number; updated_at: string | null } }>('/api/shop/mechanics/incentive-settings');
+
+export const setIncentiveRate = (ratePerJob: number) =>
+  api.put<{ success: boolean; data: { rate_per_job: number } }>('/api/shop/mechanics/incentive-settings', { ratePerJob });
+
+export interface IncentiveReportRow {
+  userId: number;
+  name: string;
+  jobsDelivered: number;
+  earned: number;
+}
+export const getIncentiveReport = (from?: string, to?: string) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  return api.get<{ success: boolean; data: { ratePerJob: number; mechanics: IncentiveReportRow[] } }>(
+    `/api/shop/mechanics/incentive-report${qs ? `?${qs}` : ''}`
+  );
+};

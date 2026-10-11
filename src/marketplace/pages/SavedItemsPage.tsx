@@ -28,7 +28,7 @@ export function SavedItemsPage({ onBack }: { onBack?: () => void }) {
         if (existing) {
             saveCart((cart || []).map((c: any) => (c === existing ? { ...c, qty: c.qty + 1 } : c)));
         } else {
-            saveCart([...(cart || []), { listing, product, qty: 1, deliveryOption: "standard" }]);
+            saveCart([...(cart || []), { listing, product, qty: 1, deliveryOption: "standard", productId: product?.id ?? listing.product_id, name: product?.name ?? "", price: listing.selling_price ?? 0, shopId: listing.shop_id }]);
         }
         setAddedId(item.id);
         setTimeout(() => setAddedId(null), 1500);

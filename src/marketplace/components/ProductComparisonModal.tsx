@@ -22,7 +22,7 @@ export function ProductComparisonModal({ open, onClose, productData }) {
     if (existing) {
       saveCart(cart.map(i => i === existing ? { ...i, qty: i.qty + 1 } : i));
     } else {
-      saveCart([...cart, { product, listing, qty: 1 }]);
+      saveCart([...cart, { product, listing, qty: 1, productId: product?.id ?? listing.product_id, name: product?.name ?? "", price: listing.selling_price ?? 0, shopId: listing.shop_id }]);
     }
     setIsCartOpen(true);
     onClose();
@@ -65,7 +65,7 @@ export function ProductComparisonModal({ open, onClose, productData }) {
                 {Object.entries(product.specifications).map(([k, v]) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, borderBottom: `1px dashed ${T.border}`, paddingBottom: 6 }}>
                     <span style={{ color: T.t3, textTransform: "capitalize" }}>{k}</span>
-                    <span style={{ color: T.t1, fontWeight: 600, fontFamily: FONT.mono }}>{v}</span>
+                    <span style={{ color: T.t1, fontWeight: 600, fontFamily: FONT.mono }}>{String(v)}</span>
                   </div>
                 ))}
               </div>

@@ -235,10 +235,96 @@ function OnboardingChecklist({ profile, counts, userId, navigate }: {
   );
 }
 
+// Check-in/check-out widget. Keeps its own small bit of state since it's the
+// one part of this page the mechanic interacts with (not just reads) — the
+// rest of the dashboard is read-only stats.
+function AttendanceCard() {
+  const [today, setToday] = useState<{ check_in_at: string | null; check_out_at: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [err, setErr] = useState("");
+
+  const load = () => {
+    api.get("/api/mechanic/attendance/today").then((r: any) => setToday(r.data)).catch(() => {});
+  };
+  useEffect(load, []);
+
+  useEffect(() => {
+    if (!today?.check_in_at || today.check_out_at) return;
+    const startMs = new Date(today.check_in_at).getTime();
+    const tick = () => setElapsed(Math.floor((Date.now() - startMs) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [today?.check_in_at, today?.check_out_at]);
+
+  async function checkIn() {
+    setBusy(true); setErr("");
+    try {
+      const r: any = await api.post("/api/mechanic/attendance/check-in", {});
+      setToday(r.data);
+    } catch (e: any) { setErr(e?.error?.message || "Could not check in"); }
+    setBusy(false);
+  }
+  async function checkOut() {
+    setBusy(true); setErr("");
+    try {
+      const r: any = await api.post("/api/mechanic/attendance/check-out", {});
+      setToday(r.data);
+    } catch (e: any) { setErr(e?.error?.message || "Could not check out"); }
+    setBusy(false);
+  }
+
+  if (!today) return null;
+  const fmt = (s: number) => `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+
+  return (
+    <div style={{
+      background: T.surface, borderRadius: 14, border: `1px solid ${T.border}`,
+      padding: "14px 16px", display: "flex", alignItems: "center", gap: 12,
+    }}>
+      <span style={{
+        width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+        background: today.check_in_at && !today.check_out_at ? T.emeraldBg : T.surfaceContainerLow,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: today.check_in_at && !today.check_out_at ? T.emerald : T.t3,
+      }}>
+        <MSIcon name="schedule" size={20} filled={!!(today.check_in_at && !today.check_out_at)} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {!today.check_in_at ? (
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.t2 }}>Not checked in yet</span>
+        ) : !today.check_out_at ? (
+          <>
+            <span style={{ fontSize: 13, fontWeight: 700, color: T.t1, display: "block" }}>On shift — {fmt(elapsed)}</span>
+            <span style={{ fontSize: 11, color: T.t3 }}>Since {new Date(today.check_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+          </>
+        ) : (
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.t2 }}>Shift complete for today</span>
+        )}
+        {err && <span style={{ fontSize: 11, color: T.crimson, display: "block", marginTop: 2 }}>{err}</span>}
+      </div>
+      {!today.check_in_at && (
+        <button onClick={checkIn} disabled={busy} style={{
+          padding: "9px 14px", background: T.emerald, color: "#fff", border: "none",
+          borderRadius: 9, fontWeight: 700, fontSize: 12, cursor: busy ? "not-allowed" : "pointer", fontFamily: FONT.ui,
+        }}>Check In</button>
+      )}
+      {today.check_in_at && !today.check_out_at && (
+        <button onClick={checkOut} disabled={busy} style={{
+          padding: "9px 14px", background: T.crimson, color: "#fff", border: "none",
+          borderRadius: 9, fontWeight: 700, fontSize: 12, cursor: busy ? "not-allowed" : "pointer", fontFamily: FONT.ui,
+        }}>Check Out</button>
+      )}
+    </div>
+  );
+}
+
 export default function MechanicDashboard() {
   const [counts, setCounts] = useState<DashboardCounts | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [earnings, setEarnings] = useState<{ ratePerJob: number; jobsDelivered: number; earned: number } | null>(null);
   const navigate = useNavigate();
   const { currentUser } = useAppCtx();
 
@@ -248,6 +334,10 @@ export default function MechanicDashboard() {
       .catch(console.error)
       .finally(() => setLoading(false));
     api.get("/api/mechanic/profile").then((r: any) => setProfile(r.data)).catch(() => {});
+    // Only meaningful for shop-employed mechanics whose shop has set a rate —
+    // the card below only renders once ratePerJob > 0, so a 0 here (no rate
+    // configured yet, or an independent mechanic) just renders nothing.
+    api.get("/api/mechanic/earnings").then((r: any) => setEarnings(r.data)).catch(() => {});
   }, []);
 
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
@@ -289,6 +379,8 @@ export default function MechanicDashboard() {
           </div>
         )}
       </div>
+
+      <AttendanceCard />
 
       {!loading && (
         <OnboardingChecklist profile={profile} counts={counts} userId={currentUser?.userId} navigate={navigate} />
@@ -340,6 +432,37 @@ export default function MechanicDashboard() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Incentive earnings — only shown once the shop has actually configured
+          a per-job rate; a freshly-onboarded shop or an independent mechanic
+          sees nothing here rather than a confusing "₹0 earned". */}
+      {earnings && earnings.ratePerJob > 0 && (
+        <div
+          onClick={() => navigate("/mechanic/jobs?status=DELIVERED")}
+          style={{
+            background: T.emeraldBg, border: `1px solid ${T.emerald}44`,
+            borderRadius: 14, padding: "12px 14px", cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 12,
+          }}
+        >
+          <span style={{
+            width: 36, height: 36, borderRadius: 9, background: T.emerald, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+          }}>
+            <MSIcon name="payments" size={18} filled />
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: T.emerald, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              This month's incentive
+            </div>
+            <div style={{ fontFamily: FONT.mono, fontSize: 17, fontWeight: 800, color: T.t1 }}>
+              ₹{earnings.earned.toFixed(0)} <span style={{ fontSize: 11, fontWeight: 600, color: T.t3, fontFamily: FONT.ui }}>
+                — {earnings.jobsDelivered} job{earnings.jobsDelivered === 1 ? "" : "s"} delivered × ₹{earnings.ratePerJob}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 

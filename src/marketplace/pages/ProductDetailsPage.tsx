@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import { FONT } from "../../theme";
 import { useStore } from "../../store";
-import { fmt, getStarRating, renderStars } from "../../utils";
+import { fmt, renderStars } from "../../utils";
 import { checkFitment, getNearDistance, getDeliveryEtaFromDistance } from "../api/engine";
 import { PartImage } from "../components/PartImage";
-import { useMarketplacePart } from "../../hooks/queries";
+import { useMarketplacePart, useMyDeliveredPartOrder } from "../../hooks/queries";
+import { addReview } from "../../api/inventory";
 
 // Light cream palette constants for this page
 const C = {
@@ -26,15 +27,12 @@ const C = {
 
 export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
     const { products, shops, selectedVehicle, cart, saveCart } = useStore();
-    const [selectedImageIdx] = useState(0);
+    const [selectedImageIdx, setSelectedImageIdx] = useState(0);
     const [addedToCartShop, setAddedToCartShop] = useState(null);
     const [qty, setQty] = useState(1);
-
-    // API-fetched product data (used when local store doesn't have the product)
-    // Only enabled when local store doesn't have it — avoids unnecessary API calls
-    const { data: apiRaw, isLoading: apiLoading, isError: apiFailed } = useMarketplacePart(
-      localProductData ? null : productId
-    );
+    const [reviewForm, setReviewForm] = useState({ rating: 0, title: "", body: "" });
+    const [reviewSubmitting, setReviewSubmitting] = useState(false);
+    const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
     // Find the master product and all listings from LOCAL store
     const safeProducts = products || [];
@@ -47,7 +45,7 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
         );
         if (matching.length === 0) return null;
 
-        const master = matching[0];
+        const master = { ...matching[0], images: [matching[0].image].filter(Boolean) };
 
         const listings = matching.map(p => {
             const shop = safeShops.find(s => s.id === p.shopId);
@@ -83,6 +81,12 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
         return { master, listings };
     }, [productId, safeProducts, safeShops]);
 
+    // API-fetched product data (used when local store doesn't have the product)
+    // Only enabled when local store doesn't have it — avoids unnecessary API calls
+    const { data: apiRaw, isLoading: apiLoading, isError: apiFailed } = useMarketplacePart(
+      localProductData ? null : productId
+    );
+
     // Map API response to the shape ProductDetailsPage expects (runs only when API data arrives)
     const apiProduct = useMemo(() => {
         if (!apiRaw) return null;
@@ -90,6 +94,10 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
         const p = (raw as any).part || raw;
         const apiListings = (raw as any).listings || (raw as any).shops || [];
         if (!p || !(p as any).masterPartId) return null;
+
+        let images: string[] = [];
+        try { images = JSON.parse((p as any).images || "[]"); } catch { /* not JSON — ignore */ }
+        if (images.length === 0 && (p as any).imageUrl) images = [(p as any).imageUrl];
 
         const master = {
             id: (p as any).masterPartId,
@@ -108,8 +116,9 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
             unitOfSale: (p as any).unitOfSale || 'Piece',
             isUniversal: (p as any).isUniversal,
             requiresFitment: (p as any).requiresFitment,
-            image: (p as any).imageUrl || null,
+            image: images[0] || null,
             imageUrl: (p as any).imageUrl || null,
+            images,
             compatibility: (p as any).fitments || [],
         };
 
@@ -122,18 +131,28 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
             return {
                 product_id: (p as any).masterPartId,
                 shop_id: shop.shopId,
-                shop: { id: shop.shopId, name: shop.shopName || 'Local Shop', address: shop.shopAddress || '', city: shop.shopCity || '', isVerified: shop.isVerified || false, rating: shop.rating || 4.2, reviews: shop.reviewCount || 0 },
+                shop: { id: shop.shopId, name: shop.shopName || 'Local Shop', address: shop.shopAddress || '', city: shop.shopCity || '', isVerified: shop.isVerified || false, rating: shop.shopRating ?? null, reviews: shop.shopReviewCount || 0 },
                 distance: dist, eta,
                 selling_price: price, buying_price: 0, mrp, discount,
                 stock_quantity: shop.stockQty || 0, min_stock: 5, buyBoxScore: 50, total_sales: 0,
             };
         }).sort((a, b) => a.distance - b.distance);
 
-        return { master, listings };
+        // Real review data from GET /catalog/:masterPartId — no fake per-product hash.
+        const reviewStats = (raw as any).reviewStats || { avgRating: null, totalReviews: 0 };
+        const recentReviews = (raw as any).reviews || [];
+
+        return { master, listings, reviewStats, recentReviews };
     }, [apiRaw]);
 
     // Use local data first, then API data
     const productData = localProductData || apiProduct;
+    const reviewStats = (productData as any)?.reviewStats || { avgRating: null, totalReviews: 0 };
+    const recentReviews = (productData as any)?.recentReviews || [];
+    const reviewMasterPartId = productData?.master?.masterPartId ?? null;
+
+    const currentUser = (() => { try { return JSON.parse(localStorage.getItem("as_user")); } catch { return null; } })();
+    const { data: deliveredOrder } = useMyDeliveredPartOrder(reviewMasterPartId, !!currentUser);
 
     // Loading state
     if (apiLoading && !productData) {
@@ -178,7 +197,22 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
         if (c.includes("seat") || c.includes("interior")) return "🪑";
         return "📦";
     };
-    const { rating, count } = getStarRating(master.id);
+    const handleSubmitReview = async () => {
+        if (!reviewForm.rating || !deliveredOrder) return;
+        setReviewSubmitting(true);
+        try {
+            await addReview(reviewMasterPartId, {
+                rating: reviewForm.rating,
+                title: reviewForm.title || undefined,
+                body: reviewForm.body || undefined,
+                orderId: deliveredOrder.orderId,
+                inventoryId: deliveredOrder.inventoryId,
+            });
+            setReviewSubmitted(true);
+        } finally {
+            setReviewSubmitting(false);
+        }
+    };
 
     const handleAddToCart = (listing) => {
         const currentUser = (() => { try { return JSON.parse(localStorage.getItem("as_user")); } catch { return null; } })();
@@ -193,7 +227,11 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
                 listing,
                 product: master,
                 qty,
-                deliveryOption: listing.eta?.speed === "express" ? "express" : "standard"
+                deliveryOption: listing.eta?.speed === "express" ? "express" : "standard",
+                productId: (master as any)?.id ?? listing.product_id,
+                name: (master as any)?.name ?? "",
+                price: listing.selling_price ?? 0,
+                shopId: listing.shop_id,
             }];
 
         saveCart(newCart);
@@ -258,18 +296,36 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 32 }}>
                 {/* ═══════ LEFT: Product Image & Specs ═══════ */}
                 <div>
-                    <div style={{ background: C.surface, borderRadius: 16, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 20 }}>
+                    <div style={{ background: C.surface, borderRadius: 16, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: master.images?.length > 1 ? 10 : 20 }}>
                         <div style={{ width: "100%", height: 320 }}>
-                            <PartImage src={master.image} alt={master.name} size="lg" />
+                            <PartImage src={master.images?.[selectedImageIdx] ?? master.image} alt={master.name} size="lg" />
                         </div>
                     </div>
+
+                    {master.images?.length > 1 && (
+                        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+                            {master.images.map((src, i) => (
+                                <button
+                                    key={src + i}
+                                    onClick={() => setSelectedImageIdx(i)}
+                                    style={{
+                                        width: 56, height: 56, borderRadius: 10, overflow: "hidden", padding: 0, cursor: "pointer",
+                                        border: i === selectedImageIdx ? `2px solid ${C.red}` : `1px solid ${C.border}`,
+                                        opacity: i === selectedImageIdx ? 1 : 0.7,
+                                    }}
+                                >
+                                    <PartImage src={src} alt={`${master.name} ${i + 1}`} size="sm" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
                         <h3 style={{ fontSize: 16, fontWeight: 900, color: C.t1, margin: "0 0 16px" }}>📋 Technical Specifications</h3>
                         {master.specifications && Object.entries(master.specifications).map(([key, val]) => (
                             <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid rgba(224,213,200,0.6)` }}>
                                 <span style={{ fontSize: 13, color: C.t3, textTransform: "capitalize" }}>{key.replace(/_/g, " ")}</span>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: C.t1, fontFamily: FONT.mono }}>{val}</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: C.t1, fontFamily: FONT.mono }}>{String(val)}</span>
                             </div>
                         ))}
                         {master.oem_part_no && (
@@ -286,16 +342,22 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
                     <div style={{ marginBottom: 24 }}>
                         <div style={{ fontSize: 11, color: C.red, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
                             {master.brand}
-                            {master.brandVerified && (
+                            {(master as any).brandVerified && (
                                 <span style={{ background: C.greenBg, color: C.green, fontSize: 9, fontWeight: 900, padding: "3px 8px", borderRadius: 5, display: "inline-flex", alignItems: "center", gap: 3 }}>🛡️ Brand Verified</span>
                             )}
                         </div>
                         <h1 style={{ fontSize: 26, fontWeight: 900, color: C.t1, margin: "0 0 8px", lineHeight: 1.3 }}>{master.name}</h1>
                         <div style={{ fontSize: 13, color: C.t2, lineHeight: 1.6 }}>{master.description}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
-                            <span style={{ color: "#FBBF24", fontSize: 15, letterSpacing: 1 }}>{renderStars(+rating)}</span>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: C.t2 }}>{rating}</span>
-                            <span style={{ fontSize: 13, color: C.t3 }}>({count} ratings)</span>
+                            {reviewStats.avgRating != null ? (
+                                <>
+                                    <span style={{ color: "#FBBF24", fontSize: 15, letterSpacing: 1 }}>{renderStars(+reviewStats.avgRating)}</span>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: C.t2 }}>{reviewStats.avgRating}</span>
+                                    <span style={{ fontSize: 13, color: C.t3 }}>({reviewStats.totalReviews} review{reviewStats.totalReviews === 1 ? "" : "s"})</span>
+                                </>
+                            ) : (
+                                <span style={{ fontSize: 13, color: C.t3 }}>No reviews yet</span>
+                            )}
                         </div>
                         <div style={{ marginTop: 10 }}>
                             {selectedVehicle ? (
@@ -327,7 +389,7 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
                                     <div style={{ fontSize: 11, color: C.red, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>Best Offer</div>
                                     <div style={{ fontSize: 14, fontWeight: 700, color: C.t1 }}>{winner.shop.name}</div>
                                     <div style={{ fontSize: 12, color: C.t3, marginTop: 2 }}>
-                                        📍 {winner.distance} km away · ⭐ {winner.shop.rating || "4.2"}
+                                        📍 {winner.distance} km away{winner.shop.rating != null && <> · ⭐ {winner.shop.rating}</>}
                                     </div>
                                 </div>
                                 <div style={{ textAlign: "right" }}>
@@ -359,7 +421,7 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
                                 </div>
                                 <button
                                     onClick={() => handleAddToCart(winner)}
-                                    disabled={winner.stock_quantity <= 0 || (!fitment.compatible && selectedVehicle)}
+                                    disabled={winner.stock_quantity <= 0 || (!fitment.compatible && !!selectedVehicle)}
                                     style={{
                                         flex: 1, height: 44,
                                         background: addedToCartShop === winner.shop_id ? C.green : ((!fitment.compatible && selectedVehicle) ? C.t4 : "#BE2B1A"),
@@ -409,7 +471,7 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
                                                 </div>
                                                 <div style={{ fontSize: 12, color: C.t3, marginTop: 4, display: "flex", gap: 12, flexWrap: "wrap" }}>
                                                     <span>📍 {listing.distance} km</span>
-                                                    <span>⭐ {listing.shop.rating || "4.2"}</span>
+                                                    {listing.shop.rating != null && <span>⭐ {listing.shop.rating}</span>}
                                                     {listing.eta && <span>⚡ {listing.eta.label}</span>}
                                                     <span style={{ color: listing.stock_quantity > 5 ? C.green : "#D97706" }}>
                                                         {listing.stock_quantity > 5 ? `${listing.stock_quantity} in stock` : `Only ${listing.stock_quantity} left`}
@@ -444,6 +506,79 @@ export function ProductDetailsPage({ productId, onBack, onRequireLogin }) {
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* ═══════ REVIEWS ═══════ */}
+            <div style={{ marginTop: 32, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 900, color: C.t1, margin: "0 0 16px" }}>
+                    ⭐ Reviews {reviewStats.avgRating != null && `(${reviewStats.avgRating} · ${reviewStats.totalReviews})`}
+                </h3>
+
+                {recentReviews.length === 0 ? (
+                    <div style={{ fontSize: 13, color: C.t3, marginBottom: deliveredOrder ? 20 : 0 }}>No reviews yet — be the first to review this part.</div>
+                ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: deliveredOrder ? 20 : 0 }}>
+                        {recentReviews.map((r, i) => (
+                            <div key={r.review_id ?? i} style={{ borderBottom: i < recentReviews.length - 1 ? `1px solid rgba(224,213,200,0.6)` : "none", paddingBottom: 14 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                    <span style={{ color: "#FBBF24", fontSize: 13, letterSpacing: 1 }}>{renderStars(r.rating)}</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: C.t1 }}>{r.customer_name || "Anonymous"}</span>
+                                    {r.verified_purchase && (
+                                        <span style={{ background: C.greenBg, color: C.green, fontSize: 9, fontWeight: 800, padding: "2px 6px", borderRadius: 4 }}>Verified Purchase</span>
+                                    )}
+                                </div>
+                                {r.title && <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginTop: 6 }}>{r.title}</div>}
+                                {r.body && <div style={{ fontSize: 13, color: C.t2, marginTop: 4, lineHeight: 1.5 }}>{r.body}</div>}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Only a customer with a DELIVERED order for this exact part can review it —
+                    mirrors MyBookingsPage's completed-booking-only review gate. */}
+                {deliveredOrder && !reviewSubmitted && (
+                    <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.t1, marginBottom: 10 }}>Write a review</div>
+                        <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
+                            {[1, 2, 3, 4, 5].map(n => (
+                                <span
+                                    key={n}
+                                    onClick={() => setReviewForm(f => ({ ...f, rating: n }))}
+                                    style={{ cursor: "pointer", fontSize: 24, color: n <= reviewForm.rating ? "#FBBF24" : C.border }}
+                                >★</span>
+                            ))}
+                        </div>
+                        <input
+                            value={reviewForm.title}
+                            onChange={e => setReviewForm(f => ({ ...f, title: e.target.value }))}
+                            placeholder="Title (optional)"
+                            style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
+                        />
+                        <textarea
+                            value={reviewForm.body}
+                            onChange={e => setReviewForm(f => ({ ...f, body: e.target.value }))}
+                            placeholder="Tell other buyers how this part worked out (optional)"
+                            rows={3}
+                            style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, marginBottom: 12, boxSizing: "border-box", resize: "vertical" }}
+                        />
+                        <button
+                            onClick={handleSubmitReview}
+                            disabled={!reviewForm.rating || reviewSubmitting}
+                            style={{
+                                background: reviewForm.rating ? "#BE2B1A" : C.t4, color: "#fff", border: "none",
+                                borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 800,
+                                cursor: reviewForm.rating ? "pointer" : "not-allowed",
+                            }}
+                        >
+                            {reviewSubmitting ? "Submitting…" : "Submit Review"}
+                        </button>
+                    </div>
+                )}
+                {reviewSubmitted && (
+                    <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, fontSize: 13, color: C.green, fontWeight: 700 }}>
+                        ✓ Thanks — your review has been posted.
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -224,6 +224,11 @@ export default function JobDetailPage() {
     try {
       const r: any = await api.patch(`/api/mechanic/jobs/${id}/status`, { status: toStatus });
       if (r?.data?.whatsapp) setWaPreview(r.data.whatsapp);
+      // Apply the now-confirmed status immediately instead of waiting on the
+      // full reload below — load() still runs for the authoritative timeline/
+      // counts, but the status the user just set shows instantly rather than
+      // flashing the old value for the length of that round trip.
+      setJob((prev: any) => (prev ? { ...prev, status: toStatus } : prev));
       load();
     } catch (e: any) {
       setError(e?.error?.message || "Status update failed");
@@ -241,6 +246,8 @@ export default function JobDetailPage() {
       // this tap always offers its own fresh one — each action independently
       // sets waPreview, so a dismissed banner never blocks the next prompt.
       setWaPreview(r?.data?.whatsapp ?? null);
+      // Same reasoning as transition() above — show the new stage immediately.
+      setJob((prev: any) => (prev ? { ...prev, mechanic_progress: progress } : prev));
       load();
     } catch (e: any) {
       setError(e?.error?.message || "Progress update failed");

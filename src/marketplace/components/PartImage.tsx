@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { T, FONT } from "../../theme";
 
 /**
@@ -27,7 +28,7 @@ export function PartImage({ src, alt = "Part", style = {}, size = "md" }) {
   // Case 1: emoji string (legacy mock-data pattern)
   const isEmoji = src && typeof src === "string" && src.length <= 4 && !src.startsWith("http");
 
-  const wrapperStyle = {
+  const wrapperStyle: CSSProperties = {
     width: "100%",
     height: "100%",
     display: "flex",
@@ -56,14 +57,14 @@ export function PartImage({ src, alt = "Part", style = {}, size = "md" }) {
           backgroundImage: `radial-gradient(circle, ${T.border} 1px, transparent 1px)`,
           backgroundSize: "18px 18px",
           opacity: 0.35,
-        }} />
+        } as CSSProperties} />
 
         {/* Centred icon + label */}
         <div style={{
           position: "relative",
           display: "flex", flexDirection: "column",
           alignItems: "center", gap: 6,
-        }}>
+        } as CSSProperties}>
           {/* Wrench SVG */}
           <svg
             width={iconSize} height={iconSize}

@@ -20,7 +20,7 @@ export interface InvoiceModel {
   invoiceNo: string;
   dateStr: string;
   shop: { name: string; address: string; gstin: string; phone: string; email: string };
-  customer: { name: string; vehicle: string };
+  customer: { name: string; vehicle: string; phone?: string; address?: string };
   jobNumber: string;
   lines: InvoiceLine[];
   subTotal: number;

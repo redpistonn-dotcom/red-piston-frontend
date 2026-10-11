@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type CSSProperties } from "react";
 import { flushSync, createPortal } from "react-dom";
 import * as XLSX from "xlsx";
 import { api, BASE_URL } from "../api/client.js";
@@ -412,8 +412,8 @@ async function parseExcel(file) {
   // raw: true keeps numbers as JS numbers so we can format them ourselves
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null, raw: true });
   if (rows.length === 0) throw new Error('The file has no data rows');
-  const headers = Object.keys(rows[0]);
-  const colMap = {};
+  const headers = Object.keys(rows[0] as Record<string, unknown>);
+  const colMap: Record<string, string> = {};
   for (const h of headers) {
     const norm = h.toLowerCase().trim().replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').replace(/_+/g, ' ').trim();
     if (DETECT_MAP[norm]) {
@@ -425,16 +425,17 @@ async function parseExcel(file) {
     }
   }
   const parts = rows.map(row => {
-    const p = {};
+    const p: Record<string, string> = {};
+    const r = row as Record<string, unknown>;
     for (const [col, field] of Object.entries(colMap)) {
-      const s = cellStr(row[col]);
+      const s = cellStr(r[col]);
       if (s && s !== '') p[field] = s;
     }
     return p;
   }).filter(p => p.oemNumber || p.partName);
 
   // Detect duplicate OEM numbers within the file
-  const oemCount = {};
+  const oemCount: Record<string, number> = {};
   parts.forEach(p => {
     if (p.oemNumber) oemCount[p.oemNumber] = (oemCount[p.oemNumber] || 0) + 1;
   });
@@ -633,10 +634,10 @@ function CatalogTab() {
     try { const res = await api.get('/api/admin/catalog/stats'); setDbStats(res.data); } catch { /* offline */ }
   }, []);
 
-  const fetchDbParts = useCallback(async (q, off) => {
+  const fetchDbParts = useCallback(async (q: string, off: number) => {
     setDbLoading(true);
     try {
-      const params = { limit: DB_LIMIT, offset: off };
+      const params: Record<string, string | number | boolean | null | undefined> = { limit: DB_LIMIT, offset: off };
       if (q) params.q = q;
       const res = await api.get('/api/admin/catalog/parts', params);
       setDbParts(res.parts || []);
@@ -827,8 +828,8 @@ function CatalogTab() {
 
           {/* ── Analysis step ── */}
           {analysisStep === 'analyzing' && (() => {
-            const dbToExcel = {};
-            for (const [col, field] of Object.entries(fileData.colMap)) dbToExcel[field] = col;
+            const dbToExcel: Record<string, string> = {};
+            for (const [col, field] of Object.entries(fileData.colMap as Record<string, string>)) dbToExcel[field] = col;
             const unrecognized = fileData.headers.filter(h => !fileData.colMap[h]);
             const fitmentMapped = DB_FIELDS.filter(f => f.section === 'fitment' && dbToExcel[f.key]);
             const missingRequired = DB_FIELDS.filter(f => f.section === 'required' && !dbToExcel[f.key]);
@@ -1346,7 +1347,15 @@ function AuditTab() {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab, setActiveTab: propSetTab }) {
+interface SuperAdminPageProps {
+  onImpersonate: (targetUser: any, impersonationToken: any) => void;
+  /** Injected by AdminShell via cloneElement — not passed at the route */
+  currentUser?: any;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
+}
+
+export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab, setActiveTab: propSetTab }: SuperAdminPageProps) {
   const [localTab, setLocalTab] = useState("users"); // "users" | "verifications"
   const activeTab = propTab ?? localTab;
   const setActiveTab = propSetTab ?? setLocalTab;
@@ -1509,10 +1518,10 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     } catch {}
   }, []);
 
-  const fetchUsers = useCallback(async (q, role, off) => {
+  const fetchUsers = useCallback(async (q: string, role: string, off: number) => {
     setLoading(true);
     try {
-      const params = { limit: LIMIT, offset: off };
+      const params: Record<string, string | number | boolean | null | undefined> = { limit: LIMIT, offset: off };
       if (q) params.q = q;
       if (role && role !== "ALL") params.role = role;
       const res = await api.get("/api/admin/users", params);
@@ -1629,7 +1638,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     titleSub: { fontSize: 10, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "'Inter', sans-serif" },
     body: { padding: "28px 28px", maxWidth: 1300, margin: "0 auto" },
     statsGrid: { display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 14, marginBottom: 28 },
-    statCard: (color) => ({
+    statCard: (color: string, _glow?: string) => ({
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderTop: `2px solid ${color}`,
@@ -1640,10 +1649,10 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     }),
     statVal: { fontSize: 26, fontWeight: 700, color: C.t1, marginBottom: 4, fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.02em" },
     statLabel: { fontSize: 10, color: C.t3, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.09em", fontFamily: "'Inter', sans-serif" },
-    controls: { display: "flex", gap: 10, marginBottom: 18, alignItems: "center", flexWrap: "wrap" },
+    controls: { display: "flex", gap: 10, marginBottom: 18, alignItems: "center", flexWrap: "wrap" } as CSSProperties,
     searchWrap: {
       flex: 1, minWidth: 220, position: "relative", display: "flex", alignItems: "center",
-    },
+    } as CSSProperties,
     searchInput: {
       flex: 1, minWidth: 220, background: C.surface, border: `1.5px solid ${C.border}`,
       borderRadius: 10, padding: "10px 14px 10px 38px", color: C.t1, fontSize: 14,
@@ -1651,19 +1660,19 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
     },
     searchIcon: {
       position: "absolute", left: 13, color: C.t3, fontSize: 14, pointerEvents: "none",
-    },
+    } as CSSProperties,
     select: {
       background: C.surface, border: `1.5px solid ${C.border}`, borderRadius: 10,
       padding: "10px 14px", color: C.t1, fontSize: 13, outline: "none",
       fontFamily: FONT.ui, cursor: "pointer",
     },
-    table: { width: "100%", borderCollapse: "collapse" },
+    table: { width: "100%", borderCollapse: "collapse" } as CSSProperties,
     th: {
       padding: "11px 16px", fontSize: 10, fontWeight: 700, color: C.t3,
       textTransform: "uppercase", letterSpacing: "0.09em",
       borderBottom: `1px solid ${C.border}`, textAlign: "left",
       background: C.surface, whiteSpace: "nowrap",
-    },
+    } as CSSProperties,
     td: {
       padding: "13px 16px", fontSize: 13, color: C.t2,
       borderBottom: `1px solid ${C.border}`,
@@ -1685,7 +1694,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
       fontSize: 11, fontWeight: 600,
       cursor: "pointer", fontFamily: FONT.ui, whiteSpace: "nowrap",
     }),
-    pagination: { display: "flex", gap: 8, justifyContent: "space-between", marginTop: 18, alignItems: "center", flexWrap: "wrap" },
+    pagination: { display: "flex", gap: 8, justifyContent: "space-between", marginTop: 18, alignItems: "center", flexWrap: "wrap" } as CSSProperties,
     pageBtn: (active) => ({
       background: active ? C.amber : "transparent",
       border: `1px solid ${active ? C.amber : C.border}`,
@@ -2159,7 +2168,7 @@ export function SuperAdminPage({ onImpersonate, currentUser, activeTab: propTab,
                             style={{ flex: 1, background: C.greenBg, border: `1px solid ${C.green}`, color: C.green, borderRadius: 9, padding: "9px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.15s" }}
                             onMouseEnter={e => { e.currentTarget.style.background = "rgba(22,163,74,0.15)"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = C.greenBg; }}
-                            onClick={() => handleVerify(v.userId, "APPROVE")}
+                            onClick={() => handleVerify(v.userId, "APPROVE", undefined)}
                           >
                             ✓ Approve
                           </button>

@@ -106,7 +106,7 @@ export const rankingEngine = (allProducts, allShops, vehicleCtx = null) => {
   if (!allProducts || !allShops) return [];
 
   // Group identical products across shops by SKU or Name
-  const groupedProducts = allProducts.reduce((acc, p) => {
+  const groupedProducts: Record<string, { masterTemplate: any; listings: any[] }> = allProducts.reduce((acc, p) => {
     const key = p.sku || p.name;
     if (!acc[key]) {
       acc[key] = {
@@ -123,7 +123,7 @@ export const rankingEngine = (allProducts, allShops, vehicleCtx = null) => {
       distance: parseFloat(getNearDistance(shop))
     });
     return acc;
-  }, {});
+  }, {} as Record<string, { masterTemplate: any; listings: any[] }>);
 
   const vehicleId = vehicleCtx ? `${vehicleCtx.brand} ${vehicleCtx.model}` : null;
 
@@ -132,7 +132,7 @@ export const rankingEngine = (allProducts, allShops, vehicleCtx = null) => {
 
     // Sort listings by Buy Box score (best first)
     const listings = group.listings.map(l => {
-      const listing = {
+      const listing: Record<string, any> = {
         product_id: l.id,
         shop_id: l.shop.id,
         shop: l.shop,

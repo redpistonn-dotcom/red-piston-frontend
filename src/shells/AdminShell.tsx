@@ -1,4 +1,4 @@
-import { useState, useContext, Children, cloneElement } from "react";
+import { useState, useContext, Children, cloneElement, type ReactElement } from "react";
 import { createPortal } from "react-dom";
 import { GLOBAL_CSS } from "../theme";
 import { AppCtx } from "../AppCtx";
@@ -128,7 +128,7 @@ export function AdminShell({ children }: AdminShellProps) {
       </div>
 
       <div className="admin-shell-content" style={{ minHeight: "100vh", background: AC.bg }}>
-        {Children.map(children, child => cloneElement(child, { activeTab, setActiveTab }))}
+        {Children.map(children, child => cloneElement(child as ReactElement<any>, { activeTab, setActiveTab }))}
       </div>
 
       {/* Logout confirmation modal */}

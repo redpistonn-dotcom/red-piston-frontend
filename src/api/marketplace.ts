@@ -6,11 +6,44 @@
  * Falls back gracefully — callers should catch errors and use mock data.
  */
 
-import { api } from './client.js';
+import { api, type QueryParams } from './client.js';
 import { getDeliveryEtaFromDistance } from '../marketplace/api/engine.js';
+
+export interface FetchShopsOptions {
+  q?: string;
+  city?: string;
+  lat?: number | string | null;
+  lng?: number | string | null;
+}
+
+export interface BrowseMarketplaceOptions {
+  make?: string;
+  model?: string;
+  year?: string | number;
+  fuelType?: string;
+  vehicleId?: string | number;
+  category?: string;
+  q?: string;
+  lat?: number | string;
+  lng?: number | string;
+  limit?: number;
+  offset?: number;
+  priceMax?: number;
+  partType?: string;
+  shopId?: string | number;
+}
+
+export interface SearchVehiclesOptions {
+  q?: string;
+  make?: string;
+  model?: string;
+  vehicle_type?: string;
+  limit?: number;
+}
 
 // ─── Existing thin wrappers (preserved) ──────────────────────────────────────
 export const searchMarketplace = (params) => api.get('/api/marketplace/search', params);
+export const getMyOrders        = (params) => api.get('/api/marketplace/orders', params);
 export const createOrder        = (data)   => api.post('/api/marketplace/orders', data);
 export const updateOrderStatus  = (id, status) => api.put(`/api/marketplace/orders/${id}/status`, { status });
 export const trackOrder         = (id)     => api.get(`/api/marketplace/orders/${id}/track`);
@@ -18,11 +51,11 @@ export const trackOrder         = (id)     => api.get(`/api/marketplace/orders/$
 // ─── Number plate → vehicle details ──────────────────────────────────────────
 // Backend proxies API Setu so the secret key never reaches the browser.
 // Returns { make, model, year, fuelType, plate } on success.
-export async function fetchShops({ q = '', city = '', lat, lng } = {}) {
+export async function fetchShops({ q = '', city = '', lat, lng }: FetchShopsOptions = {}) {
   // Route through the api client so VITE_API_URL (the backend host) is applied.
   // A raw relative fetch('/api/...') hits the frontend domain in production
   // (Vercel) where no backend lives → always returned empty.
-  const params = { limit: '80' };
+  const params: QueryParams = { limit: '80' };
   if (q)   params.q = q;
   if (city) params.city = city;
   if (lat)  params.lat = String(lat);
@@ -127,8 +160,8 @@ export function mapPartToRanked(part) {
  * @param {object} opts - { make, model, year, fuelType, vehicleId, category, q, lat, lng, limit, offset }
  * @returns {Promise<{ parts: RankedPart[], total: number, vehicleApplied: boolean }>}
  */
-export async function browseMarketplace(opts = {}) {
-  const params = {};
+export async function browseMarketplace(opts: BrowseMarketplaceOptions = {}) {
+  const params: QueryParams = {};
   if (opts.make)      params.make       = opts.make;
   if (opts.model)     params.model      = opts.model;
   if (opts.year)      params.year       = String(opts.year);
@@ -186,8 +219,8 @@ export function buildHomeDataFromApi(browsed, vehicleCtx, CATEGORIES) {
 }
 
 // ─── Vehicle search ───────────────────────────────────────────────────────────
-export async function searchVehicles(opts = {}) {
-  const params = {};
+export async function searchVehicles(opts: SearchVehiclesOptions = {}) {
+  const params: QueryParams = {};
   if (opts.q)            params.q            = opts.q;
   if (opts.make)         params.make         = opts.make;
   if (opts.model)        params.model        = opts.model;
@@ -219,7 +252,7 @@ export async function fetchVehicleVariants(make, model) {
  * Fetch all manufacturers from vehicle_manufacturers table.
  * @param {string} [vehicleType] — "car" | "2wheeler" | "commercial" | "tractor" | undefined = all
  */
-export async function fetchVehicleManufacturers(vehicleType) {
+export async function fetchVehicleManufacturers(vehicleType?: string) {
   const params = vehicleType ? { vehicleType } : {};
   const res = await api.get('/api/marketplace/vehicles/manufacturers', params);
   return (res.data || res) || [];
@@ -230,8 +263,8 @@ export async function fetchVehicleManufacturers(vehicleType) {
  * @param {number} manufacturerId
  * @param {string} [vehicleType]
  */
-export async function fetchVehicleModelsByManufacturer(manufacturerId, vehicleType) {
-  const params = { manufacturerId };
+export async function fetchVehicleModelsByManufacturer(manufacturerId: number | string, vehicleType?: string) {
+  const params: QueryParams = { manufacturerId };
   if (vehicleType) params.vehicleType = vehicleType;
   const res = await api.get('/api/marketplace/vehicles/models', params);
   return (res.data || res) || [];

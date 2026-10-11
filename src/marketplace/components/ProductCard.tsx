@@ -26,7 +26,7 @@ const LIGHT = {
   sellerPillBg: "rgba(255,255,255,0.92)", sellerPillColor: "#5C4F40",
 };
 
-export function ProductCard({ item, onClick, inCompare, onCompareToggle, variant = "dark" }) {
+export function ProductCard({ item, onClick, inCompare = false, onCompareToggle = null, variant = "dark" }) {
   const C = variant === "light" ? LIGHT : DARK;
   const { product, bestPrice, availability, shopCount, fastestEta, listings, isCompatible, fitmentType, bestShop } = item;
   const [wishlisted, setWishlisted] = useState(() => isSaved(product.id));

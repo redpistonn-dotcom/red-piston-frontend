@@ -21,6 +21,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import type { CSSProperties } from "react";
 import { T, FONT } from "../theme";
 
 // ─── ZXing dynamic import (tree-shakeable) ────────────────────────────────────
@@ -41,7 +42,7 @@ export function preloadScanner() {
 }
 
 // ─── Overlay styles ───────────────────────────────────────────────────────────
-const OVERLAY = {
+const OVERLAY: CSSProperties = {
   position: "fixed",
   inset: 0,
   zIndex: 3000,
@@ -53,7 +54,7 @@ const OVERLAY = {
   padding: "20px",
 };
 
-const VIDEO_WRAPPER = {
+const VIDEO_WRAPPER: CSSProperties = {
   position: "relative",
   width: "100%",
   maxWidth: 480,

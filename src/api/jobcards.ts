@@ -13,6 +13,14 @@ const BE_TO_FE: Record<string, string> = {
   IN_PROGRESS: "in_progress",
   WAITING_PARTS: "approved",
   READY: "completed",
+  // QC is a backend-only sub-stage after READY (see workshop.js's /jobs/:id/qc)
+  // with no equivalent in this frontend's vocabulary. Without these two, a job
+  // sitting in either state fell through to the "|| estimated" default below
+  // and displayed as a fresh draft — QC_PASSED is "READY, cleared for
+  // delivery" (still "completed" from this board's point of view); QC_REWORK
+  // sends it back to active mechanic work ("in_progress").
+  QC_PASSED: "completed",
+  QC_REWORK: "in_progress",
   DELIVERED: "invoiced",
   CANCELLED: "cancelled",
 };

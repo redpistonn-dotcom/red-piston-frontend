@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, clearTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
@@ -24,29 +25,29 @@ const S = {
   },
   toggleLabel: { fontSize: 14, fontWeight: 600 },
   toggleDesc: { fontSize: 12, color: T.t3, marginTop: 2 },
-  toggle: (on) => ({
+  toggle: (on: boolean): CSSProperties => ({
     width: 44, height: 24, borderRadius: 12, cursor: "pointer", border: "none",
     background: on ? T.emerald : T.border, position: "relative", transition: "background 0.2s",
     flexShrink: 0,
   }),
-  toggleDot: (on) => ({
+  toggleDot: (on: boolean): CSSProperties => ({
     width: 18, height: 18, borderRadius: "50%", background: "#fff",
     position: "absolute", top: 3, left: on ? 23 : 3, transition: "left 0.2s",
     boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
   }),
-  label: { fontSize: 12, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, display: "block" },
+  label: { fontSize: 12, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, display: "block" } as CSSProperties,
   input: {
     width: "100%", background: T.bg, border: `1.5px solid ${T.border}`,
     borderRadius: 10, padding: "11px 14px", color: T.t1, fontSize: 14,
     outline: "none", boxSizing: "border-box", fontFamily: FONT.ui, marginBottom: 14,
-  },
-  passwordWrap: { position: "relative" },
+  } as CSSProperties,
+  passwordWrap: { position: "relative" } as CSSProperties,
   passwordInput: { paddingRight: 44 },
   eyeBtn: {
     position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
     border: "none", background: "transparent", color: T.t3, cursor: "pointer", fontSize: 16,
-  },
-  btn: (variant = "primary") => ({
+  } as CSSProperties,
+  btn: (variant = "primary"): CSSProperties => ({
     padding: "10px 20px", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700,
     cursor: "pointer", fontFamily: FONT.ui, transition: "all 0.2s",
     ...(variant === "primary"
@@ -63,13 +64,13 @@ const S = {
     position: "fixed", bottom: 24, right: 24, background: T.emerald, color: "#fff",
     padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600,
     boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 9999, fontFamily: FONT.ui,
-  },
+  } as CSSProperties,
   linkRow: {
     width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
     padding: "14px 16px", borderRadius: 12, border: `1px solid ${T.border}`,
     background: T.bg, color: T.t1, fontSize: 14, fontWeight: 600, cursor: "pointer",
     fontFamily: FONT.ui, textAlign: "left", transition: "border-color 0.15s, background 0.15s",
-  },
+  } as CSSProperties,
 };
 
 function Toggle({ on, onToggle }) {

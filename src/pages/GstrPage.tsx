@@ -583,7 +583,7 @@ export function GstrPage() {
               ? renderCreditNotes(previewData as CreditNoteRow[])
               : null
           )}
-          {previewMode === "b2cs" && Array.isArray(previewData) && renderB2CS(previewData as B2CSRow[])}
+          {previewMode === "b2cs" && Array.isArray(previewData) && renderB2CS(previewData as unknown as B2CSRow[])}
         </div>
       )}
 

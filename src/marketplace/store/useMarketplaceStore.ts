@@ -7,16 +7,16 @@ const store = {
     cart: [],                 // Items in cart
     isCartOpen: false,        // UI state
 
-    listeners: new Set(),
+    listeners: new Set<() => void>(),
 
     setState: (partial) => {
         Object.assign(store, typeof partial === "function" ? partial(store) : partial);
         store.listeners.forEach(l => l());
     },
 
-    subscribe: (listener) => {
+    subscribe: (listener: () => void) => {
         store.listeners.add(listener);
-        return () => store.listeners.delete(listener);
+        return () => { store.listeners.delete(listener); };
     }
 };
 

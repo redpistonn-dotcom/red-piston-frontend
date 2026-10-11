@@ -12,14 +12,14 @@ import "../../styles/landing.css";
 const STEPS = ["address", "delivery", "payment", "confirm", "processing", "success"];
 const STEP_LABELS = { address: "Address", delivery: "Delivery Slot", payment: "Payment", confirm: "Confirm", processing: "Processing", success: "Order Placed" };
 
-export function CheckoutPage({ onBack, onOrderPlaced }) {
+export function CheckoutPage({ onBack, onOrderPlaced }: { onBack?: () => void; onOrderPlaced?: (ids: string[]) => void }) {
     const { cart, saveCart, products, saveProducts, orders, saveOrders, movements, saveMovements, shops } = useStore();
     const [step, setStep] = useState("address");
     const [address, setAddress] = useState({ name: "", phone: "", pincode: "", line1: "", line2: "", city: "Hyderabad", state: "Telangana" });
     const [paymentMethod, setPaymentMethod] = useState("upi");
     const [deliverySlot, setDeliverySlot] = useState("express");
     const [orderIds, setOrderIds] = useState([]);
-    const [errors, setErrors] = useState({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [stockoutError, setStockoutError] = useState(null);
 
     const safeCart = cart || [];
@@ -27,16 +27,16 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
 
     // Group cart by shop
     const cartByShop = useMemo(() => {
-        return safeCart.reduce((acc, item) => {
+        return safeCart.reduce((acc: Record<string, any>, item) => {
             const shopId = item.listing?.shop_id;
             if (!shopId) return acc;
             if (!acc[shopId]) {
                 acc[shopId] = { shopId, shop: item.listing.shop, items: [], subtotal: 0, deliveryOption: item.deliveryOption || "standard" };
             }
             acc[shopId].items.push(item);
-            acc[shopId].subtotal += (item.listing?.selling_price || 0) * item.qty;
+            acc[shopId].subtotal += Number(item.listing?.selling_price || 0) * Number(item.qty);
             return acc;
-        }, {});
+        }, {} as Record<string, any>);
     }, [safeCart]);
 
     const selectedSlot = DELIVERY_SLOTS.find(s => s.id === deliverySlot) || DELIVERY_SLOTS[0];
@@ -60,7 +60,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
 
     // Validation
     const validateAddress = () => {
-        const e = {};
+        const e: Record<string, string> = {};
         if (!address.name.trim()) e.name = "Name is required";
         if (!address.phone.trim() || !/^\d{10}$/.test(address.phone.trim())) e.phone = "Valid 10-digit phone number required";
         if (!address.pincode.trim() || address.pincode.length < 6) e.pincode = "Valid pincode required";
@@ -89,7 +89,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
                         shopId: altShop.shopId,
                         shopName: (shops || []).find(s => s.id === altShop.shopId)?.name || "Another shop",
                         price: altShop.sellPrice,
-                        priceDiff: altShop.sellPrice - (item.listing?.selling_price || 0)
+                        priceDiff: Number(altShop.sellPrice) - Number(item.listing?.selling_price || 0)
                     } : null
                 };
             }
@@ -229,7 +229,7 @@ export function CheckoutPage({ onBack, onOrderPlaced }) {
         </div>
     );
 
-    const fieldStyle = (err) => ({
+    const fieldStyle = (err?: string): import("react").CSSProperties => ({
         width: "100%", padding: "12px 16px", background: T.surface, border: `1.5px solid ${err ? T.crimson : T.border}`,
         borderRadius: 10, color: T.t1, fontSize: 14, fontFamily: FONT.ui, outline: "none", transition: "border 0.2s", boxSizing: "border-box"
     });

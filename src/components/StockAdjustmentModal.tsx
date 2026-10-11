@@ -45,7 +45,7 @@ export function StockAdjustmentModal({ open, onClose, product, products, onSave,
         notes: "",
     };
     const [f, setF] = useState(blank);
-    const [errors, setErrors] = useState({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const now = useRef(Date.now());
 
@@ -75,7 +75,7 @@ export function StockAdjustmentModal({ open, onClose, product, products, onSave,
     const auditDiff = f.adjustType === "AUDIT" ? actualCount - (sel?.stock || 0) : 0;
 
     const validate = () => {
-        const e = {};
+        const e: Record<string, string> = {};
         if (!f.productId) e.productId = "Select a product";
         if (f.adjustType === "AUDIT") {
             if (f.actualCount === "" || actualCount < 0) e.actualCount = "Enter actual physical count";

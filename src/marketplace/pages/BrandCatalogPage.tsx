@@ -9,7 +9,7 @@ const TIER_META = {
     mid: { label: "Mid-Tier", color: T.t2, icon: "🔧" },
 };
 
-export function BrandCatalogPage({ onBack, onViewProduct }) {
+export function BrandCatalogPage({ onBack, onViewProduct }: { onBack?: () => void; onViewProduct?: (p: any) => void }) {
     const [selectedBrand, setSelectedBrand] = useState(null);
     const [search, setSearch] = useState("");
     const [filterTier, setFilterTier] = useState("All");

@@ -118,7 +118,9 @@ interface RequestOptions extends RequestInit {
   _isColdStartRetry?: boolean;
 }
 
-export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+// Backend JSON is untyped at the wire boundary, so the default result type is
+// `any` — callers that know the shape narrow it with an explicit generic.
+export async function apiRequest<T = any>(path: string, options: RequestOptions = {}): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const method = (options.method || 'GET').toUpperCase();
 
@@ -159,7 +161,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, ms: number): 
   }
 }
 
-async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
+async function _doRequest<T = any>(url: string, options: RequestOptions = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
@@ -229,15 +231,18 @@ async function _doRequest<T = unknown>(url: string, options: RequestOptions = {}
 }
 
 // ─── Typed convenience methods ────────────────────────────────────────────────
+// Query-string values — URLSearchParams stringifies numbers/booleans itself.
+export type QueryParams = Record<string, string | number | boolean | null | undefined>;
+
 export const api = {
-  get:    <T = unknown>(path: string, params?: Record<string, string>) =>
-            apiRequest<T>(params ? `${path}?${new URLSearchParams(params)}` : path),
-  post:   <T = unknown>(path: string, body?: unknown) =>
+  get:    <T = any>(path: string, params?: QueryParams) =>
+            apiRequest<T>(params ? `${path}?${new URLSearchParams(params as Record<string, string>)}` : path),
+  post:   <T = any>(path: string, body?: unknown) =>
             apiRequest<T>(path, { method: 'POST',   body: JSON.stringify(body) }),
-  put:    <T = unknown>(path: string, body?: unknown) =>
+  put:    <T = any>(path: string, body?: unknown) =>
             apiRequest<T>(path, { method: 'PUT',    body: JSON.stringify(body) }),
-  patch:  <T = unknown>(path: string, body?: unknown) =>
+  patch:  <T = any>(path: string, body?: unknown) =>
             apiRequest<T>(path, { method: 'PATCH',  body: JSON.stringify(body) }),
-  delete: <T = unknown>(path: string) =>
+  delete: <T = any>(path: string) =>
             apiRequest<T>(path, { method: 'DELETE' }),
 };

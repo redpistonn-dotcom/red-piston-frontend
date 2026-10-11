@@ -17,9 +17,9 @@ import { z } from 'zod';
 
 // ── Reusable refinements ──────────────────────────────────────────────────────
 
-const positiveNumber = z.number({ invalid_type_error: 'Must be a number' }).positive('Must be greater than 0');
-const nonNegativeNumber = z.number({ invalid_type_error: 'Must be a number' }).min(0, 'Cannot be negative');
-const positiveInt = z.number({ invalid_type_error: 'Must be a number' }).int('Must be a whole number').positive('Must be greater than 0');
+const positiveNumber = z.number({ error: 'Must be a number' }).positive('Must be greater than 0');
+const nonNegativeNumber = z.number({ error: 'Must be a number' }).min(0, 'Cannot be negative');
+const positiveInt = z.number({ error: 'Must be a number' }).int('Must be a whole number').positive('Must be greater than 0');
 const optionalString = z.string().optional().nullable();
 const requiredString = z.string().min(1, 'Required');
 

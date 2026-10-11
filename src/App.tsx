@@ -24,8 +24,12 @@
  * repo (copy-then-trim from this one, not yet cut over to production).
  * This repo is untouched by that split and keeps working exactly as before.
  */
-import { useState, useCallback, useEffect, Component, useMemo, lazy, Suspense, cloneElement, isValidElement } from "react";
-import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { useState, useCallback, useEffect, Component, useMemo, lazy, Suspense, cloneElement, isValidElement, type ReactNode } from "react";
+import type { AppUser, Movement } from "./types";
+
+interface ErrorBoundaryProps { children?: ReactNode; [extra: string]: unknown; }
+interface ErrorBoundaryState { hasError: boolean; error: Error | null; }
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import { LoadingBar } from "./components/LoadingBar";
 import { T, FONT, GLOBAL_CSS } from "./theme";
 import { fmt, uid } from "./utils";
@@ -48,6 +52,7 @@ import { AdminShell } from "./shells/AdminShell";
 const LandingPage       = lazy(() => import("./pages/LandingPage").then(m => ({ default: m.LandingPage })));
 const LoginPage         = lazy(() => import("./pages/LoginPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const ImpersonateHandoffPage = lazy(() => import("./pages/ImpersonateHandoffPage"));
 const AcceptInvitePage  = lazy(() => import("./pages/AcceptInvitePage"));
 const ProfilePage       = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
 const SettingsPage      = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
@@ -125,8 +130,8 @@ const PageLoader = () => (
 );
 
 // ── Top-level error boundary — full-screen fallback for catastrophic failures ──
-class ErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(error, info) { console.error("[ErrorBoundary]", error, info); }
   render() {
@@ -154,8 +159,8 @@ class ErrorBoundary extends Component {
 // ── Page-level error boundary — renders error INSIDE the shell so sidebar/header survive ──
 // Wraps each individual route's page component. If the page crashes, the user can
 // still navigate to another section using the sidebar instead of losing the whole app.
-class PageErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+class PageErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   componentDidCatch(error, info) {
     console.error("[PageErrorBoundary]", error, info);
@@ -205,6 +210,22 @@ function AuthenticatedShell({ user, children }) {
   return <>{children}</>;
 }
 
+// ── Product detail — ProductDetailsPage takes productId/onBack/onRequireLogin
+// as props (also used inside the legacy MarketplaceHome's own page-state
+// switch), so the live route just adapts useParams()/useNavigate() to that
+// same prop contract instead of forking the page. ─────────────────────────
+function ProductDetailsRoute() {
+  const { productId } = useParams();
+  const navigate = useNavigate();
+  return (
+    <ProductDetailsPage
+      productId={productId}
+      onBack={() => navigate("/marketplace")}
+      onRequireLogin={() => navigate("/")}
+    />
+  );
+}
+
 // ── Role gate helper — used inline in routes ──────────────────────────────────
 function requireRole(user, role, element) {
   if (getUserRole(user) === role) return element;
@@ -238,7 +259,7 @@ function AppContent() {
   const location = useLocation();
 
   // ── Auth state ───────────────────────────────────────────────────────────────
-  const [currentUser, setCurrentUser] = useState(() => {
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
     try {
       const stored = localStorage.getItem("as_user");
       if (stored) {
@@ -472,7 +493,7 @@ function AppContent() {
           case "k": e.preventDefault(); setCmdPaletteOpen(true); break;
           case "b":
             e.preventDefault();
-            document.querySelector('[data-barcode-input]')?.focus();
+            document.querySelector<HTMLElement>('[data-barcode-input]')?.focus();
             break;
           default: break;
         }
@@ -534,6 +555,27 @@ function AppContent() {
     navigate(getDefaultRoute(targetUser), { replace: true });
   }, [currentUser, navigate, setActiveShopId]);
 
+  // Entry point for a "Login as" handoff from the standalone admin console
+  // (admin.app.redpiston — different origin, so there's no local admin
+  // session here to back up, unlike handleImpersonate above which is only
+  // ever called from this app's OWN /admin page). The `external: true` marker
+  // tells handleExitImpersonation below to redirect back to that origin
+  // instead of attempting to restore a same-origin admin session.
+  const handleExternalImpersonate = useCallback((targetUser, accessToken) => {
+    setTokens(accessToken, null);
+    setCurrentUser(targetUser);
+    localStorage.setItem('as_user', JSON.stringify(targetUser));
+    const marker = { external: true };
+    setImpersonating(marker);
+    localStorage.setItem('as_impersonating', JSON.stringify(marker));
+    try { sessionStorage.setItem('as_imp_token', accessToken); } catch {}
+    if (targetUser.shopId) {
+      setActiveShopId(targetUser.shopId);
+      try { localStorage.setItem('vl_shopId', targetUser.shopId); } catch {}
+    }
+    navigate(getDefaultRoute(targetUser), { replace: true });
+  }, [navigate, setActiveShopId]);
+
   const handleExitImpersonation = useCallback(async () => {
     if (!impersonating) return;
     const backup = impersonating;
@@ -541,6 +583,16 @@ function AppContent() {
     try { sessionStorage.removeItem('as_imp_token'); } catch {}
     clearTokens();
     setImpersonating(null);
+
+    // Handed off from the separate admin console — there's no local admin
+    // session on this origin to restore, so just send the browser back.
+    if (backup.external) {
+      try { localStorage.removeItem('as_user'); localStorage.removeItem('as_refresh_token'); } catch {}
+      setCurrentUser(null);
+      const adminUrl = import.meta.env.VITE_ADMIN_URL || 'https://admin.redpiston.in';
+      window.location.href = `${adminUrl}/admin`;
+      return;
+    }
 
     let restored = false;
     try {
@@ -809,7 +861,7 @@ function AppContent() {
 
   const handlePaymentReceipt = useCallback((data) => {
     if (!movements) return;
-    const receiptMovement = {
+    const receiptMovement: Movement = {
       id: "m" + uid(), shopId: activeShopId, productId: null, productName: "",
       type: "RECEIPT", qty: 0, unitPrice: 0, sellingPrice: 0,
       total: data.amount, gstAmount: 0, profit: 0,
@@ -818,7 +870,7 @@ function AppContent() {
       note: `Payment received: ${fmt(data.amount)} from ${data.partyName} via ${data.paymentMode}. ${data.notes || ""}`.trim(),
       date: Date.now(),
     };
-    let updatedMovements = movements.map((m) => {
+    let updatedMovements: Movement[] = movements.map((m): Movement => {
       if (data.movementIds && data.movementIds.length > 0) {
         // Only mark paid if the movement actually belongs to this party — prevents
         // a stale/wrong movementId list from silently clearing another party's debt.
@@ -863,7 +915,7 @@ function AppContent() {
   ]);
 
   const genInvoiceNo = useCallback(() => {
-    const shopSuffix = (activeShopId || "0000").slice(-4).toUpperCase();
+    const shopSuffix = String(activeShopId || "0000").slice(-4).toUpperCase();
     return shopSuffix + "-" + Date.now().toString(36).toUpperCase();
   }, [activeShopId]);
 
@@ -920,9 +972,11 @@ function AppContent() {
             <span style={{ background: T.violetBg, border: `1px solid ${T.violet}`, color: T.violet, borderRadius: 6, padding: '1px 8px', fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
               {currentUser?.userType?.name || currentUser?.role}
             </span>
-            <span className="impersonation-admin-label" style={{ color: T.t4, fontSize: 11, whiteSpace: 'nowrap' }}>
-              Admin: <span style={{ color: T.t3, fontWeight: 600 }}>{impersonating.user?.name || impersonating.user?.email}</span>
-            </span>
+            {!impersonating.external && (
+              <span className="impersonation-admin-label" style={{ color: T.t4, fontSize: 11, whiteSpace: 'nowrap' }}>
+                Admin: <span style={{ color: T.t3, fontWeight: 600 }}>{impersonating.user?.name || impersonating.user?.email}</span>
+              </span>
+            )}
           </div>
           <button
             onClick={handleExitImpersonation}
@@ -946,6 +1000,7 @@ function AppContent() {
           {/* Public — "/" shows LandingPage for unauthenticated users */}
           <Route path="/" element={currentUser ? <Navigate to={getDefaultRoute(currentUser)} replace /> : <LandingPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/impersonate-handoff" element={<ImpersonateHandoffPage onExternalImpersonate={handleExternalImpersonate} />} />
           <Route path="/accept-invite" element={<AcceptInvitePage />} />
 
           {/* ERP routes — pages pull data via useStore(), handlers via useContext(AppCtx).
@@ -981,6 +1036,7 @@ function AppContent() {
           {/* Marketplace routes */}
           {/* New marketplace — Stitch design (browse without login, cart requires login) */}
           <Route path="/marketplace"          element={<MarketplacePage />} />
+          <Route path="/marketplace/product/:productId" element={<ProductDetailsRoute />} />
           <Route path="/services"             element={<ServiceDiscoveryPage />} />
           <Route path="/cart"                 element={<CartPage />} />
           <Route path="/saved"                element={<SavedItemsPage />} />

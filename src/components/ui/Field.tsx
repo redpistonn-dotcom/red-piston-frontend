@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { T, FONT } from "../../theme";
 
 interface FieldProps {
@@ -8,11 +8,12 @@ interface FieldProps {
     error?: string;
     children: ReactNode;
     horizontal?: boolean;
+    style?: CSSProperties;
 }
 
-export function Field({ label, required = false, hint, error, children, horizontal = false }: FieldProps) {
+export function Field({ label, required = false, hint, error, children, horizontal = false, style }: FieldProps) {
     return (
-        <div style={{ display: "flex", flexDirection: horizontal ? "row" : "column", gap: horizontal ? 12 : 6, alignItems: horizontal ? "center" : "stretch" }}>
+        <div style={{ display: "flex", flexDirection: horizontal ? "row" : "column", gap: horizontal ? 12 : 6, alignItems: horizontal ? "center" : "stretch", ...style }}>
             {label && (
                 <label style={{ fontSize: 12, fontWeight: 600, color: T.t3, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: FONT.ui, whiteSpace: "nowrap", flexShrink: 0, marginBottom: horizontal ? 0 : 0 }}>
                     {label}{required && <span style={{ color: T.crimson, marginLeft: 2 }}>*</span>}

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type CSSProperties } from "react";
 import { api, setTokens } from "../api/client.js";
 import { T, FONT } from "../theme.js";
 import { useCloudinaryUpload } from "../hooks/useCloudinaryUpload";
@@ -158,24 +158,24 @@ const css = `
 
 // ─── Shared style tokens (light cream palette) ────────────────────────────────
 const BASE_S = {
-  label:  { fontSize: 11, fontWeight: 700, color: "#9C8C7C", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6, display: "block", fontFamily: "'Inter', sans-serif" },
-  input:  { width: "100%", background: "#FFFFFF", border: "1.5px solid #E0D5C8", borderRadius: 8, padding: "12px 14px", color: "#1A1205", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "'Inter', sans-serif", transition: "border 0.18s, box-shadow 0.18s" },
+  label:  { fontSize: 11, fontWeight: 700, color: "#9C8C7C", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6, display: "block", fontFamily: "'Inter', sans-serif" } as CSSProperties,
+  input:  { width: "100%", background: "#FFFFFF", border: "1.5px solid #E0D5C8", borderRadius: 8, padding: "12px 14px", color: "#1A1205", fontSize: 14, outline: "none", boxSizing: "border-box", fontFamily: "'Inter', sans-serif", transition: "border 0.18s, box-shadow 0.18s" } as CSSProperties,
   phoneRow: { display: "flex", alignItems: "stretch", border: "1.5px solid #E0D5C8", borderRadius: 8, overflow: "hidden", background: "#FFFFFF" },
   phoneFlag: { padding: "12px 14px", background: "#FAF6F0", color: "#5C4F40", fontSize: 13, fontWeight: 500, borderRight: "1px solid #E0D5C8", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", fontFamily: "'Inter', sans-serif" },
   phoneInput: { flex: 1, background: "transparent", border: "none", outline: "none", color: "#1A1205", fontSize: 15, padding: "12px 14px", fontFamily: "'Inter', sans-serif", letterSpacing: "0.08em" },
   btnPrimary: (disabled) => ({ width: "100%", padding: "14px", background: disabled ? "#E0D5C8" : "#BE2B1A", color: disabled ? "#9C8C7C" : "#FFFFFF", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.2s", boxShadow: disabled ? "none" : "0 8px 24px rgba(190,43,26,0.25)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }),
-  btnOutline: { width: "100%", padding: "13px", background: "transparent", border: "1.5px solid #E0D5C8", borderRadius: 8, color: "#5C4F40", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-  btnGoogle: { width: "100%", padding: "13px", background: "#fff", border: "1.5px solid #E0D5C8", borderRadius: 8, color: "#1A1205", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" },
+  btnOutline: { width: "100%", padding: "13px", background: "transparent", border: "1.5px solid #E0D5C8", borderRadius: 8, color: "#5C4F40", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.08em", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 } as CSSProperties,
+  btnGoogle: { width: "100%", padding: "13px", background: "#fff", border: "1.5px solid #E0D5C8", borderRadius: 8, color: "#1A1205", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" } as CSSProperties,
   btnBack: { background: "none", border: "none", color: "#9C8C7C", cursor: "pointer", fontSize: 13, padding: "0 0 20px", display: "flex", alignItems: "center", gap: 5, fontFamily: "'Inter', sans-serif" },
   otpRow: { display: "flex", gap: 8, marginBottom: 20, justifyContent: "center" },
-  otpBox: { width: 46, height: 54, textAlign: "center", fontSize: 22, fontWeight: 700, fontFamily: "'Inter', sans-serif", background: "#FFFFFF", border: "1.5px solid #E0D5C8", borderRadius: 8, color: "#1A1205", outline: "none" },
+  otpBox: { width: 46, height: 54, textAlign: "center", fontSize: 22, fontWeight: 700, fontFamily: "'Inter', sans-serif", background: "#FFFFFF", border: "1.5px solid #E0D5C8", borderRadius: 8, color: "#1A1205", outline: "none" } as CSSProperties,
   error: { background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: "11px 14px", color: "#BE2B1A", fontSize: 13, marginBottom: 16, lineHeight: 1.5 },
   divider: { display: "flex", alignItems: "center", gap: 12, margin: "20px 0" },
   dividerLine: { flex: 1, height: 1, background: "#E0D5C8" },
   dividerText: { color: "#9C8C7C", fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif" },
   heading: { fontSize: 22, fontWeight: 800, color: "#1A1205", marginBottom: 6, letterSpacing: "-0.2px", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   sub: { fontSize: 14, color: "#9C8C7C", marginBottom: 24, lineHeight: 1.55 },
-  chip: { fontSize: 10, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#BE2B1A", marginBottom: 8, fontFamily: "'Inter', sans-serif" },
+  chip: { fontSize: 10, fontWeight: 700, letterSpacing: "0.09em", textTransform: "uppercase", color: "#BE2B1A", marginBottom: 8, fontFamily: "'Inter', sans-serif" } as CSSProperties,
   hint: { fontSize: 12, color: "#9C8C7C", lineHeight: 1.6, marginBottom: 16 },
   fieldErr: { fontSize: 11, color: "#DC2626", fontWeight: 600, marginBottom: 10 },
 };
@@ -1414,10 +1414,10 @@ export default function LoginPage({ onLogin, isModal = false }) {
           sizes="(max-width: 1200px) 900px, 1400px"
           alt="Precision automotive engineering"
           loading="lazy"
-          fetchpriority="low"
+          fetchPriority="low"
           decoding="async"
           style={{ width: "100%", height: "100%", objectFit: "cover", filter: "grayscale(15%) brightness(0.75)", display: "block" }}
-          onError={e => { e.target.style.background = "#1a1c1e"; e.target.style.display = "none"; }}
+          onError={e => { const t = e.currentTarget; t.style.background = "#1a1c1e"; t.style.display = "none"; }}
         />
         {/* Overlay */}
         <div className="auth-left-overlay" />

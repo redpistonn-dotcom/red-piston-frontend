@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { T, FONT } from "../theme.js";
@@ -24,13 +25,13 @@ const S = {
     borderRadius: 10, padding: "12px 14px", color: T.t1, fontSize: 15,
     outline: "none", boxSizing: "border-box", fontFamily: FONT.ui, marginBottom: 14,
     transition: "border 0.2s",
-  },
-  passwordWrap: { position: "relative" },
+  } as CSSProperties,
+  passwordWrap: { position: "relative" } as CSSProperties,
   passwordInput: { paddingRight: 44 },
   eyeBtn: {
     position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
     border: "none", background: "transparent", color: T.t3, cursor: "pointer", fontSize: 16,
-  },
+  } as CSSProperties,
   btn: (disabled) => ({
     width: "100%", padding: "14px", background: disabled ? T.amberDim : T.amber,
     color: disabled ? "#aaa" : "#000", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 700,
@@ -44,7 +45,7 @@ const S = {
   success: {
     background: "#091c0f", border: `1.5px solid ${T.emerald}`, borderRadius: 10,
     padding: "16px", textAlign: "center", marginBottom: 14,
-  },
+  } as CSSProperties,
   link: { background: "none", border: "none", color: T.amber, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: FONT.ui },
 };
 

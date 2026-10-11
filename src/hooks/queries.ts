@@ -29,6 +29,7 @@ import {
   searchVehicles,
   createOrder,
   trackOrder,
+  getMyOrders,
 } from "../api/marketplace";
 import { api } from "../api/client";
 import { getParties, getPartyLedger } from "../api/parties";
@@ -164,6 +165,31 @@ export function useMarketplacePart(partId: string | number | null) {
     queryFn: () => api.get(`/api/marketplace/catalog/${partId}`),
     enabled: !!partId,
     staleTime: 10 * 60 * 1000, // product details rarely change mid-session
+    retry: 1,
+  });
+}
+
+/**
+ * Find the caller's own DELIVERED order (if any) that included this part —
+ * gates the "Write a review" button on ProductDetailsPage the same way
+ * MyBookingsPage only lets you review a COMPLETED booking.
+ */
+export function useMyDeliveredPartOrder(masterPartId: string | number | null, enabled = true) {
+  return useQuery({
+    queryKey: ["my-delivered-part-order", masterPartId],
+    queryFn: async () => {
+      const res: any = await getMyOrders({ status: "DELIVERED", limit: 100 });
+      const orders = res?.data?.orders || res?.orders || [];
+      for (const order of orders) {
+        const item = (order.items || []).find(
+          (it: any) => it.inventory?.masterPart?.masterPartId === Number(masterPartId)
+        );
+        if (item) return { orderId: order.orderId, inventoryId: item.inventoryId };
+      }
+      return null;
+    },
+    enabled: enabled && !!masterPartId,
+    staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 }

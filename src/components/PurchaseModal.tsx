@@ -6,7 +6,7 @@ import { Modal, Field, Input, Select, Divider, Btn } from "./ui";
 export function PurchaseModal({ open, onClose, product, products, onSave, toast }) {
     const blank = { productId: product?.id || "", qty: "", buyPrice: "", newSellPrice: "", supplier: product?.supplier || "", invoiceNo: "", payment: "Cash", creditDays: "30", notes: "", gst: product?.gst || 18 };
     const [f, setF] = useState(blank);
-    const [errors, setErrors] = useState({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
 
     const now = useRef(Date.now());
@@ -26,7 +26,7 @@ export function PurchaseModal({ open, onClose, product, products, onSave, toast 
     const grandTotal = subtotal + gstAmt_;
 
     const validate = () => {
-        const e = {};
+        const e: Record<string, string> = {};
         if (!f.productId) e.productId = "Select a product";
         if (!f.qty || +f.qty <= 0) e.qty = "Enter quantity";
         if (!f.buyPrice || +f.buyPrice <= 0) e.buyPrice = "Enter buying price";

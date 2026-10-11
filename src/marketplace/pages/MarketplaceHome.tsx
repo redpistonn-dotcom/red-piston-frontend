@@ -54,7 +54,7 @@ function SideBySideModal({ open, items, onClose }) {
                       {Object.entries(product.specifications).slice(0, 5).map(([k, v]) => (
                         <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
                           <span style={{ color: "#9C8C7C", textTransform: "capitalize" }}>{k}</span>
-                          <span style={{ color: "#1A1205", fontWeight: 600 }}>{v}</span>
+                          <span style={{ color: "#1A1205", fontWeight: 600 }}>{String(v)}</span>
                         </div>
                       ))}
                     </div>
@@ -1109,7 +1109,7 @@ export function MarketplaceHome() {
                                 <div style={{ padding: "12px 16px", display: "flex", gap: 8, borderTop: "1px solid #F0E8DF" }}>
                                   <button
                                     onClick={() => {
-                                      saveVehicle({ brand: plateVehicleResult.make, make: plateVehicleResult.make, model: plateVehicleResult.model, year: plateVehicleResult.year, fuel: plateVehicleResult.fuelType, plate: plateVehicleResult.plate });
+                                      saveVehicle({ id: `plate_${Date.now()}`, brand: plateVehicleResult.make, make: plateVehicleResult.make, model: plateVehicleResult.model, year: plateVehicleResult.year, fuel: plateVehicleResult.fuelType, plate: plateVehicleResult.plate });
                                     }}
                                     style={{ flex: 1, background: "#BE2B1A", color: "#fff", border: "none", borderRadius: 7, padding: "11px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
                                   >

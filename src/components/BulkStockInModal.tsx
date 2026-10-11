@@ -44,7 +44,7 @@ function PartImage({ src, category, size = 36 }) {
   );
 }
 
-function Field({ label, required, children, error }) {
+function Field({ label, required = false, children, error = undefined }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       <label style={{ fontSize: 10, fontWeight: 700, color: T.t3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -56,7 +56,7 @@ function Field({ label, required, children, error }) {
   );
 }
 
-function Input({ value, onChange, placeholder, type = 'text', min, step, disabled, style, name }) {
+function Input({ value, onChange, placeholder = '', type = 'text', min = undefined, step = undefined, disabled = false, style = undefined, name = undefined }) {
   return (
     <input
       type={type} value={value} onChange={onChange} placeholder={placeholder}
@@ -79,13 +79,13 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
   const [query, setQuery]         = useState('');
   const [results, setResults]     = useState([]);
   const [searching, setSearching] = useState(false);
-  const [selected, setSelected]   = useState(null);   // catalog part being configured
+  const [selected, setSelected]   = useState<Record<string, any> | null>(null);   // catalog part being configured
   const [editIdx, setEditIdx]     = useState(null);    // cart item being re-edited
   const [noResults, setNoResults] = useState(false);
 
   // Configure form state
-  const [form, setForm] = useState({ buyPrice: '', sellPrice: '', qty: '', rack: '', minAlert: '5', notes: '' });
-  const [formErr, setFormErr] = useState({});
+  const [form, setForm] = useState({ buyPrice: '', sellPrice: '', qty: '', rack: '', minAlert: '5', notes: '', partName: '' });
+  const [formErr, setFormErr] = useState<Record<string, string>>({});
 
   const searchRef = useRef(null);
   const debounceRef = useRef(null);
@@ -139,7 +139,7 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
   const selectPart = (part) => {
     setSelected(part);
     setEditIdx(null);
-    setForm({ buyPrice: '', sellPrice: '', qty: '1', rack: '', minAlert: '5', notes: '' });
+    setForm({ buyPrice: '', sellPrice: '', qty: '1', rack: '', minAlert: '5', notes: '', partName: '' });
     setFormErr({});
     setResults([]);
     setQuery('');
@@ -150,13 +150,13 @@ function SearchPhase({ cart, setCart, onProceed, toast }) {
     const ci = cart[idx];
     setSelected(ci.part);
     setEditIdx(idx);
-    setForm({ buyPrice: String(ci.buyPrice || ''), sellPrice: String(ci.sellPrice), qty: String(ci.qty), rack: ci.rack || '', minAlert: String(ci.minAlert || 5), notes: ci.notes || '' });
+    setForm({ buyPrice: String(ci.buyPrice || ''), sellPrice: String(ci.sellPrice), qty: String(ci.qty), rack: ci.rack || '', minAlert: String(ci.minAlert || 5), notes: ci.notes || '', partName: ci.part?.partName || '' });
     setFormErr({});
   };
 
   // ── Validate configure form ───────────────────────────────────────────────
   const validate = () => {
-    const errs = {};
+    const errs: Record<string, string> = {};
     if (!form.sellPrice || parseFloat(form.sellPrice) <= 0) errs.sellPrice = 'Required';
     if (!form.qty || parseInt(form.qty) < 1) errs.qty = 'Min 1';
     return errs;

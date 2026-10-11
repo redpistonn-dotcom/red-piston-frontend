@@ -13,7 +13,10 @@ export function Select({ value, onChange, options, style: sx = {}, invalid }: Se
     return (
         <select value={value} onChange={e => onChange(e.target.value)} onFocus={() => setF(true)} onBlur={() => setF(false)}
             style={{ background: T.surface, border: `1px solid ${invalid ? T.crimson : focus ? T.sky : T.border}`, color: T.t1, borderRadius: 10, padding: "11px 14px", fontSize: 14, outline: "none", fontFamily: FONT.ui, cursor: "pointer", width: "100%", boxShadow: invalid ? `0 0 0 3px ${T.crimson}22` : focus ? `0 0 0 3px ${T.sky}22` : "none", transition: "border-color 0.15s", ...sx }}>
-            {options.map(o => <option key={o.value || o} value={o.value || o}>{o.label || o}</option>)}
+            {options.map(o => {
+                const opt: SelectOption = typeof o === "string" ? { value: o } : o;
+                return <option key={opt.value || String(o)} value={opt.value || String(o)}>{opt.label || String(o)}</option>;
+            })}
         </select>
     );
 }

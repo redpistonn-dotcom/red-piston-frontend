@@ -21,7 +21,7 @@ export function SaleModal({ open, onClose, product, products, onSave, toast }) {
         notes: ""
     };
     const [f, setF] = useState(blank);
-    const [errors, setErrors] = useState({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [showInvoice, setShowInvoice] = useState(false);
     const now = useRef(Date.now());
@@ -61,7 +61,7 @@ export function SaleModal({ open, onClose, product, products, onSave, toast }) {
     const overridePct = originalPrice > 0 ? ((overrideDiff / originalPrice) * 100).toFixed(1) : 0;
 
     const validate = () => {
-        const e = {};
+        const e: Record<string, string> = {};
         if (!f.productId) e.productId = "Select a product";
         if (!f.qty || +f.qty <= 0) e.qty = "Enter quantity";
         if (f.type === "Sale" && sel && +f.qty > sel.stock) e.qty = `Only ${sel.stock} in stock`;

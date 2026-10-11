@@ -63,7 +63,7 @@ export function CustomerProfile() {
                                             <span style={{ fontSize: 12, color: T.t3 }}>{fmtDateTime(o.time)}</span>
                                         </div>
                                         <div style={{ fontSize: 16, fontWeight: 700, color: T.t1, marginTop: 8 }}>{shop?.name || "Auto Parts Shop"}</div>
-                                        <div style={{ fontSize: 13, color: T.t2, marginTop: 4 }}>{o.items}</div>
+                                        <div style={{ fontSize: 13, color: T.t2, marginTop: 4 }}>{typeof o.items === "string" ? o.items : Array.isArray(o.items) ? o.items.map((i: any) => i.name || "").join(", ") : ""}</div>
                                     </div>
                                     <div style={{ textAlign: "right" }}>
                                         <div style={{ fontSize: 20, fontWeight: 900, color: T.t1, fontFamily: FONT.mono }}>{fmt(o.total)}</div>

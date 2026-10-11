@@ -20,8 +20,112 @@ import {
   getMechanicSections, inviteMechanic, resendMechanicInvite, cancelMechanicInvite,
   approveMechanic, rejectMechanic, updateMechanicRole, updateMechanicSections,
   deactivateMechanic, reactivateMechanic,
+  getTeamAttendanceToday, getIncentiveSettings, setIncentiveRate, getIncentiveReport,
   type ShopMechanic, type MechanicInvite, type MechanicSection,
+  type MechanicAttendanceRow, type IncentiveReportRow,
 } from "../api/mechanics";
+
+// Today's check-in/out roster + the shop's flat per-job incentive rate and
+// this month's payout so far. Lives as its own self-contained block (own
+// data fetching, not threaded through the page's mechanics/invites state)
+// since it reads from entirely different endpoints than the rest of this page.
+function TeamAttendanceIncentives() {
+  const { toast } = useContext(AppCtx);
+  const [roster, setRoster] = useState<MechanicAttendanceRow[]>([]);
+  const [report, setReport] = useState<IncentiveReportRow[]>([]);
+  const [rate, setRate] = useState("0");
+  const [savedRate, setSavedRate] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [rosterRes, settingsRes, reportRes] = await Promise.all([
+        getTeamAttendanceToday(), getIncentiveSettings(), getIncentiveReport(),
+      ]);
+      setRoster(rosterRes.data || []);
+      setSavedRate(Number(settingsRes.data?.rate_per_job || 0));
+      setRate(String(settingsRes.data?.rate_per_job || 0));
+      setReport(reportRes.data?.mechanics || []);
+    } catch { /* non-fatal — section just stays empty */ }
+    setLoading(false);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function saveRate() {
+    const n = Number(rate);
+    if (!Number.isFinite(n) || n < 0) { toast?.("Enter a valid, non-negative rate", "error"); return; }
+    setSaving(true);
+    try {
+      await setIncentiveRate(n);
+      setSavedRate(n);
+      toast?.("Incentive rate updated", "success");
+      load(); // re-fetch the report — it's computed at the just-updated rate
+    } catch (e: any) {
+      toast?.(e?.error?.message || "Could not update rate", "error");
+    }
+    setSaving(false);
+  }
+
+  const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—";
+
+  if (loading) return <Skeleton height={160} />;
+
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: T.t1, marginBottom: 14 }}>Team Attendance & Incentives</div>
+
+      {/* Today's roster */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Today</div>
+      {roster.length === 0 ? (
+        <div style={{ fontSize: 13, color: T.t3, marginBottom: 16 }}>No active mechanics on your team yet.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+          {roster.map(m => {
+            const status = m.check_out_at ? "Done" : m.check_in_at ? "On shift" : "Not checked in";
+            const color = m.check_out_at ? T.t3 : m.check_in_at ? T.emerald : T.t4;
+            return (
+              <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: T.bg }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: T.t1, flex: 1 }}>{m.name}</span>
+                <span style={{ fontSize: 11, color: T.t3 }}>{fmtTime(m.check_in_at)} – {fmtTime(m.check_out_at)}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color, minWidth: 80, textAlign: "right" }}>{status}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Incentive rate */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>Incentive rate</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, color: T.t2 }}>Pay</span>
+        <span style={{ fontSize: 13, color: T.t2 }}>₹</span>
+        <input
+          type="number" min={0} step="0.01" value={rate} onChange={e => setRate(e.target.value)}
+          style={{ width: 90, padding: "8px 10px", borderRadius: 8, border: `1.5px solid ${T.border}`, background: T.bg, color: T.t1, fontSize: 13, fontFamily: FONT.mono }}
+        />
+        <span style={{ fontSize: 13, color: T.t2 }}>per job card delivered</span>
+        <Btn onClick={saveRate} disabled={saving || Number(rate) === savedRate}>{saving ? "Saving…" : "Save"}</Btn>
+      </div>
+
+      {/* This month's report */}
+      {savedRate > 0 && (
+        <>
+          <div style={{ fontSize: 12, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 8 }}>This month</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {report.map(r => (
+              <div key={r.userId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: T.bg }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: T.t1, flex: 1 }}>{r.name}</span>
+                <span style={{ fontSize: 12, color: T.t3 }}>{r.jobsDelivered} delivered</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: T.emerald, fontFamily: FONT.mono, minWidth: 70, textAlign: "right" }}>₹{r.earned.toFixed(0)}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const ROLE_COLOR = { HEAD: "#D97706", MEMBER: "#0EA5E9" } as Record<string, string>;
 
@@ -191,6 +295,8 @@ export function MechanicsPage() {
           {isPending("rotate-code") ? "Rotating…" : "Rotate Code"}
         </Btn>
       </div>
+
+      <TeamAttendanceIncentives />
 
       {/* Invite form */}
       {showInviteForm && (

@@ -9,7 +9,7 @@ export function ProductModal({ open, onClose, product, products, onSave, toast, 
     const isEdit = !!product;
     const blank = { name: "", sku: "", hsnCode: "", category: "Engine", brand: "", vehicles: "", buyPrice: "", sellPrice: "", mrp: "", stock: "", minStock: "10", maxStock: "1000", reorderQty: "20", location: "", supplier: "", image: "📦", gstRate: "18", trackBatch: false, batchNumber: "", expiryDate: "", notes: "", oemNumber: "", position: "", engineType: "", transmission: "", condition: "New", warranty: "", globalSku: null };
     const [f, setF] = useState(blank);
-    const [errors, setErrors] = useState({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
 
     // Global SKU search

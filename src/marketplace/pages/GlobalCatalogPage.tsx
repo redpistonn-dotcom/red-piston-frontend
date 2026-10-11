@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from "react";
+import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { T, FONT } from "../../theme";
 import { MASTER_PRODUCTS, BRAND_CATALOG, CATEGORIES, VEHICLES } from "../api/mockDatabase";
@@ -12,7 +13,7 @@ const STATUS_COLORS = {
     archived: { bg: `${T.t3}18`, color: T.t3, label: "Archived" },
 };
 
-export function GlobalCatalogPage({ onBack }) {
+export function GlobalCatalogPage({ onBack }: { onBack?: () => void } = {}) {
     const { products, saveProducts, activeShopId } = useStore();
     const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("All");
@@ -47,8 +48,8 @@ export function GlobalCatalogPage({ onBack }) {
 
         if (sortBy === "name") list.sort((a, b) => a.name.localeCompare(b.name));
         else if (sortBy === "sku") list.sort((a, b) => a.sku.localeCompare(b.sku));
-        else if (sortBy === "sales") list.sort((a, b) => b.global_sales_velocity - a.global_sales_velocity);
-        else if (sortBy === "created") list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        else if (sortBy === "sales") list.sort((a, b) => (b.global_sales_velocity || 0) - (a.global_sales_velocity || 0));
+        else if (sortBy === "created") list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
         return list;
     }, [masterProducts, search, filterCategory, filterBrand, filterStatus, sortBy]);
@@ -722,7 +723,7 @@ function ImportModal({ onClose, existingProducts, activeShopId, onImport }) {
                     return;
                 }
                 const mapped = rows.map((raw, i) => {
-                    const row = mapRow(raw, i);
+                    const row = mapRow(raw, i) as ReturnType<typeof mapRow> & { _errors: string[] };
                     row._errors = validateRow(row, existingSkus);
                     return row;
                 });
@@ -798,11 +799,11 @@ function ImportModal({ onClose, existingProducts, activeShopId, onImport }) {
         }, 600);
     };
 
-    const MODAL_STYLE = {
+    const MODAL_STYLE: CSSProperties = {
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 2000,
         display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
     };
-    const BOX_STYLE = {
+    const BOX_STYLE: CSSProperties = {
         background: T.bg, borderRadius: 20, width: "100%", maxWidth: 860,
         maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column",
         border: `1px solid ${T.border}`, boxShadow: "0 24px 80px rgba(0,0,0,0.6)",

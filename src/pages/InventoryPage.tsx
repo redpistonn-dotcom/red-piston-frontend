@@ -1040,7 +1040,7 @@ export function InventoryPage() {
             <PurchaseOrderModal
                 open={poModalOpen}
                 onClose={() => { setPoModalOpen(false); setSelectedIds([]); }}
-                products={shopProducts}
+                products={shopProducts as any}
                 preselectedIds={selectedIds}
                 shopName={(shops || []).find(s => (s.id ?? s.shopId) === activeShopId)?.name || "RED PISTON — Shop"}
                 toast={toast}

@@ -82,7 +82,7 @@ const VALUE_PROPS = [
     { icon: "📊", title: "1-Click GST Filing", desc: "Auto-generated GST reports replace ₹5,000/month CA data entry fees." },
 ];
 
-export function PricingPage({ onBack }) {
+export function PricingPage({ onBack }: { onBack?: () => void }) {
     return (
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "60px 20px" }}>
             {onBack && (

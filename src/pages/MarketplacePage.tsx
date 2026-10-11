@@ -105,6 +105,7 @@ function ProductCard({
   product: Product;
   onAddToCart: (p: Product) => void;
 }) {
+  const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [saved, setSaved] = useState(() => isSaved(product.id));
@@ -135,12 +136,14 @@ function ProductCard({
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={() => navigate(`/marketplace/product/${product.id}`)}
       style={{
         backgroundColor: '#fff', border: '1px solid #dfbfbc',
         borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column',
         height: '100%',   // fills grid cell so all cards in a row are equal height
         boxShadow: hovered ? '0 8px 32px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.04)',
         transition: 'box-shadow 0.3s',
+        cursor: 'pointer',
       }}>
       {/* Image / placeholder — fixed height, not full aspect-ratio square */}
       <div style={{ height: 140, backgroundColor: '#fff', padding: hasImage ? 12 : 0, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
@@ -236,7 +239,7 @@ function ProductCard({
             )}
           </div>
           <button
-            onClick={() => onAddToCart(product)}
+            onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
             title="Add to Cart"
             style={{
               flexShrink: 0, border: 'none', cursor: 'pointer',

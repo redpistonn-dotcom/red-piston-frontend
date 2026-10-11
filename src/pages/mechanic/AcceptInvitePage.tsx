@@ -4,8 +4,7 @@
  */
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { api } from "../../api/client.js";
-import { useStore } from "../../store";
+import { api, setTokens } from "../../api/client.js";
 import { T, FONT } from "../../theme";
 
 type Step = "otp" | "name";
@@ -13,8 +12,6 @@ type Step = "otp" | "name";
 export default function MechanicAcceptInvitePage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { setCurrentUser, setTokens } = useStore();
-
   const emailFromUrl = params.get("email") || "";
   const [email, setEmail] = useState(emailFromUrl);
   const [code, setCode] = useState("");
@@ -32,7 +29,6 @@ export default function MechanicAcceptInvitePage() {
     try {
       const r = await api.post("/mechanic-auth/accept", { email, code, name, phone });
       setTokens(r.accessToken, r.refreshToken);
-      setCurrentUser(r.user);
       navigate("/mechanic");
     } catch (e: any) {
       const msg = e?.error?.message || e?.message || "Verification failed";

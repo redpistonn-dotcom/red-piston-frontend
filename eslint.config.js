@@ -28,6 +28,20 @@ export default defineConfig([
     },
   },
   {
+    // Firebase messaging service worker: runs in a SW context with the compat
+    // SDK loaded via importScripts, not as an ES module in the browser window.
+    files: ['public/firebase-messaging-sw.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker, firebase: 'readonly' },
+      sourceType: 'script',
+    },
+  },
+  {
+    // Build-time config files run under Node.
+    files: ['*.config.js'],
+    languageOptions: { globals: globals.node },
+  },
+  {
     files: ['backend/**/*.js'],
     extends: [
       js.configs.recommended,

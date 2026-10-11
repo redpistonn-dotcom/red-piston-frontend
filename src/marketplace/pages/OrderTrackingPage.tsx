@@ -114,12 +114,12 @@ export function OrderTrackingPage({ onBack }: { onBack?: () => void }) {
     const handleConfirmDelivery = (orderId) => {
         const updated = safeOrders.map(o => o.id === orderId ? {
             ...o,
-            status: "DELIVERED",
+            status: "DELIVERED" as import("../../types").OrderStatus,
             deliveredAt: Date.now(),
             customerConfirmed: true,
             paymentSettled: true,
         } : o);
-        saveOrders(updated);
+        saveOrders(updated as import("../../types").Order[]);
     };
 
     if (loading) {

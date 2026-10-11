@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { T, FONT } from "../theme.js";
@@ -20,12 +20,12 @@ const S = {
   },
   sectionTitle: { fontSize: 16, fontWeight: 700, color: T.t1, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 },
   field: { marginBottom: 16 },
-  label: { fontSize: 12, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, display: "block" },
+  label: { fontSize: 12, fontWeight: 600, color: T.t3, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, display: "block" } as CSSProperties,
   input: {
     width: "100%", background: T.bg, border: `1.5px solid ${T.border}`,
     borderRadius: 10, padding: "11px 14px", color: T.t1, fontSize: 14,
     outline: "none", boxSizing: "border-box", fontFamily: FONT.ui, transition: "border 0.2s",
-  },
+  } as CSSProperties,
   inputDisabled: { opacity: 0.5, cursor: "not-allowed" },
   row: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 },
   btn: (variant = "primary") => ({
@@ -50,7 +50,7 @@ const S = {
     position: "fixed", bottom: 24, right: 24, background: T.emerald, color: "#fff",
     padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 600,
     boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 9999, fontFamily: FONT.ui,
-  },
+  } as CSSProperties,
   error: {
     background: "#1c0909", border: `1.5px solid ${T.crimson}`, borderRadius: 10,
     padding: "11px 14px", color: T.crimson, fontSize: 13, marginBottom: 14,
@@ -66,11 +66,11 @@ const S = {
   },
   statRow: {
     display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap",
-  },
+  } as CSSProperties,
   stat: {
     flex: "1 1 120px", background: T.bg, border: `1px solid ${T.border}`,
     borderRadius: 12, padding: "14px 16px", textAlign: "center",
-  },
+  } as CSSProperties,
   statVal: { fontSize: 22, fontWeight: 800, color: T.amber },
   statLabel: { fontSize: 11, color: T.t3, marginTop: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" },
 };
@@ -93,7 +93,7 @@ function formatRole(role?: string) {
 }
 
 // ─── Address Form Modal ────────────────────────────────────────────────────────
-function AddressForm({ initial, onSave, onCancel, saving }) {
+function AddressForm({ initial = null, onSave, onCancel, saving }) {
   const [form, setForm] = useState(initial || { label: "Home", fullName: "", phone: "", line1: "", line2: "", landmark: "", city: "", state: "", pincode: "" });
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   return (
@@ -145,7 +145,7 @@ function AddressForm({ initial, onSave, onCancel, saving }) {
 }
 
 // ─── Garage Form ───────────────────────────────────────────────────────────────
-function GarageForm({ initial, onSave, onCancel, saving }) {
+function GarageForm({ initial = null, onSave, onCancel, saving }) {
   const [form, setForm] = useState(initial || { nickname: "", make: "", model: "", variant: "", year: new Date().getFullYear(), fuelType: "PETROL", registrationNo: "" });
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
   return (

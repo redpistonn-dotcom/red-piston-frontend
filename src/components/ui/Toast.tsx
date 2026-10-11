@@ -1,8 +1,6 @@
-import { useState, useCallback } from "react";
 import { T, FONT } from "../../theme";
-import { uid } from "../../utils";
+import type { ToastItem } from "../../types";
 
-interface ToastItem { id: string; type?: 'success'|'error'|'info'|'warn'|'emerald'; title?: string; msg: string; }
 interface ToastProps { items: ToastItem[]; onRemove: (id: string) => void; }
 export function Toast({ items, onRemove }: ToastProps) {
     return (
@@ -14,7 +12,7 @@ export function Toast({ items, onRemove }: ToastProps) {
                     error:   { icon: "✕", bg: T.crimsonBg,  border: "rgba(186,26,26,0.3)",  color: T.crimson },
                     info:    { icon: "ℹ", bg: T.skyBg,      border: "rgba(2,132,199,0.3)",  color: T.sky     },
                     warn:    { icon: "⚠", bg: T.amberGlow,  border: "rgba(139,30,30,0.3)",  color: T.amber   },
-                }[t.type] || { icon: "ℹ", bg: T.skyBg, border: "rgba(2,132,199,0.3)", color: T.sky };
+                }[t.type as string] || { icon: "ℹ", bg: T.skyBg, border: "rgba(2,132,199,0.3)", color: T.sky };
                 return (
                     <div key={t.id} className="toast-in" style={{ background: "#FFFFFF", border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: 12, padding: "13px 16px", minWidth: 300, maxWidth: 400, display: "flex", gap: 10, alignItems: "flex-start", boxShadow: "0 8px 32px rgba(28,27,27,0.14), 0 2px 8px rgba(28,27,27,0.07)", fontFamily: FONT.ui }}>
                         <span style={{ fontSize: 16, color: cfg.color, flexShrink: 0, marginTop: 1 }}>{cfg.icon}</span>

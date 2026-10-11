@@ -346,7 +346,7 @@ function CartPanel({ cart, onRemove, onEdit, onSaveAll, saving, supplier, setSup
 }
 
 // ─── Step 1: Search ────────────────────────────────────────────────────────────
-function SearchStep({ onSelect, onManual, initialQuery }) {
+function SearchStep({ onSelect, onManual, initialQuery = "" }) {
   // onManual(name, barcode?) — barcode is defined only when called from camera scan not-found
   const [query, setQuery]       = useState(initialQuery || "");
   const [results, setResults]   = useState([]);
@@ -701,12 +701,12 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
   // Nickname starts as the catalog name itself (a real, editable value, not
   // just a placeholder) — the owner can backspace and rename it, or leave it
   // as-is and it's saved exactly like any other nickname.
-  const [f, setF] = useState(initialForm || {
+  const [f, setF] = useState<Record<string, any>>(initialForm || {
     buyPrice: "", sellPrice: "", mrp: "", stockQty: "0", description: "",
     rackLocation: "", minStockAlert: "5", nickname: part.partName || "",
     shopImageUrl: catalogImage, // pre-fill from catalog; owner can override
   });
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
 
@@ -718,7 +718,7 @@ function ConfigureStep({ part, onBack, onSave, saving, activeShopId, initialForm
     : null;
 
   const validate = () => {
-    const e = {};
+    const e: Record<string, string> = {};
     if (!f.buyPrice || isNaN(f.buyPrice) || parseFloat(f.buyPrice) <= 0) e.buyPrice = "Must be greater than 0";
     if (!f.sellPrice || isNaN(f.sellPrice) || parseFloat(f.sellPrice) <= 0) e.sellPrice = "Must be greater than 0";
     if (f.mrp && (isNaN(f.mrp) || parseFloat(f.mrp) <= 0)) e.mrp = "Must be greater than 0";
@@ -894,8 +894,8 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
     imageUrl: "", partType: "OEM",
     _scannedBarcode: initialBarcode || "",
   };
-  const [f, setF] = useState(initialForm || blank);
-  const [errors, setErrors] = useState({});
+  const [f, setF] = useState<Record<string, any>>(initialForm || blank);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   // Vehicle fitment state
   const [fitments, setFitments] = useState([]); // [{ make, model, yearFrom, yearTo, fitType }]
   const [fitMake, setFitMake]   = useState("");
@@ -915,7 +915,7 @@ function ContributeStep({ initialName, initialBarcode, initialForm, onBack, onSa
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
 
   const validate = () => {
-    const e = {};
+    const e: Record<string, string> = {};
     if (!f.partName.trim()) e.partName  = "Required";
     if (!f.categoryL1)      e.categoryL1 = "Select a category";
     if (!f.buyPrice || isNaN(f.buyPrice) || parseFloat(f.buyPrice) <= 0) e.buyPrice = "Must be greater than 0";

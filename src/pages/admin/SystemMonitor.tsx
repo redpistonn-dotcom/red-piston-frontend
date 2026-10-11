@@ -42,6 +42,10 @@ function StatCard({ icon, label, value, sub, color, bg }: any) {
 
 export default function SystemMonitor() {
   const logEndRef = useRef<HTMLDivElement>(null);
+  // Sentry auth token typed into the feed header. The issues query itself is
+  // proxied by the backend; this only gates the feed UI.
+  const [sentryToken, setSentryToken] = useState('');
+  const activeSentryToken = sentryToken;
 
   // Backend system metrics
   const { data: metrics, isLoading, refetch, isRefetching } = useQuery({

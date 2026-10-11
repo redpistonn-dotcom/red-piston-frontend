@@ -91,7 +91,15 @@ function encodeCode128B(text) {
  * @param {object} options - { width, height, showText, fontSize }
  * @returns {string} SVG markup string
  */
-export function generateBarcodeSVG(text, options = {}) {
+export interface BarcodeSvgOptions {
+    width?: number;
+    height?: number;
+    showText?: boolean;
+    fontSize?: number;
+    color?: string;
+}
+
+export function generateBarcodeSVG(text: string, options: BarcodeSvgOptions = {}) {
     const { width = 200, height = 60, showText = true, fontSize = 12, color = "#000" } = options;
     const bits = encodeCode128B(text);
     const barWidth = width / bits.length;
@@ -117,7 +125,13 @@ export function generateBarcodeSVG(text, options = {}) {
  * Generate a printable label sheet with barcode + product info
  * Opens print dialog with formatted labels
  */
-export function printBarcodeLabels(products, options = {}) {
+export interface BarcodeLabelOptions {
+    columns?: number;
+    labelWidth?: number;
+    labelHeight?: number;
+}
+
+export function printBarcodeLabels(products, options: BarcodeLabelOptions = {}) {
     const { columns = 3, labelWidth = 200, labelHeight = 120 } = options;
 
     let html = `

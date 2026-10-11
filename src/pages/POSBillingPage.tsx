@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect, use
 import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { T, FONT } from "../theme";
-import { fmt, fmtDateTime, margin } from "../utils";
+import { fmt, fmtDate, fmtDateTime, margin } from "../utils";
 import { isValidMobile, cleanMobile, isValidGstin, cleanGstin } from "../utils/validators";
 import { BarcodeScanner } from "../components/BarcodeScanner.jsx";
 import { ProductModal } from "../components/ProductModal";
@@ -101,7 +101,7 @@ export function POSBillingPage() {
     }, []);
 
     // Cash tendered (for change-due calc) and UPI reference
-    const [cashTendered, setCashTendered] = useState<number | "">(0);
+    const [cashTendered, setCashTendered] = useState<number>(0);
     const [upiRef, setUpiRef]         = useState("");
     // Split payment (Cash + UPI on one bill): splitCash is the source of truth,
     // the UPI portion is derived as the remainder of the rounded amount due.
@@ -452,7 +452,7 @@ export function POSBillingPage() {
             })),
             customerName, customerPhone, customerAddress, customerGstin: customerGstin || undefined,
             vehicleReg, notes, upiRef: upiRef || undefined,
-            partyId: partyId || undefined,
+            partyId: partyId ? String(partyId) : undefined,
             // amountDue (finalTotal minus any applied store credit) is what's actually
             // collected via the chosen payment method — the credit portion is reported
             // separately below so the backend can redeem the credit note. Keys here must
@@ -1566,7 +1566,7 @@ export function POSBillingPage() {
 
                     {/* Finalize & Print button */}
                     <div style={{ padding: "0 18px 18px" }}>
-                        <button onClick={handleSubmit} disabled={saving || items.length === 0}
+                        <button onClick={() => handleSubmit()} disabled={saving || items.length === 0}
                             style={{ width: "100%", height: 52, background: items.length === 0 ? T.surfaceContainerHigh : `linear-gradient(135deg, ${T.amber}, #6A020A)`, border: "none", borderRadius: 10, color: items.length === 0 ? T.t3 : "#FFFFFF", fontSize: 15, fontWeight: 800, cursor: items.length === 0 ? "not-allowed" : "pointer", fontFamily: FONT.ui, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, letterSpacing: "0.03em", boxShadow: items.length > 0 ? "0 3px 12px rgba(139,30,30,0.35)" : "none", transition: "all 0.15s" }}>
                             {saving ? "Processing…" : "🖨 FINALIZE & PRINT"}
                         </button>

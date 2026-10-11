@@ -200,5 +200,7 @@ export function useStore(): StoreContextValue {
 // object — the Provider in main.tsx still holds the old reference while consumers
 // get the new one, so useContext returns null → "must be used within StoreProvider".
 if (import.meta.hot) {
-  import.meta.hot.decline();
+  // `decline()` was dropped from Vite 7's ViteHotContext typings but is still
+  // a (no-op) runtime method on the client; keep the call, just type it loosely.
+  (import.meta.hot as { decline?: () => void }).decline?.();
 }

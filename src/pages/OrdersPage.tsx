@@ -205,7 +205,7 @@ function CreateOrderModal({ onClose, onCreated, activeShopId }: { onClose: () =>
             qty,
             unitPrice,
             total,
-            status: form.status === "Delivered" ? "DELIVERED" : form.status === "Shipped" ? "DISPATCHED" : form.status === "Cancelled" ? "CANCELLED" : "PENDING",
+            status: (form.status === "Delivered" ? "DELIVERED" : form.status === "Shipped" ? "DISPATCHED" : form.status === "Cancelled" ? "CANCELLED" : "PENDING") as import("../types").OrderStatus,
             time: Date.now(),
         };
         saveOrders([...(orders || []), newOrder]);

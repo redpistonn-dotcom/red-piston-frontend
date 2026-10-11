@@ -10,6 +10,8 @@
  * Shapes that are entirely internal to one file can stay local.
  */
 
+import type { Dispatch, SetStateAction } from 'react';
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export interface AppUser {
@@ -26,6 +28,12 @@ export interface AppUser {
   phoneVerified?: boolean;
   isVerified?: boolean;
   loginCount?: number;
+  /** Staff: owner-assigned section permissions and display role label */
+  sections?: string[];
+  roleLabel?: string | null;
+  /** Firebase/Google profile fields carried through from the auth provider */
+  displayName?: string | null;
+  photoURL?: string | null;
 }
 
 export type UserRole = 'SHOP_OWNER' | 'SHOP_STAFF' | 'CUSTOMER' | 'PLATFORM_ADMIN';
@@ -51,6 +59,11 @@ export interface Shop {
   businessType?: string | null;
   whatsappNumber?: string | null;
   shopDescription?: string | null;
+  /** Marketplace-facing fields (ranked listings carry these on `listing.shop`) */
+  rating?: number | null;
+  reviews?: number | null;
+  isVerified?: boolean;
+  distance_km?: number | null;
 }
 
 // ─── Product / Inventory ─────────────────────────────────────────────────────
@@ -95,6 +108,19 @@ export interface Product {
   lastPurchasedAt?: number;
   maxStock?: number;
   images?: string[];
+  /* Fitment / spec attributes (InventoryPage detail panel) */
+  position?: string | null;
+  engineType?: string | null;
+  transmission?: string | null;
+  condition?: string | null;
+  crossRef?: string | null;
+  warranty?: string | number | null;
+  /* Marketplace listing extras (ProductDetailsPage) */
+  reservedStock?: number;
+  totalSales?: number;
+  specifications?: Record<string, unknown> | null;
+  oem_part_no?: string | null;
+  brandVerified?: boolean;
 }
 
 // ─── Movements / Transactions ─────────────────────────────────────────────────
@@ -138,7 +164,7 @@ export interface Movement {
   supplier?: string | null;
   supplierName?: string | null;
   invoiceNo?: string | null;
-  invoiceId?: number | null;
+  invoiceId?: number | string | null;
   batchId?: string | null;
   partyId?: string | null;
   payment?: string | null;
@@ -170,7 +196,10 @@ export interface AdjustmentMeta {
 
 // ─── Parties (Customers / Suppliers) ─────────────────────────────────────────
 
-export type PartyType = 'CUSTOMER' | 'SUPPLIER' | 'BOTH';
+// Local/seed parties use lowercase ("customer"); the API uses uppercase.
+export type PartyType =
+  | 'CUSTOMER' | 'SUPPLIER' | 'BOTH'
+  | 'customer' | 'supplier' | 'both';
 
 export interface Party {
   id: string | number;
@@ -186,6 +215,13 @@ export interface Party {
   shopId: number | string;
   isActive?: boolean;
   creditDays?: number;
+  email?: string | null;
+  city?: string | null;
+  loyaltyPoints?: number;
+  openingBalance?: number;
+  tags?: string[];
+  vehicles?: string[];
+  createdAt?: number;
 }
 
 // ─── Vehicles ────────────────────────────────────────────────────────────────
@@ -203,6 +239,18 @@ export interface Vehicle {
   engineType?: string;
   odometer?: string | number;
   shopId?: string | number;
+  /** Marketplace vehicle selector uses brand/variant/fuel/plate naming */
+  brand?: string;
+  variant?: string;
+  fuel?: string;
+  plate?: string;
+  vin?: string;
+  insuranceExpiry?: string | null;
+  pucExpiry?: string | null;
+  photos?: string[];
+  notes?: string;
+  createdAt?: number;
+  [key: string]: unknown;
 }
 
 // ─── Job Cards (Workshop) ─────────────────────────────────────────────────────
@@ -213,7 +261,9 @@ export type JobStatus =
   | 'in_progress'
   | 'approved'
   | 'completed'
-  | 'invoiced';
+  | 'invoiced'
+  | 'cancelled'
+  | 'closed';
 
 export interface LaborItem {
   description: string;
@@ -259,12 +309,26 @@ export interface JobCard {
   paymentMode?: string | null;
   paymentStatus?: 'PENDING' | 'PAID';
   notes?: string;
+  /* Seed / legacy job-card fields */
+  assignedTo?: string | null;
+  estimatedAmount?: number | null;
+  actualAmount?: number | null;
+  complaints?: string;
+  checklist?: { task: string; status: string }[];
+  parts?: { itemId?: string | number; name: string; qty: number; price: number }[];
+  labour?: { description: string; amount: number }[];
+  nextServiceDate?: string | null;
+  nextServiceKm?: number | null;
+  voucherId?: string | number | null;
 }
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 
+// Local orders are written in several casings (marketplace checkout writes
+// "NEW", OrdersPage writes "DELIVERED"/"DISPATCHED", older seeds use lowercase).
 export type OrderStatus =
-  | 'NEW'
+  | 'NEW' | 'new'
+  | 'PENDING' | 'PROCESSING' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED'
   | 'placed'
   | 'confirmed'
   | 'shipped'
@@ -276,9 +340,32 @@ export interface Order {
   shopId: string | number;
   status: OrderStatus;
   total?: number;
-  items?: OrderItem[];
+  /** Structured line items, or the "Part x qty, ..." summary string local orders store */
+  items?: OrderItem[] | string;
   createdAt?: number;
   updatedAt?: number;
+  /* Local (localStorage) order fields — marketplace checkout + OrdersPage */
+  time?: number;
+  type?: string;
+  customer?: string | null;
+  supplier?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  payment?: string | null;
+  vehicle?: string | null;
+  inventoryId?: string | number | null;
+  productName?: string;
+  qty?: number;
+  unitPrice?: number;
+  deliverySlot?: { id?: string; label?: string; fee?: number; desc?: string; [key: string]: unknown } | null;
+  deliveryPartner?: unknown;
+  deliveryFee?: number;
+  estimatedDelivery?: string;
+  paymentSettled?: boolean;
+  customerConfirmed?: boolean;
+  deliveredAt?: number;
+  backendOrderId?: number | string | null;
+  backendOrderNumber?: string | null;
 }
 
 export interface OrderItem {
@@ -424,10 +511,12 @@ export interface BulkStockInData {
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
 
+export type ToastType = 'success' | 'error' | 'info' | 'warn' | 'emerald';
+
 export interface ToastItem {
   id: string;
-  message: string;
-  variant?: 'success' | 'error' | 'info' | 'warning' | 'emerald';
+  msg: string;
+  type?: ToastType | string;
   title?: string;
 }
 
@@ -447,8 +536,11 @@ export interface AppCtxValue {
   removeToast: (id: string) => void;
   /* Auth */
   currentUser: AppUser | null;
+  setCurrentUser: Dispatch<SetStateAction<AppUser | null>>;
   handleLogin: (user: AppUser) => void;
   handleLogout: () => void;
+  /** Platform-admin "login as shop" marker (null when not impersonating) */
+  impersonating?: ImpersonationState | null;
   /* Business handlers — pages consume these via useContext(AppCtx) */
   saveProduct: (p: Product) => boolean;
   handleBulkStockIn: (data: BulkStockInData) => void;
@@ -457,6 +549,13 @@ export interface AppCtxValue {
   handlePurchase: (data: PurchaseData) => void;
   handleAdjustment: (data: AdjustmentData) => void;
   handlePaymentReceipt: (data: PaymentReceiptData) => void;
+}
+
+export interface ImpersonationState {
+  user?: AppUser | null;
+  token?: string | null;
+  refreshToken?: string | null;
+  [key: string]: unknown;
 }
 
 // ─── Store state ──────────────────────────────────────────────────────────────
